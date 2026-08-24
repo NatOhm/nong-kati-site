@@ -1,0 +1,74 @@
+@import '../styles/tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-ink-700;
+  }
+
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    background: var(--bg-base);
+    color: var(--fg-primary);
+    font-family: var(--font-ui);
+  }
+
+  /* 04-design-system.md §2.5 — Thai typography rules */
+  .text-thai,
+  p:lang(th) {
+    word-break: break-word;
+    overflow-wrap: break-word;
+    -webkit-hyphens: none;
+    hyphens: none;
+    font-feature-settings:
+      'kern' 1,
+      'liga' 1;
+  }
+
+  p:lang(th) {
+    line-height: 1.8;
+  }
+
+  /* 04-design-system.md §8.2 — global focus ring, keyboard only */
+  :focus-visible {
+    outline: none;
+    box-shadow: var(--shadow-focus-ring);
+    border-radius: inherit;
+  }
+
+  :focus:not(:focus-visible) {
+    outline: none;
+    box-shadow: none;
+  }
+
+  /* 04-design-system.md §8.5 — screen-reader-only utility */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
+  /* 04-design-system.md §7.5 — respect prefers-reduced-motion sitewide */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

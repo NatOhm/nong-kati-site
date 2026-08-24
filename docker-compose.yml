@@ -1,0 +1,59 @@
+# ─── Nong-Kati — Docker Compose ─────────────────────────
+# Local development environment
+# Source: 16-devops.md §8.2
+
+version: '3.8'
+
+services:
+  # ─── Next.js App ─────────────────────────────────────
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://nongkati:nongkati@db:5432/nong_kati?schema=store
+      - DATABASE_DIRECT_URL=postgresql://nongkati:nongkati@db:5432/nong_kati?schema=store
+      - NEXT_PUBLIC_SITE_URL=http://localhost:3000
+      - NODE_ENV=development
+      - NK_JWT_SECRET=dev-only-jwt-secret
+      - NK_CSP_REPORT_ONLY=true
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+
+  # ─── PostgreSQL ───────────────────────────────────────
+  db:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: nongkati
+      POSTGRES_PASSWORD: nongkati
+      POSTGRES_DB: nong_kati
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nongkati -d nong_kati"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ─── Redis (Upstash-compatible) ───────────────────────
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:

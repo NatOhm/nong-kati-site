@@ -1,0 +1,367 @@
+// Nong-Kati Database Schema
+// Source of truth: 06-database.md §7 (Catalogue), §8 (Inventory), §9 (Cart), §10 (Orders)
+// Extended by: 10-digital-code.md §2 (Schema Amendments)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Categories ───────────────────────────────────────────
+
+model Category {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  icon      String?
+  parentId  String?
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryTree")
+  products Product[]
+
+  @@index([parentId])
+  @@index([slug])
+}
+
+// ─── Products ─────────────────────────────────────────────
+
+model Product {
+  id               String   @id @default(cuid())
+  name             String
+  slug             String   @unique
+  description      String?
+  shortDescription String?
+  imageUrl         String?
+  categoryId       String
+  isActive         Boolean  @default(true)
+  isFeatured       Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  category  Category          @relation(fields: [categoryId], references: [id])
+  variants  ProductVariant[]
+  aliases   ProductAlias[]
+  inventory InventorySnapshot[]
+
+  @@index([categoryId])
+  @@index([slug])
+  @@index([isFeatured])
+}
+
+// ─── Product Variants (denominations) ─────────────────────
+
+model ProductVariant {
+  id        String   @id @default(cuid())
+  productId String
+  label     String
+  price     Decimal  @db.Decimal(10, 2)
+  stock     Int      @default(0)
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product   Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variants  InventorySnapshot[]
+  cartItems CartItem[]
+  orderItems OrderItem[]
+  giftCodes GiftCode[]
+
+  @@index([productId])
+}
+
+// ─── Product Aliases (for search) ─────────────────────────
+
+model ProductAlias {
+  id        String   @id @default(cuid())
+  productId String
+  alias     String
+  createdAt DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, alias])
+  @@index([alias])
+}
+
+// ─── Inventory Snapshots (for stock tracking) ─────────────
+
+model InventorySnapshot {
+  id              String   @id @default(cuid())
+  productId       String
+  productVariantId String
+  previousStock   Int
+  newStock        Int
+  reason          String
+  createdAt       DateTime @default(now())
+
+  product       Product        @relation(fields: [productId], references: [id])
+  productVariant ProductVariant @relation(fields: [productVariantId], references: [id])
+
+  @@index([productId])
+  @@index([productVariantId])
+}
+
+// ─── Carts (§9) ──────────────────────────────────────────
+
+model Cart {
+  id          String   @id @default(cuid())
+  customerId  String?
+  sessionKey  String   @unique
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items CartItem[]
+
+  @@index([customerId])
+  @@index([sessionKey])
+  @@index([expiresAt])
+}
+
+// ─── Cart Items (§9) ─────────────────────────────────────
+
+model CartItem {
+  id            String   @id @default(cuid())
+  cartId        String
+  variantId     String
+  quantity      Int      @default(1)
+  unitPriceThb  Decimal  @db.Decimal(10, 2)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  cart    Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, variantId])
+  @@index([cartId])
+  @@index([variantId])
+}
+
+// ─── Orders (§10) ────────────────────────────────────────
+
+model Order {
+  id                    String   @id @default(cuid())
+  orderNumber           String   @unique
+  customerId            String?
+  customerEmail         String
+  customerPhone         String?
+  status                String   @default("pending_payment")
+  paymentMethod         String?
+  subtotalThb           Decimal  @db.Decimal(10, 2)
+  vatAmountThb          Decimal  @db.Decimal(10, 2)
+  totalAmountThb        Decimal  @db.Decimal(10, 2)
+  lineOptIn             Boolean  @default(false)
+  marketingOptIn        Boolean  @default(false)
+  tosAcceptedAt         DateTime
+  tosVersion            String   @default("1.0")
+  requiresTaxInvoice    Boolean  @default(false)
+  taxInvoiceName        String?
+  taxInvoiceTaxId       String?
+  ipAddress             String?
+  userAgent             String?
+  confirmationUuid      String   @default("") @unique
+  notes                 String?
+  manualFulfilmentReason String?
+  completedAt           DateTime?
+  expiredAt             DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  items          OrderItem[]
+  paymentAttempts PaymentAttempt[]
+  giftCodes      GiftCode[]
+  invoices       Invoice[]
+
+  @@index([customerId])
+  @@index([customerEmail])
+  @@index([status])
+  @@index([confirmationUuid])
+  @@index([orderNumber])
+}
+
+// ─── Order Items (§10) ───────────────────────────────────
+
+model OrderItem {
+  id                String   @id @default(cuid())
+  orderId           String
+  variantId         String
+  productNameTh     String
+  productNameEn     String
+  skuCode           String
+  denominationThb   Decimal  @db.Decimal(10, 2)
+  quantity          Int
+  unitPriceThb      Decimal  @db.Decimal(10, 2)
+  unitPriceExVat    Decimal  @db.Decimal(10, 2)
+  unitVatAmount     Decimal  @db.Decimal(10, 2)
+  lineTotalThb      Decimal  @db.Decimal(10, 2)
+  deliveryStatus    String   @default("pending")
+  deliveredAt       DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  order     Order           @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  variant   ProductVariant  @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  giftCodes GiftCode[]
+
+  @@index([orderId])
+  @@index([variantId])
+}
+
+// ─── Gift Codes (§8) ─────────────────────────────────────
+
+model GiftCode {
+  id              String   @id @default(cuid())
+  variantId       String
+  codeEncrypted   Bytes
+  codeHash        Bytes    @unique
+  nonce           Bytes
+  keyVersion      Int      @default(1)
+  status          String   @default("available")
+  orderId         String?
+  orderItemId     String?
+  voidedById      String?
+  voidReason      String?
+  uploadedById    String?
+  uploadBatchId   String?
+  reservedAt      DateTime?
+  deliveredAt     DateTime?
+  voidedAt        DateTime?
+  expiresAt       DateTime?
+  expiredAt       DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  variant     ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  order       Order?         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  orderItem   OrderItem?     @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  uploadBatch CodeUploadBatch? @relation(fields: [uploadBatchId], references: [id], onDelete: Restrict)
+
+  @@index([variantId, status])
+  @@index([orderId])
+  @@index([uploadBatchId])
+  @@index([status])
+}
+
+// ─── Code Upload Batches (§8) ────────────────────────────
+
+model CodeUploadBatch {
+  id               String   @id @default(cuid())
+  variantId        String
+  uploadedById     String
+  originalFilename String
+  totalRows        Int      @default(0)
+  importedCount    Int      @default(0)
+  rejectedCount    Int      @default(0)
+  rejectionDetails Json?
+  status           String   @default("processing")
+  completedAt      DateTime?
+  createdAt        DateTime @default(now())
+
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  codes   GiftCode[]
+
+  @@index([variantId])
+}
+
+// ─── Payment Attempts (§10) ──────────────────────────────
+
+model PaymentAttempt {
+  id                    String   @id @default(cuid())
+  orderId               String
+  paymentMethod         String
+  status                String   @default("pending")
+  amountThb             Decimal  @db.Decimal(10, 2)
+  gatewayName           String
+  gatewayRef            String?
+  gatewayStatusCode     String?
+  gatewayResponse       Json?
+  failureReason         String?
+  qrExpiresAt           DateTime?
+  threeDsRequired       Boolean  @default(false)
+  threeDsStatus         String?
+  webhookReceivedAt     DateTime?
+  webhookSignatureValid Boolean?
+  attemptNumber         Int      @default(1)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@unique([gatewayName, gatewayRef])
+  @@index([orderId])
+  @@index([gatewayName, gatewayRef])
+  @@index([status])
+}
+
+// ─── Invoices (§12) ──────────────────────────────────────
+
+model Invoice {
+  id                 String   @id @default(cuid())
+  orderId            String
+  invoiceType        String
+  invoiceNumber      String   @unique
+  pdfStorageKey      String?
+  pdfGeneratedAt     DateTime?
+  pdfGenerationFailed Boolean @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([invoiceNumber])
+}
+
+// ─── Refunds (11-admin.md §14.1) ──────────────────────────
+
+model Refund {
+  id                    String   @id @default(cuid())
+  orderId               String
+  amountThb             Decimal  @db.Decimal(10, 2)
+  reasonCategory        String
+  reasonDetail          String?
+  gatewayRefundReference String
+  codesVoidedCount      Int      @default(0)
+  initiatedBy           String
+  createdAt             DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@unique([orderId])
+  @@index([orderId])
+  @@index([createdAt(sort: Desc)])
+  @@index([reasonCategory, createdAt(sort: Desc)])
+  @@index([initiatedBy])
+}
+
+// ─── Audit Logs (06-database.md §14, 11-admin.md §14.1) ────
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorType   String
+  actorId     String
+  actorEmail  String
+  action      String
+  tableName   String
+  recordId    String
+  diffBefore  Json?
+  diffAfter   Json?
+  ipAddress   String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([actorType, actorId])
+  @@index([action])
+  @@index([tableName, recordId])
+  @@index([createdAt(sort: Desc)])
+}

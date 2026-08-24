@@ -1,0 +1,13 @@
+{
+  "root": true,
+  "extends": ["next/core-web-vitals"],
+  "rules": {
+    "import/no-default-export": "off"
+  },
+  "overrides": [
+    {
+      "files": ["src/app/**/page.tsx", "src/app/**/layout.tsx", "src/app/**/route.ts"],
+      "rules": { "import/no-default-export": "off" }
+    }
+  ]
+}
