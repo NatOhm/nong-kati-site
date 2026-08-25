@@ -112,7 +112,9 @@ export function adminLogin(
   user.lockedUntil = null;
 
   // Generate challenge token for 2FA
-  const challengeToken = cn(crypto.randomUUID());
+  const challengeToken = (typeof globalThis.crypto !== 'undefined' && globalThis.crypto.randomUUID)
+    ? globalThis.crypto.randomUUID()
+    : getRandomId();
   challengeTokens.set(challengeToken, {
     adminUserId: user.id,
     expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes
@@ -133,8 +135,14 @@ export function adminLogin(
   };
 }
 
-// Helper to avoid circular reference
-function cn(s: string): string { return s; }
+// Helper to generate random IDs for environments without crypto.randomUUID
+function getRandomId(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
 
 /**
  * Setup 2FA — generate TOTP secret + backup codes.
@@ -176,16 +184,16 @@ export function setup2fa(
  * Confirm 2FA — verify TOTP code and activate 2FA.
  * 08-auth.md §5.2 — Confirm step.
  */
-export function confirm2fa(
+export async function confirm2fa(
   challengeToken: string,
   totpCode: string,
-): {
+): Promise<{
   success: boolean;
   accessToken?: string;
   refreshToken?: string;
   expiresIn?: number;
   error?: string;
-} {
+}> {
   const challenge = challengeTokens.get(challengeToken);
   if (!challenge || challenge.expiresAt < new Date()) {
     return { success: false, error: 'TOKEN_INVALID' };
@@ -212,16 +220,16 @@ export function confirm2fa(
  * Verify TOTP — second factor for login.
  * 08-auth.md §5.1 — verify-totp endpoint.
  */
-export function verifyTotp(
+export async function verifyTotp(
   challengeToken: string,
   totpCode: string,
-): {
+): Promise<{
   success: boolean;
   accessToken?: string;
   refreshToken?: string;
   expiresIn?: number;
   error?: string;
-} {
+}> {
   const challenge = challengeTokens.get(challengeToken);
   if (!challenge || challenge.expiresAt < new Date()) {
     return { success: false, error: 'TOKEN_INVALID' };
@@ -244,18 +252,18 @@ export function verifyTotp(
 /**
  * Issue admin session (JWT + refresh token).
  */
-function issueAdminSession(
+async function issueAdminSession(
   user: AdminUser,
-): {
+): Promise<{
   success: boolean;
   accessToken: string;
   refreshToken: string;
   expiresIn: number;
-} {
+}> {
   const perms = ROLE_PERMISSIONS[user.role] ?? [];
-  const accessToken = issueAdminJwt(user.id, user.email, user.role, perms);
+  const accessToken = await issueAdminJwt(user.id, user.email, user.role, perms);
   const refreshToken = generateRefreshToken();
-  const tokenHash = hashRefreshToken(refreshToken);
+  const tokenHash = await hashRefreshToken(refreshToken);
 
   // Store refresh token
   adminSessions.set(tokenHash, {
@@ -288,8 +296,8 @@ function issueAdminSession(
 /**
  * Admin logout — revoke session.
  */
-export function adminLogout(refreshToken: string): { success: boolean } {
-  const tokenHash = hashRefreshToken(refreshToken);
+export async function adminLogout(refreshToken: string): Promise<{ success: boolean }> {
+  const tokenHash = await hashRefreshToken(refreshToken);
   adminSessions.delete(tokenHash);
   return { success: true };
 }

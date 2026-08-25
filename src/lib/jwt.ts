@@ -4,16 +4,10 @@
  *
  * In production: real RSA key pairs from env vars.
  * For M4/M5/M6 mock: HMAC-SHA256 with shared secret for simplicity.
- *
- * Env vars:
- *   NK_ADMIN_JWT_PRIVATE_KEY (RSA private key, PEM)
- *   NK_ADMIN_JWT_PUBLIC_KEY (RSA public key, PEM)
- *   NK_CUSTOMER_JWT_PRIVATE_KEY
- *   NK_CUSTOMER_JWT_PUBLIC_KEY
- *   NK_JWT_SECRET (fallback for mock mode)
+ * 
+ * Browser-compatible: uses Web Crypto API instead of Node.js crypto.
  */
 
-import { createSign, createVerify, createHmac, createHash, randomBytes } from 'crypto';
 import type { AdminJwtPayload, Permission, AdminRole } from '@/types/auth';
 
 const ALGORITHM = 'HS256'; // Mock: HMAC. Production: RS256
@@ -21,14 +15,73 @@ const ACCESS_TOKEN_TTL = 15 * 60; // 15 minutes
 const REFRESH_TOKEN_TTL = 30 * 24 * 60 * 60; // 30 days
 
 function getSecret(): string {
-  const secret = process.env['NK_JWT_SECRET'];
-  return secret ?? 'mock-jwt-secret-for-development-only';
+  // NK_JWT_SECRET is not available client-side, always use mock
+  return 'mock-jwt-secret-for-development-only';
 }
+
+// ─── Browser-compatible helpers ──────────────────────────
+
+function toBase64Url(data: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < data.length; i++) {
+    binary += String.fromCharCode(data[i]!);
+  }
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function stringToBase64Url(str: string): string {
+  return btoa(unescape(encodeURIComponent(str)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function base64UrlToString(b64: string): string {
+  let base64 = b64.replace(/-/g, '+').replace(/_/g, '/');
+  while (base64.length % 4) base64 += '=';
+  return decodeURIComponent(escape(atob(base64)));
+}
+
+function getRandomHex(length: number): string {
+  const bytes = new Uint8Array(length);
+  // Use crypto.getRandomValues (browser) or Math.random fallback
+  if (typeof globalThis.crypto !== 'undefined' && globalThis.crypto.getRandomValues) {
+    globalThis.crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < length; i++) {
+      bytes[i] = Math.floor(Math.random() * 256);
+    }
+  }
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function hmacSha256(key: string, message: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const keyData = encoder.encode(key);
+  const msgData = encoder.encode(message);
+  
+  if (typeof globalThis.crypto !== 'undefined' && globalThis.crypto.subtle) {
+    const cryptoKey = await globalThis.crypto.subtle.importKey(
+      'raw', keyData, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+    );
+    const sig = await globalThis.crypto.subtle.sign('HMAC', cryptoKey, msgData);
+    return toBase64Url(new Uint8Array(sig));
+  }
+  
+  // Fallback: simple hash for mock mode
+  let hash = 0;
+  for (let i = 0; i < message.length; i++) {
+    const char = message.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return stringToBase64Url(JSON.stringify({ hash, key: key.slice(0, 8) }));
+}
+
+// ─── JWT Functions ───────────────────────────────────────
 
 /**
  * Sign a JWT token (mock HMAC mode).
  */
-export function signJwt(payload: Record<string, unknown>, expiresIn: number = ACCESS_TOKEN_TTL): string {
+export async function signJwt(payload: Record<string, unknown>, expiresIn: number = ACCESS_TOKEN_TTL): Promise<string> {
   const header = { alg: ALGORITHM, typ: 'JWT' };
   const now = Math.floor(Date.now() / 1000);
 
@@ -36,14 +89,12 @@ export function signJwt(payload: Record<string, unknown>, expiresIn: number = AC
     ...payload,
     iat: now,
     exp: now + expiresIn,
-    jti: randomBytes(16).toString('hex'),
+    jti: getRandomHex(16),
   };
 
-  const headerB64 = Buffer.from(JSON.stringify(header)).toString('base64url');
-  const payloadB64 = Buffer.from(JSON.stringify(fullPayload)).toString('base64url');
-  const signature = createHmac('sha256', getSecret())
-    .update(`${headerB64}.${payloadB64}`)
-    .digest('base64url');
+  const headerB64 = stringToBase64Url(JSON.stringify(header));
+  const payloadB64 = stringToBase64Url(JSON.stringify(fullPayload));
+  const signature = await hmacSha256(getSecret(), `${headerB64}.${payloadB64}`);
 
   return `${headerB64}.${payloadB64}.${signature}`;
 }
@@ -51,7 +102,7 @@ export function signJwt(payload: Record<string, unknown>, expiresIn: number = AC
 /**
  * Verify a JWT token and return the decoded payload.
  */
-export function verifyJwt<T>(token: string): T | null {
+export async function verifyJwt<T>(token: string): Promise<T | null> {
   try {
     const parts = token.split('.');
     if (parts.length !== 3) return null;
@@ -61,14 +112,12 @@ export function verifyJwt<T>(token: string): T | null {
     const signature = parts[2]!;
 
     // Verify signature
-    const expectedSig = createHmac('sha256', getSecret())
-      .update(`${headerB64}.${payloadB64}`)
-      .digest('base64url');
+    const expectedSig = await hmacSha256(getSecret(), `${headerB64}.${payloadB64}`);
 
     if (signature !== expectedSig) return null;
 
     // Decode payload
-    const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf8'));
+    const payload = JSON.parse(base64UrlToString(payloadB64));
 
     // Check expiry
     const now = Math.floor(Date.now() / 1000);
@@ -84,7 +133,7 @@ export function verifyJwt<T>(token: string): T | null {
  * Verify an admin JWT and return the payload.
  * 08-auth.md §6.1 — Admin JWT has role + perms.
  */
-export function verifyAdminJwt(token: string): AdminJwtPayload | null {
+export async function verifyAdminJwt(token: string): Promise<AdminJwtPayload | null> {
   return verifyJwt<AdminJwtPayload>(token);
 }
 
@@ -92,12 +141,12 @@ export function verifyAdminJwt(token: string): AdminJwtPayload | null {
  * Issue an admin access JWT.
  * 08-auth.md §6.1 — Payload includes role + flattened permission list.
  */
-export function issueAdminJwt(
+export async function issueAdminJwt(
   adminId: string,
   email: string,
   role: AdminRole,
   perms: Permission[],
-): string {
+): Promise<string> {
   return signJwt({
     sub: adminId,
     email,
@@ -111,14 +160,26 @@ export function issueAdminJwt(
  * 08-auth.md §6.1 — Stored as SHA-256 hash in DB.
  */
 export function generateRefreshToken(): string {
-  return randomBytes(32).toString('hex');
+  return getRandomHex(32);
 }
 
 /**
  * Hash a refresh token for storage.
  */
-export function hashRefreshToken(token: string): string {
-  return createHash('sha256').update(token).digest('hex');
+export async function hashRefreshToken(token: string): Promise<string> {
+  if (typeof globalThis.crypto !== 'undefined' && globalThis.crypto.subtle) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(token);
+    const hash = await globalThis.crypto.subtle.digest('SHA-256', data);
+    return toBase64Url(new Uint8Array(hash));
+  }
+  // Simple hash fallback for mock mode
+  let h = 0;
+  for (let i = 0; i < token.length; i++) {
+    h = ((h << 5) - h) + token.charCodeAt(i);
+    h = h & h;
+  }
+  return Math.abs(h).toString(16).padStart(8, '0');
 }
 
 /**
@@ -126,8 +187,8 @@ export function hashRefreshToken(token: string): string {
  * 08-auth.md §5.2 — 20-byte base32 secret.
  */
 export function generateTotpSecret(): string {
-  const bytes = randomBytes(20);
-  return bytes.toString('base64').replace(/[^A-Z2-7]/g, '').slice(0, 32);
+  const bytes = getRandomHex(20);
+  return bytes.toUpperCase().replace(/[^A-Z2-7]/g, '').slice(0, 32);
 }
 
 /**
@@ -137,7 +198,7 @@ export function generateTotpSecret(): string {
 export function generateBackupCodes(count: number = 10): string[] {
   const codes: string[] = [];
   for (let i = 0; i < count; i++) {
-    const code = randomBytes(4).toString('hex').toUpperCase();
+    const code = getRandomHex(4).toUpperCase();
     codes.push(`${code.slice(0, 4)}-${code.slice(4)}`);
   }
   return codes;

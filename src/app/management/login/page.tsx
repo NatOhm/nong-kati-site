@@ -74,7 +74,7 @@ export default function AdminLoginPage(): React.JSX.Element {
     setError(null);
 
     try {
-      const result = confirm2fa(challengeToken, totpCode);
+      const result = await confirm2fa(challengeToken, totpCode);
       if (result.success) {
         // Store tokens in localStorage
         if (result.accessToken) {

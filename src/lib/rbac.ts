@@ -19,11 +19,11 @@ export interface RbacCheckResult {
  * Check if a JWT token has the required permission.
  * 08-auth.md §7.4 — Middleware verifies permission presence in JWT.
  */
-export function checkPermission(
+export async function checkPermission(
   token: string,
   requiredPermission: Permission,
-): RbacCheckResult {
-  const payload = verifyAdminJwt(token);
+): Promise<RbacCheckResult> {
+  const payload = await verifyAdminJwt(token);
   if (!payload) {
     return { allowed: false, error: 'UNAUTHENTICATED' };
   }
