@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Shield } from 'lucide-react';
 
 import { adminLogin, confirm2fa, setup2fa } from '@/api/adminAuth';
@@ -11,6 +12,7 @@ import { cn } from '@/utils/cn';
  * Two-factor mandatory: email+password → TOTP 2FA.
  */
 export default function AdminLoginPage(): React.JSX.Element {
+  const router = useRouter();
   const [step, setStep] = useState<'credentials' | '2fa' | '2fa-setup'>('credentials');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -74,8 +76,16 @@ export default function AdminLoginPage(): React.JSX.Element {
     try {
       const result = confirm2fa(challengeToken, totpCode);
       if (result.success) {
-        // Store tokens and redirect to dashboard
-        window.location.href = '/management/dashboard';
+        // Store tokens in localStorage
+        if (result.accessToken) {
+          localStorage.setItem('nk_admin_access_token', result.accessToken);
+        }
+        if (result.refreshToken) {
+          localStorage.setItem('nk_admin_refresh_token', result.refreshToken);
+        }
+        localStorage.setItem('nk_admin_email', email);
+        // Redirect to dashboard
+        router.push('/management/dashboard');
       } else {
         setError(result.error === 'TOTP_INVALID' ? 'รหัสไม่ถูกต้อง กรุณาลองใหม่' : 'เกิดข้อผิดพลาด');
       }

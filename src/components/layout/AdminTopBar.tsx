@@ -1,5 +1,7 @@
 'use client';
 
+import { useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Bell, LogOut, Menu } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { type AdminRole } from '@/types/auth';
@@ -96,6 +98,12 @@ export function AdminTopBar({
 
         {/* Logout */}
         <button
+          onClick={() => {
+            localStorage.removeItem('nk_admin_access_token');
+            localStorage.removeItem('nk_admin_refresh_token');
+            localStorage.removeItem('nk_admin_email');
+            window.location.href = '/management/login';
+          }}
           className="rounded p-1.5 text-ink-400 hover:bg-ink-800 hover:text-crimson-400"
           aria-label="ออกจากระบบ"
         >
