@@ -1,7 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  output: 'standalone',
   images: {
     // 06-database.md product/asset host — extended per-milestone as CDN domain is finalised
     remotePatterns: [
