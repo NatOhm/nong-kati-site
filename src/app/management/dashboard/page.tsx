@@ -313,7 +313,7 @@ export default function AdminDashboardPage(): React.JSX.Element {
                 </thead>
                 <tbody>
                   {recentOrders.map((order) => {
-                    const statusInfo = STATUS_MAP[order.status] ?? STATUS_MAP.expired;
+                    const statusInfo = STATUS_MAP[order.status] ?? { label: order.status, color: 'bg-ink-800 text-ink-400 border-ink-700' };
                     const PayIcon = PAYMENT_ICONS[order.payment] ?? CreditCard;
                     return (
                       <tr key={order.id} className="border-b border-ink-700/30 hover:bg-ink-800/50 transition-colors">
@@ -472,8 +472,8 @@ export default function AdminDashboardPage(): React.JSX.Element {
         <div className="rounded-xl border border-ink-700 bg-ink-850 p-5">
           <h2 className="mb-4 text-sm font-semibold text-ink-200">ดำเนินการด่วน</h2>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <QuickAction href="/management/orders" icon={ShoppingCart} label="จัดการคำสั่งซื้อ" badge={sales.pendingManualFulfilment > 0 ? sales.pendingManualFulfilment : undefined} />
-            <QuickAction href="/management/inventory" icon={Package} label="จัดการคลังสินค้า" badge={sales.lowStockAlerts > 0 ? sales.lowStockAlerts : undefined} />
+            <QuickAction href="/management/orders" icon={ShoppingCart} label="จัดการคำสั่งซื้อ" {...(sales.pendingManualFulfilment > 0 ? { badge: sales.pendingManualFulfilment } : {})} />
+            <QuickAction href="/management/inventory" icon={Package} label="จัดการคลังสินค้า" {...(sales.lowStockAlerts > 0 ? { badge: sales.lowStockAlerts } : {})} />
             <QuickAction href="/management/products" icon={Eye} label="ดูสินค้าทั้งหมด" />
             <QuickAction href="/management/customers" icon={Users} label="จัดการลูกค้า" />
           </div>
