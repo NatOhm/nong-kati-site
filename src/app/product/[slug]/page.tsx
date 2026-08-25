@@ -8,6 +8,7 @@ import { PageShell } from '@/components/layout/PageShell';
 import { Breadcrumb } from '@/components/data-display/Breadcrumb';
 import { StructuredData } from '@/components/data-display/StructuredData';
 import { StockBadge } from '@/components/product/StockBadge';
+import { ProductDetailClient } from '@/components/product/ProductDetailClient';
 import { formatThb } from '@/utils/format';
 
 import {
@@ -148,48 +149,16 @@ export default async function ProductPage({ params }: ProductPageProps): Promise
                 </div>
               )}
 
-              {/* Price from first variant */}
-              <div className="border-t border-ink-700 pt-4">
-                <span className="text-xs text-ink-400">ราคาเริ่มต้น</span>
-                <div className="text-2xl font-bold text-amber-300">
-                  {formatThb(product.variants[0]?.price ?? 0)}
-                </div>
-              </div>
-
-              {/* Denominations / Variants */}
-              {product.variants.length > 0 && (
-                <div>
-                  <h2 className="mb-3 text-sm font-semibold text-ink-200">เลือกประเภท</h2>
-                  <div className="flex flex-wrap gap-2">
-                    {product.variants.map((variant) => (
-                      <button
-                        key={variant.id}
-                        disabled={variant.stock === 0}
-                        className="flex flex-col items-center gap-1 rounded-md border border-ink-600 bg-ink-800 px-4 py-2 text-sm transition-all hover:border-amber-700 hover:bg-ink-750 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        <span className="font-medium text-ink-100">{variant.label}</span>
-                        <span className="text-xs text-ink-400">{formatThb(variant.price)}</span>
-                        {variant.stock <= 10 && variant.stock > 0 && (
-                          <span className="text-xs text-amber-400">เหลือ {variant.stock}</span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Add to Cart placeholder */}
-              <div className="border-t border-ink-700 pt-4">
-                <button
-                  disabled
-                  className="w-full rounded-md bg-ink-700 px-6 py-3 text-base font-semibold text-ink-400 cursor-not-allowed"
-                >
-                  เพิ่มลงตะกร้า (M3)
-                </button>
-                <p className="mt-2 text-center text-xs text-ink-500">
-                  ฟังก์ชันตะกร้าจะพร้อมใช้งานใน Milestone 3
-                </p>
-              </div>
+              {/* Interactive Product Details (variant selection, add to cart) */}
+              <ProductDetailClient
+                productId={product.id}
+                productName={product.name}
+                productSlug={product.slug}
+                categorySlug={product.category.slug}
+                categoryName={product.category.name}
+                thumbnailUrl={product.imageUrl}
+                variants={product.variants}
+              />
             </div>
           </div>
         </PageShell>
