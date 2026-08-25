@@ -50,6 +50,7 @@ export function ProductDetailClient({
 
     addItem(
       {
+        id: `cart-${selectedVariant.id}-${Date.now()}`,
         variantId: selectedVariant.id,
         skuCode: `${productSlug}-${selectedVariant.id}`,
         productNameTh: productName,
