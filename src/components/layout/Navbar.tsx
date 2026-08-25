@@ -79,6 +79,13 @@ export function Navbar({
           <IconButton
             icon={<User size={20} strokeWidth={1.5} />}
             label={isAuthenticated ? `บัญชี: ${customerName ?? ''}` : 'เข้าสู่ระบบ'}
+            onClick={() => {
+              if (isAuthenticated) {
+                window.location.href = '/account/dashboard';
+              } else {
+                window.location.href = '/account/login';
+              }
+            }}
           />
         </div>
       </nav>
