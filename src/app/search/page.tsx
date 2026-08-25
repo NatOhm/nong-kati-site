@@ -3,6 +3,8 @@ import Link from 'next/link';
 
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
+
+export const dynamic = 'force-dynamic';
 import { PageShell } from '@/components/layout/PageShell';
 import { ProductCard } from '@/components/product/ProductCard';
 import { ProductGrid } from '@/components/product/ProductGrid';

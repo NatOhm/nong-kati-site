@@ -2,6 +2,8 @@ import { MetadataRoute } from 'next';
 
 import { getAllCategorySlugs, getAllProductSlugs } from '@/lib/data';
 
+export const dynamic = 'force-dynamic';
+
 const BASE_URL = process.env['NEXT_PUBLIC_SITE_URL'] || 'https://nong-kati.com';
 
 /**

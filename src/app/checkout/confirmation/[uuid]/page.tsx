@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { ArrowLeft, Clock, Mail, FileText, CheckCircle } from 'lucide-react';
 
 import { Navbar } from '@/components/layout/Navbar';
+
+export const dynamic = 'force-dynamic';
 import { Footer } from '@/components/layout/Footer';
 import { PageShell } from '@/components/layout/PageShell';
 import { Breadcrumb } from '@/components/data-display/Breadcrumb';

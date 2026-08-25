@@ -2,6 +2,8 @@ import { getTopLevelCategories } from '@/lib/data';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Orders Layout — Server component that fetches categories
  * and renders Navbar + Footer around order pages.
