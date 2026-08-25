@@ -29,7 +29,7 @@ export default async function ConfirmationPage({
   const order = getOrderByConfirmationUuid(uuid);
   if (!order) notFound();
 
-  const categories = getTopLevelCategories();
+  const categories = await getTopLevelCategories();
   const isCompleted = order.status === 'completed';
   const isPendingPayment = order.status === 'pending_payment';
   const isPendingManual = order.status === 'pending_manual_fulfilment';

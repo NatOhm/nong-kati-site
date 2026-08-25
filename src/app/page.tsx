@@ -26,9 +26,9 @@ export const metadata: Metadata = {
   },
 };
 
-export default function HomePage(): React.JSX.Element {
-  const categories = getTopLevelCategories();
-  const featuredProducts = getFeaturedProducts();
+export default async function HomePage(): Promise<React.JSX.Element> {
+  const categories = await getTopLevelCategories();
+  const featuredProducts = await getFeaturedProducts();
 
   return (
     <>

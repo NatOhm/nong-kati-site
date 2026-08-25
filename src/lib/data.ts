@@ -1,13 +1,12 @@
 /**
- * Mock Data Provider — Uses seed data for M2 catalog without requiring a database.
- * When Prisma + PostgreSQL are configured, swap these to use the real services.
- * Source of truth: 06-database.md §22 seed data.
+ * Data Provider — Prisma-backed queries for the catalog.
+ * Replaces the M2 seed-data mock with real database queries.
  */
 
-import { seedCategories } from '@/seed-data/categories';
-import { seedProducts } from '@/seed-data/products';
+import { prisma } from '@/lib/db';
 
-// Re-export types used by the API surface
+// ─── Types ────────────────────────────────────────────
+
 export interface CategoryItem {
   id: string;
   name: string;
@@ -44,79 +43,73 @@ export interface ProductItem {
   createdAt: string;
 }
 
-// ─── Category helpers ─────────────────────────────────────
+// ─── Category helpers ─────────────────────────────────
 
-interface RawCategory {
-  id: string;
-  parentId: string | null;
-  slug: string;
-  nameTh: string;
-  iconName: string | null;
-  sortOrder: number;
-  isActive: boolean;
-}
-
-function mapCategory(raw: RawCategory): CategoryItem {
-  return {
-    id: raw.id,
-    name: raw.nameTh,
-    slug: raw.slug,
-    icon: raw.iconName,
-    parentId: raw.parentId,
-    sortOrder: raw.sortOrder,
-    isActive: raw.isActive,
-    children: [],
-  };
-}
-
-function buildCategoryTree(flat: RawCategory[]): CategoryItem[] {
+function buildCategoryTree(
+  cats: { id: string; name: string; slug: string; icon: string | null; parentId: string | null; sortOrder: number; isActive: boolean }[],
+): CategoryItem[] {
   const map = new Map<string, CategoryItem>();
   const roots: CategoryItem[] = [];
 
-  for (const cat of flat) {
-    map.set(cat.id, mapCategory(cat));
+  for (const cat of cats) {
+    map.set(cat.id, {
+      id: cat.id,
+      name: cat.name,
+      slug: cat.slug,
+      icon: cat.icon,
+      parentId: cat.parentId,
+      sortOrder: cat.sortOrder,
+      isActive: cat.isActive,
+      children: [],
+    });
   }
 
-  for (const cat of flat) {
+  for (const cat of cats) {
     const node = map.get(cat.id)!;
     if (cat.parentId) {
       const parent = map.get(cat.parentId);
-      if (parent) {
-        parent.children.push(node);
-      }
+      if (parent) parent.children.push(node);
     } else {
       roots.push(node);
     }
   }
 
+  // Sort children by sortOrder
+  function sortTree(nodes: CategoryItem[]) {
+    nodes.sort((a, b) => a.sortOrder - b.sortOrder);
+    for (const node of nodes) sortTree(node.children);
+  }
+  sortTree(roots);
+
   return roots;
 }
 
-const categoryTree = buildCategoryTree(seedCategories as unknown as RawCategory[]);
+// ─── Category Queries ─────────────────────────────────
 
-// ─── Category Queries ─────────────────────────────────────
-
-export function getTopLevelCategories(): CategoryItem[] {
-  return categoryTree;
+export async function getTopLevelCategories(): Promise<CategoryItem[]> {
+  const cats = await prisma.category.findMany({ orderBy: { sortOrder: 'asc' } });
+  return buildCategoryTree(cats);
 }
 
-export function getCategoryTree(): CategoryItem[] {
-  return categoryTree;
+export async function getCategoryTree(): Promise<CategoryItem[]> {
+  const cats = await prisma.category.findMany({ orderBy: { sortOrder: 'asc' } });
+  return buildCategoryTree(cats);
 }
 
-export function getCategoryBySlug(slug: string): {
+export async function getCategoryBySlug(slug: string): Promise<{
   category: CategoryItem;
   breadcrumb: { id: string; name: string; slug: string }[];
-} | null {
+} | null> {
+  const cats = await prisma.category.findMany({ orderBy: { sortOrder: 'asc' } });
+  const tree = buildCategoryTree(cats);
+
   function findInTree(
     nodes: CategoryItem[],
     trail: { id: string; name: string; slug: string }[],
   ): { category: CategoryItem; breadcrumb: { id: string; name: string; slug: string }[] } | null {
     for (const node of nodes) {
       const newTrail = [...trail, { id: node.id, name: node.name, slug: node.slug }];
-      if (node.slug === slug) {
-        return { category: node, breadcrumb: newTrail };
-      }
+      if (node.slug === slug) return { category: node, breadcrumb: newTrail };
       if (node.children.length > 0) {
         const found = findInTree(node.children, newTrail);
         if (found) return found;
@@ -125,186 +118,171 @@ export function getCategoryBySlug(slug: string): {
     return null;
   }
 
-  return findInTree(categoryTree, []);
+  return findInTree(tree, []);
 }
 
-export function getAllCategorySlugs(): string[] {
-  function collectSlugs(nodes: CategoryItem[]): string[] {
-    const slugs: string[] = [];
-    for (const node of nodes) {
-      slugs.push(node.slug);
-      if (node.children.length > 0) {
-        slugs.push(...collectSlugs(node.children));
-      }
-    }
-    return slugs;
-  }
-  return collectSlugs(categoryTree);
+export async function getAllCategorySlugs(): Promise<string[]> {
+  const cats = await prisma.category.findMany({ select: { slug: true } });
+  return cats.map((c) => c.slug);
 }
 
-// ─── Product helpers ───────────────────────────────────────
+// ─── Product helpers ───────────────────────────────────
 
-interface RawProduct {
-  id: string;
-  slug: string;
-  nameTh: string;
-  descriptionTh: string | null;
-  thumbnailUrl: string | null;
-  categoryId: string;
-  isFeatured: boolean;
-  status: string;
-  variants: {
-    id: string;
-    skuCode: string;
-    faceValueThb: string;
-    salePriceThb: string;
-    inStock: boolean;
-    isLowStock: boolean;
-    sortOrder: number;
-    status: string;
-  }[];
-}
-
-function mapProduct(raw: RawProduct, cat: CategoryItem | undefined): ProductItem {
+function mapProduct(
+  p: any,
+  cat: { id: string; name: string; slug: string } | null,
+): ProductItem {
   return {
-    id: raw.id,
-    name: raw.nameTh,
-    slug: raw.slug,
-    description: raw.descriptionTh,
-    shortDescription: raw.descriptionTh
-      ? raw.descriptionTh.replace(/<[^>]+>/g, '').slice(0, 100)
+    id: p.id,
+    name: p.name,
+    slug: p.slug,
+    description: p.description,
+    shortDescription: p.description
+      ? p.description.replace(/<[^>]+>/g, '').slice(0, 100)
       : null,
-    imageUrl: raw.thumbnailUrl,
-    categoryId: raw.categoryId,
-    category: cat ? { id: cat.id, name: cat.name, slug: cat.slug } : { id: '', name: '', slug: '' },
-    variants: raw.variants.map((v) => ({
+    imageUrl: p.imageUrl,
+    categoryId: p.categoryId,
+    category: cat ?? { id: '', name: '', slug: '' },
+    variants: (p.variants ?? []).map((v: any) => ({
       id: v.id,
-      label: `${v.faceValueThb} THB`,
-      price: parseFloat(v.salePriceThb),
-      stock: v.inStock ? (v.isLowStock ? 5 : 50) : 0,
-      isActive: v.status === 'active',
+      label: v.label,
+      price: Number(v.price),
+      stock: v.stock,
+      isActive: v.isActive,
       sortOrder: v.sortOrder,
     })),
-    aliases: [],
-    isActive: raw.status === 'published',
-    isFeatured: raw.isFeatured,
-    createdAt: new Date().toISOString(),
+    aliases: (p.aliases ?? []).map((a: any) => a.alias),
+    isActive: p.isActive,
+    isFeatured: p.isFeatured,
+    createdAt: p.createdAt?.toISOString?.() ?? new Date().toISOString(),
   };
 }
 
-function findCategoryById(id: string): CategoryItem | undefined {
-  function search(nodes: CategoryItem[]): CategoryItem | undefined {
-    for (const node of nodes) {
-      if (node.id === id) return node;
-      if (node.children.length > 0) {
-        const found = search(node.children);
-        if (found) return found;
-      }
-    }
-    return undefined;
-  }
-  return search(categoryTree);
+// ─── Product Queries ───────────────────────────────────
+
+export async function getFeaturedProducts(): Promise<ProductItem[]> {
+  const products = await prisma.product.findMany({
+    where: { isFeatured: true, isActive: true },
+    include: {
+      category: { select: { id: true, name: true, slug: true } },
+      variants: { orderBy: { sortOrder: 'asc' } },
+      aliases: true,
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  return products.map((p) => mapProduct(p, p.category));
 }
 
-function findCategoryBySlugLocal(slug: string): CategoryItem | undefined {
-  function search(nodes: CategoryItem[]): CategoryItem | undefined {
-    for (const node of nodes) {
-      if (node.slug === slug) return node;
-      if (node.children.length > 0) {
-        const found = search(node.children);
-        if (found) return found;
-      }
-    }
-    return undefined;
-  }
-  return search(categoryTree);
-}
-
-// ─── Product Queries ───────────────────────────────────────
-
-export function getFeaturedProducts(): ProductItem[] {
-  return seedProducts
-    .filter((p) => p.isFeatured && p.status === 'published')
-    .map((p) => {
-      const cat = findCategoryById(p.categoryId);
-      return mapProduct(p as unknown as RawProduct, cat);
-    });
-}
-
-export function getProductsByCategory(
+export async function getProductsByCategory(
   slug: string,
   page: number = 1,
   limit: number = 24,
-): { products: ProductItem[]; total: number } {
-  const cat = findCategoryBySlugLocal(slug);
+): Promise<{ products: ProductItem[]; total: number }> {
+  const cat = await prisma.category.findUnique({ where: { slug } });
   if (!cat) return { products: [], total: 0 };
 
-  const filtered = seedProducts.filter((p) => p.categoryId === cat.id && p.status === 'published');
-  const total = filtered.length;
-  const products = filtered.slice((page - 1) * limit, page * limit).map((p) =>
-    mapProduct(p as unknown as RawProduct, cat),
-  );
+  const [products, total] = await Promise.all([
+    prisma.product.findMany({
+      where: { categoryId: cat.id, isActive: true },
+      include: {
+        category: { select: { id: true, name: true, slug: true } },
+        variants: { orderBy: { sortOrder: 'asc' } },
+        aliases: true,
+      },
+      skip: (page - 1) * limit,
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.product.count({ where: { categoryId: cat.id, isActive: true } }),
+  ]);
 
-  return { products, total };
+  return {
+    products: products.map((p) => mapProduct(p, p.category)),
+    total,
+  };
 }
 
-export function getProductBySlug(slug: string): ProductItem | null {
-  const p = seedProducts.find((prod) => prod.slug === slug && prod.status === 'published');
+export async function getProductBySlug(slug: string): Promise<ProductItem | null> {
+  const p = await prisma.product.findUnique({
+    where: { slug, isActive: true },
+    include: {
+      category: { select: { id: true, name: true, slug: true } },
+      variants: { where: { isActive: true }, orderBy: { sortOrder: 'asc' } },
+      aliases: true,
+    },
+  });
+
   if (!p) return null;
-
-  const cat = findCategoryById(p.categoryId);
-  return mapProduct(p as unknown as RawProduct, cat);
+  return mapProduct(p, p.category);
 }
 
-export function getAllProductSlugs(): string[] {
-  return seedProducts.filter((p) => p.status === 'published').map((p) => p.slug);
+export async function getAllProductSlugs(): Promise<string[]> {
+  const products = await prisma.product.findMany({
+    where: { isActive: true },
+    select: { slug: true },
+  });
+  return products.map((p) => p.slug);
 }
 
-export function searchProducts(
+export async function searchProducts(
   query: string,
   page: number = 1,
   limit: number = 24,
-): { products: ProductItem[]; total: number; query: string } {
+): Promise<{ products: ProductItem[]; total: number; query: string }> {
   const trimmed = query.trim().toLowerCase();
   if (!trimmed) return { products: [], total: 0, query: '' };
 
-  const filtered = seedProducts.filter((p) => {
-    if (p.status !== 'published') return false;
-    const matchesName = p.nameTh.toLowerCase().includes(trimmed);
-    const matchesDesc = p.descriptionTh?.toLowerCase().includes(trimmed);
-    const cat = findCategoryById(p.categoryId);
-    const matchesCategory = cat?.name.toLowerCase().includes(trimmed);
-    return matchesName || matchesDesc || matchesCategory;
-  });
+  const where = {
+    isActive: true,
+    OR: [
+      { name: { contains: trimmed, mode: 'insensitive' as const } },
+      { description: { contains: trimmed, mode: 'insensitive' as const } },
+      { aliases: { some: { alias: { contains: trimmed, mode: 'insensitive' as const } } } },
+    ],
+  };
 
-  const total = filtered.length;
-  const products = filtered.slice((page - 1) * limit, page * limit).map((p) => {
-    const cat = findCategoryById(p.categoryId);
-    return mapProduct(p as unknown as RawProduct, cat);
-  });
+  const [products, total] = await Promise.all([
+    prisma.product.findMany({
+      where,
+      include: {
+        category: { select: { id: true, name: true, slug: true } },
+        variants: { orderBy: { sortOrder: 'asc' } },
+        aliases: true,
+      },
+      skip: (page - 1) * limit,
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.product.count({ where }),
+  ]);
 
-  return { products, total, query: trimmed };
+  return {
+    products: products.map((p) => mapProduct(p, p.category)),
+    total,
+    query: trimmed,
+  };
 }
 
-export function getSearchSuggestions(
+export async function getSearchSuggestions(
   query: string,
   limit: number = 5,
-): { name: string; slug: string; categoryName: string }[] {
+): Promise<{ name: string; slug: string; categoryName: string }[]> {
   const trimmed = query.trim().toLowerCase();
   if (!trimmed) return [];
 
-  return seedProducts
-    .filter((p) => {
-      if (p.status !== 'published') return false;
-      return p.nameTh.toLowerCase().includes(trimmed);
-    })
-    .slice(0, limit)
-    .map((p) => {
-      const cat = findCategoryById(p.categoryId);
-      return {
-        name: p.nameTh,
-        slug: p.slug,
-        categoryName: cat?.name ?? '',
-      };
-    });
+  const products = await prisma.product.findMany({
+    where: {
+      isActive: true,
+      name: { contains: trimmed, mode: 'insensitive' },
+    },
+    include: { category: { select: { name: true } } },
+    take: limit,
+  });
+
+  return products.map((p) => ({
+    name: p.name,
+    slug: p.slug,
+    categoryName: p.category.name,
+  }));
 }

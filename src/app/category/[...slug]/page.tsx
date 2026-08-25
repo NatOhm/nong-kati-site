@@ -24,7 +24,7 @@ interface CategoryPageProps {
 export async function generateMetadata({ params }: CategoryPageProps): Promise<Metadata> {
   const { slug } = await params;
   const slugPath = slug.join('/');
-  const result = getCategoryBySlug(slugPath);
+  const result = await getCategoryBySlug(slugPath);
 
   if (!result) {
     return { title: 'ไม่พบหมวดหมู่ — Nong-Kati' };
@@ -49,12 +49,12 @@ export default async function CategoryPage({ params }: CategoryPageProps): Promi
   const { slug } = await params;
   const slugPath = slug.join('/');
 
-  const result = getCategoryBySlug(slugPath);
+  const result = await getCategoryBySlug(slugPath);
   if (!result) notFound();
 
   const { category, breadcrumb } = result;
-  const { products, total } = getProductsByCategory(slugPath);
-  const categories = getTopLevelCategories();
+  const { products, total } = await getProductsByCategory(slugPath);
+  const categories = await getTopLevelCategories();
 
   const siteUrl = process.env['NEXT_PUBLIC_SITE_URL'] || 'https://nong-kati.com';
   const categoryUrl = `${siteUrl}/category/${slugPath}`;

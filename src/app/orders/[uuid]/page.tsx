@@ -28,7 +28,7 @@ export default async function OrderDetailPage({
   const order = getOrderByConfirmationUuid(uuid);
   if (!order) notFound();
 
-  const categories = getTopLevelCategories();
+  const categories = await getTopLevelCategories();
 
   // Map order status to OrderStatus type
   const orderStatus = order.status as

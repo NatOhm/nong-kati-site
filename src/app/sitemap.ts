@@ -8,7 +8,7 @@ const BASE_URL = process.env['NEXT_PUBLIC_SITE_URL'] || 'https://nong-kati.com';
  * 14-seo.md §7 — Dynamic sitemap.xml.
  * Lists all category and product pages with appropriate changeFrequency and priority.
  */
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
 
   // Static pages
@@ -28,7 +28,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
   ];
 
   // Category pages
-  const categoryPages: MetadataRoute.Sitemap = getAllCategorySlugs().map((slug) => ({
+  const categorySlugs = await getAllCategorySlugs();
+  const categoryPages: MetadataRoute.Sitemap = categorySlugs.map((slug) => ({
     url: `${BASE_URL}/category/${slug}`,
     lastModified: now,
     changeFrequency: 'daily' as const,
@@ -36,7 +37,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
   }));
 
   // Product pages
-  const productPages: MetadataRoute.Sitemap = getAllProductSlugs().map((slug) => ({
+  const productSlugs = await getAllProductSlugs();
+  const productPages: MetadataRoute.Sitemap = productSlugs.map((slug) => ({
     url: `${BASE_URL}/product/${slug}`,
     lastModified: now,
     changeFrequency: 'weekly' as const,

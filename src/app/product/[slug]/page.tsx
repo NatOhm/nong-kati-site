@@ -21,7 +21,7 @@ interface ProductPageProps {
 
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const product = getProductBySlug(slug);
+  const product = await getProductBySlug(slug);
 
   if (!product) {
     return { title: 'ไม่พบสินค้า — Nong-Kati' };
@@ -45,11 +45,11 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
 
 export default async function ProductPage({ params }: ProductPageProps): Promise<React.JSX.Element> {
   const { slug } = await params;
-  const product = getProductBySlug(slug);
+  const product = await getProductBySlug(slug);
 
   if (!product) notFound();
 
-  const categories = getTopLevelCategories();
+  const categories = await getTopLevelCategories();
   const siteUrl = process.env['NEXT_PUBLIC_SITE_URL'] || 'https://nong-kati.com';
   const productUrl = `${siteUrl}/product/${slug}`;
   const totalStock = product.variants.reduce((sum, v) => sum + v.stock, 0);

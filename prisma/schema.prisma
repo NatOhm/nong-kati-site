@@ -70,11 +70,12 @@ model ProductVariant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  product   Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
-  variants  InventorySnapshot[]
-  cartItems CartItem[]
-  orderItems OrderItem[]
-  giftCodes GiftCode[]
+  product       Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+  inventory     InventorySnapshot[]
+  cartItems     CartItem[]
+  orderItems    OrderItem[]
+  giftCodes     GiftCode[]
+  uploadBatches CodeUploadBatch[]
 
   @@index([productId])
 }
@@ -181,6 +182,7 @@ model Order {
   paymentAttempts PaymentAttempt[]
   giftCodes      GiftCode[]
   invoices       Invoice[]
+  refunds        Refund[]
 
   @@index([customerId])
   @@index([customerEmail])

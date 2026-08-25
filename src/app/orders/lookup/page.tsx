@@ -4,11 +4,8 @@ import { useState, useCallback } from 'react';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
-import { Navbar } from '@/components/layout/Navbar';
-import { Footer } from '@/components/layout/Footer';
 import { PageShell } from '@/components/layout/PageShell';
 import { OrderLookupForm } from '@/components/order/OrderLookupForm';
-import { getTopLevelCategories } from '@/lib/data';
 import { lookupOrder, type OrderLookupResult } from '@/api/orderLookup';
 
 /**
@@ -19,8 +16,6 @@ export default function OrderLookupPage(): React.JSX.Element {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<OrderLookupResult | null>(null);
-
-  const categories = getTopLevelCategories();
 
   const handleSubmit = useCallback(async (email: string, orderNumber: string) => {
     setLoading(true);
@@ -43,16 +38,7 @@ export default function OrderLookupPage(): React.JSX.Element {
   }, []);
 
   return (
-    <>
-      <Navbar
-        categories={categories.map((c) => ({
-          ...c,
-          children: c.children.map((ch) => ({ id: ch.id, name: ch.name, slug: ch.slug })),
-        }))}
-      />
-
-      <main>
-        <PageShell maxWidth="prose">
+    <PageShell maxWidth="prose">
           <div className="py-8">
             {/* Back link */}
             <Link
@@ -92,10 +78,6 @@ export default function OrderLookupPage(): React.JSX.Element {
               </ul>
             </div>
           </div>
-        </PageShell>
-      </main>
-
-      <Footer />
-    </>
+    </PageShell>
   );
 }

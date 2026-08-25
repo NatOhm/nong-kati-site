@@ -4,8 +4,6 @@ import { useState, useCallback } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Clock, Construction } from 'lucide-react';
 
-import { Navbar } from '@/components/layout/Navbar';
-import { Footer } from '@/components/layout/Footer';
 import { PageShell } from '@/components/layout/PageShell';
 import { CheckoutStepper } from '@/components/checkout/CheckoutStepper';
 import { ContactForm, type ContactFormData } from '@/components/checkout/ContactForm';
@@ -15,7 +13,6 @@ import { OrderSummaryPanel } from '@/components/checkout/OrderSummaryPanel';
 import { TrustBadgeRow } from '@/components/checkout/TrustBadgeRow';
 import { CartIcon } from '@/components/cart/CartIcon';
 import { useCart } from '@/hooks/useCart';
-import { getTopLevelCategories } from '@/lib/data';
 import { createOrder, type Order } from '@/api/orders';
 import { initiatePayment, getPaymentStatus } from '@/api/payments';
 import { formatThb } from '@/lib/pricing';
@@ -41,8 +38,6 @@ export default function CheckoutPage(): React.JSX.Element {
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const categories = getTopLevelCategories();
 
   // Step 1: Submit contact info → create order → advance to Step 2
   const handleContactSubmit = useCallback(
@@ -157,44 +152,24 @@ export default function CheckoutPage(): React.JSX.Element {
   // Redirect if cart is empty
   if (isLoaded && (!cart || cart.items.length === 0)) {
     return (
-      <>
-        <Navbar
-          categories={categories.map((c) => ({
-            ...c,
-            children: c.children.map((ch) => ({ id: ch.id, name: ch.name, slug: ch.slug })),
-          }))}
-        />
-        <main>
-          <PageShell>
-            <div className="flex flex-col items-center justify-center py-24 text-center">
-              <h1 className="mb-4 text-2xl font-bold text-ink-100">ตะกร้าว่างเปล่า</h1>
-              <p className="mb-6 text-ink-400">กรุณาเพิ่มสินค้าในตะกร้าก่อนดำเนินการชำระเงิน</p>
-              <Link
-                href="/"
-                className="inline-flex items-center gap-2 rounded-md bg-amber-400 px-5 py-2.5 text-sm font-semibold text-ink-900 hover:bg-amber-300"
-              >
-                <ArrowLeft size={16} />
-                เลือกซื้อสินค้า
-              </Link>
-            </div>
-          </PageShell>
-        </main>
-        <Footer />
-      </>
+      <PageShell>
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <h1 className="mb-4 text-2xl font-bold text-ink-100">ตะกร้าว่างเปล่า</h1>
+          <p className="mb-6 text-ink-400">กรุณาเพิ่มสินค้าในตะกร้าก่อนดำเนินการชำระเงิน</p>
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 rounded-md bg-amber-400 px-5 py-2.5 text-sm font-semibold text-ink-900 hover:bg-amber-300"
+          >
+            <ArrowLeft size={16} />
+            เลือกซื้อสินค้า
+          </Link>
+        </div>
+      </PageShell>
     );
   }
 
   return (
-    <>
-      <Navbar
-        categories={categories.map((c) => ({
-          ...c,
-          children: c.children.map((ch) => ({ id: ch.id, name: ch.name, slug: ch.slug })),
-        }))}
-      />
-
-      <main>
-        <PageShell>
+    <PageShell>
           {/* Header */}
           <div className="flex items-center justify-between py-6">
             <Link
@@ -320,9 +295,5 @@ export default function CheckoutPage(): React.JSX.Element {
             </div>
           </div>
         </PageShell>
-      </main>
-
-      <Footer />
-    </>
   );
 }

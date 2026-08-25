@@ -114,20 +114,20 @@ export async function adminListProducts(params: {
 }): Promise<PaginatedResult<AdminProduct>> {
   const { page = 1, limit = 20, categorySlug, search: searchTerm, isActive } = params;
 
-  let allProductSlugs = getAllProductSlugs();
   let products: ProductItem[] = [];
 
   if (searchTerm) {
-    const result = searchProducts(searchTerm, 1, 1000);
+    const result = await searchProducts(searchTerm, 1, 1000);
     products = result.products;
   } else if (categorySlug) {
-    const result = getProductsByCategory(categorySlug, 1, 1000);
+    const result = await getProductsByCategory(categorySlug, 1, 1000);
     products = result.products;
   } else {
     // Get all products
-    products = allProductSlugs
-      .map((slug) => getProductBySlug(slug))
-      .filter((p): p is ProductItem => p !== null);
+    const allSlugs = await getAllProductSlugs();
+    products = (
+      await Promise.all(allSlugs.map((slug) => getProductBySlug(slug)))
+    ).filter((p): p is ProductItem => p !== null);
   }
 
   // Filter by active status
@@ -151,7 +151,7 @@ export async function adminListProducts(params: {
 export async function adminGetProduct(
   slug: string
 ): Promise<AdminProduct | null> {
-  const product = getProductBySlug(slug);
+  const product = await getProductBySlug(slug);
   if (!product) return null;
   return mapToAdminProduct(product);
 }
@@ -210,28 +210,28 @@ export async function adminDeleteProduct(
 
 // ─── Category CRUD ──────────────────────────────────────
 
-function countProductsByCategory(
+async function countProductsByCategory(
   tree: CategoryItem[]
-): Map<string, number> {
+): Promise<Map<string, number>> {
   const counts = new Map<string, number>();
 
-  function walk(nodes: CategoryItem[]) {
+  async function walk(nodes: CategoryItem[]) {
     for (const node of nodes) {
-      const result = getProductsByCategory(node.slug, 1, 1000);
+      const result = await getProductsByCategory(node.slug, 1, 1000);
       counts.set(node.id, result.total);
       if (node.children.length > 0) {
-        walk(node.children);
+        await walk(node.children);
       }
     }
   }
 
-  walk(tree);
+  await walk(tree);
   return counts;
 }
 
 export async function adminListCategories(): Promise<AdminCategory[]> {
-  const tree = getCategoryTree();
-  const productCounts = countProductsByCategory(tree);
+  const tree = await getCategoryTree();
+  const productCounts = await countProductsByCategory(tree);
 
   return tree.map((cat) => mapToAdminCategory(cat, productCounts));
 }
@@ -239,11 +239,11 @@ export async function adminListCategories(): Promise<AdminCategory[]> {
 export async function adminGetCategory(
   slug: string
 ): Promise<AdminCategory | null> {
-  const result = getCategoryBySlug(slug);
+  const result = await getCategoryBySlug(slug);
   if (!result) return null;
 
-  const tree = getCategoryTree();
-  const productCounts = countProductsByCategory(tree);
+  const tree = await getCategoryTree();
+  const productCounts = await countProductsByCategory(tree);
 
   return mapToAdminCategory(result.category, productCounts);
 }
@@ -288,7 +288,7 @@ export async function adminUpdateCategory(
 export async function adminDeleteCategory(
   slug: string
 ): Promise<{ success: boolean; reason?: string }> {
-  const result = getProductsByCategory(slug, 1, 1);
+  const result = await getProductsByCategory(slug, 1, 1);
   if (result.total > 0) {
     return {
       success: false,

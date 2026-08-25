@@ -36,9 +36,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps): Pro
   const page = parseInt(pageParam || '1', 10);
   const limit = 24;
 
-  const { products, total } = searchProducts(query, page, limit);
+  const { products, total } = await searchProducts(query, page, limit);
   const totalPages = Math.ceil(total / limit);
-  const categories = getTopLevelCategories();
+  const categories = await getTopLevelCategories();
 
   return (
     <>
