@@ -36,7 +36,7 @@ const LEGAL_LINKS = [
 /** 05-components.md §1.4 — 4-col desktop, accordion-shaped stack on mobile (accordion interaction deferred to M2 content pass). */
 export function Footer(): React.JSX.Element {
   return (
-    <footer className="border-t border-ink-700 bg-ink-900 py-16">
+    <footer className="border-t border-ink-700 bg-ink-900 py-16 relative z-50">
       <div className="mx-auto max-w-content px-4 md:px-8">
         <div className="grid grid-cols-1 gap-10 md:grid-cols-4">
           <div>

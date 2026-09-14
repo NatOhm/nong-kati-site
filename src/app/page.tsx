@@ -1,7 +1,8 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
 
-import { Navbar } from '@/components/layout/Navbar';
+import { FacebookNavbar } from '@/components/layout/FacebookNavbar';
+import { FacebookSidebar } from '@/components/layout/FacebookSidebar';
 import { Footer } from '@/components/layout/Footer';
 
 export const dynamic = 'force-dynamic';
@@ -49,46 +50,52 @@ export default async function HomePage(): Promise<React.JSX.Element> {
         }}
       />
 
-      <Navbar
-        categories={categories.map((c) => ({
-          ...c,
-          children: c.children.map((ch) => ({ id: ch.id, name: ch.name, slug: ch.slug })),
-        }))}
-      />
+      {/* Facebook-style top navigation */}
+      <FacebookNavbar />
 
-      <main>
-        {/* Hero Section */}
-        <PageShell>
-          <section className="flex flex-col items-center gap-6 py-16 text-center md:py-24">
-            <h1 className="font-display text-3xl font-bold text-fg-brand-strong md:text-5xl">
-              ซื้อบัตรเกม สตรีมมิ่ง และอีคอมเมิร์ซ
-            </h1>
-            <p className="max-w-prose text-lg text-ink-300">
-              ส่งโค้ดทันทีภายใน 60 วินาที ชำระผ่าน PromptPay หรือบัตรเครดิต
-            </p>
-            <div className="flex gap-3">
-              <Link
-                href="/search?q="
-                className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md px-6 py-3 text-base font-semibold bg-amber-400 text-ink-900 border border-amber-300/30 shadow-brand-glow hover:bg-amber-300 hover:shadow-brand-glow-hover h-12"
-              >
-                เลือกซื้อสินค้า
-              </Link>
-              <Link
-                href="/search?q="
-                className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md px-6 py-3 text-base font-semibold bg-transparent text-amber-300 border border-amber-500 hover:bg-amber-900/40 h-12"
-              >
-                ค้นหาสินค้า
-              </Link>
+      {/* Main content area with sidebar */}
+      <div className="mx-auto flex max-w-[1440px]">
+        {/* Left sidebar - Facebook style */}
+        <FacebookSidebar />
+
+        {/* Main content */}
+        <main className="flex-1 min-w-0">
+          {/* Hero Section */}
+          <section className="border-b border-ink-700 bg-ink-900/50">
+            <div className="px-4 py-10 text-center md:px-8 md:py-16">
+              <h1 className="font-display text-2xl font-bold text-fg-brand-strong md:text-4xl">
+                ซื้อบัตรเกม สตรีมมิ่ง และอีคอมเมิร์ซ
+              </h1>
+              <p className="mx-auto mt-3 max-w-prose text-ink-300">
+                ส่งโค้ดทันทีภายใน 60 วินาที ชำระผ่าน PromptPay หรือบัตรเครดิต
+              </p>
+              <div className="mt-6 flex justify-center gap-3">
+                <Link
+                  href="/search?q="
+                  className="inline-flex items-center justify-center gap-2 rounded-full bg-amber-400 px-6 py-2.5 text-sm font-semibold text-ink-900 hover:bg-amber-300 transition-colors"
+                >
+                  เลือกซื้อสินค้า
+                </Link>
+                <Link
+                  href="/search?q="
+                  className="inline-flex items-center justify-center gap-2 rounded-full border border-ink-600 px-6 py-2.5 text-sm font-semibold text-ink-200 hover:bg-ink-800 transition-colors"
+                >
+                  ค้นหาสินค้า
+                </Link>
+              </div>
             </div>
           </section>
-        </PageShell>
 
-        {/* Categories Section */}
-        <PageShell>
-          <section className="py-12">
-            <h2 className="mb-6 font-display text-2xl font-bold text-ink-100">
-              หมวดหมู่สินค้า
-            </h2>
+          {/* Categories Section */}
+          <section className="border-b border-ink-700 bg-ink-900/30 px-4 py-6 md:px-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-ink-100">
+                หมวดหมู่สินค้า
+              </h2>
+              <Link href="/search" className="text-sm text-amber-400 hover:text-amber-300">
+                ดูทั้งหมด
+              </Link>
+            </div>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
               {categories.map((cat) => (
                 <CategoryCard
@@ -102,17 +109,15 @@ export default async function HomePage(): Promise<React.JSX.Element> {
               ))}
             </div>
           </section>
-        </PageShell>
 
-        {/* Featured Products Section */}
-        {featuredProducts.length > 0 && (
-          <PageShell>
-            <section className="py-12">
-              <div className="mb-6 flex items-center justify-between">
-                <h2 className="font-display text-2xl font-bold text-ink-100">
+          {/* Featured Products Section */}
+          {featuredProducts.length > 0 && (
+            <section className="border-b border-ink-700 bg-ink-900/50 px-4 py-6 md:px-8">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold text-ink-100">
                   สินค้าแนะนำ
                 </h2>
-                <Link href="/search?q=" className="text-sm text-amber-300 hover:underline">
+                <Link href="/search?q=" className="text-sm text-amber-400 hover:text-amber-300">
                   ดูทั้งหมด →
                 </Link>
               </div>
@@ -133,16 +138,14 @@ export default async function HomePage(): Promise<React.JSX.Element> {
                 ))}
               </ProductGrid>
             </section>
-          </PageShell>
-        )}
+          )}
 
-        {/* How It Works Section */}
-        <PageShell>
-          <section className="py-16">
-            <h2 className="mb-8 text-center font-display text-2xl font-bold text-ink-100">
+          {/* How It Works Section */}
+          <section className="bg-ink-900/30 px-4 py-8 md:px-8">
+            <h2 className="mb-6 text-center text-lg font-bold text-ink-100">
               วิธีการซื้อ
             </h2>
-            <div className="grid gap-6 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-3">
               {[
                 { step: '01', title: 'เลือกสินค้า', desc: 'เลือกประเภทบัตรและราคาที่ต้องการ' },
                 { step: '02', title: 'ชำระเงิน', desc: 'จ่ายผ่าน PromptPay หรือบัตรเครดิต' },
@@ -150,17 +153,19 @@ export default async function HomePage(): Promise<React.JSX.Element> {
               ].map((item) => (
                 <div
                   key={item.step}
-                  className="flex flex-col items-center gap-3 rounded-lg border border-ink-700 bg-ink-850 p-6 text-center"
+                  className="flex items-center gap-4 rounded-lg border border-ink-700 bg-ink-850 p-4"
                 >
-                  <span className="text-3xl font-bold text-amber-400">{item.step}</span>
-                  <h3 className="text-lg font-semibold text-ink-100">{item.title}</h3>
-                  <p className="text-sm text-ink-300">{item.desc}</p>
+                  <span className="text-2xl font-bold text-amber-400">{item.step}</span>
+                  <div>
+                    <h3 className="text-sm font-semibold text-ink-100">{item.title}</h3>
+                    <p className="text-xs text-ink-300">{item.desc}</p>
+                  </div>
                 </div>
               ))}
             </div>
           </section>
-        </PageShell>
-      </main>
+        </main>
+      </div>
 
       <Footer />
     </>
