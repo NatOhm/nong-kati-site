@@ -49,7 +49,7 @@ function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
   };
 
   return (
-    <>
+    <div className="flex flex-col h-full">
       {/* Mobile close button */}
       {onClose && (
         <div className="flex items-center justify-between px-4 py-3 border-b border-ink-700 lg:hidden">
@@ -68,7 +68,7 @@ function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
         </div>
       )}
 
-      <div className="px-2 py-4">
+      <div className="flex-1 overflow-y-auto px-4 py-4">
         {/* Navigation Items */}
         <nav className="space-y-1">
           {visibleItems.map((item) => {
@@ -83,15 +83,15 @@ function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
                 className={cn(
                   'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150',
                   isActive
-                    ? 'bg-ink-800 text-amber-300'
-                    : 'text-ink-200 hover:bg-ink-800/60 hover:text-ink-100'
+                    ? 'bg-amber-900/30 text-amber-300'
+                    : 'text-ink-200 hover:bg-ink-800 hover:text-ink-100'
                 )}
               >
                 <div className={cn(
-                  'flex h-9 w-9 items-center justify-center rounded-full',
-                  isActive ? 'bg-amber-900/40' : 'bg-ink-800'
+                  'flex h-9 w-9 items-center justify-center rounded-full shrink-0',
+                  isActive ? 'bg-amber-900/50' : 'bg-ink-800'
                 )}>
-                  <Icon size={20} className={isActive ? 'text-amber-400' : item.color} strokeWidth={1.5} />
+                  <Icon size={18} className={isActive ? 'text-amber-400' : item.color} strokeWidth={1.5} />
                 </div>
                 <span>{item.label}</span>
               </Link>
@@ -101,13 +101,13 @@ function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
           {/* See more / See less */}
           <button
             onClick={() => setShowMore(!showMore)}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-ink-300 hover:bg-ink-800/60 hover:text-ink-100 transition-all duration-150"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-ink-300 hover:bg-ink-800 hover:text-ink-100 transition-all duration-150"
           >
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-ink-800">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-ink-800 shrink-0">
               {showMore ? (
-                <ChevronUp size={20} className="text-ink-400" />
+                <ChevronUp size={18} className="text-ink-400" />
               ) : (
-                <ChevronDown size={20} className="text-ink-400" />
+                <ChevronDown size={18} className="text-ink-400" />
               )}
             </div>
             <span>{showMore ? 'แสดงน้อยลง' : 'ดูเพิ่มเติม'}</span>
@@ -115,14 +115,14 @@ function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
         </nav>
 
         {/* Divider */}
-        <div className="my-4 mx-3 h-px bg-ink-700" />
+        <div className="my-4 h-px bg-ink-700" />
 
         {/* Shortcuts */}
         <div>
-          <h3 className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-ink-500">
+          <h3 className="mb-3 px-3 text-xs font-semibold uppercase tracking-wider text-ink-500">
             ทางลัดของคุณ
           </h3>
-          <div className="space-y-0.5">
+          <div className="space-y-1">
             {SHORTCUTS.map((shortcut) => {
               const Icon = shortcut.icon;
               return (
@@ -130,31 +130,38 @@ function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
                   key={shortcut.href}
                   href={shortcut.href}
                   onClick={linkClickHandler}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-ink-200 hover:bg-ink-800/60 hover:text-ink-100 transition-all duration-150"
+                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-ink-200 hover:bg-ink-800 hover:text-ink-100 transition-all duration-150"
                 >
                   <div className={cn(
-                    'flex h-9 w-9 items-center justify-center rounded-lg',
+                    'flex h-9 w-9 items-center justify-center rounded-lg shrink-0',
                     shortcut.color
                   )}>
                     <Icon size={18} className="text-white" strokeWidth={1.5} />
                   </div>
-                  <span>{shortcut.label}</span>
+                  <span className="truncate">{shortcut.label}</span>
                 </Link>
               );
             })}
           </div>
         </div>
       </div>
-    </>
+
+      {/* Footer copyright */}
+      <div className="px-4 py-3 border-t border-ink-700">
+        <p className="text-xs text-ink-600">
+          © 2024 Nong-Kati Store
+        </p>
+      </div>
+    </div>
   );
 }
 
 export function FacebookSidebar({ isOpen = false, onClose }: FacebookSidebarProps): React.JSX.Element {
   return (
     <>
-      {/* Desktop sidebar - fixed position */}
+      {/* Desktop sidebar - scrollable within page flow */}
       <aside className="hidden lg:block w-[280px] shrink-0">
-        <div className="fixed top-16 left-0 h-[calc(100vh-64px)] w-[280px] overflow-y-auto z-40 bg-ink-900 border-r border-ink-700/50">
+        <div className="sticky top-16 h-[calc(100vh-64px)] w-[280px] overflow-y-auto z-40 bg-ink-950 border-r border-ink-800">
           <SidebarContent />
         </div>
       </aside>
@@ -168,7 +175,7 @@ export function FacebookSidebar({ isOpen = false, onClose }: FacebookSidebarProp
             onClick={onClose}
           />
           {/* Drawer */}
-          <div className="fixed top-0 left-0 h-full w-[280px] bg-ink-900 z-50 lg:hidden overflow-y-auto shadow-2xl">
+          <div className="fixed top-0 left-0 h-full w-[300px] bg-ink-950 z-50 lg:hidden overflow-y-auto shadow-2xl">
             <SidebarContent onClose={onClose} />
           </div>
         </>
