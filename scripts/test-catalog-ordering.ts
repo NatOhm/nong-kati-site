@@ -55,13 +55,17 @@ async function main() {
     assert(sorted, 'non-null prices non-decreasing across ALL page boundaries');
 
     // Boundary check: last item of page 1 precedes first item of page 2
-    if (pages.length >= 2) {
-      const lastP1 = minPrices(pages[0]).at(-1);
-      const firstP2 = minPrices(pages[1])[0];
+    const p1 = pages[0];
+    const p2 = pages[1];
+    if (p1 && p2) {
+      const lastP1 = minPrices(p1).at(-1) ?? null;
+      const firstP2 = minPrices(p2)[0] ?? null;
       assert(
         lastP1 !== null && firstP2 !== null && lastP1 <= firstP2,
         `page1 last (${lastP1}) <= page2 first (${firstP2})`,
       );
+    } else {
+      assert(false, 'expected at least 2 pages of results');
     }
   }
 
@@ -69,11 +73,11 @@ async function main() {
   {
     const r1 = await getCatalogProducts('', undefined, 'price-desc', 1, LIMIT);
     const r2 = await getCatalogProducts('', undefined, 'price-desc', 2, LIMIT);
-    const lastP1 = minPrices(r1.products).at(-1);
-    const firstP2 = minPrices(r2.products)[0];
+    const lastP1 = minPrices(r1.products).at(-1) ?? null;
+    const firstP2 = minPrices(r2.products)[0] ?? null;
     console.log(`price-desc: p1 last=${lastP1} p2 first=${firstP2}`);
     assert(
-      lastP1 !== null && firstP2 !== null && lastP1! >= firstP2!,
+      lastP1 !== null && firstP2 !== null && lastP1 >= firstP2,
       `page1 last (${lastP1}) >= page2 first (${firstP2})`,
     );
     const flat = [...r1.products, ...r2.products];
