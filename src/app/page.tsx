@@ -11,7 +11,7 @@ import { ProductGrid } from '@/components/product/ProductGrid';
 import { StructuredData } from '@/components/data-display/StructuredData';
 
 import {
-  getTopLevelCategories,
+  getCategoriesWithProductCounts,
   getFeaturedProducts,
 } from '@/lib/data';
 
@@ -28,10 +28,10 @@ export const metadata: Metadata = {
 };
 
 export default async function HomePage(): Promise<React.JSX.Element> {
-  let categories: Awaited<ReturnType<typeof getTopLevelCategories>> = [];
+  let categories: Awaited<ReturnType<typeof getCategoriesWithProductCounts>> = [];
   let featuredProducts: Awaited<ReturnType<typeof getFeaturedProducts>> = [];
   try {
-    categories = await getTopLevelCategories();
+    categories = await getCategoriesWithProductCounts();
     featuredProducts = await getFeaturedProducts();
   } catch (e) {
     console.error('[HomePage] Database unavailable, rendering with empty data:', e instanceof Error ? e.message : e);
@@ -93,7 +93,7 @@ export default async function HomePage(): Promise<React.JSX.Element> {
                 name={cat.name}
                 slug={cat.slug}
                 icon={cat.icon}
-                productCount={cat.children.length}
+                productCount={cat.productCount}
               />
             ))}
           </div>

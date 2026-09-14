@@ -91,6 +91,27 @@ export async function getTopLevelCategories(): Promise<CategoryItem[]> {
   return buildCategoryTree(cats);
 }
 
+/**
+ * Get categories with product counts (for homepage cards).
+ */
+export async function getCategoriesWithProductCounts(): Promise<(CategoryItem & { productCount: number })[]> {
+  const cats = await prisma.category.findMany({
+    orderBy: { sortOrder: 'asc' },
+    include: { _count: { select: { products: true } } },
+  });
+  // Build flat list with product counts (no tree nesting needed for homepage)
+  const countMap = new Map(cats.map((c) => [c.id, c._count.products]));
+  const tree = buildCategoryTree(cats);
+  function enrich(nodes: CategoryItem[]): (CategoryItem & { productCount: number })[] {
+    return nodes.map((n) => ({
+      ...n,
+      productCount: countMap.get(n.id) ?? 0,
+      children: enrich(n.children),
+    }));
+  }
+  return enrich(tree);
+}
+
 export async function getCategoryTree(): Promise<CategoryItem[]> {
   const cats = await prisma.category.findMany({ orderBy: { sortOrder: 'asc' } });
   return buildCategoryTree(cats);
