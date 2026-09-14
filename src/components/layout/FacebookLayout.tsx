@@ -17,16 +17,18 @@ export function FacebookLayout({ children }: FacebookLayoutProps) {
       <FacebookNavbar onMenuToggle={() => setSidebarOpen(true)} />
 
       {/* Main content area with sidebar */}
-      <div className="mx-auto flex max-w-[1440px]">
+      <div className="flex">
         {/* Left sidebar - fixed on desktop, drawer on mobile */}
         <FacebookSidebar
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
         />
 
-        {/* Main content - add pb-16 lg:pb-0 for mobile bottom nav */}
-        <main className="flex-1 min-w-0 pb-16 lg:pb-0">
-          {children}
+        {/* Main content - centered in the remaining space (add pb-16 lg:pb-0 for mobile bottom nav) */}
+        <main className="min-w-0 flex-1 pb-16 lg:pb-0">
+          <div className="mx-auto max-w-[1440px]">
+            {children}
+          </div>
         </main>
       </div>
     </>
