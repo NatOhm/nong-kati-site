@@ -13,7 +13,12 @@ export default async function OrdersLayout({
 }: {
   children: React.ReactNode;
 }): Promise<React.JSX.Element> {
-  const categories = await getTopLevelCategories();
+  let categories: Awaited<ReturnType<typeof getTopLevelCategories>> = [];
+  try {
+    categories = await getTopLevelCategories();
+  } catch {
+    // DB unavailable — render with empty categories
+  }
 
   return (
     <>

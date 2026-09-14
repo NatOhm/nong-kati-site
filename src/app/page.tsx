@@ -29,8 +29,14 @@ export const metadata: Metadata = {
 };
 
 export default async function HomePage(): Promise<React.JSX.Element> {
-  const categories = await getTopLevelCategories();
-  const featuredProducts = await getFeaturedProducts();
+  let categories: Awaited<ReturnType<typeof getTopLevelCategories>> = [];
+  let featuredProducts: Awaited<ReturnType<typeof getFeaturedProducts>> = [];
+  try {
+    categories = await getTopLevelCategories();
+    featuredProducts = await getFeaturedProducts();
+  } catch (e) {
+    console.error('[HomePage] Database unavailable, rendering with empty data:', e instanceof Error ? e.message : e);
+  }
 
   return (
     <>
