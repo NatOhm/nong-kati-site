@@ -4,11 +4,11 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Home, Grid3X3, Tag, ShoppingBag, MessageCircle,
-  ChevronDown, ChevronUp, Clock, Bookmark, Users, Tv,
-  Gamepad2, Music, Zap, Headphones, MonitorPlay,
+  ChevronDown, ChevronUp, Tv, Gamepad2, Music,
+  Headphones, MonitorPlay, Zap, X,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
-import { useState } from 'react';
+import { useState, useEffect, type MouseEventHandler } from 'react';
 
 const NAV_ITEMS = [
   { icon: Home, href: '/', label: 'หน้าหลัก', color: 'text-amber-400' },
@@ -29,15 +29,46 @@ const SHORTCUTS = [
   { icon: Gamepad2, label: 'Steam', href: '/category/games', color: 'bg-blue-600' },
 ];
 
-export function FacebookSidebar() {
+interface FacebookSidebarProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+}
+
+function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
   const pathname = usePathname();
   const [showMore, setShowMore] = useState(false);
-
   const visibleItems = showMore ? NAV_ITEMS : NAV_ITEMS.slice(0, 6);
 
+  // Close drawer on navigation (mobile)
+  useEffect(() => {
+    if (onClose) onClose();
+  }, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const linkClickHandler: MouseEventHandler<HTMLAnchorElement> = () => {
+    if (onClose) onClose();
+  };
+
   return (
-    <aside className="hidden lg:block w-[280px] shrink-0">
-      <div className="fixed top-16 left-0 h-[calc(100vh-64px)] w-[280px] overflow-y-auto px-2 py-4 scrollbar-thin scrollbar-thumb-ink-700 z-40">
+    <>
+      {/* Mobile close button */}
+      {onClose && (
+        <div className="flex items-center justify-between px-4 py-3 border-b border-ink-700 lg:hidden">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-400">
+              <span className="text-lg font-bold text-ink-900">NK</span>
+            </div>
+            <span className="text-lg font-bold text-ink-100">Nong-Kati</span>
+          </div>
+          <button
+            onClick={onClose}
+            className="flex h-10 w-10 items-center justify-center rounded-full text-ink-300 hover:bg-ink-800"
+          >
+            <X size={22} />
+          </button>
+        </div>
+      )}
+
+      <div className="px-2 py-4">
         {/* Navigation Items */}
         <nav className="space-y-1">
           {visibleItems.map((item) => {
@@ -48,6 +79,7 @@ export function FacebookSidebar() {
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={linkClickHandler}
                 className={cn(
                   'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150',
                   isActive
@@ -97,6 +129,7 @@ export function FacebookSidebar() {
                 <Link
                   key={shortcut.href}
                   href={shortcut.href}
+                  onClick={linkClickHandler}
                   className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-ink-200 hover:bg-ink-800/60 hover:text-ink-100 transition-all duration-150"
                 >
                   <div className={cn(
@@ -111,9 +144,35 @@ export function FacebookSidebar() {
             })}
           </div>
         </div>
-
-  
       </div>
-    </aside>
+    </>
+  );
+}
+
+export function FacebookSidebar({ isOpen = false, onClose }: FacebookSidebarProps): React.JSX.Element {
+  return (
+    <>
+      {/* Desktop sidebar - fixed position */}
+      <aside className="hidden lg:block w-[280px] shrink-0">
+        <div className="fixed top-16 left-0 h-[calc(100vh-64px)] w-[280px] overflow-y-auto z-40 bg-ink-900 border-r border-ink-700/50">
+          <SidebarContent />
+        </div>
+      </aside>
+
+      {/* Mobile drawer - slide from left */}
+      {isOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/60 z-50 lg:hidden"
+            onClick={onClose}
+          />
+          {/* Drawer */}
+          <div className="fixed top-0 left-0 h-full w-[280px] bg-ink-900 z-50 lg:hidden overflow-y-auto shadow-2xl">
+            <SidebarContent onClose={onClose} />
+          </div>
+        </>
+      )}
+    </>
   );
 }
