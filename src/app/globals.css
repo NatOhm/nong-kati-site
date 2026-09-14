@@ -9,6 +9,11 @@
     @apply border-ink-700;
   }
 
+  /* Add cursor-pointer to all clickable elements */
+  a, button, [role='button'], input[type='submit'], input[type='button'] {
+    @apply cursor-pointer;
+  }
+
   html {
     @apply scroll-smooth;
   }

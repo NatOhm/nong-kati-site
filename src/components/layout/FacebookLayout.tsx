@@ -24,8 +24,8 @@ export function FacebookLayout({ children }: FacebookLayoutProps) {
           onClose={() => setSidebarOpen(false)}
         />
 
-        {/* Main content */}
-        <main className="flex-1 min-w-0">
+        {/* Main content - add pb-16 lg:pb-0 for mobile bottom nav */}
+        <main className="flex-1 min-w-0 pb-16 lg:pb-0">
           {children}
         </main>
       </div>
