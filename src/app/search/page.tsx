@@ -38,9 +38,18 @@ export default async function SearchPage({ searchParams }: SearchPageProps): Pro
   const page = parseInt(pageParam || '1', 10);
   const limit = 24;
 
-  const { products, total } = await searchProducts(query, page, limit);
+  let products: Awaited<ReturnType<typeof searchProducts>>['products'] = [];
+  let total = 0;
+  let categories: Awaited<ReturnType<typeof getTopLevelCategories>> = [];
+  try {
+    const result = await searchProducts(query, page, limit);
+    products = result.products;
+    total = result.total;
+    categories = await getTopLevelCategories();
+  } catch {
+    // DB unavailable — render with empty results
+  }
   const totalPages = Math.ceil(total / limit);
-  const categories = await getTopLevelCategories();
 
   return (
     <>

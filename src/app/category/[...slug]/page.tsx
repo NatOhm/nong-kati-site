@@ -26,7 +26,12 @@ interface CategoryPageProps {
 export async function generateMetadata({ params }: CategoryPageProps): Promise<Metadata> {
   const { slug } = await params;
   const slugPath = slug.join('/');
-  const result = await getCategoryBySlug(slugPath);
+  let result: Awaited<ReturnType<typeof getCategoryBySlug>> = null;
+  try {
+    result = await getCategoryBySlug(slugPath);
+  } catch {
+    return { title: 'หมวดหมู่ — Nong-Kati' };
+  }
 
   if (!result) {
     return { title: 'ไม่พบหมวดหมู่ — Nong-Kati' };
@@ -51,12 +56,38 @@ export default async function CategoryPage({ params }: CategoryPageProps): Promi
   const { slug } = await params;
   const slugPath = slug.join('/');
 
-  const result = await getCategoryBySlug(slugPath);
-  if (!result) notFound();
+  let result: Awaited<ReturnType<typeof getCategoryBySlug>> = null;
+  let products: Awaited<ReturnType<typeof getProductsByCategory>>['products'] = [];
+  let total = 0;
+  let categories: Awaited<ReturnType<typeof getTopLevelCategories>> = [];
+  try {
+    result = await getCategoryBySlug(slugPath);
+    if (!result) notFound();
+    const { category: cat, breadcrumb: bc } = result;
+    const catResult = await getProductsByCategory(slugPath);
+    products = catResult.products;
+    total = catResult.total;
+    categories = await getTopLevelCategories();
+  } catch {
+    // DB unavailable — render empty state
+    return (
+      <>
+        <Navbar />
+        <main>
+          <PageShell>
+            <section className="py-16 text-center">
+              <h1 className="text-2xl font-bold text-ink-100">หมวดหมู่สินค้า</h1>
+              <p className="mt-4 text-ink-400">ไม่สามารถโหลดข้อมูลได้ในขณะนี้</p>
+              <Link href="/" className="mt-4 inline-block text-amber-400 hover:underline">กลับหน้าหลัก</Link>
+            </section>
+          </PageShell>
+        </main>
+        <Footer />
+      </>
+    );
+  }
 
-  const { category, breadcrumb } = result;
-  const { products, total } = await getProductsByCategory(slugPath);
-  const categories = await getTopLevelCategories();
+  const { category, breadcrumb } = result!;
 
   const siteUrl = process.env['NEXT_PUBLIC_SITE_URL'] || 'https://nong-kati.com';
   const categoryUrl = `${siteUrl}/category/${slugPath}`;

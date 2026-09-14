@@ -24,7 +24,12 @@ interface ProductPageProps {
 
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const product = await getProductBySlug(slug);
+  let product: Awaited<ReturnType<typeof getProductBySlug>> = null;
+  try {
+    product = await getProductBySlug(slug);
+  } catch {
+    return { title: 'สินค้า — Nong-Kati' };
+  }
 
   if (!product) {
     return { title: 'ไม่พบสินค้า — Nong-Kati' };
@@ -48,11 +53,30 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
 
 export default async function ProductPage({ params }: ProductPageProps): Promise<React.JSX.Element> {
   const { slug } = await params;
-  const product = await getProductBySlug(slug);
-
-  if (!product) notFound();
-
-  const categories = await getTopLevelCategories();
+  let product: Awaited<ReturnType<typeof getProductBySlug>> = null;
+  let categories: Awaited<ReturnType<typeof getTopLevelCategories>> = [];
+  try {
+    product = await getProductBySlug(slug);
+    if (!product) notFound();
+    categories = await getTopLevelCategories();
+  } catch {
+    // DB unavailable — render error state
+    return (
+      <>
+        <Navbar />
+        <main>
+          <PageShell>
+            <section className="py-16 text-center">
+              <h1 className="text-2xl font-bold text-ink-100">ไม่พบสินค้า</h1>
+              <p className="mt-4 text-ink-400">ไม่สามารถโหลดข้อมูลได้ในขณะนี้</p>
+              <Link href="/" className="mt-4 inline-block text-amber-400 hover:underline">กลับหน้าหลัก</Link>
+            </section>
+          </PageShell>
+        </main>
+        <Footer />
+      </>
+    );
+  }
   const siteUrl = process.env['NEXT_PUBLIC_SITE_URL'] || 'https://nong-kati.com';
   const productUrl = `${siteUrl}/product/${slug}`;
   const totalStock = product.variants.reduce((sum, v) => sum + v.stock, 0);

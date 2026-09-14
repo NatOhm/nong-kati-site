@@ -30,7 +30,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   // Category pages
-  const categorySlugs = await getAllCategorySlugs();
+  let categorySlugs: string[] = [];
+  let productSlugs: string[] = [];
+  try {
+    categorySlugs = await getAllCategorySlugs();
+    productSlugs = await getAllProductSlugs();
+  } catch {
+    // DB unavailable — return only static pages
+  }
   const categoryPages: MetadataRoute.Sitemap = categorySlugs.map((slug) => ({
     url: `${BASE_URL}/category/${slug}`,
     lastModified: now,
@@ -38,8 +45,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8,
   }));
 
-  // Product pages
-  const productSlugs = await getAllProductSlugs();
   const productPages: MetadataRoute.Sitemap = productSlugs.map((slug) => ({
     url: `${BASE_URL}/product/${slug}`,
     lastModified: now,
