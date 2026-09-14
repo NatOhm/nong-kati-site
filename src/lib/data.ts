@@ -246,6 +246,79 @@ export async function getAllProductSlugs(): Promise<string[]> {
   return products.map((p) => p.slug);
 }
 
+export type CatalogSort = 'featured' | 'price-asc' | 'price-desc' | 'name-asc' | 'newest';
+
+/**
+ * Full catalog query with sorting — used by the "สินค้าทั้งหมด" page.
+ * When query is empty, returns every active product.
+ */
+export async function getCatalogProducts(
+  query: string,
+  categorySlug: string | undefined,
+  sort: CatalogSort,
+  page: number = 1,
+  limit: number = 24,
+): Promise<{ products: ProductItem[]; total: number }> {
+  const trimmed = query.trim().toLowerCase();
+  type CatalogWhere = {
+    isActive: boolean;
+    OR?: Array<
+      | { name: { contains: string; mode: 'insensitive' } }
+      | { description: { contains: string; mode: 'insensitive' } }
+      | { aliases: { some: { alias: { contains: string; mode: 'insensitive' } } } }
+    >;
+    categoryId?: string;
+  };
+  const where: CatalogWhere = { isActive: true };
+
+  if (trimmed) {
+    where.OR = [
+      { name: { contains: trimmed, mode: 'insensitive' as const } },
+      { description: { contains: trimmed, mode: 'insensitive' as const } },
+      { aliases: { some: { alias: { contains: trimmed, mode: 'insensitive' as const } } } },
+    ];
+  }
+  if (categorySlug) {
+    const cat = await prisma.category.findUnique({ where: { slug: categorySlug } });
+    if (!cat) return { products: [], total: 0 };
+    where.categoryId = cat.id;
+  }
+
+  // Sorting: by min variant price requires fetching then sorting in JS for correctness.
+  const [products, total] = await Promise.all([
+    prisma.product.findMany({
+      where,
+      include: {
+        category: { select: { id: true, name: true, slug: true } },
+        variants: { orderBy: { sortOrder: 'asc' } },
+        aliases: true,
+      },
+      skip: (page - 1) * limit,
+      take: limit,
+      orderBy:
+        sort === 'newest'
+          ? { createdAt: 'desc' }
+          : sort === 'name-asc'
+            ? { name: 'asc' }
+            : { createdAt: 'desc' },
+    }),
+    prisma.product.count({ where }),
+  ]);
+
+  let items = products.map((p) => mapProduct(p, p.category));
+  if (sort === 'price-asc' || sort === 'price-desc') {
+    const minPrice = (p: ProductItem) =>
+      p.variants.length ? Math.min(...p.variants.map((v) => v.price)) : Infinity;
+    items = items.sort((a, b) =>
+      sort === 'price-asc' ? minPrice(a) - minPrice(b) : minPrice(b) - minPrice(a),
+    );
+  } else if (sort === 'featured') {
+    items = items.sort((a, b) => Number(b.isFeatured) - Number(a.isFeatured));
+  }
+
+  return { products: items, total };
+}
+
 export async function searchProducts(
   query: string,
   page: number = 1,

@@ -1,164 +1,237 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
 
-import { Navbar } from '@/components/layout/Navbar';
+import { FacebookLayout } from '@/components/layout/FacebookLayout';
 import { Footer } from '@/components/layout/Footer';
-
-export const dynamic = 'force-dynamic';
 import { PageShell } from '@/components/layout/PageShell';
 import { ProductCard } from '@/components/product/ProductCard';
 import { ProductGrid } from '@/components/product/ProductGrid';
 import { Breadcrumb } from '@/components/data-display/Breadcrumb';
 
 import {
-  searchProducts,
-  getTopLevelCategories,
+  getCatalogProducts,
+  getCategoriesWithProductCounts,
+  type CatalogSort,
 } from '@/lib/data';
 
+export const dynamic = 'force-dynamic';
+
 interface SearchPageProps {
-  searchParams: Promise<{ q?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; page?: string; sort?: string; category?: string }>;
+}
+
+const SORT_OPTIONS: { value: CatalogSort; label: string }[] = [
+  { value: 'featured', label: 'แนะนำ' },
+  { value: 'price-asc', label: 'ราคาต่ำ → สูง' },
+  { value: 'price-desc', label: 'ราคาสูง → ต่ำ' },
+  { value: 'name-asc', label: 'ชื่อ A → Z' },
+  { value: 'newest', label: 'ใหม่มาก่อน' },
+];
+
+function buildUrl(params: {
+  q?: string | undefined;
+  page?: number | undefined;
+  sort?: string | undefined;
+  category?: string | undefined;
+}): string {
+  const sp = new URLSearchParams();
+  if (params.q) sp.set('q', params.q);
+  if (params.category) sp.set('category', params.category);
+  if (params.sort && params.sort !== 'featured') sp.set('sort', params.sort);
+  if (params.page && params.page > 1) sp.set('page', String(params.page));
+  const s = sp.toString();
+  return `/search${s ? `?${s}` : ''}`;
 }
 
 export async function generateMetadata({ searchParams }: SearchPageProps): Promise<Metadata> {
-  const { q } = await searchParams;
+  const { q, category } = await searchParams;
   const query = q || '';
 
   return {
-    title: query ? `ค้นหา "${query}" — Nong-Kati` : 'ค้นหาสินค้า — Nong-Kati',
+    title: query ? `ค้นหา "${query}" — Nong-Kati` : 'สินค้าทั้งหมด — Nong-Kati',
     description: query
       ? `ผลการค้นหา "${query}" — ซื้อบัตรเกม สตรีมมิ่ง และอีคอมเมิร์ซ ออนไลน์`
-      : 'ค้นหาสินค้า gift card ออนไลน์ ส่งโค้ดทันที',
+      : 'เลือกซื้อสินค้าทั้งหมด gift card ออนไลน์ ส่งโค้ดทันที',
     robots: { index: false, follow: true },
+    other: category ? { category } : {},
   };
 }
 
 export default async function SearchPage({ searchParams }: SearchPageProps): Promise<React.JSX.Element> {
-  const { q, page: pageParam } = await searchParams;
+  const { q, page: pageParam, sort: sortParam, category } = await searchParams;
   const query = q || '';
   const page = parseInt(pageParam || '1', 10);
   const limit = 24;
+  const sort: CatalogSort = (SORT_OPTIONS.find((o) => o.value === sortParam)?.value ?? 'featured');
 
-  let products: Awaited<ReturnType<typeof searchProducts>>['products'] = [];
+  let products: Awaited<ReturnType<typeof getCatalogProducts>>['products'] = [];
   let total = 0;
-  let categories: Awaited<ReturnType<typeof getTopLevelCategories>> = [];
+  let categories: Awaited<ReturnType<typeof getCategoriesWithProductCounts>> = [];
   try {
-    const result = await searchProducts(query, page, limit);
+    const result = await getCatalogProducts(query, category, sort, page, limit);
     products = result.products;
     total = result.total;
-    categories = await getTopLevelCategories();
+    categories = await getCategoriesWithProductCounts();
   } catch {
     // DB unavailable — render with empty results
   }
   const totalPages = Math.ceil(total / limit);
 
+  // Build sort control that preserves current query/category
+  const sortUrl = (sortValue: CatalogSort) =>
+    buildUrl({ q: query || undefined, category: category || undefined, sort: sortValue });
+
   return (
     <>
-      <Navbar
-        categories={categories.map((c) => ({
-          ...c,
-          children: c.children.map((ch) => ({ id: ch.id, name: ch.name, slug: ch.slug })),
-        }))}
-      />
+      <FacebookLayout>
+        <main>
+          <PageShell>
+            {/* Breadcrumb */}
+            <Breadcrumb
+              className="py-4"
+              items={[
+                { label: 'หน้าหลัก', href: '/' },
+                category
+                  ? { label: `หมวดหมู่: ${category}`, href: `/category/${category}` }
+                  : { label: query ? 'ค้นหาสินค้า' : 'สินค้าทั้งหมด' },
+              ]}
+            />
 
-      <main>
-        <PageShell>
-          {/* Breadcrumb */}
-          <Breadcrumb
-            className="py-4"
-            items={[
-              { label: 'หน้าหลัก', href: '/' },
-              { label: 'ค้นหาสินค้า' },
-            ]}
-          />
-
-          {/* Search Header */}
-          <section className="pb-8">
-            <h1 className="font-display text-2xl font-bold text-ink-100">
-              {query ? (
-                <>ผลการค้นหา &ldquo;{query}&rdquo;</>
-              ) : (
-                'ค้นหาสินค้า'
-              )}
-            </h1>
-            {query && (
+            {/* Header */}
+            <section className="pb-6">
+              <h1 className="font-display text-2xl font-bold text-ink-100">
+                {query ? (
+                  <>ผลการค้นหา &ldquo;{query}&rdquo;</>
+                ) : category ? (
+                  <>หมวดหมู่: {category}</>
+                ) : (
+                  'สินค้าทั้งหมด'
+                )}
+              </h1>
               <p className="mt-2 text-ink-400">
                 พบ {total} รายการ
               </p>
-            )}
-          </section>
+            </section>
 
-          {/* Results */}
-          {products.length > 0 ? (
-            <section className="pb-16">
-              <ProductGrid>
-                {products.map((product) => (
-                  <ProductCard
-                    key={product.id}
-                    id={product.id}
-                    name={product.name}
-                    slug={product.slug}
-                    shortDescription={product.shortDescription}
-                    imageUrl={product.imageUrl}
-                    categoryName={product.category.name}
-                    categorySlug={product.category.slug}
-                    price={product.variants[0]?.price ?? 0}
-                    stock={product.variants.reduce((sum, v) => sum + v.stock, 0)}
-                  />
+            {/* Category chips + sort */}
+            <section className="pb-6">
+              <div className="flex flex-wrap items-center gap-2">
+                <Link
+                  href={buildUrl({ q: query || undefined, sort: sortParam })}
+                  className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                    !category
+                      ? 'border-amber-500 bg-amber-900/30 text-amber-300'
+                      : 'border-ink-600 bg-ink-800 text-ink-200 hover:border-amber-700 hover:text-amber-300'
+                  }`}
+                >
+                  ทั้งหมด
+                </Link>
+                {categories.map((cat) => (
+                  <Link
+                    key={cat.id}
+                    href={buildUrl({ q: query || undefined, category: cat.slug, sort: sortParam })}
+                    className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                      category === cat.slug
+                        ? 'border-amber-500 bg-amber-900/30 text-amber-300'
+                        : 'border-ink-600 bg-ink-800 text-ink-200 hover:border-amber-700 hover:text-amber-300'
+                    }`}
+                  >
+                    {cat.name} <span className="text-ink-500">({cat.productCount})</span>
+                  </Link>
                 ))}
-              </ProductGrid>
+              </div>
 
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="mt-8 flex items-center justify-center gap-2">
-                  {page > 1 && (
-                    <Link
-                      href={`/search?q=${encodeURIComponent(query)}&page=${page - 1}`}
-                      className="rounded-md border border-ink-600 bg-ink-800 px-3 py-1.5 text-sm text-ink-200 hover:border-amber-700 hover:text-amber-300"
-                    >
-                      ← ก่อนหน้า
-                    </Link>
-                  )}
-                  <span className="text-sm text-ink-400">
-                    หน้า {page} จาก {totalPages}
-                  </span>
-                  {page < totalPages && (
-                    <Link
-                      href={`/search?q=${encodeURIComponent(query)}&page=${page + 1}`}
-                      className="rounded-md border border-ink-600 bg-ink-800 px-3 py-1.5 text-sm text-ink-200 hover:border-amber-700 hover:text-amber-300"
-                    >
-                      ถัดไป →
-                    </Link>
-                  )}
+              <div className="mt-4 flex items-center gap-2">
+                <span className="text-sm text-ink-400">เรียงตาม:</span>
+                {SORT_OPTIONS.map((opt) => (
+                  <Link
+                    key={opt.value}
+                    href={sortUrl(opt.value)}
+                    className={`rounded-md px-2.5 py-1 text-sm transition-colors ${
+                      sort === opt.value
+                        ? 'bg-amber-900/30 font-semibold text-amber-300'
+                        : 'text-ink-300 hover:bg-ink-800 hover:text-ink-100'
+                    }`}
+                  >
+                    {opt.label}
+                  </Link>
+                ))}
+              </div>
+            </section>
+
+            {/* Results */}
+            {products.length > 0 ? (
+              <section className="pb-16">
+                <ProductGrid>
+                  {products.map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      id={product.id}
+                      name={product.name}
+                      slug={product.slug}
+                      shortDescription={product.shortDescription}
+                      imageUrl={product.imageUrl}
+                      categoryName={product.category.name}
+                      categorySlug={product.category.slug}
+                      price={product.variants[0]?.price ?? 0}
+                      stock={product.variants.reduce((sum, v) => sum + v.stock, 0)}
+                    />
+                  ))}
+                </ProductGrid>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="mt-8 flex items-center justify-center gap-2">
+                    {page > 1 && (
+                      <Link
+                        href={buildUrl({ q: query || undefined, category: category || undefined, sort: sortParam, page: page - 1 })}
+                        className="rounded-md border border-ink-600 bg-ink-800 px-3 py-1.5 text-sm text-ink-200 hover:border-amber-700 hover:text-amber-300"
+                      >
+                        ← ก่อนหน้า
+                      </Link>
+                    )}
+                    <span className="text-sm text-ink-400">
+                      หน้า {page} จาก {totalPages}
+                    </span>
+                    {page < totalPages && (
+                      <Link
+                        href={buildUrl({ q: query || undefined, category: category || undefined, sort: sortParam, page: page + 1 })}
+                        className="rounded-md border border-ink-600 bg-ink-800 px-3 py-1.5 text-sm text-ink-200 hover:border-amber-700 hover:text-amber-300"
+                      >
+                        ถัดไป →
+                      </Link>
+                    )}
+                  </div>
+                )}
+              </section>
+            ) : query || category ? (
+              <section className="py-16 text-center">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-ink-800">
+                  <span className="text-2xl">🔍</span>
                 </div>
-              )}
-            </section>
-          ) : query ? (
-            <section className="py-16 text-center">
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-ink-800">
-                <span className="text-2xl">🔍</span>
-              </div>
-              <h2 className="mb-2 text-lg font-semibold text-ink-100">
-                ไม่พบสินค้า &ldquo;{query}&rdquo;
-              </h2>
-              <p className="text-sm text-ink-400">
-                ลองค้นหาด้วยคำอื่น หรือตรวจสอบการสะกดคำ
-              </p>
-            </section>
-          ) : (
-            <section className="py-16 text-center">
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-ink-800">
-                <span className="text-2xl">🔍</span>
-              </div>
-              <h2 className="mb-2 text-lg font-semibold text-ink-100">
-                ป้อนคำค้นหา
-              </h2>
-              <p className="text-sm text-ink-400">
-                พิมพ์ชื่อสินค้าหรือหมวดหมู่ที่ต้องการค้นหา
-              </p>
-            </section>
-          )}
-        </PageShell>
-      </main>
+                <h2 className="mb-2 text-lg font-semibold text-ink-100">
+                  {query ? <>ไม่พบสินค้า &ldquo;{query}&rdquo;</> : 'ไม่พบสินค้าในหมวดหมู่นี้'}
+                </h2>
+                <p className="text-sm text-ink-400">
+                  ลองค้นหาด้วยคำอื่น หรือเลือกหมวดหมู่อื่น
+                </p>
+              </section>
+            ) : (
+              <section className="py-16 text-center">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-ink-800">
+                  <span className="text-2xl">🛒</span>
+                </div>
+                <h2 className="mb-2 text-lg font-semibold text-ink-100">
+                  ยังไม่มีสินค้าในร้าน
+                </h2>
+                <p className="text-sm text-ink-400">
+                  กลับมาใหม่ภายหลัง หรือติดต่อทีมงานเพื่อสอบถาม
+                </p>
+              </section>
+            )}
+          </PageShell>
+        </main>
+      </FacebookLayout>
 
       <Footer />
     </>
