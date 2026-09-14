@@ -24,12 +24,21 @@ const NAV_ITEMS = [
   { label: 'ตั้งค่า', href: '/account/settings', icon: Settings },
 ];
 
+// Pages that should NOT show the sidebar (auth pages)
+const PUBLIC_ACCOUNT_ROUTES = ['/account/login', '/account/register'];
+
 export default function AccountLayout({
   children,
 }: {
   children: React.ReactNode;
 }): React.JSX.Element {
   const pathname = usePathname();
+  const isPublicPage = PUBLIC_ACCOUNT_ROUTES.some((r) => pathname?.startsWith(r));
+
+  // Auth pages (login, register) render without sidebar
+  if (isPublicPage) {
+    return <>{children}</>;
+  }
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
