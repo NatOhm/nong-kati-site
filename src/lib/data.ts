@@ -251,6 +251,11 @@ export type CatalogSort = 'featured' | 'price-asc' | 'price-desc' | 'name-asc' |
 /**
  * Full catalog query with sorting — used by the "สินค้าทั้งหมด" page.
  * When query is empty, returns every active product.
+ *
+ * Ordering is computed over the ENTIRE matching set before pagination, so
+ * page N+1 continues page N's sequence exactly. Sort keys are fetched with a
+ * lightweight select, sorted with deterministic tiebreakers, then only the
+ * requested page's ids are hydrated with full includes.
  */
 export async function getCatalogProducts(
   query: string,
@@ -284,39 +289,68 @@ export async function getCatalogProducts(
     where.categoryId = cat.id;
   }
 
-  // Sorting: by min variant price requires fetching then sorting in JS for correctness.
-  const [products, total] = await Promise.all([
-    prisma.product.findMany({
-      where,
-      include: {
-        category: { select: { id: true, name: true, slug: true } },
-        variants: { orderBy: { sortOrder: 'asc' } },
-        aliases: true,
-      },
-      skip: (page - 1) * limit,
-      take: limit,
-      orderBy:
-        sort === 'newest'
-          ? { createdAt: 'desc' }
-          : sort === 'name-asc'
-            ? { name: 'asc' }
-            : { createdAt: 'desc' },
-    }),
-    prisma.product.count({ where }),
-  ]);
+  // Lightweight pass: only the fields needed to order the full matching set.
+  const keys = await prisma.product.findMany({
+    where,
+    select: {
+      id: true,
+      name: true,
+      createdAt: true,
+      isFeatured: true,
+      variants: { select: { price: true } },
+    },
+  });
 
-  let items = products.map((p) => mapProduct(p, p.category));
-  if (sort === 'price-asc' || sort === 'price-desc') {
-    const minPrice = (p: ProductItem) =>
-      p.variants.length ? Math.min(...p.variants.map((v) => v.price)) : Infinity;
-    items = items.sort((a, b) =>
-      sort === 'price-asc' ? minPrice(a) - minPrice(b) : minPrice(b) - minPrice(a),
-    );
-  } else if (sort === 'featured') {
-    items = items.sort((a, b) => Number(b.isFeatured) - Number(a.isFeatured));
-  }
+  const byName = (a: { name: string }, b: { name: string }) =>
+    a.name.localeCompare(b.name, 'th');
+  const byId = (a: { id: string }, b: { id: string }) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+  const minPriceOf = (p: (typeof keys)[number]) =>
+    p.variants.length ? Math.min(...p.variants.map((v) => Number(v.price))) : null;
 
-  return { products: items, total };
+  const cmp: (a: (typeof keys)[number], b: (typeof keys)[number]) => number =
+    sort === 'price-asc' || sort === 'price-desc'
+      ? (a, b) => {
+          // Products without variants sink to the bottom in either direction.
+          const pa = minPriceOf(a);
+          const pb = minPriceOf(b);
+          if (pa === null && pb === null) return byName(a, b) || byId(a, b);
+          if (pa === null) return 1;
+          if (pb === null) return -1;
+          const d = sort === 'price-asc' ? pa - pb : pb - pa;
+          return d !== 0 ? d : byName(a, b) || byId(a, b);
+        }
+      : sort === 'name-asc'
+        ? (a, b) => byName(a, b) || byId(a, b)
+        : sort === 'newest'
+          ? (a, b) =>
+              b.createdAt.getTime() - a.createdAt.getTime() || byId(a, b)
+          : // featured: featured first, then name, then id — deterministic
+            (a, b) =>
+              Number(b.isFeatured) - Number(a.isFeatured) || byName(a, b) || byId(a, b);
+
+  keys.sort(cmp);
+
+  const total = keys.length;
+  const pageIds = keys.slice((page - 1) * limit, page * limit).map((k) => k.id);
+  if (pageIds.length === 0) return { products: [], total };
+
+  const rows = await prisma.product.findMany({
+    where: { id: { in: pageIds } },
+    include: {
+      category: { select: { id: true, name: true, slug: true } },
+      variants: { orderBy: { sortOrder: 'asc' } },
+      aliases: true,
+    },
+  });
+  const rowById = new Map(rows.map((r) => [r.id, r]));
+
+  return {
+    products: pageIds
+      .map((id) => rowById.get(id))
+      .filter((r): r is NonNullable<typeof r> => Boolean(r))
+      .map((p) => mapProduct(p, p.category)),
+    total,
+  };
 }
 
 export async function searchProducts(
