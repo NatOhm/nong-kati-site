@@ -4,9 +4,15 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  Home, Search, Grid3X3, User,
-  MessageCircle, Menu,
-  Gamepad2, Tv, Music,
+  Home,
+  Search,
+  Grid3X3,
+  User,
+  MessageCircle,
+  Menu,
+  Gamepad2,
+  Tv,
+  Music,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { CartIcon } from '@/components/cart/CartIcon';
@@ -28,7 +34,11 @@ const NAV_ITEMS = [
   { icon: Music, href: '/category/music', label: 'เพลง' },
 ];
 
-export function FacebookNavbar({ isAuthenticated = false, customerName, onMenuToggle }: FacebookNavbarProps) {
+export function FacebookNavbar({
+  isAuthenticated = false,
+  customerName,
+  onMenuToggle,
+}: FacebookNavbarProps) {
   const pathname = usePathname();
   const { cart, updateQuantity, removeItem, itemCount } = useCart();
   const [searchFocused, setSearchFocused] = useState(false);
@@ -44,116 +54,116 @@ export function FacebookNavbar({ isAuthenticated = false, customerName, onMenuTo
 
   return (
     <>
-    <nav className="sticky top-0 z-50 border-b border-ink-700 bg-ink-900/95 backdrop-blur-md">
-      <div className="mx-auto flex h-14 items-center justify-between px-4 md:h-16 md:px-6">
-        {/* Left: Logo + Search */}
-        <div className="flex items-center gap-3">
-          {/* Mobile menu button - opens sidebar drawer */}
-          <button
-            onClick={onMenuToggle}
-            className="cursor-pointer rounded-lg p-2 text-ink-300 hover:bg-ink-800 hover:text-amber-300 lg:hidden"
-            aria-label="เปิดเมนู"
-          >
-            <Menu size={22} />
-          </button>
+      <nav className="sticky top-0 z-50 border-b border-ink-700 bg-ink-900/95 backdrop-blur-md">
+        <div className="mx-auto flex h-14 items-center justify-between px-4 md:h-16 md:px-6">
+          {/* Left: Logo + Search */}
+          <div className="flex items-center gap-3">
+            {/* Mobile menu button - opens sidebar drawer */}
+            <button
+              onClick={onMenuToggle}
+              className="cursor-pointer rounded-lg p-2 text-ink-300 hover:bg-ink-800 hover:text-amber-300 lg:hidden"
+              aria-label="เปิดเมนู"
+            >
+              <Menu size={22} />
+            </button>
 
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-400">
-              <span className="text-lg font-bold text-ink-900">NK</span>
-            </div>
-          </Link>
+            {/* Logo */}
+            <Link href="/" className="flex items-center gap-2">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-400">
+                <span className="text-lg font-bold text-ink-900">NK</span>
+              </div>
+            </Link>
 
-          {/* Search bar */}
-          <form onSubmit={handleSearch} className="hidden md:block">
-            <div className={cn(
-              'flex items-center gap-2 rounded-full border px-3 py-2 transition-colors',
-              searchFocused
-                ? 'border-amber-500 bg-ink-800'
-                : 'border-ink-700 bg-ink-800'
-            )}>
-              <Search size={16} className="text-ink-400" />
-              <input
-                type="text"
-                aria-label="ค้นหาสินค้า"
-                placeholder="ค้นหาสินค้า…"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onFocus={() => setSearchFocused(true)}
-                onBlur={() => setSearchFocused(false)}
-                className="w-48 bg-transparent text-sm text-ink-100 placeholder:text-ink-500 focus:outline-none lg:w-64"
-              />
-            </div>
-          </form>
-        </div>
-
-        {/* Center: Navigation icons - desktop only */}
-        <div className="hidden items-center gap-1 md:flex">
-          {NAV_ITEMS.map((item) => {
-            const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
-            const Icon = item.icon;
-
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
+            {/* Search bar */}
+            <form onSubmit={handleSearch} className="hidden md:block">
+              <div
                 className={cn(
-                  'group relative flex h-12 w-24 items-center justify-center rounded-lg transition-colors',
-                  isActive
-                    ? 'text-amber-400'
-                    : 'text-ink-400 hover:bg-ink-800 hover:text-ink-200'
+                  'flex items-center gap-2 rounded-full border px-3 py-2 transition-colors',
+                  searchFocused ? 'border-amber-500 bg-ink-800' : 'border-ink-700 bg-ink-800',
                 )}
-                title={item.label}
-                aria-label={item.label}
               >
-                <Icon size={22} strokeWidth={isActive ? 2.5 : 1.5} />
-                {isActive && (
-                  <div className="absolute bottom-0 left-1/2 h-[3px] w-12 -translate-x-1/2 rounded-full bg-amber-400" />
-                )}
-              </Link>
-            );
-          })}
+                <Search size={16} className="text-ink-400" />
+                <input
+                  type="text"
+                  aria-label="ค้นหาสินค้า"
+                  placeholder="ค้นหาสินค้า…"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => setSearchFocused(true)}
+                  onBlur={() => setSearchFocused(false)}
+                  className="placeholder:text-ink-500 w-48 bg-transparent text-sm text-ink-100 focus:outline-none lg:w-64"
+                />
+              </div>
+            </form>
+          </div>
+
+          {/* Center: Navigation icons - desktop only */}
+          <div className="hidden items-center gap-1 md:flex">
+            {NAV_ITEMS.map((item) => {
+              const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
+              const Icon = item.icon;
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    'group relative flex h-12 w-24 items-center justify-center rounded-lg transition-colors',
+                    isActive
+                      ? 'text-amber-400'
+                      : 'text-ink-400 hover:bg-ink-800 hover:text-ink-200',
+                  )}
+                  title={item.label}
+                  aria-label={item.label}
+                >
+                  <Icon size={22} strokeWidth={isActive ? 2.5 : 1.5} />
+                  {isActive && (
+                    <div className="absolute bottom-0 left-1/2 h-[3px] w-12 -translate-x-1/2 rounded-full bg-amber-400" />
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+
+          {/* Right: Actions */}
+          <div className="flex items-center gap-1">
+            {/* Cart — opens cart drawer */}
+            <CartIcon count={itemCount} onClick={() => setCartOpen(true)} />
+
+            {/* Notifications — popover */}
+            <NotificationsDropdown />
+
+            {/* Messenger — support contact */}
+            <Link
+              href="/account/support"
+              aria-label="ฝ่ายสนับสนุน"
+              title="ฝ่ายสนับสนุน"
+              className="flex h-10 w-10 items-center justify-center rounded-full text-ink-300 transition-colors hover:bg-ink-800 hover:text-amber-300"
+            >
+              <MessageCircle size={20} strokeWidth={1.5} />
+            </Link>
+
+            {/* Profile */}
+            <Link
+              href={isAuthenticated ? '/account/dashboard' : '/account/login'}
+              aria-label={isAuthenticated ? 'บัญชีของฉัน' : 'เข้าสู่ระบบ'}
+              title={isAuthenticated ? 'บัญชีของฉัน' : 'เข้าสู่ระบบ'}
+              className="flex h-10 w-10 items-center justify-center rounded-full text-ink-300 hover:bg-ink-800 hover:text-amber-300"
+            >
+              <User size={20} />
+            </Link>
+          </div>
         </div>
+      </nav>
 
-        {/* Right: Actions */}
-        <div className="flex items-center gap-1">
-          {/* Cart — opens cart drawer */}
-          <CartIcon count={itemCount} onClick={() => setCartOpen(true)} />
-
-          {/* Notifications — popover */}
-          <NotificationsDropdown />
-
-          {/* Messenger — support contact */}
-          <Link
-            href="/account/support"
-            aria-label="ฝ่ายสนับสนุน"
-            title="ฝ่ายสนับสนุน"
-            className="flex h-10 w-10 items-center justify-center rounded-full text-ink-300 transition-colors hover:bg-ink-800 hover:text-amber-300"
-          >
-            <MessageCircle size={20} strokeWidth={1.5} />
-          </Link>
-
-          {/* Profile */}
-          <Link
-            href={isAuthenticated ? '/account/dashboard' : '/account/login'}
-            aria-label={isAuthenticated ? 'บัญชีของฉัน' : 'เข้าสู่ระบบ'}
-            title={isAuthenticated ? 'บัญชีของฉัน' : 'เข้าสู่ระบบ'}
-            className="flex h-10 w-10 items-center justify-center rounded-full text-ink-300 hover:bg-ink-800 hover:text-amber-300"
-          >
-            <User size={20} />
-          </Link>
-        </div>
-      </div>
-    </nav>
-
-    {/* Cart drawer */}
-    <CartDrawer
-      isOpen={cartOpen}
-      onClose={() => setCartOpen(false)}
-      items={cart?.items ?? []}
-      onUpdateQty={(variantId, qty) => updateQuantity(variantId, qty)}
-      onRemoveItem={(variantId) => removeItem(variantId)}
-    />
+      {/* Cart drawer */}
+      <CartDrawer
+        isOpen={cartOpen}
+        onClose={() => setCartOpen(false)}
+        items={cart?.items ?? []}
+        onUpdateQty={(variantId, qty) => updateQuantity(variantId, qty)}
+        onRemoveItem={(variantId) => removeItem(variantId)}
+      />
     </>
   );
 }

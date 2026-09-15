@@ -46,12 +46,13 @@ export const metadata: Metadata = {
 /** 14-seo.md §13.1 — single sitewide lang="th", no per-page override. */
 export default function RootLayout({ children }: { children: React.ReactNode }): React.JSX.Element {
   return (
-    <html lang="th" className={`${ibmPlexSansThai.variable} ${notoSerifThai.variable} ${jetbrainsMono.variable}`}>
+    <html
+      lang="th"
+      className={`${ibmPlexSansThai.variable} ${notoSerifThai.variable} ${jetbrainsMono.variable}`}
+    >
       <body className="text-thai font-ui">
         <ThemeProvider defaultTheme="dark">
-          <CartProvider>
-            {children}
-          </CartProvider>
+          <CartProvider>{children}</CartProvider>
           <ToastMount />
           <CookieConsentBanner />
         </ThemeProvider>

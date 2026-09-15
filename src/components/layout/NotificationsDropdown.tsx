@@ -72,8 +72,7 @@ export function NotificationsDropdown(): React.JSX.Element {
     };
   }, [open]);
 
-  const markAllRead = () =>
-    setNotifications((ns) => ns.map((n) => ({ ...n, read: true })));
+  const markAllRead = () => setNotifications((ns) => ns.map((n) => ({ ...n, read: true })));
 
   return (
     <div ref={containerRef} className="relative">
@@ -130,7 +129,7 @@ export function NotificationsDropdown(): React.JSX.Element {
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-ink-100">{n.title}</p>
                     <p className="text-xs text-ink-400">{n.body}</p>
-                    <p className="mt-0.5 text-[11px] text-ink-500">{n.time}</p>
+                    <p className="text-ink-500 mt-0.5 text-[11px]">{n.time}</p>
                   </div>
                   {!n.read && (
                     <span className="ml-auto mt-1 h-2 w-2 shrink-0 rounded-full bg-amber-400" />

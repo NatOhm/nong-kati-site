@@ -24,7 +24,6 @@ import {
 
 const CART_STORAGE_KEY = 'nk_cart:v2';
 const LEGACY_CART_KEY = 'nk_cart';
-const STORAGE_SYNC_EVENT = 'nk-cart-storage-sync';
 
 interface CartContextValue {
   // State
@@ -109,10 +108,8 @@ export function CartProvider({ children }: { children: React.ReactNode }): React
     };
 
     window.addEventListener('storage', syncFromStorage);
-    window.addEventListener(STORAGE_SYNC_EVENT, syncFromStorage);
     return () => {
       window.removeEventListener('storage', syncFromStorage);
-      window.removeEventListener(STORAGE_SYNC_EVENT, syncFromStorage);
     };
   }, []);
 
@@ -215,5 +212,3 @@ export function useCartContext(): CartContextValue {
   }
   return ctx;
 }
-
-export { STORAGE_SYNC_EVENT };
