@@ -13,10 +13,7 @@ import { StockBadge } from '@/components/product/StockBadge';
 import { ProductDetailClient } from '@/components/product/ProductDetailClient';
 import { formatThb } from '@/utils/format';
 
-import {
-  getProductBySlug,
-  getTopLevelCategories,
-} from '@/lib/data';
+import { getProductBySlug, getTopLevelCategories } from '@/lib/data';
 
 interface ProductPageProps {
   params: Promise<{ slug: string }>;
@@ -51,7 +48,9 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
   };
 }
 
-export default async function ProductPage({ params }: ProductPageProps): Promise<React.JSX.Element> {
+export default async function ProductPage({
+  params,
+}: ProductPageProps): Promise<React.JSX.Element> {
   const { slug } = await params;
   let product: Awaited<ReturnType<typeof getProductBySlug>> = null;
   let categories: Awaited<ReturnType<typeof getTopLevelCategories>> = [];
@@ -67,9 +66,11 @@ export default async function ProductPage({ params }: ProductPageProps): Promise
         <main>
           <PageShell>
             <section className="py-16 text-center">
-              <h1 className="text-2xl font-bold text-clay-900">ไม่พบสินค้า</h1>
-              <p className="mt-4 text-clay-500">ไม่สามารถโหลดข้อมูลได้ในขณะนี้</p>
-              <Link href="/" className="mt-4 inline-block text-peach-600 hover:underline">กลับหน้าหลัก</Link>
+              <h1 className="text-2xl font-bold text-fg">ไม่พบสินค้า</h1>
+              <p className="mt-4 text-fg-placeholder">ไม่สามารถโหลดข้อมูลได้ในขณะนี้</p>
+              <Link href="/" className="mt-4 inline-block text-fg-brand hover:underline">
+                กลับหน้าหลัก
+              </Link>
             </section>
           </PageShell>
         </main>
@@ -95,9 +96,8 @@ export default async function ProductPage({ params }: ProductPageProps): Promise
           offers: {
             price: product.variants[0]?.price ?? 0,
             priceCurrency: 'THB',
-            availability: totalStock > 0
-              ? 'https://schema.org/InStock'
-              : 'https://schema.org/OutOfStock',
+            availability:
+              totalStock > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
             url: productUrl,
           },
         }}
@@ -133,7 +133,7 @@ export default async function ProductPage({ params }: ProductPageProps): Promise
           {/* Product Detail */}
           <div className="grid gap-8 pb-16 md:grid-cols-2">
             {/* Image */}
-            <div className="flex aspect-square items-center justify-center overflow-hidden rounded-lg border border-clay-200 bg-clay-100">
+            <div className="flex aspect-square items-center justify-center overflow-hidden rounded-lg border border-line-subtle bg-surface">
               {product.imageUrl ? (
                 <img
                   src={product.imageUrl}
@@ -141,7 +141,7 @@ export default async function ProductPage({ params }: ProductPageProps): Promise
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <div className="flex flex-col items-center gap-4 text-clay-9000">
+                <div className="text-clay-9000 flex flex-col items-center gap-4">
                   <span className="text-6xl">🎮</span>
                   <span className="text-sm">ไม่มีรูปภาพ</span>
                 </div>
@@ -153,13 +153,13 @@ export default async function ProductPage({ params }: ProductPageProps): Promise
               {/* Category tag */}
               <Link
                 href={`/category/${product.category.slug}`}
-                className="text-sm font-medium text-peach-600 hover:text-peach-700"
+                className="text-sm font-medium text-fg-brand hover:text-fg-brand"
               >
                 {product.category.name}
               </Link>
 
               {/* Title */}
-              <h1 className="font-display text-2xl font-bold text-clay-900 md:text-3xl">
+              <h1 className="font-display text-2xl font-bold text-fg md:text-3xl">
                 {product.name}
               </h1>
 
@@ -170,7 +170,7 @@ export default async function ProductPage({ params }: ProductPageProps): Promise
 
               {/* Description */}
               {product.description && (
-                <div className="prose prose-invert max-w-none text-sm text-clay-600">
+                <div className="prose prose-invert max-w-none text-sm text-fg-muted">
                   <p>{product.description}</p>
                 </div>
               )}

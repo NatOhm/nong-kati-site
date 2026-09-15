@@ -71,22 +71,22 @@ export function Modal({
         aria-modal="true"
         aria-labelledby={titleId}
         className={cn(
-          'relative w-full animate-modal-enter rounded-t-3xl border border-clay-200 bg-white p-8 shadow-xl md:rounded-2xl',
+          'relative w-full animate-modal-enter rounded-t-3xl border border-line-subtle bg-white p-8 shadow-xl md:rounded-2xl',
           sizeClasses[size],
         )}
       >
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
-            <h2 id={titleId} className="font-display text-xl font-semibold text-clay-900">
+            <h2 id={titleId} className="font-display text-xl font-semibold text-fg">
               {title}
             </h2>
-            {description && <p className="mt-1 text-sm text-clay-600">{description}</p>}
+            {description && <p className="mt-1 text-sm text-fg-muted">{description}</p>}
           </div>
           <button
             type="button"
             aria-label="ปิด"
             onClick={onClose}
-            className="text-clay-500 hover:text-clay-700"
+            className="text-fg-placeholder hover:text-fg-secondary"
           >
             <X size={20} />
           </button>

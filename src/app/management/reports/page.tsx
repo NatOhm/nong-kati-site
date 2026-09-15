@@ -56,27 +56,27 @@ export default function AdminReportsPage(): React.JSX.Element {
   return (
     <AdminShell staffName="Founder" staffRole="super_admin" breadcrumbs={[{ label: 'รายงาน' }]}>
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold text-clay-900">รายงาน</h1>
+        <h1 className="text-2xl font-bold text-fg">รายงาน</h1>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {REPORTS.map((report) => (
             <div
               key={report.id}
-              className="rounded-md border border-clay-200 bg-white p-6 transition-colors hover:border-peach-300"
+              className="rounded-md border border-line-subtle bg-white p-6 transition-colors hover:border-line-brand"
             >
               <div className="mb-3 text-2xl">{report.icon}</div>
-              <h3 className="mb-1 text-sm font-semibold text-clay-900">{report.name}</h3>
-              <p className="mb-4 text-xs text-clay-500">{report.description}</p>
+              <h3 className="mb-1 text-sm font-semibold text-fg">{report.name}</h3>
+              <p className="mb-4 text-xs text-fg-placeholder">{report.description}</p>
               <div className="flex gap-2">
                 <button
                   onClick={() => handleExport(report.id)}
-                  className="inline-flex items-center gap-1 rounded-md border border-clay-200 px-3 py-1.5 text-xs text-clay-600 hover:bg-clay-100"
+                  className="inline-flex items-center gap-1 rounded-md border border-line-subtle px-3 py-1.5 text-xs text-fg-muted hover:bg-surface"
                 >
                   <Download size={12} /> CSV
                 </button>
                 <button
                   onClick={() => handleExport(report.id)}
-                  className="inline-flex items-center gap-1 rounded-md border border-clay-200 px-3 py-1.5 text-xs text-clay-600 hover:bg-clay-100"
+                  className="inline-flex items-center gap-1 rounded-md border border-line-subtle px-3 py-1.5 text-xs text-fg-muted hover:bg-surface"
                 >
                   <FileText size={12} /> PDF
                 </button>

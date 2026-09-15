@@ -10,10 +10,10 @@ const BADGES = [
     color: 'bg-jade-500/15 text-jade-700',
   },
   {
-    icon: <Zap size={24} className="text-peach-600" />,
+    icon: <Zap size={24} className="text-fg-brand" />,
     title: 'ส่งโค้ดทันที',
     desc: 'ภายใน 60 วินาทีหลังชำระเงิน',
-    color: 'bg-peach-100 text-peach-700',
+    color: 'bg-peach-100 text-fg-brand',
   },
   {
     icon: <Headphones size={24} className="text-coral-500" />,
@@ -22,7 +22,7 @@ const BADGES = [
     color: 'bg-coral-100 text-coral-600',
   },
   {
-    icon: <CreditCard size={24} className="text-peach-700" />,
+    icon: <CreditCard size={24} className="text-fg-brand" />,
     title: 'PromptPay + บัตรเครดิต',
     desc: 'ชำระเงินได้หลายช่องทาง',
     color: 'bg-peach-50 text-peach-800',
@@ -31,14 +31,14 @@ const BADGES = [
     icon: <Star size={24} className="text-peach-500" />,
     title: 'ขายแล้ว 567+ โค้ด',
     desc: 'ลูกค้าไว้วางใจ 4.9/5 ดาว',
-    color: 'bg-peach-100 text-peach-600',
+    color: 'bg-peach-100 text-fg-brand',
   },
 ];
 
 export function TrustBadges() {
   return (
     <section className="px-4 py-8 md:px-8">
-      <h2 className="mb-6 text-center text-lg font-bold text-clay-900">ทำไมต้อง Nong-Kati?</h2>
+      <h2 className="mb-6 text-center text-lg font-bold text-fg">ทำไมต้อง Nong-Kati?</h2>
       <div className="mx-auto grid max-w-4xl grid-cols-2 gap-4 md:grid-cols-5">
         {BADGES.map((badge) => (
           <div
@@ -51,7 +51,7 @@ export function TrustBadges() {
               {badge.icon}
             </div>
             <h3 className="text-sm font-semibold text-clay-800">{badge.title}</h3>
-            <p className="text-xs text-clay-600">{badge.desc}</p>
+            <p className="text-xs text-fg-muted">{badge.desc}</p>
           </div>
         ))}
       </div>

@@ -35,16 +35,16 @@ function FAQItem({ q, a }: { q: string; a: string }) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div className="border-b border-clay-200 last:border-b-0">
+    <div className="border-b border-line-subtle last:border-b-0">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex w-full items-center justify-between px-4 py-4 text-left transition-colors hover:bg-clay-100"
+        className="flex w-full items-center justify-between px-4 py-4 text-left transition-colors hover:bg-surface"
       >
         <span className="pr-4 text-sm font-medium text-clay-800">{q}</span>
         {isOpen ? (
-          <ChevronUp size={18} className="shrink-0 text-peach-600" />
+          <ChevronUp size={18} className="shrink-0 text-fg-brand" />
         ) : (
-          <ChevronDown size={18} className="shrink-0 text-clay-500" />
+          <ChevronDown size={18} className="shrink-0 text-fg-placeholder" />
         )}
       </button>
       <div
@@ -53,7 +53,7 @@ function FAQItem({ q, a }: { q: string; a: string }) {
           isOpen ? 'max-h-40' : 'max-h-0',
         )}
       >
-        <p className="px-4 pb-4 text-sm leading-relaxed text-clay-600">{a}</p>
+        <p className="px-4 pb-4 text-sm leading-relaxed text-fg-muted">{a}</p>
       </div>
     </div>
   );
@@ -62,7 +62,7 @@ function FAQItem({ q, a }: { q: string; a: string }) {
 export function FAQAccordion() {
   return (
     <section className="px-4 py-8 md:px-8">
-      <h2 className="mb-6 text-center text-lg font-bold text-clay-900">คำถามที่พบบ่อย</h2>
+      <h2 className="mb-6 text-center text-lg font-bold text-fg">คำถามที่พบบ่อย</h2>
       <div className="clay-card mx-auto max-w-2xl rounded-2xl">
         {FAQ_DATA.map((item) => (
           <FAQItem key={item.q} q={item.q} a={item.a} />

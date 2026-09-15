@@ -50,9 +50,9 @@ export function CheckoutStepper({
                   'flex items-center gap-2 text-sm font-medium transition-colors',
                   isClickable && 'cursor-pointer',
                   !isClickable && 'cursor-not-allowed',
-                  isCurrent && 'text-peach-600',
+                  isCurrent && 'text-fg-brand',
                   isCompleted && 'text-jade-600',
-                  isFuture && 'text-clay-500',
+                  isFuture && 'text-fg-placeholder',
                 )}
               >
                 {/* Step circle */}
@@ -61,7 +61,7 @@ export function CheckoutStepper({
                     'flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-colors',
                     isCurrent && 'bg-peach-500 text-white',
                     isCompleted && 'bg-jade-500 text-white',
-                    isFuture && 'border border-clay-300 bg-clay-100 text-clay-500',
+                    isFuture && 'border border-line bg-surface text-fg-placeholder',
                   )}
                 >
                   {isCompleted ? <Check size={14} strokeWidth={2.5} /> : step.number}

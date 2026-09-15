@@ -13,12 +13,12 @@ export const metadata: Metadata = {
 export default function PrivacyPolicyPage(): React.JSX.Element {
   return (
     <div className="mx-auto max-w-3xl px-4 py-12">
-      <h1 className="mb-6 text-2xl font-bold text-clay-900">นโยบายความเป็นส่วนตัว</h1>
-      <p className="mb-4 text-xs text-clay-9000">อัปเดตล่าสุด: 24 สิงหาคม 2569</p>
+      <h1 className="mb-6 text-2xl font-bold text-fg">นโยบายความเป็นส่วนตัว</h1>
+      <p className="text-clay-9000 mb-4 text-xs">อัปเดตล่าสุด: 24 สิงหาคม 2569</p>
 
-      <div className="space-y-6 text-sm leading-relaxed text-clay-600">
+      <div className="space-y-6 text-sm leading-relaxed text-fg-muted">
         <section>
-          <h2 className="mb-2 text-lg font-semibold text-clay-900">1. บทนำ</h2>
+          <h2 className="mb-2 text-lg font-semibold text-fg">1. บทนำ</h2>
           <p>
             Nong-Kati (&quot;เรา&quot;) ให้ความสำคัญกับการคุ้มครองข้อมูลส่วนบุคคลของคุณ
             นโยบายนี้อธิบายวิธีที่เราเก็บรวบรวม ใช้ และปกป้องข้อมูลส่วนบุคคลของคุณ
@@ -27,7 +27,7 @@ export default function PrivacyPolicyPage(): React.JSX.Element {
         </section>
 
         <section>
-          <h2 className="mb-2 text-lg font-semibold text-clay-900">2. ข้อมูลที่เราเก็บรวบรวม</h2>
+          <h2 className="mb-2 text-lg font-semibold text-fg">2. ข้อมูลที่เราเก็บรวบรวม</h2>
           <ul className="list-inside list-disc space-y-1">
             <li>อีเมลและหมายเลขโทรศัพท์ (เมื่อดำเนินการสั่งซื้อ)</li>
             <li>ข้อมูลการชำระเงิน (ไม่เก็บหมายเลขบัตรเครดิต — ประมวลผลโดยผู้ให้บริการชำระเงิน)</li>
@@ -37,7 +37,7 @@ export default function PrivacyPolicyPage(): React.JSX.Element {
         </section>
 
         <section>
-          <h2 className="mb-2 text-lg font-semibold text-clay-900">3. วัตถุประสงค์ในการใช้ข้อมูล</h2>
+          <h2 className="mb-2 text-lg font-semibold text-fg">3. วัตถุประสงค์ในการใช้ข้อมูล</h2>
           <ul className="list-inside list-disc space-y-1">
             <li>ดำเนินการสั่งซื้อและส่งมอบสินค้าดิจิทัล</li>
             <li>ป้องกันการทุจริต</li>
@@ -47,7 +47,7 @@ export default function PrivacyPolicyPage(): React.JSX.Element {
         </section>
 
         <section>
-          <h2 className="mb-2 text-lg font-semibold text-clay-900">4. สิทธิของคุณ</h2>
+          <h2 className="mb-2 text-lg font-semibold text-fg">4. สิทธิของคุณ</h2>
           <p>ภายใต้ PDPA คุณมีสิทธิ์:</p>
           <ul className="mt-2 list-inside list-disc space-y-1">
             <li>ขอเข้าถึงข้อมูลส่วนบุคคลของคุณ</li>
@@ -60,10 +60,10 @@ export default function PrivacyPolicyPage(): React.JSX.Element {
         </section>
 
         <section>
-          <h2 className="mb-2 text-lg font-semibold text-clay-900">5. การติดต่อ</h2>
+          <h2 className="mb-2 text-lg font-semibold text-fg">5. การติดต่อ</h2>
           <p>
             หากมีคำถามเกี่ยวกับนโยบายความเป็นส่วนตัว กรุณาติดต่อเราที่{' '}
-            <a href="mailto:privacy@nong-kati.co.th" className="text-peach-600 hover:text-peach-700">
+            <a href="mailto:privacy@nong-kati.co.th" className="text-fg-brand hover:text-fg-brand">
               privacy@nong-kati.co.th
             </a>
           </p>

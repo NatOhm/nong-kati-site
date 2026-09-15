@@ -44,7 +44,7 @@ export function ProductCard({
       aria-label={`${name} — ${formatThb(price)}`}
     >
       {/* Image placeholder */}
-      <div className="relative aspect-square overflow-hidden bg-clay-100">
+      <div className="relative aspect-square overflow-hidden bg-surface">
         {imageUrl ? (
           <img
             src={imageUrl}
@@ -66,21 +66,21 @@ export function ProductCard({
       {/* Content */}
       <div className="flex flex-1 flex-col gap-1.5 p-3">
         {/* Category tag */}
-        <span className="text-xs font-medium text-peach-600">{categoryName}</span>
+        <span className="text-xs font-medium text-fg-brand">{categoryName}</span>
 
         {/* Product name */}
-        <h3 className="line-clamp-2 text-sm font-semibold text-clay-800 transition-colors group-hover:text-peach-700">
+        <h3 className="line-clamp-2 text-sm font-semibold text-clay-800 transition-colors group-hover:text-fg-brand">
           {name}
         </h3>
 
         {/* Short description */}
         {shortDescription && (
-          <p className="line-clamp-2 text-xs text-clay-600">{shortDescription}</p>
+          <p className="line-clamp-2 text-xs text-fg-muted">{shortDescription}</p>
         )}
 
         {/* Price */}
         <div className="mt-auto pt-2">
-          <span className="text-lg font-bold text-peach-700">{formatThb(price)}</span>
+          <span className="text-lg font-bold text-fg-brand">{formatThb(price)}</span>
         </div>
       </div>
     </Link>

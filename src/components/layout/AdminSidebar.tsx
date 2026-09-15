@@ -100,15 +100,15 @@ export function AdminSidebar({
   return (
     <aside
       className={cn(
-        'flex h-full flex-col border-r border-clay-200 bg-clay-50 transition-all duration-200',
+        'flex h-full flex-col border-r border-line-subtle bg-surface-base transition-all duration-200',
         collapsed ? 'w-16' : 'w-64',
         className,
       )}
     >
       {/* Logo */}
-      <div className="flex h-14 items-center border-b border-clay-200 px-4">
+      <div className="flex h-14 items-center border-b border-line-subtle px-4">
         {!collapsed && (
-          <Link href="/management/dashboard" className="text-lg font-bold text-peach-600">
+          <Link href="/management/dashboard" className="text-lg font-bold text-fg-brand">
             Nong-Kati
           </Link>
         )}
@@ -128,8 +128,8 @@ export function AdminSidebar({
                   className={cn(
                     'flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors',
                     isActive
-                      ? 'bg-peach-100 text-peach-600'
-                      : 'text-clay-600 hover:bg-clay-100 hover:text-clay-900',
+                      ? 'bg-peach-100 text-fg-brand'
+                      : 'text-fg-muted hover:bg-surface hover:text-fg',
                     collapsed && 'justify-center px-2',
                   )}
                   title={collapsed ? item.label : undefined}
@@ -144,10 +144,10 @@ export function AdminSidebar({
       </nav>
 
       {/* Collapse toggle */}
-      <div className="border-t border-clay-200 p-2">
+      <div className="border-t border-line-subtle p-2">
         <button
           onClick={onToggle}
-          className="flex w-full items-center justify-center rounded-md p-2 text-clay-500 hover:bg-clay-100 hover:text-clay-900"
+          className="flex w-full items-center justify-center rounded-md p-2 text-fg-placeholder hover:bg-surface hover:text-fg"
           aria-label={collapsed ? 'ขยาย sidebar' : 'ย่อ sidebar'}
         >
           {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}

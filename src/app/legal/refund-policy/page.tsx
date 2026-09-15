@@ -13,20 +13,20 @@ export const metadata: Metadata = {
 export default function RefundPolicyPage(): React.JSX.Element {
   return (
     <div className="mx-auto max-w-3xl px-4 py-12">
-      <h1 className="mb-6 text-2xl font-bold text-clay-900">นโยบายการคืนเงิน</h1>
-      <p className="mb-4 text-xs text-clay-9000">อัปเดตล่าสุด: 24 สิงหาคม 2569</p>
+      <h1 className="mb-6 text-2xl font-bold text-fg">นโยบายการคืนเงิน</h1>
+      <p className="text-clay-9000 mb-4 text-xs">อัปเดตล่าสุด: 24 สิงหาคม 2569</p>
 
-      <div className="space-y-6 text-sm leading-relaxed text-clay-600">
+      <div className="space-y-6 text-sm leading-relaxed text-fg-muted">
         <section>
-          <h2 className="mb-2 text-lg font-semibold text-clay-900">1. เงื่อนไขการคืนเงิน</h2>
+          <h2 className="mb-2 text-lg font-semibold text-fg">1. เงื่อนไขการคืนเงิน</h2>
           <p>
-            คุณสามารถขอคืนเงินได้ภายใน 7 วันนับจากวันที่สั่งซื้อ
-            หากไม่ได้รับรหัสโค้ด หรือรหัสโค้ดไม่สามารถใช้งานได้
+            คุณสามารถขอคืนเงินได้ภายใน 7 วันนับจากวันที่สั่งซื้อ หากไม่ได้รับรหัสโค้ด
+            หรือรหัสโค้ดไม่สามารถใช้งานได้
           </p>
         </section>
 
         <section>
-          <h2 className="mb-2 text-lg font-semibold text-clay-900">2. กรณีที่ไม่สามารถคืนเงินได้</h2>
+          <h2 className="mb-2 text-lg font-semibold text-fg">2. กรณีที่ไม่สามารถคืนเงินได้</h2>
           <ul className="list-inside list-disc space-y-1">
             <li>รหัสโค้ดถูกใช้งานแล้ว</li>
             <li>สั่งซื้อเกิน 7 วัน</li>
@@ -35,10 +35,10 @@ export default function RefundPolicyPage(): React.JSX.Element {
         </section>
 
         <section>
-          <h2 className="mb-2 text-lg font-semibold text-clay-900">3. วิธีการขอคืนเงิน</h2>
+          <h2 className="mb-2 text-lg font-semibold text-fg">3. วิธีการขอคืนเงิน</h2>
           <p>
             ติดต่อเราที่{' '}
-            <a href="mailto:support@nong-kati.co.th" className="text-peach-600 hover:text-peach-700">
+            <a href="mailto:support@nong-kati.co.th" className="text-fg-brand hover:text-fg-brand">
               support@nong-kati.co.th
             </a>{' '}
             พร้อมหมายเลขคำสั่งซื้อและเหตุผลในการขอคืนเงิน
@@ -46,10 +46,8 @@ export default function RefundPolicyPage(): React.JSX.Element {
         </section>
 
         <section>
-          <h2 className="mb-2 text-lg font-semibold text-clay-900">4. ระยะเวลาดำเนินการ</h2>
-          <p>
-            การคืนเงินจะดำเนินการภายใน 3-5 วันทำการหลังจากได้รับการอนุมัติ
-          </p>
+          <h2 className="mb-2 text-lg font-semibold text-fg">4. ระยะเวลาดำเนินการ</h2>
+          <p>การคืนเงินจะดำเนินการภายใน 3-5 วันทำการหลังจากได้รับการอนุมัติ</p>
         </section>
       </div>
     </div>

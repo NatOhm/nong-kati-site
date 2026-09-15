@@ -39,7 +39,7 @@ export function AdminTopBar({
   return (
     <header
       className={cn(
-        'flex h-14 items-center justify-between border-b border-clay-200 bg-clay-50 px-4 md:px-6',
+        'flex h-14 items-center justify-between border-b border-line-subtle bg-surface-base px-4 md:px-6',
         className,
       )}
     >
@@ -47,7 +47,7 @@ export function AdminTopBar({
         {/* Mobile sidebar toggle */}
         <button
           onClick={onSidebarToggle}
-          className="rounded p-1 text-clay-500 hover:bg-clay-100 hover:text-clay-900 md:hidden"
+          className="rounded p-1 text-fg-placeholder hover:bg-surface hover:text-fg md:hidden"
           aria-label="เปิดเมนู"
         >
           <Menu size={20} strokeWidth={1.5} />
@@ -61,11 +61,11 @@ export function AdminTopBar({
                 <li key={idx} className="flex items-center gap-1">
                   {idx > 0 && <span className="text-clay-400">/</span>}
                   {crumb.href ? (
-                    <a href={crumb.href} className="text-clay-500 hover:text-peach-700">
+                    <a href={crumb.href} className="text-fg-placeholder hover:text-fg-brand">
                       {crumb.label}
                     </a>
                   ) : (
-                    <span className="text-clay-700">{crumb.label}</span>
+                    <span className="text-fg-secondary">{crumb.label}</span>
                   )}
                 </li>
               ))}
@@ -77,7 +77,7 @@ export function AdminTopBar({
       <div className="flex items-center gap-4">
         {/* Notifications */}
         <button
-          className="relative rounded p-1.5 text-clay-500 hover:bg-clay-100 hover:text-clay-900"
+          className="relative rounded p-1.5 text-fg-placeholder hover:bg-surface hover:text-fg"
           aria-label={`การแจ้งเตือน (${notificationCount})`}
         >
           <Bell size={18} strokeWidth={1.5} />
@@ -91,8 +91,8 @@ export function AdminTopBar({
         {/* User info */}
         <div className="hidden items-center gap-2 md:flex">
           <div className="text-right">
-            <p className="text-sm font-medium text-clay-900">{staffName}</p>
-            <p className="text-xs text-clay-500">{ROLE_LABELS[staffRole]}</p>
+            <p className="text-sm font-medium text-fg">{staffName}</p>
+            <p className="text-xs text-fg-placeholder">{ROLE_LABELS[staffRole]}</p>
           </div>
         </div>
 
@@ -104,7 +104,7 @@ export function AdminTopBar({
             localStorage.removeItem('nk_admin_email');
             window.location.href = '/management/login';
           }}
-          className="rounded p-1.5 text-clay-500 hover:bg-clay-100 hover:text-coral-600"
+          className="rounded p-1.5 text-fg-placeholder hover:bg-surface hover:text-coral-600"
           aria-label="ออกจากระบบ"
         >
           <LogOut size={18} strokeWidth={1.5} />

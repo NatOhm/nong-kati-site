@@ -25,9 +25,9 @@ const STATUS_CONFIG: Record<
 > = {
   pending_payment: {
     label: 'รอชำระเงิน',
-    bgClass: 'bg-clay-100',
-    textClass: 'text-clay-700',
-    borderClass: 'border-clay-300',
+    bgClass: 'bg-surface',
+    textClass: 'text-fg-secondary',
+    borderClass: 'border-line',
   },
   payment_confirmed: {
     label: 'ยืนยันการชำระแล้ว',
@@ -51,7 +51,7 @@ const STATUS_CONFIG: Record<
     label: 'กำลังดำเนินการ',
     bgClass: 'bg-peach-100',
     textClass: 'text-peach-800',
-    borderClass: 'border-peach-300',
+    borderClass: 'border-line-brand',
   },
   failed: {
     label: 'ล้มเหลว',
@@ -67,21 +67,21 @@ const STATUS_CONFIG: Record<
   },
   refunded: {
     label: 'คืนเงินแล้ว',
-    bgClass: 'bg-clay-100',
-    textClass: 'text-clay-600',
-    borderClass: 'border-clay-300',
+    bgClass: 'bg-surface',
+    textClass: 'text-fg-muted',
+    borderClass: 'border-line',
   },
   expired: {
     label: 'หมดอายุ',
-    bgClass: 'bg-clay-100',
-    textClass: 'text-clay-500',
-    borderClass: 'border-clay-300',
+    bgClass: 'bg-surface',
+    textClass: 'text-fg-placeholder',
+    borderClass: 'border-line',
   },
   abandoned: {
     label: 'ยกเลิก',
-    bgClass: 'bg-clay-100',
-    textClass: 'text-clay-500',
-    borderClass: 'border-clay-300',
+    bgClass: 'bg-surface',
+    textClass: 'text-fg-placeholder',
+    borderClass: 'border-line',
   },
 };
 

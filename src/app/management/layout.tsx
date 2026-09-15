@@ -36,10 +36,10 @@ export default function ManagementLayout({
   // Loading state while checking auth
   if (isAuthenticated === null) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-clay-50">
+      <div className="flex min-h-screen items-center justify-center bg-surface-base">
         <div className="text-center">
           <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-peach-500 border-t-transparent" />
-          <p className="text-sm text-clay-500">กำลังตรวจสอบ...</p>
+          <p className="text-sm text-fg-placeholder">กำลังตรวจสอบ...</p>
         </div>
       </div>
     );

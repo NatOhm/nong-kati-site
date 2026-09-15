@@ -18,7 +18,7 @@ export function MobileBottomNav() {
   const { itemCount } = useCart();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-clay-200 bg-clay-50/95 backdrop-blur-md lg:hidden">
+    <nav className="bg-surface-base/95 fixed bottom-0 left-0 right-0 z-50 border-t border-line-subtle backdrop-blur-md lg:hidden">
       <div className="flex items-center justify-around px-2 py-1">
         {NAV_ITEMS.map((item) => {
           const isActive =
@@ -32,7 +32,7 @@ export function MobileBottomNav() {
               href={item.href}
               className={cn(
                 'flex min-w-[60px] flex-col items-center gap-0.5 rounded-lg px-3 py-2 transition-colors',
-                isActive ? 'text-peach-600' : 'text-clay-500 hover:text-clay-800',
+                isActive ? 'text-fg-brand' : 'text-fg-placeholder hover:text-clay-800',
               )}
             >
               <div className="relative">

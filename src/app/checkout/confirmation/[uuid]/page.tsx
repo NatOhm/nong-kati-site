@@ -59,7 +59,7 @@ export default async function ConfirmationPage({
 
           <div className="mx-auto max-w-2xl pb-16">
             {/* Order Status Header */}
-            <div className="mb-8 rounded-md border border-clay-200 bg-white p-6 text-center">
+            <div className="mb-8 rounded-md border border-line-subtle bg-white p-6 text-center">
               <div className="mb-4 flex justify-center">
                 {isCompleted ? (
                   <div className="flex h-16 w-16 items-center justify-center rounded-full bg-jade-500/15">
@@ -67,12 +67,12 @@ export default async function ConfirmationPage({
                   </div>
                 ) : (
                   <div className="flex h-16 w-16 items-center justify-center rounded-full bg-peach-100">
-                    <Clock size={28} className="text-peach-600" />
+                    <Clock size={28} className="text-fg-brand" />
                   </div>
                 )}
               </div>
 
-              <h1 className="mb-2 font-display text-2xl font-bold text-clay-900">
+              <h1 className="mb-2 font-display text-2xl font-bold text-fg">
                 {isCompleted
                   ? 'ชำระเงินสำเร็จ'
                   : isPendingManual
@@ -84,7 +84,7 @@ export default async function ConfirmationPage({
                 <OrderStatusBadge status={order.status as any} />
               </div>
 
-              <p className="text-sm text-clay-500">
+              <p className="text-sm text-fg-placeholder">
                 {isCompleted
                   ? 'โค้ดของคุณพร้อมใช้งานแล้ว — ตรวจสอบอีเมลหรือดูด้านล่าง'
                   : isPendingManual
@@ -93,9 +93,9 @@ export default async function ConfirmationPage({
               </p>
 
               {/* Order number */}
-              <div className="mt-6 rounded-md border border-clay-200 bg-clay-100 px-4 py-3">
-                <p className="text-xs text-clay-500">หมายเลขคำสั่งซื้อ</p>
-                <p className="font-mono text-lg font-bold text-peach-600">{order.orderNumber}</p>
+              <div className="mt-6 rounded-md border border-line-subtle bg-surface px-4 py-3">
+                <p className="text-xs text-fg-placeholder">หมายเลขคำสั่งซื้อ</p>
+                <p className="font-mono text-lg font-bold text-fg-brand">{order.orderNumber}</p>
               </div>
             </div>
 
@@ -103,7 +103,7 @@ export default async function ConfirmationPage({
             {isCompleted && (
               <div className="mb-6 rounded-md border border-jade-500/30 bg-jade-500/10 p-6">
                 <h2 className="mb-4 text-lg font-semibold text-jade-200">โค้ดของคุณ</h2>
-                <p className="mb-4 text-sm text-clay-600">
+                <p className="mb-4 text-sm text-fg-muted">
                   โปรดนำโค้ดไปใช้ตามวิธีการใช้งานของแต่ละสินค้า
                 </p>
 
@@ -111,12 +111,12 @@ export default async function ConfirmationPage({
                   {order.items.map((item) => (
                     <div
                       key={item.id}
-                      className="rounded-md border border-peach-300 bg-white p-4 shadow-code-glow"
+                      className="rounded-md border border-line-brand bg-white p-4 shadow-code-glow"
                     >
-                      <p className="mb-2 text-sm text-clay-600">
+                      <p className="mb-2 text-sm text-fg-muted">
                         {item.productNameTh} × {item.quantity}
                       </p>
-                      <p className="font-mono text-sm text-peach-600">
+                      <p className="font-mono text-sm text-fg-brand">
                         โค้ดจะแสดงหลังการชำระเงินสำเร็จ
                       </p>
                     </div>
@@ -126,23 +126,23 @@ export default async function ConfirmationPage({
             )}
 
             {/* Order Details */}
-            <div className="rounded-md border border-clay-200 bg-white p-6">
-              <h2 className="mb-4 text-lg font-semibold text-clay-900">รายละเอียดคำสั่งซื้อ</h2>
+            <div className="rounded-md border border-line-subtle bg-white p-6">
+              <h2 className="mb-4 text-lg font-semibold text-fg">รายละเอียดคำสั่งซื้อ</h2>
 
               {/* Items */}
               <div className="mb-4 space-y-3">
                 {order.items.map((item) => (
                   <div
                     key={item.id}
-                    className="flex items-center justify-between rounded-md border border-clay-200 bg-clay-100 p-3"
+                    className="flex items-center justify-between rounded-md border border-line-subtle bg-surface p-3"
                   >
                     <div>
-                      <p className="text-sm font-medium text-clay-900">{item.productNameTh}</p>
-                      <p className="text-xs text-clay-500">
+                      <p className="text-sm font-medium text-fg">{item.productNameTh}</p>
+                      <p className="text-xs text-fg-placeholder">
                         {item.skuCode} × {item.quantity}
                       </p>
                     </div>
-                    <span className="text-sm font-medium text-clay-700">
+                    <span className="text-sm font-medium text-fg-secondary">
                       {formatThb(item.lineTotalThb)}
                     </span>
                   </div>
@@ -150,31 +150,31 @@ export default async function ConfirmationPage({
               </div>
 
               {/* Summary */}
-              <div className="border-t border-clay-200 pt-4">
-                <div className="flex items-center justify-between text-sm text-clay-600">
+              <div className="border-t border-line-subtle pt-4">
+                <div className="flex items-center justify-between text-sm text-fg-muted">
                   <span>ยอดรวม</span>
                   <span>{formatThb(order.subtotalThb)}</span>
                 </div>
-                <div className="flex items-center justify-between text-sm text-clay-600">
+                <div className="flex items-center justify-between text-sm text-fg-muted">
                   <span>VAT 7%</span>
                   <span>{formatThb(order.vatAmountThb)}</span>
                 </div>
-                <div className="mt-2 flex items-center justify-between border-t border-clay-200 pt-2">
-                  <span className="font-bold text-clay-900">รวมทั้งสิ้น</span>
-                  <span className="text-lg font-bold text-peach-600">
+                <div className="mt-2 flex items-center justify-between border-t border-line-subtle pt-2">
+                  <span className="font-bold text-fg">รวมทั้งสิ้น</span>
+                  <span className="text-lg font-bold text-fg-brand">
                     {formatThb(order.totalAmountThb)}
                   </span>
                 </div>
               </div>
 
               {/* Email */}
-              <div className="mt-4 flex items-center gap-2 text-sm text-clay-500">
+              <div className="mt-4 flex items-center gap-2 text-sm text-fg-placeholder">
                 <Mail size={14} />
                 <span>อีเมล: {order.customerEmail}</span>
               </div>
 
               {order.requiresTaxInvoice && (
-                <div className="mt-2 flex items-center gap-2 text-sm text-clay-500">
+                <div className="mt-2 flex items-center gap-2 text-sm text-fg-placeholder">
                   <FileText size={14} />
                   <span>ใบกำกับภาษีจะออกให้หลังชำระเงิน</span>
                 </div>
@@ -194,7 +194,7 @@ export default async function ConfirmationPage({
 
               <Link
                 href="/"
-                className="flex w-full items-center justify-center gap-2 rounded-md border border-clay-300 bg-clay-100 px-5 py-3 text-base font-medium text-clay-700 hover:border-clay-400 hover:text-clay-900"
+                className="flex w-full items-center justify-center gap-2 rounded-md border border-line bg-surface px-5 py-3 text-base font-medium text-fg-secondary hover:border-clay-400 hover:text-fg"
               >
                 <ArrowLeft size={16} />
                 กลับหน้าหลัก

@@ -54,24 +54,27 @@ export default function AccountCodesPage(): React.JSX.Element {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-clay-900">โค้ดที่ซื้อ</h1>
+      <h1 className="text-2xl font-bold text-fg">โค้ดที่ซื้อ</h1>
 
       {/* Search */}
       <div className="relative">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-clay-500" />
+        <Search
+          size={16}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-placeholder"
+        />
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="ค้นหาโค้ด หรือชื่อสินค้า..."
-          className="placeholder:text-clay-9000 w-full rounded-md border border-clay-200 bg-white py-2 pl-9 pr-3 text-sm text-clay-900 focus:border-peach-300 focus:outline-none"
+          className="placeholder:text-clay-9000 w-full rounded-md border border-line-subtle bg-white py-2 pl-9 pr-3 text-sm text-fg focus:border-line-brand focus:outline-none"
         />
       </div>
 
       {/* Codes List */}
       {filteredCodes.length === 0 ? (
-        <div className="rounded-md border border-clay-200 bg-white p-8 text-center">
-          <p className="text-clay-500">ไม่พบโค้ด</p>
+        <div className="rounded-md border border-line-subtle bg-white p-8 text-center">
+          <p className="text-fg-placeholder">ไม่พบโค้ด</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -80,13 +83,15 @@ export default function AccountCodesPage(): React.JSX.Element {
               key={item.id}
               className={cn(
                 'rounded-md border p-4',
-                item.used ? 'border-clay-200 bg-white opacity-60' : 'border-peach-300 bg-peach-50',
+                item.used
+                  ? 'border-line-subtle bg-white opacity-60'
+                  : 'border-line-brand bg-peach-50',
               )}
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-clay-700">{item.product}</p>
-                  <p className="mt-1 font-mono text-sm text-peach-600">{item.code}</p>
+                  <p className="text-sm font-medium text-fg-secondary">{item.product}</p>
+                  <p className="mt-1 font-mono text-sm text-fg-brand">{item.code}</p>
                   <p className="text-clay-9000 mt-1 text-xs">
                     {item.orderNumber} · ได้รับ {item.deliveredAt.toLocaleDateString('th-TH')}
                   </p>
@@ -96,7 +101,7 @@ export default function AccountCodesPage(): React.JSX.Element {
                   {!item.used && (
                     <button
                       onClick={() => handleCopy(item.code, item.id)}
-                      className="inline-flex items-center gap-1 rounded-md border border-clay-200 px-3 py-1.5 text-xs text-clay-600 hover:bg-clay-100"
+                      className="inline-flex items-center gap-1 rounded-md border border-line-subtle px-3 py-1.5 text-xs text-fg-muted hover:bg-surface"
                     >
                       {copiedId === item.id ? (
                         <>

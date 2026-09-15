@@ -45,8 +45,8 @@ const STATUS_MAP: Record<string, { label: string; color: string }> = {
     color: 'bg-sapphire-400/15 text-sapphire-200 border-sapphire-700/50',
   },
   refunded: { label: 'คืนเงิน', color: 'bg-coral-500/15 text-coral-700 border-coral-300' },
-  expired: { label: 'หมดอายุ', color: 'bg-clay-100 text-clay-500 border-clay-200' },
-  cancelled: { label: 'ยกเลิก', color: 'bg-clay-100 text-clay-400 border-clay-200' },
+  expired: { label: 'หมดอายุ', color: 'bg-surface text-fg-placeholder border-line-subtle' },
+  cancelled: { label: 'ยกเลิก', color: 'bg-surface text-clay-400 border-line-subtle' },
   payment_failed: {
     label: 'ชำระล้มเหลว',
     color: 'bg-coral-500/15 text-coral-700 border-coral-300',
@@ -86,7 +86,7 @@ function MiniBarChart({
               style={{ height: `${height}%`, minHeight: d.revenue > 0 ? 4 : 0 }}
             />
             {/* Tooltip */}
-            <div className="pointer-events-none absolute bottom-full left-1/2 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-md bg-clay-100 px-2 py-1 text-xs text-clay-900 shadow-lg group-hover:block">
+            <div className="pointer-events-none absolute bottom-full left-1/2 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-md bg-surface px-2 py-1 text-xs text-fg shadow-lg group-hover:block">
               {formatThb(d.revenue)}
               <div className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-clay-300" />
             </div>
@@ -101,7 +101,7 @@ function MiniBarChart({
 function HBar({ value, max, color }: { value: number; max: number; color: string }) {
   const pct = max > 0 ? (value / max) * 100 : 0;
   return (
-    <div className="h-2 w-full overflow-hidden rounded-full bg-clay-100">
+    <div className="h-2 w-full overflow-hidden rounded-full bg-surface">
       <div
         className={cn('h-full rounded-full transition-all duration-500', color)}
         style={{ width: `${pct}%` }}
@@ -221,7 +221,7 @@ export default function AdminDashboardPage(): React.JSX.Element {
       text: 'Stock STEAM-100 ต่ำกว่าเกณฑ์ (3 เหลือ)',
       time: '12 นาทีที่แล้ว',
       icon: AlertTriangle,
-      color: 'text-peach-600',
+      color: 'text-fg-brand',
     },
     {
       type: 'refund',
@@ -259,12 +259,12 @@ export default function AdminDashboardPage(): React.JSX.Element {
         {/* ── Time Filter Tabs ── */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-clay-900">แดชบอร์ด</h1>
-            <p className="mt-1 text-sm text-clay-500">
+            <h1 className="text-2xl font-bold text-fg">แดชบอร์ด</h1>
+            <p className="mt-1 text-sm text-fg-placeholder">
               ภาพรวมระบบ Nong-Kati · อัปเดตล่าสุด เมื่อสักครู่
             </p>
           </div>
-          <div className="flex items-center gap-1 rounded-lg border border-clay-200 bg-white p-1">
+          <div className="flex items-center gap-1 rounded-lg border border-line-subtle bg-white p-1">
             {(['today', 'week', 'month'] as const).map((tab) => (
               <button
                 key={tab}
@@ -273,7 +273,7 @@ export default function AdminDashboardPage(): React.JSX.Element {
                   'rounded-md px-3 py-1.5 text-xs font-medium transition-all',
                   activeTab === tab
                     ? 'bg-peach-500 text-white'
-                    : 'text-clay-500 hover:text-clay-900',
+                    : 'text-fg-placeholder hover:text-fg',
                 )}
               >
                 {tabData[tab].label}
@@ -318,15 +318,15 @@ export default function AdminDashboardPage(): React.JSX.Element {
             change={12.5}
             sparkline={[980, 1020, 1080, 1150, 1200, 1230, customers.totalCustomers]}
             subtitle={`+${customers.newCustomersThisMonth} เดือนนี้ · ${customers.returningCustomerRate}% กลับมาซื้อ`}
-            iconBg="bg-clay-100 text-clay-600"
+            iconBg="bg-surface text-fg-muted"
           />
         </div>
 
         {/* ── Revenue Breakdown Bar ── */}
-        <div className="rounded-xl border border-clay-200 bg-white p-5">
+        <div className="rounded-xl border border-line-subtle bg-white p-5">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-clay-700">รายได้เดือนนี้</h2>
-            <span className="text-xs text-clay-500">กรกฎาคม 2026</span>
+            <h2 className="text-sm font-semibold text-fg-secondary">รายได้เดือนนี้</h2>
+            <span className="text-xs text-fg-placeholder">กรกฎาคม 2026</span>
           </div>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
             <MiniStat
@@ -339,13 +339,13 @@ export default function AdminDashboardPage(): React.JSX.Element {
               label="รายได้สุทธิ"
               value={formatThb(revenue.netRevenue)}
               icon={TrendingUp}
-              color="text-peach-600"
+              color="text-fg-brand"
             />
             <MiniStat
               label=" VAT"
               value={formatThb(revenue.vatCollected)}
               icon={BarChart3}
-              color="text-clay-600"
+              color="text-fg-muted"
             />
             <MiniStat
               label="ส่วนลด"
@@ -365,12 +365,12 @@ export default function AdminDashboardPage(): React.JSX.Element {
         {/* ── Charts Row ── */}
         <div className="grid gap-4 lg:grid-cols-3">
           {/* Revenue Chart */}
-          <div className="rounded-xl border border-clay-200 bg-white p-5 lg:col-span-2">
+          <div className="rounded-xl border border-line-subtle bg-white p-5 lg:col-span-2">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-clay-700">รายได้ 7 วันล่าสุด</h2>
+              <h2 className="text-sm font-semibold text-fg-secondary">รายได้ 7 วันล่าสุด</h2>
               <Link
                 href="/management/analytics"
-                className="flex items-center gap-1 text-xs text-peach-600 hover:text-peach-700"
+                className="flex items-center gap-1 text-xs text-fg-brand hover:text-fg-brand"
               >
                 ดูทั้งหมด <ArrowUpRight size={12} />
               </Link>
@@ -384,8 +384,8 @@ export default function AdminDashboardPage(): React.JSX.Element {
           </div>
 
           {/* Payment Methods */}
-          <div className="rounded-xl border border-clay-200 bg-white p-5">
-            <h2 className="mb-4 text-sm font-semibold text-clay-700">วิธีชำระเงิน</h2>
+          <div className="rounded-xl border border-line-subtle bg-white p-5">
+            <h2 className="mb-4 text-sm font-semibold text-fg-secondary">วิธีชำระเงิน</h2>
             <div className="space-y-4">
               {revenue.revenueByPaymentMethod.map((pm) => {
                 const Icon = PAYMENT_ICONS[pm.method] ?? CreditCard;
@@ -393,12 +393,12 @@ export default function AdminDashboardPage(): React.JSX.Element {
                   <div key={pm.method}>
                     <div className="mb-1.5 flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <Icon size={14} className="text-clay-500" />
-                        <span className="text-xs font-medium text-clay-700">
+                        <Icon size={14} className="text-fg-placeholder" />
+                        <span className="text-xs font-medium text-fg-secondary">
                           {pm.method === 'promptpay' ? 'PromptPay' : 'บัตรเครดิต'}
                         </span>
                       </div>
-                      <span className="text-xs text-clay-500">{pm.count} ออเดอร์</span>
+                      <span className="text-xs text-fg-placeholder">{pm.count} ออเดอร์</span>
                     </div>
                     <HBar
                       value={pm.count}
@@ -410,9 +410,9 @@ export default function AdminDashboardPage(): React.JSX.Element {
                 );
               })}
             </div>
-            <div className="mt-4 rounded-lg bg-clay-100 p-3 text-center">
-              <p className="text-xs text-clay-500">PromptPay คิดเป็น</p>
-              <p className="text-lg font-bold text-peach-600">
+            <div className="mt-4 rounded-lg bg-surface p-3 text-center">
+              <p className="text-xs text-fg-placeholder">PromptPay คิดเป็น</p>
+              <p className="text-lg font-bold text-fg-brand">
                 {Math.round(
                   ((revenue.revenueByPaymentMethod[0]?.total ?? 0) / revenue.grossRevenue) * 100,
                 )}
@@ -426,12 +426,12 @@ export default function AdminDashboardPage(): React.JSX.Element {
         {/* ── Orders Table + Activity Feed ── */}
         <div className="grid gap-4 lg:grid-cols-3">
           {/* Recent Orders */}
-          <div className="rounded-xl border border-clay-200 bg-white lg:col-span-2">
-            <div className="flex items-center justify-between border-b border-clay-200 px-5 py-4">
-              <h2 className="text-sm font-semibold text-clay-700">ออเดอร์ล่าสุด</h2>
+          <div className="rounded-xl border border-line-subtle bg-white lg:col-span-2">
+            <div className="flex items-center justify-between border-b border-line-subtle px-5 py-4">
+              <h2 className="text-sm font-semibold text-fg-secondary">ออเดอร์ล่าสุด</h2>
               <Link
                 href="/management/orders"
-                className="flex items-center gap-1 text-xs text-peach-600 hover:text-peach-700"
+                className="flex items-center gap-1 text-xs text-fg-brand hover:text-fg-brand"
               >
                 ดูทั้งหมด <ArrowUpRight size={12} />
               </Link>
@@ -439,7 +439,7 @@ export default function AdminDashboardPage(): React.JSX.Element {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-clay-200">
+                  <tr className="border-b border-line-subtle">
                     <th className="px-5 py-2.5 text-left text-xs font-medium text-clay-400">
                       ออเดอร์
                     </th>
@@ -464,25 +464,25 @@ export default function AdminDashboardPage(): React.JSX.Element {
                   {recentOrders.map((order) => {
                     const statusInfo = STATUS_MAP[order.status] ?? {
                       label: order.status,
-                      color: 'bg-clay-100 text-clay-500 border-clay-200',
+                      color: 'bg-surface text-fg-placeholder border-line-subtle',
                     };
                     const PayIcon = PAYMENT_ICONS[order.payment] ?? CreditCard;
                     return (
                       <tr
                         key={order.id}
-                        className="border-b border-clay-200/30 transition-colors hover:bg-clay-100"
+                        className="border-line-subtle/30 border-b transition-colors hover:bg-surface"
                       >
                         <td className="px-5 py-3">
-                          <span className="font-mono text-xs text-clay-600">{order.id}</span>
+                          <span className="font-mono text-xs text-fg-muted">{order.id}</span>
                         </td>
-                        <td className="px-5 py-3 text-xs text-clay-600">{order.customer}</td>
+                        <td className="px-5 py-3 text-xs text-fg-muted">{order.customer}</td>
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-1.5">
                             <PayIcon size={12} className="text-clay-400" />
-                            <span className="text-xs text-clay-700">{order.product}</span>
+                            <span className="text-xs text-fg-secondary">{order.product}</span>
                           </div>
                         </td>
-                        <td className="px-5 py-3 text-right font-mono text-xs text-clay-700">
+                        <td className="px-5 py-3 text-right font-mono text-xs text-fg-secondary">
                           {formatThb(order.amount)}
                         </td>
                         <td className="px-5 py-3 text-center">
@@ -508,10 +508,10 @@ export default function AdminDashboardPage(): React.JSX.Element {
           </div>
 
           {/* Activity Feed */}
-          <div className="rounded-xl border border-clay-200 bg-white">
-            <div className="flex items-center justify-between border-b border-clay-200 px-5 py-4">
-              <h2 className="flex items-center gap-2 text-sm font-semibold text-clay-700">
-                <Activity size={14} className="text-peach-600" />
+          <div className="rounded-xl border border-line-subtle bg-white">
+            <div className="flex items-center justify-between border-b border-line-subtle px-5 py-4">
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-fg-secondary">
+                <Activity size={14} className="text-fg-brand" />
                 กิจกรรมล่าสุด
               </h2>
               <span className="flex h-2 w-2 animate-pulse rounded-full bg-jade-500" />
@@ -522,13 +522,13 @@ export default function AdminDashboardPage(): React.JSX.Element {
                 return (
                   <div
                     key={i}
-                    className="flex gap-3 px-5 py-3 transition-colors hover:bg-clay-100/30"
+                    className="hover:bg-surface/30 flex gap-3 px-5 py-3 transition-colors"
                   >
                     <div className={cn('mt-0.5 flex-shrink-0', item.color)}>
                       <Icon size={14} />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs leading-relaxed text-clay-700">{item.text}</p>
+                      <p className="text-xs leading-relaxed text-fg-secondary">{item.text}</p>
                       <p className="mt-0.5 text-[10px] text-clay-400">{item.time}</p>
                     </div>
                   </div>
@@ -541,12 +541,12 @@ export default function AdminDashboardPage(): React.JSX.Element {
         {/* ── Bottom Row: Top Products + Customer Metrics + Low Stock ── */}
         <div className="grid gap-4 lg:grid-cols-3">
           {/* Top Products */}
-          <div className="rounded-xl border border-clay-200 bg-white p-5">
+          <div className="rounded-xl border border-line-subtle bg-white p-5">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-clay-700">สินค้าขายดี</h2>
+              <h2 className="text-sm font-semibold text-fg-secondary">สินค้าขายดี</h2>
               <Link
                 href="/management/products"
-                className="flex items-center gap-1 text-xs text-peach-600 hover:text-peach-700"
+                className="flex items-center gap-1 text-xs text-fg-brand hover:text-fg-brand"
               >
                 ดูทั้งหมด <ArrowUpRight size={12} />
               </Link>
@@ -565,14 +565,16 @@ export default function AdminDashboardPage(): React.JSX.Element {
                               ? 'bg-peach-500 text-white'
                               : i === 1
                                 ? 'bg-clay-300 text-clay-800'
-                                : 'bg-clay-200 text-clay-500',
+                                : 'bg-clay-200 text-fg-placeholder',
                           )}
                         >
                           {i + 1}
                         </span>
-                        <span className="text-xs text-clay-700">{p.name}</span>
+                        <span className="text-xs text-fg-secondary">{p.name}</span>
                       </div>
-                      <span className="font-mono text-xs text-clay-500">{p.totalSold} ชิ้น</span>
+                      <span className="font-mono text-xs text-fg-placeholder">
+                        {p.totalSold} ชิ้น
+                      </span>
                     </div>
                     <div className="mt-1.5 flex items-center gap-2">
                       <HBar value={p.totalRevenue} max={maxRevenue} color="bg-peach-500" />
@@ -587,8 +589,8 @@ export default function AdminDashboardPage(): React.JSX.Element {
           </div>
 
           {/* Customer Metrics */}
-          <div className="rounded-xl border border-clay-200 bg-white p-5">
-            <h2 className="mb-4 text-sm font-semibold text-clay-700">เมตริกลูกค้า</h2>
+          <div className="rounded-xl border border-line-subtle bg-white p-5">
+            <h2 className="mb-4 text-sm font-semibold text-fg-secondary">เมตริกลูกค้า</h2>
             <div className="space-y-4">
               <MetricRow
                 label="ลูกค้าทั้งหมด"
@@ -625,15 +627,15 @@ export default function AdminDashboardPage(): React.JSX.Element {
           </div>
 
           {/* Low Stock Alerts */}
-          <div className="rounded-xl border border-clay-200 bg-white">
-            <div className="flex items-center justify-between border-b border-clay-200 px-5 py-4">
-              <h2 className="flex items-center gap-2 text-sm font-semibold text-clay-700">
-                <AlertTriangle size={14} className="text-peach-600" />
+          <div className="rounded-xl border border-line-subtle bg-white">
+            <div className="flex items-center justify-between border-b border-line-subtle px-5 py-4">
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-fg-secondary">
+                <AlertTriangle size={14} className="text-fg-brand" />
                 สินค้าใกล้หมด
               </h2>
               <Link
                 href="/management/inventory"
-                className="flex items-center gap-1 text-xs text-peach-600 hover:text-peach-700"
+                className="flex items-center gap-1 text-xs text-fg-brand hover:text-fg-brand"
               >
                 ดูทั้งหมด <ArrowUpRight size={12} />
               </Link>
@@ -642,17 +644,17 @@ export default function AdminDashboardPage(): React.JSX.Element {
               {lowStockItems.map((item) => {
                 const pct = Math.round((item.stock / item.threshold) * 100);
                 return (
-                  <div key={item.sku} className="px-5 py-3 transition-colors hover:bg-clay-100/30">
+                  <div key={item.sku} className="hover:bg-surface/30 px-5 py-3 transition-colors">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-xs font-medium text-clay-700">{item.name}</p>
+                        <p className="text-xs font-medium text-fg-secondary">{item.name}</p>
                         <p className="font-mono text-[10px] text-clay-400">{item.sku}</p>
                       </div>
                       <div className="text-right">
                         <p
                           className={cn(
                             'text-sm font-bold',
-                            item.stock <= 3 ? 'text-coral-600' : 'text-peach-600',
+                            item.stock <= 3 ? 'text-coral-600' : 'text-fg-brand',
                           )}
                         >
                           {item.stock}
@@ -675,8 +677,8 @@ export default function AdminDashboardPage(): React.JSX.Element {
         </div>
 
         {/* ── Quick Actions ── */}
-        <div className="rounded-xl border border-clay-200 bg-white p-5">
-          <h2 className="mb-4 text-sm font-semibold text-clay-700">ดำเนินการด่วน</h2>
+        <div className="rounded-xl border border-line-subtle bg-white p-5">
+          <h2 className="mb-4 text-sm font-semibold text-fg-secondary">ดำเนินการด่วน</h2>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <QuickAction
               href="/management/orders"
@@ -726,8 +728,8 @@ function KPICard({
   return (
     <div
       className={cn(
-        'group rounded-xl border bg-white p-4 transition-all duration-200 hover:border-clay-300',
-        alert ? 'border-peach-300 shadow-brand-glow' : 'border-clay-200',
+        'group rounded-xl border bg-white p-4 transition-all duration-200 hover:border-line',
+        alert ? 'border-line-brand shadow-brand-glow' : 'border-line-subtle',
       )}
     >
       <div className="mb-3 flex items-center justify-between">
@@ -736,9 +738,9 @@ function KPICard({
         </div>
         {sparkline && <Sparkline values={sparkline} color={isPositive ? '#22C76E' : '#E8203C'} />}
       </div>
-      <p className="text-xs font-medium text-clay-500">{label}</p>
+      <p className="text-xs font-medium text-fg-placeholder">{label}</p>
       <div className="mt-1 flex items-baseline gap-2">
-        <p className="text-2xl font-bold text-clay-900">{value}</p>
+        <p className="text-2xl font-bold text-fg">{value}</p>
         {change !== undefined && change !== 0 && (
           <span
             className={cn(
@@ -769,10 +771,10 @@ function MiniStat({
   color: string;
 }) {
   return (
-    <div className="rounded-lg bg-clay-100 p-3">
+    <div className="rounded-lg bg-surface p-3">
       <div className="flex items-center gap-1.5">
         <Icon size={12} className={color} />
-        <span className="text-[10px] text-clay-500">{label}</span>
+        <span className="text-[10px] text-fg-placeholder">{label}</span>
       </div>
       <p className={cn('mt-1 font-mono text-sm font-bold', color)}>{value}</p>
     </div>
@@ -792,12 +794,12 @@ function MetricRow({
 }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-xs text-clay-500">{label}</span>
+      <span className="text-xs text-fg-placeholder">{label}</span>
       <div className="flex items-center gap-1.5">
         <span
           className={cn(
             'font-mono text-sm font-semibold',
-            highlight ? 'text-jade-600' : 'text-clay-700',
+            highlight ? 'text-jade-600' : 'text-fg-secondary',
           )}
         >
           {value}
@@ -822,20 +824,20 @@ function QuickAction({
   return (
     <Link
       href={href}
-      className="group flex items-center gap-3 rounded-lg border border-clay-200 bg-clay-100 px-4 py-3 transition-all duration-200 hover:border-peach-300 hover:bg-clay-100"
+      className="group flex items-center gap-3 rounded-lg border border-line-subtle bg-surface px-4 py-3 transition-all duration-200 hover:border-line-brand hover:bg-surface"
     >
-      <Icon size={16} className="text-clay-500 transition-colors group-hover:text-peach-600" />
-      <span className="flex-1 text-sm font-medium text-clay-700 transition-colors group-hover:text-clay-900">
+      <Icon size={16} className="text-fg-placeholder transition-colors group-hover:text-fg-brand" />
+      <span className="flex-1 text-sm font-medium text-fg-secondary transition-colors group-hover:text-fg">
         {label}
       </span>
       {badge !== undefined && (
-        <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-peach-500/20 px-1.5 text-[10px] font-bold text-peach-600">
+        <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-peach-500/20 px-1.5 text-[10px] font-bold text-fg-brand">
           {badge}
         </span>
       )}
       <ChevronRight
         size={14}
-        className="text-clay-500 transition-colors group-hover:text-peach-600"
+        className="text-fg-placeholder transition-colors group-hover:text-fg-brand"
       />
     </Link>
   );

@@ -27,8 +27,8 @@ export function PromptPayQR({
   className,
 }: PromptPayQRProps): React.JSX.Element {
   return (
-    <div className={cn('rounded-md border border-peach-300 bg-white p-6', className)}>
-      <h3 className="mb-4 text-center text-lg font-semibold text-clay-900">ชำระผ่าน PromptPay</h3>
+    <div className={cn('rounded-md border border-line-brand bg-white p-6', className)}>
+      <h3 className="mb-4 text-center text-lg font-semibold text-fg">ชำระผ่าน PromptPay</h3>
 
       {/* QR Code */}
       <div className="mx-auto mb-4 flex w-fit flex-col items-center gap-4">
@@ -43,7 +43,7 @@ export function PromptPayQR({
         </div>
 
         {/* Amount */}
-        <p className="text-lg font-bold text-peach-600">จำนวนเงิน: {formatThb(amount)}</p>
+        <p className="text-lg font-bold text-fg-brand">จำนวนเงิน: {formatThb(amount)}</p>
 
         {/* Timer */}
         <QRCountdownTimer expiresAt={expiresAt} onExpire={onExpire} />
@@ -53,7 +53,7 @@ export function PromptPayQR({
       {onSaveImage && (
         <button
           onClick={onSaveImage}
-          className="mb-4 flex w-full items-center justify-center gap-2 rounded-md border border-clay-300 bg-clay-100 px-4 py-2.5 text-sm font-medium text-clay-700 hover:border-peach-300 hover:text-clay-900"
+          className="mb-4 flex w-full items-center justify-center gap-2 rounded-md border border-line bg-surface px-4 py-2.5 text-sm font-medium text-fg-secondary hover:border-line-brand hover:text-fg"
         >
           <Download size={16} />
           บันทึก QR
@@ -61,9 +61,9 @@ export function PromptPayQR({
       )}
 
       {/* Instructions */}
-      <div className="rounded-md border border-clay-200 bg-clay-100 p-4">
-        <p className="mb-2 text-xs font-semibold text-clay-600">วิธีการชำระ:</p>
-        <ol className="space-y-1 text-xs text-clay-500">
+      <div className="rounded-md border border-line-subtle bg-surface p-4">
+        <p className="mb-2 text-xs font-semibold text-fg-muted">วิธีการชำระ:</p>
+        <ol className="space-y-1 text-xs text-fg-placeholder">
           <li>1. เปิดแอปธนาคาร → สแกน QR</li>
           <li>2. ตรวจสอบจำนวนเงิน → ยืนยัน</li>
           <li>3. รอรับโค้ดภายใน 60 วินาที</li>

@@ -47,26 +47,28 @@ export default function LoginPage(): React.JSX.Element {
     <div className="flex min-h-[80vh] items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <h1 className="mb-2 text-2xl font-bold text-clay-900">เข้าสู่ระบบ</h1>
-          <p className="text-sm text-clay-500">เข้าสู่ระบบเพื่อจัดการคำสั่งซื้อและโค้ดของคุณ</p>
+          <h1 className="mb-2 text-2xl font-bold text-fg">เข้าสู่ระบบ</h1>
+          <p className="text-sm text-fg-placeholder">
+            เข้าสู่ระบบเพื่อจัดการคำสั่งซื้อและโค้ดของคุณ
+          </p>
         </div>
 
-        <div className="rounded-lg border border-clay-200 bg-white p-6">
+        <div className="rounded-lg border border-line-subtle bg-white p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Email */}
             <div>
-              <label className="mb-1 block text-sm text-clay-600">อีเมล</label>
+              <label className="mb-1 block text-sm text-fg-muted">อีเมล</label>
               <div className="relative">
                 <Mail
                   size={16}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-clay-500"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-placeholder"
                 />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="placeholder:text-clay-9000 w-full rounded-md border border-clay-200 bg-clay-100 py-2 pl-9 pr-3 text-sm text-clay-900 focus:border-peach-300 focus:outline-none"
+                  className="placeholder:text-clay-9000 w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-3 text-sm text-fg focus:border-line-brand focus:outline-none"
                   placeholder="your@email.com"
                 />
               </div>
@@ -74,24 +76,24 @@ export default function LoginPage(): React.JSX.Element {
 
             {/* Password */}
             <div>
-              <label className="mb-1 block text-sm text-clay-600">รหัสผ่าน</label>
+              <label className="mb-1 block text-sm text-fg-muted">รหัสผ่าน</label>
               <div className="relative">
                 <Lock
                   size={16}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-clay-500"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-placeholder"
                 />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="placeholder:text-clay-9000 w-full rounded-md border border-clay-200 bg-clay-100 py-2 pl-9 pr-10 text-sm text-clay-900 focus:border-peach-300 focus:outline-none"
+                  className="placeholder:text-clay-9000 w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-10 text-sm text-fg focus:border-line-brand focus:outline-none"
                   placeholder="••••••••"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-clay-500 hover:text-clay-700"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-placeholder hover:text-fg-secondary"
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -106,7 +108,7 @@ export default function LoginPage(): React.JSX.Element {
                 onChange={(e) => setRememberMe(e.target.checked)}
                 className="rounded"
               />
-              <span className="text-sm text-clay-500">จดจำฉัน</span>
+              <span className="text-sm text-fg-placeholder">จดจำฉัน</span>
             </label>
 
             {/* Error */}
@@ -128,20 +130,17 @@ export default function LoginPage(): React.JSX.Element {
           </form>
 
           {/* Magic Link */}
-          <div className="mt-4 border-t border-clay-200 pt-4 text-center">
-            <Link
-              href="/account/magic-link"
-              className="text-sm text-peach-600 hover:text-peach-700"
-            >
+          <div className="mt-4 border-t border-line-subtle pt-4 text-center">
+            <Link href="/account/magic-link" className="text-sm text-fg-brand hover:text-fg-brand">
               เข้าสู่ระบบด้วย Magic Link
             </Link>
           </div>
         </div>
 
         {/* Register link */}
-        <p className="mt-4 text-center text-sm text-clay-500">
+        <p className="mt-4 text-center text-sm text-fg-placeholder">
           ยังไม่มีบัญชี?{' '}
-          <Link href="/account/register" className="text-peach-600 hover:text-peach-700">
+          <Link href="/account/register" className="text-fg-brand hover:text-fg-brand">
             สมัครสมาชิก
           </Link>
         </p>

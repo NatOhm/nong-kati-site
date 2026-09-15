@@ -45,18 +45,18 @@ export function Toast({
   return (
     <div
       role={type === 'error' ? 'alert' : 'status'}
-      className="flex w-full max-w-sm animate-toast-enter items-start gap-3 rounded-lg border border-clay-200 bg-white p-4 shadow-lg"
+      className="flex w-full max-w-sm animate-toast-enter items-start gap-3 rounded-lg border border-line-subtle bg-white p-4 shadow-lg"
     >
       {iconByType[type]}
       <div className="flex-1">
-        <p className="text-sm font-semibold text-clay-900">{title}</p>
-        {message && <p className="mt-0.5 text-xs text-clay-600">{message}</p>}
+        <p className="text-sm font-semibold text-fg">{title}</p>
+        {message && <p className="mt-0.5 text-xs text-fg-muted">{message}</p>}
       </div>
       <button
         type="button"
         aria-label="ปิดการแจ้งเตือน"
         onClick={() => onDismiss(id)}
-        className="text-clay-500 hover:text-clay-700"
+        className="text-fg-placeholder hover:text-fg-secondary"
       >
         <X size={16} />
       </button>

@@ -59,8 +59,8 @@ export function DataRequestForm(): React.JSX.Element {
     return (
       <div className="rounded-md border border-jade-700/50 bg-jade-900/10 p-6 text-center">
         <CheckCircle size={32} className="mx-auto mb-3 text-jade-400" />
-        <h3 className="mb-2 text-lg font-semibold text-clay-900">ส่งคำขอสำเร็จ</h3>
-        <p className="text-sm text-clay-500">
+        <h3 className="mb-2 text-lg font-semibold text-fg">ส่งคำขอสำเร็จ</h3>
+        <p className="text-sm text-fg-placeholder">
           เราจะดำเนินการคำขอภายใน 30 วันทำการ ผลลัพธ์จะถูกส่งไปยังอีเมลที่คุณระบุ
         </p>
       </div>
@@ -70,7 +70,7 @@ export function DataRequestForm(): React.JSX.Element {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="mb-2 block text-sm font-medium text-clay-600">ประเภทคำขอ</label>
+        <label className="mb-2 block text-sm font-medium text-fg-muted">ประเภทคำขอ</label>
         <div className="space-y-2">
           {REQUEST_TYPES.map((type) => (
             <label
@@ -78,8 +78,8 @@ export function DataRequestForm(): React.JSX.Element {
               className={cn(
                 'flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors',
                 requestType === type.value
-                  ? 'border-peach-300 bg-peach-50'
-                  : 'border-clay-200 hover:border-clay-300',
+                  ? 'border-line-brand bg-peach-50'
+                  : 'border-line-subtle hover:border-line',
               )}
             >
               <input
@@ -91,7 +91,7 @@ export function DataRequestForm(): React.JSX.Element {
                 className="mt-0.5"
               />
               <div>
-                <p className="text-sm text-clay-900">{type.label}</p>
+                <p className="text-sm text-fg">{type.label}</p>
                 <p className="text-clay-9000 text-xs">{type.description}</p>
               </div>
             </label>
@@ -100,25 +100,25 @@ export function DataRequestForm(): React.JSX.Element {
       </div>
 
       <div>
-        <label className="mb-1 block text-sm text-clay-600">อีเมล</label>
+        <label className="mb-1 block text-sm text-fg-muted">อีเมล</label>
         <input
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          className="placeholder:text-clay-9000 w-full rounded-md border border-clay-200 bg-white px-3 py-2 text-sm text-clay-900 focus:border-peach-300 focus:outline-none"
+          className="placeholder:text-clay-9000 w-full rounded-md border border-line-subtle bg-white px-3 py-2 text-sm text-fg focus:border-line-brand focus:outline-none"
           placeholder="your@email.com"
         />
       </div>
 
       <div>
-        <label className="mb-1 block text-sm text-clay-600">รายละเอียด</label>
+        <label className="mb-1 block text-sm text-fg-muted">รายละเอียด</label>
         <textarea
           value={details}
           onChange={(e) => setDetails(e.target.value)}
           required
           rows={4}
-          className="placeholder:text-clay-9000 w-full rounded-md border border-clay-200 bg-white px-3 py-2 text-sm text-clay-900 focus:border-peach-300 focus:outline-none"
+          className="placeholder:text-clay-9000 w-full rounded-md border border-line-subtle bg-white px-3 py-2 text-sm text-fg focus:border-line-brand focus:outline-none"
           placeholder="กรุณาระบุรายละเอียดเพิ่มเติม..."
         />
       </div>

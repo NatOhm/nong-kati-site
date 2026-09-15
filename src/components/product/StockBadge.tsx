@@ -20,7 +20,7 @@ export function StockBadge({ stock, className }: StockBadgeProps): React.JSX.Ele
       className={cn(
         'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold',
         isOutOfStock && 'bg-coral-500 text-white',
-        isLowStock && 'border border-topaz-200 bg-topaz-400 text-clay-900',
+        isLowStock && 'border border-topaz-200 bg-topaz-400 text-fg',
         !isOutOfStock && !isLowStock && 'bg-jade-500 text-white',
         className,
       )}

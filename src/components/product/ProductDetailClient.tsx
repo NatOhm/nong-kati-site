@@ -77,9 +77,9 @@ export function ProductDetailClient({
   return (
     <div className="flex flex-col gap-6">
       {/* Price */}
-      <div className="border-t border-clay-200 pt-4">
-        <span className="text-xs text-clay-500">ราคา</span>
-        <div className="text-2xl font-bold text-peach-600">
+      <div className="border-t border-line-subtle pt-4">
+        <span className="text-xs text-fg-placeholder">ราคา</span>
+        <div className="text-2xl font-bold text-fg-brand">
           {selectedVariant ? formatThb(selectedVariant.price) : formatThb(variants[0]?.price ?? 0)}
         </div>
         {selectedVariant && (
@@ -90,7 +90,7 @@ export function ProductDetailClient({
       {/* Variant Selection */}
       {variants.length > 0 && (
         <div>
-          <h2 className="mb-3 text-sm font-semibold text-clay-700">เลือกประเภท</h2>
+          <h2 className="mb-3 text-sm font-semibold text-fg-secondary">เลือกประเภท</h2>
           <div className="flex flex-wrap gap-2">
             {variants.map((variant) => {
               const isSelected = selectedVariant?.id === variant.id;
@@ -105,7 +105,7 @@ export function ProductDetailClient({
                     'disabled:cursor-not-allowed disabled:opacity-40',
                     isSelected
                       ? 'border-peach-500 bg-peach-100 shadow-brand-glow'
-                      : 'border-clay-300 bg-clay-100 hover:border-peach-300 hover:bg-clay-200',
+                      : 'border-line bg-surface hover:border-line-brand hover:bg-clay-200',
                   )}
                 >
                   {inCart && (
@@ -113,10 +113,10 @@ export function ProductDetailClient({
                       {getQuantity(variant.id)}
                     </span>
                   )}
-                  <span className="font-medium text-clay-900">{variant.label}</span>
-                  <span className="text-xs text-clay-500">{formatThb(variant.price)}</span>
+                  <span className="font-medium text-fg">{variant.label}</span>
+                  <span className="text-xs text-fg-placeholder">{formatThb(variant.price)}</span>
                   {variant.stock <= 10 && variant.stock > 0 && (
-                    <span className="text-xs text-peach-600">เหลือ {variant.stock}</span>
+                    <span className="text-xs text-fg-brand">เหลือ {variant.stock}</span>
                   )}
                   {variant.stock === 0 && <span className="text-xs text-coral-600">หมด</span>}
                 </button>
@@ -129,20 +129,20 @@ export function ProductDetailClient({
       {/* Quantity */}
       {selectedVariant && selectedVariant.stock > 0 && (
         <div>
-          <h2 className="mb-3 text-sm font-semibold text-clay-700">จำนวน</h2>
+          <h2 className="mb-3 text-sm font-semibold text-fg-secondary">จำนวน</h2>
           <div className="flex items-center gap-3">
             <button
               onClick={() => setQuantity(Math.max(1, quantity - 1))}
-              className="flex h-8 w-8 items-center justify-center rounded-md border border-clay-300 bg-clay-100 text-clay-700 hover:border-peach-300"
+              className="flex h-8 w-8 items-center justify-center rounded-md border border-line bg-surface text-fg-secondary hover:border-line-brand"
             >
               -
             </button>
-            <span className="w-8 text-center font-mono text-lg text-clay-900">{quantity}</span>
+            <span className="w-8 text-center font-mono text-lg text-fg">{quantity}</span>
             <button
               onClick={() =>
                 setQuantity(Math.min(Math.min(10, selectedVariant.stock), quantity + 1))
               }
-              className="flex h-8 w-8 items-center justify-center rounded-md border border-clay-300 bg-clay-100 text-clay-700 hover:border-peach-300"
+              className="flex h-8 w-8 items-center justify-center rounded-md border border-line bg-surface text-fg-secondary hover:border-line-brand"
             >
               +
             </button>
@@ -152,7 +152,7 @@ export function ProductDetailClient({
       )}
 
       {/* Add to Cart */}
-      <div className="border-t border-clay-200 pt-4">
+      <div className="border-t border-line-subtle pt-4">
         <button
           onClick={handleAddToCart}
           disabled={!selectedVariant || selectedVariant.stock === 0 || addedToCart}
@@ -162,7 +162,7 @@ export function ProductDetailClient({
               ? 'bg-jade-500 text-white'
               : selectedVariant && selectedVariant.stock > 0
                 ? 'bg-peach-500 text-white shadow-clay-sm hover:bg-peach-400'
-                : 'cursor-not-allowed bg-clay-300 text-clay-500',
+                : 'cursor-not-allowed bg-clay-300 text-fg-placeholder',
           )}
         >
           {addedToCart ? (
@@ -178,7 +178,7 @@ export function ProductDetailClient({
           )}
         </button>
         {inCartCount > 0 && !addedToCart && (
-          <p className="mt-2 text-center text-xs text-peach-600">
+          <p className="mt-2 text-center text-xs text-fg-brand">
             มี {inCartCount} ชิ้นในตะกร้าแล้ว
           </p>
         )}

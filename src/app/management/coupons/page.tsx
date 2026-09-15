@@ -151,12 +151,12 @@ export default function AdminCouponsPage(): React.JSX.Element {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-clay-900">คูปอง</h1>
+        <h1 className="text-2xl font-bold text-fg">คูปอง</h1>
         <div className="flex gap-3">
           <button
             onClick={handleLoad}
             disabled={loading}
-            className="rounded-md border border-clay-200 px-4 py-2 text-sm text-clay-700 hover:bg-clay-100"
+            className="rounded-md border border-line-subtle px-4 py-2 text-sm text-fg-secondary hover:bg-surface"
           >
             {loading ? 'กำลังโหลด...' : 'โหลด'}
           </button>
@@ -165,7 +165,7 @@ export default function AdminCouponsPage(): React.JSX.Element {
               resetForm();
               setShowCreateForm(true);
             }}
-            className="inline-flex items-center gap-2 rounded-md bg-peach-500 px-4 py-2 text-sm font-medium text-clay-900 hover:bg-peach-400"
+            className="inline-flex items-center gap-2 rounded-md bg-peach-500 px-4 py-2 text-sm font-medium text-fg hover:bg-peach-400"
           >
             <Plus size={16} /> สร้างคูปอง
           </button>
@@ -180,36 +180,36 @@ export default function AdminCouponsPage(): React.JSX.Element {
 
       {/* Create/Edit Form */}
       {showCreateForm && (
-        <div className="rounded-md border border-clay-200 bg-white p-6">
-          <h2 className="mb-4 text-lg font-semibold text-clay-900">
+        <div className="rounded-md border border-line-subtle bg-white p-6">
+          <h2 className="mb-4 text-lg font-semibold text-fg">
             {editingCoupon ? 'แก้ไขคูปอง' : 'สร้างคูปองใหม่'}
           </h2>
           <div className="grid gap-4 md:grid-cols-2">
             {!editingCoupon && (
               <div>
-                <label className="mb-1 block text-sm text-clay-600">รหัสคูปอง *</label>
+                <label className="mb-1 block text-sm text-fg-muted">รหัสคูปอง *</label>
                 <input
                   type="text"
                   value={formCode}
                   onChange={(e) => setFormCode(e.target.value.toUpperCase())}
-                  className="w-full rounded-md border border-clay-200 bg-clay-100 px-3 py-2 font-mono text-sm text-clay-900 focus:border-peach-300 focus:outline-none"
+                  className="w-full rounded-md border border-line-subtle bg-surface px-3 py-2 font-mono text-sm text-fg focus:border-line-brand focus:outline-none"
                   placeholder="SUMMER10"
                   maxLength={20}
                 />
               </div>
             )}
             <div>
-              <label className="mb-1 block text-sm text-clay-600">คำอธิบาย *</label>
+              <label className="mb-1 block text-sm text-fg-muted">คำอธิบาย *</label>
               <input
                 type="text"
                 value={formDescription}
                 onChange={(e) => setFormDescription(e.target.value)}
-                className="w-full rounded-md border border-clay-200 bg-clay-100 px-3 py-2 text-sm text-clay-900 focus:border-peach-300 focus:outline-none"
+                className="w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg focus:border-line-brand focus:outline-none"
                 placeholder="ลด 10% ทุกสินค้า"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm text-clay-600">ส่วนลด (%) *</label>
+              <label className="mb-1 block text-sm text-fg-muted">ส่วนลด (%) *</label>
               <input
                 type="number"
                 value={formDiscountValue}
@@ -217,15 +217,15 @@ export default function AdminCouponsPage(): React.JSX.Element {
                 min={0.01}
                 max={100}
                 step={0.01}
-                className="w-full rounded-md border border-clay-200 bg-clay-100 px-3 py-2 text-sm text-clay-900 focus:border-peach-300 focus:outline-none"
+                className="w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg focus:border-line-brand focus:outline-none"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm text-clay-600">ขอบเขต</label>
+              <label className="mb-1 block text-sm text-fg-muted">ขอบเขต</label>
               <select
                 value={formScope}
                 onChange={(e) => setFormScope(e.target.value as typeof formScope)}
-                className="w-full rounded-md border border-clay-200 bg-clay-100 px-3 py-2 text-sm text-clay-900 focus:border-peach-300 focus:outline-none"
+                className="w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg focus:border-line-brand focus:outline-none"
               >
                 <option value="cart">ทั้งตะกร้า</option>
                 <option value="product">ตามสินค้า</option>
@@ -233,34 +233,34 @@ export default function AdminCouponsPage(): React.JSX.Element {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm text-clay-600">จำกัดการใช้งาน</label>
+              <label className="mb-1 block text-sm text-fg-muted">จำกัดการใช้งาน</label>
               <input
                 type="number"
                 value={formUsageLimit}
                 onChange={(e) => setFormUsageLimit(e.target.value)}
-                className="w-full rounded-md border border-clay-200 bg-clay-100 px-3 py-2 text-sm text-clay-900 focus:border-peach-300 focus:outline-none"
+                className="w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg focus:border-line-brand focus:outline-none"
                 placeholder="ไม่จำกัด"
                 min={1}
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm text-clay-600">จำกัดต่อลูกค้า</label>
+              <label className="mb-1 block text-sm text-fg-muted">จำกัดต่อลูกค้า</label>
               <input
                 type="number"
                 value={formPerCustomerLimit}
                 onChange={(e) => setFormPerCustomerLimit(e.target.value)}
-                className="w-full rounded-md border border-clay-200 bg-clay-100 px-3 py-2 text-sm text-clay-900 focus:border-peach-300 focus:outline-none"
+                className="w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg focus:border-line-brand focus:outline-none"
                 placeholder="ไม่จำกัด"
                 min={1}
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm text-clay-600">วันหมดอายุ</label>
+              <label className="mb-1 block text-sm text-fg-muted">วันหมดอายุ</label>
               <input
                 type="date"
                 value={formExpiresAt}
                 onChange={(e) => setFormExpiresAt(e.target.value)}
-                className="w-full rounded-md border border-clay-200 bg-clay-100 px-3 py-2 text-sm text-clay-900 focus:border-peach-300 focus:outline-none"
+                className="w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg focus:border-line-brand focus:outline-none"
               />
             </div>
           </div>
@@ -268,13 +268,13 @@ export default function AdminCouponsPage(): React.JSX.Element {
             <button
               onClick={editingCoupon ? handleUpdate : handleCreate}
               disabled={!formDescription || formDiscountValue <= 0}
-              className="rounded-md bg-peach-500 px-4 py-2 text-sm font-medium text-clay-900 hover:bg-peach-400 disabled:opacity-50"
+              className="rounded-md bg-peach-500 px-4 py-2 text-sm font-medium text-fg hover:bg-peach-400 disabled:opacity-50"
             >
               {editingCoupon ? 'บันทึก' : 'สร้าง'}
             </button>
             <button
               onClick={resetForm}
-              className="rounded-md border border-clay-200 px-4 py-2 text-sm text-clay-600 hover:bg-clay-100"
+              className="rounded-md border border-line-subtle px-4 py-2 text-sm text-fg-muted hover:bg-surface"
             >
               ยกเลิก
             </button>
@@ -282,21 +282,21 @@ export default function AdminCouponsPage(): React.JSX.Element {
         </div>
       )}
 
-      <div className="text-sm text-clay-500">พบ {total} รายการ</div>
+      <div className="text-sm text-fg-placeholder">พบ {total} รายการ</div>
 
       {/* Coupons Table */}
-      <div className="overflow-x-auto rounded-md border border-clay-200">
+      <div className="overflow-x-auto rounded-md border border-line-subtle">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-clay-200 bg-clay-100">
-              <th className="px-4 py-3 text-left font-medium text-clay-600">รหัส</th>
-              <th className="px-4 py-3 text-left font-medium text-clay-600">คำอธิบาย</th>
-              <th className="px-4 py-3 text-center font-medium text-clay-600">ส่วนลด</th>
-              <th className="px-4 py-3 text-center font-medium text-clay-600">ขอบเขต</th>
-              <th className="px-4 py-3 text-center font-medium text-clay-600">ใช้แล้ว</th>
-              <th className="px-4 py-3 text-center font-medium text-clay-600">สถานะ</th>
-              <th className="px-4 py-3 text-center font-medium text-clay-600">หมดอายุ</th>
-              <th className="px-4 py-3 text-right font-medium text-clay-600">จัดการ</th>
+            <tr className="border-b border-line-subtle bg-surface">
+              <th className="px-4 py-3 text-left font-medium text-fg-muted">รหัส</th>
+              <th className="px-4 py-3 text-left font-medium text-fg-muted">คำอธิบาย</th>
+              <th className="px-4 py-3 text-center font-medium text-fg-muted">ส่วนลด</th>
+              <th className="px-4 py-3 text-center font-medium text-fg-muted">ขอบเขต</th>
+              <th className="px-4 py-3 text-center font-medium text-fg-muted">ใช้แล้ว</th>
+              <th className="px-4 py-3 text-center font-medium text-fg-muted">สถานะ</th>
+              <th className="px-4 py-3 text-center font-medium text-fg-muted">หมดอายุ</th>
+              <th className="px-4 py-3 text-right font-medium text-fg-muted">จัดการ</th>
             </tr>
           </thead>
           <tbody>
@@ -311,12 +311,16 @@ export default function AdminCouponsPage(): React.JSX.Element {
                 const now = new Date();
                 const isExpired = coupon.expiresAt && coupon.expiresAt < now;
                 return (
-                  <tr key={coupon.id} className="border-b border-clay-200 hover:bg-white">
-                    <td className="px-4 py-3 font-mono text-xs text-peach-600">{coupon.code}</td>
-                    <td className="px-4 py-3 text-clay-700">{coupon.description}</td>
-                    <td className="px-4 py-3 text-center text-clay-700">{coupon.discountValue}%</td>
-                    <td className="px-4 py-3 text-center text-xs text-clay-500">{coupon.scope}</td>
-                    <td className="px-4 py-3 text-center text-clay-600">
+                  <tr key={coupon.id} className="border-b border-line-subtle hover:bg-white">
+                    <td className="px-4 py-3 font-mono text-xs text-fg-brand">{coupon.code}</td>
+                    <td className="px-4 py-3 text-fg-secondary">{coupon.description}</td>
+                    <td className="px-4 py-3 text-center text-fg-secondary">
+                      {coupon.discountValue}%
+                    </td>
+                    <td className="px-4 py-3 text-center text-xs text-fg-placeholder">
+                      {coupon.scope}
+                    </td>
+                    <td className="px-4 py-3 text-center text-fg-muted">
                       {coupon.usageCount}
                       {coupon.usageLimit ? `/${coupon.usageLimit}` : ''}
                     </td>
@@ -325,7 +329,7 @@ export default function AdminCouponsPage(): React.JSX.Element {
                         className={cn(
                           'inline-block rounded-full px-2 py-0.5 text-xs font-medium',
                           isExpired
-                            ? 'bg-clay-100 text-clay-400'
+                            ? 'bg-surface text-clay-400'
                             : coupon.isActive
                               ? 'text-jade-600 bg-jade-500/15'
                               : 'bg-coral-500/15 text-coral-700',
@@ -334,21 +338,21 @@ export default function AdminCouponsPage(): React.JSX.Element {
                         {isExpired ? 'หมดอายุ' : coupon.isActive ? 'ใช้งาน' : 'ปิดใช้งาน'}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-center text-xs text-clay-500">
+                    <td className="px-4 py-3 text-center text-xs text-fg-placeholder">
                       {coupon.expiresAt ? coupon.expiresAt.toLocaleDateString('th-TH') : '—'}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-1">
                         <button
                           onClick={() => startEdit(coupon)}
-                          className="rounded p-1.5 text-clay-500 hover:bg-clay-100 hover:text-clay-900"
+                          className="rounded p-1.5 text-fg-placeholder hover:bg-surface hover:text-fg"
                           title="แก้ไข"
                         >
                           <Edit size={14} />
                         </button>
                         <button
                           onClick={() => handleToggle(coupon.id, coupon.isActive)}
-                          className="rounded p-1.5 text-clay-500 hover:bg-clay-200 hover:text-peach-700"
+                          className="rounded p-1.5 text-fg-placeholder hover:bg-clay-200 hover:text-fg-brand"
                           title={coupon.isActive ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}
                         >
                           {coupon.isActive ? <ToggleRight size={14} /> : <ToggleLeft size={14} />}
@@ -356,7 +360,7 @@ export default function AdminCouponsPage(): React.JSX.Element {
                         {coupon.usageCount === 0 && (
                           <button
                             onClick={() => handleDelete(coupon.id)}
-                            className="rounded p-1.5 text-clay-500 hover:bg-coral-50 hover:text-coral-600"
+                            className="rounded p-1.5 text-fg-placeholder hover:bg-coral-50 hover:text-coral-600"
                             title="ลบ"
                           >
                             <Trash2 size={14} />

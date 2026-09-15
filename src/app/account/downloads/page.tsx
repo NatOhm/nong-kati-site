@@ -26,26 +26,26 @@ const MOCK_RECEIPTS = [
 export default function AccountDownloadsPage(): React.JSX.Element {
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-clay-900">ใบเสร็จรับเงิน</h1>
+      <h1 className="text-2xl font-bold text-fg">ใบเสร็จรับเงิน</h1>
 
       {MOCK_RECEIPTS.length === 0 ? (
-        <div className="rounded-md border border-clay-200 bg-white p-8 text-center">
-          <p className="text-clay-500">ยังไม่มีใบเสร็จ</p>
+        <div className="rounded-md border border-line-subtle bg-white p-8 text-center">
+          <p className="text-fg-placeholder">ยังไม่มีใบเสร็จ</p>
         </div>
       ) : (
         <div className="space-y-3">
           {MOCK_RECEIPTS.map((receipt) => (
             <div
               key={receipt.id}
-              className="flex items-center justify-between rounded-md border border-clay-200 bg-white p-4"
+              className="flex items-center justify-between rounded-md border border-line-subtle bg-white p-4"
             >
               <div>
-                <p className="text-sm font-medium text-clay-700">{receipt.orderNumber}</p>
+                <p className="text-sm font-medium text-fg-secondary">{receipt.orderNumber}</p>
                 <p className="text-clay-9000 text-xs">{receipt.date.toLocaleDateString('th-TH')}</p>
               </div>
               <div className="flex items-center gap-3">
-                <p className="text-sm text-clay-700">{formatThb(receipt.amount)}</p>
-                <button className="inline-flex items-center gap-1 rounded-md border border-clay-200 px-3 py-1.5 text-xs text-clay-600 hover:bg-clay-100">
+                <p className="text-sm text-fg-secondary">{formatThb(receipt.amount)}</p>
+                <button className="inline-flex items-center gap-1 rounded-md border border-line-subtle px-3 py-1.5 text-xs text-fg-muted hover:bg-surface">
                   <Download size={12} /> ดาวน์โหลด
                 </button>
               </div>

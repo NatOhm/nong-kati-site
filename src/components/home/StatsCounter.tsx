@@ -58,13 +58,13 @@ function RingStat({ icon, value, label, suffix = '', color }: RingStatProps) {
       <ProgressRing value={ringValue} size={88} stroke={9} color={color}>
         <div className="flex flex-col items-center gap-0.5">
           {icon}
-          <span className="text-lg font-bold text-clay-900">
+          <span className="text-lg font-bold text-fg">
             {count.toLocaleString()}
             {suffix}
           </span>
         </div>
       </ProgressRing>
-      <p className="text-xs font-semibold text-clay-700">{label}</p>
+      <p className="text-xs font-semibold text-fg-secondary">{label}</p>
     </div>
   );
 }
@@ -74,7 +74,7 @@ export function StatsCounter() {
     <section className="px-4 py-6 md:px-8">
       <div className="mx-auto grid max-w-4xl grid-cols-2 gap-4 md:grid-cols-4">
         <RingStat
-          icon={<Users size={18} className="text-peach-600" />}
+          icon={<Users size={18} className="text-fg-brand" />}
           value={1234}
           label="ลูกค้า"
           suffix="+"
@@ -87,7 +87,7 @@ export function StatsCounter() {
           color="text-coral-400"
         />
         <RingStat
-          icon={<Zap size={18} className="text-peach-600" />}
+          icon={<Zap size={18} className="text-fg-brand" />}
           value={567}
           label="ขายแล้ว"
           suffix="+"

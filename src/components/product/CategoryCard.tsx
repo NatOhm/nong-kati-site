@@ -79,18 +79,18 @@ export function CategoryCard({
       aria-label={`หมวดหมู่ ${name}`}
     >
       {/* Icon */}
-      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-peach-100 text-peach-600 shadow-clay-xs transition-transform duration-fast ease-out-quart group-hover:scale-110">
+      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-peach-100 text-fg-brand shadow-clay-xs transition-transform duration-fast ease-out-quart group-hover:scale-110">
         {IconComponent}
       </div>
 
       {/* Name */}
-      <h3 className="text-sm font-semibold text-clay-800 transition-colors group-hover:text-peach-700">
+      <h3 className="text-sm font-semibold text-clay-800 transition-colors group-hover:text-fg-brand">
         {name}
       </h3>
 
       {/* Product count */}
       {productCount !== undefined && (
-        <span className="text-xs text-clay-600">{productCount} สินค้า</span>
+        <span className="text-xs text-fg-muted">{productCount} สินค้า</span>
       )}
     </Link>
   );

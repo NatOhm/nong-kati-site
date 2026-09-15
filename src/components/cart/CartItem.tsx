@@ -30,11 +30,11 @@ export function CartItem({ item, onUpdateQty, onRemove }: CartItemProps): React.
     <div
       className={cn(
         'flex gap-3 rounded-md border p-3 transition-colors',
-        item.inStock ? 'border-clay-200 bg-white' : 'border-crimson-700/50 bg-crimson-900/10',
+        item.inStock ? 'border-line-subtle bg-white' : 'border-crimson-700/50 bg-crimson-900/10',
       )}
     >
       {/* Thumbnail */}
-      <div className="h-12 w-12 shrink-0 overflow-hidden rounded bg-clay-100">
+      <div className="h-12 w-12 shrink-0 overflow-hidden rounded bg-surface">
         {item.thumbnailUrl ? (
           <img
             src={item.thumbnailUrl}
@@ -53,12 +53,12 @@ export function CartItem({ item, onUpdateQty, onRemove }: CartItemProps): React.
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-clay-900">{item.productNameTh}</p>
-            <p className="text-xs text-clay-500">{formatThb(item.unitPriceThb)}</p>
+            <p className="truncate text-sm font-medium text-fg">{item.productNameTh}</p>
+            <p className="text-xs text-fg-placeholder">{formatThb(item.unitPriceThb)}</p>
           </div>
           <button
             onClick={onRemove}
-            className="shrink-0 rounded p-1 text-clay-500 transition-colors hover:bg-coral-50 hover:text-coral-600"
+            className="shrink-0 rounded p-1 text-fg-placeholder transition-colors hover:bg-coral-50 hover:text-coral-600"
             aria-label={`ลบ ${item.productNameTh}`}
           >
             <Trash2 size={16} strokeWidth={1.5} />
@@ -82,7 +82,7 @@ export function CartItem({ item, onUpdateQty, onRemove }: CartItemProps): React.
             onChange={onUpdateQty}
             disabled={!item.inStock}
           />
-          <span className="text-sm font-semibold text-peach-600">
+          <span className="text-sm font-semibold text-fg-brand">
             {formatThb(item.unitPriceThb * item.quantity)}
           </span>
         </div>

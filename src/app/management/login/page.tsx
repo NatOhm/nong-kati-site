@@ -107,24 +107,24 @@ export default function AdminLoginPage(): React.JSX.Element {
   );
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-clay-50 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-surface-base p-4">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-peach-100">
-            <Shield size={28} className="text-peach-600" />
+            <Shield size={28} className="text-fg-brand" />
           </div>
-          <h1 className="text-2xl font-bold text-clay-900">Nong-Kati Admin</h1>
-          <p className="text-sm text-clay-500">ระบบจัดการหลังบ้าน</p>
+          <h1 className="text-2xl font-bold text-fg">Nong-Kati Admin</h1>
+          <p className="text-sm text-fg-placeholder">ระบบจัดการหลังบ้าน</p>
         </div>
 
         {/* Step 1: Credentials */}
         {step === 'credentials' && (
           <form
             onSubmit={handleCredentialsSubmit}
-            className="space-y-4 rounded-md border border-clay-200 bg-white p-6"
+            className="space-y-4 rounded-md border border-line-subtle bg-white p-6"
           >
-            <h2 className="text-lg font-semibold text-clay-900">เข้าสู่ระบบ</h2>
+            <h2 className="text-lg font-semibold text-fg">เข้าสู่ระบบ</h2>
 
             {error && (
               <div className="rounded-md border border-coral-300 bg-coral-50 px-3 py-2 text-sm text-coral-700">
@@ -133,7 +133,7 @@ export default function AdminLoginPage(): React.JSX.Element {
             )}
 
             <div>
-              <label htmlFor="admin-email" className="mb-1 block text-sm text-clay-600">
+              <label htmlFor="admin-email" className="mb-1 block text-sm text-fg-muted">
                 อีเมล
               </label>
               <input
@@ -142,12 +142,12 @@ export default function AdminLoginPage(): React.JSX.Element {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full rounded-md border border-clay-300 bg-clay-100 px-3 py-2.5 text-sm text-clay-900 focus:outline-none focus:ring-2 focus:ring-peach-500"
+                className="w-full rounded-md border border-line bg-surface px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-peach-500"
               />
             </div>
 
             <div>
-              <label htmlFor="admin-password" className="mb-1 block text-sm text-clay-600">
+              <label htmlFor="admin-password" className="mb-1 block text-sm text-fg-muted">
                 รหัสผ่าน
               </label>
               <input
@@ -156,7 +156,7 @@ export default function AdminLoginPage(): React.JSX.Element {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full rounded-md border border-clay-300 bg-clay-100 px-3 py-2.5 text-sm text-clay-900 focus:outline-none focus:ring-2 focus:ring-peach-500"
+                className="w-full rounded-md border border-line bg-surface px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-peach-500"
               />
             </div>
 
@@ -166,7 +166,7 @@ export default function AdminLoginPage(): React.JSX.Element {
               className={cn(
                 'w-full rounded-md px-5 py-2.5 text-sm font-semibold transition-colors',
                 loading
-                  ? 'bg-clay-300 text-clay-500'
+                  ? 'bg-clay-300 text-fg-placeholder'
                   : 'bg-peach-500 text-white shadow-clay-sm hover:bg-peach-400',
               )}
             >
@@ -177,9 +177,9 @@ export default function AdminLoginPage(): React.JSX.Element {
 
         {/* Step 2: 2FA Setup */}
         {step === '2fa-setup' && setupData && (
-          <div className="space-y-4 rounded-md border border-clay-200 bg-white p-6">
-            <h2 className="text-lg font-semibold text-clay-900">ตั้งค่า 2FA</h2>
-            <p className="text-sm text-clay-500">
+          <div className="space-y-4 rounded-md border border-line-subtle bg-white p-6">
+            <h2 className="text-lg font-semibold text-fg">ตั้งค่า 2FA</h2>
+            <p className="text-sm text-fg-placeholder">
               สแกน QR Code ด้วย Google Authenticator หรือ Authy
             </p>
 
@@ -194,16 +194,16 @@ export default function AdminLoginPage(): React.JSX.Element {
               </div>
             </div>
 
-            <div className="rounded-md bg-clay-100 p-3 text-center">
-              <p className="text-xs text-clay-500">รหัสลับ (เก็บไว้ปลอดภัย)</p>
-              <p className="font-mono text-sm font-bold text-peach-600">{setupData.secretBase32}</p>
+            <div className="rounded-md bg-surface p-3 text-center">
+              <p className="text-xs text-fg-placeholder">รหัสลับ (เก็บไว้ปลอดภัย)</p>
+              <p className="font-mono text-sm font-bold text-fg-brand">{setupData.secretBase32}</p>
             </div>
 
-            <div className="rounded-md bg-clay-100 p-3">
-              <p className="mb-2 text-xs text-clay-500">รหัสสำรอง (ใช้เมื่อสูญหาย)</p>
+            <div className="rounded-md bg-surface p-3">
+              <p className="mb-2 text-xs text-fg-placeholder">รหัสสำรอง (ใช้เมื่อสูญหาย)</p>
               <div className="grid grid-cols-2 gap-1">
                 {setupData.backupCodes.map((code) => (
-                  <p key={code} className="font-mono text-xs text-clay-600">
+                  <p key={code} className="font-mono text-xs text-fg-muted">
                     {code}
                   </p>
                 ))}
@@ -217,13 +217,13 @@ export default function AdminLoginPage(): React.JSX.Element {
                 onChange={(e) => setTotpCode(e.target.value)}
                 placeholder="กรอกรหัส 6 หลัก"
                 maxLength={6}
-                className="w-full rounded-md border border-clay-300 bg-clay-100 px-3 py-2.5 text-center font-mono text-lg tracking-widest text-clay-900 focus:outline-none focus:ring-2 focus:ring-peach-500"
+                className="w-full rounded-md border border-line bg-surface px-3 py-2.5 text-center font-mono text-lg tracking-widest text-fg focus:outline-none focus:ring-2 focus:ring-peach-500"
               />
               {error && <p className="text-sm text-coral-600">{error}</p>}
               <button
                 type="submit"
                 disabled={loading || totpCode.length !== 6}
-                className="w-full rounded-md bg-peach-500 px-5 py-2.5 text-sm font-semibold text-clay-900 hover:bg-peach-400 disabled:opacity-50"
+                className="w-full rounded-md bg-peach-500 px-5 py-2.5 text-sm font-semibold text-fg hover:bg-peach-400 disabled:opacity-50"
               >
                 {loading ? 'กำลังยืนยัน...' : 'ยืนยัน'}
               </button>
@@ -235,10 +235,10 @@ export default function AdminLoginPage(): React.JSX.Element {
         {step === '2fa' && (
           <form
             onSubmit={handleTotpSubmit}
-            className="space-y-4 rounded-md border border-clay-200 bg-white p-6"
+            className="space-y-4 rounded-md border border-line-subtle bg-white p-6"
           >
-            <h2 className="text-lg font-semibold text-clay-900">ยืนยันตัวตน</h2>
-            <p className="text-sm text-clay-500">กรอกรหัส 6 หลักจาก Authenticator App</p>
+            <h2 className="text-lg font-semibold text-fg">ยืนยันตัวตน</h2>
+            <p className="text-sm text-fg-placeholder">กรอกรหัส 6 หลักจาก Authenticator App</p>
 
             {error && (
               <div className="rounded-md border border-coral-300 bg-coral-50 px-3 py-2 text-sm text-coral-700">
@@ -253,7 +253,7 @@ export default function AdminLoginPage(): React.JSX.Element {
               placeholder="กรอกรหัส 6 หลัก"
               maxLength={6}
               autoFocus
-              className="w-full rounded-md border border-clay-300 bg-clay-100 px-3 py-2.5 text-center font-mono text-lg tracking-widest text-clay-900 focus:outline-none focus:ring-2 focus:ring-peach-500"
+              className="w-full rounded-md border border-line bg-surface px-3 py-2.5 text-center font-mono text-lg tracking-widest text-fg focus:outline-none focus:ring-2 focus:ring-peach-500"
             />
 
             <button
@@ -262,15 +262,15 @@ export default function AdminLoginPage(): React.JSX.Element {
               className={cn(
                 'w-full rounded-md px-5 py-2.5 text-sm font-semibold transition-colors',
                 loading
-                  ? 'bg-clay-300 text-clay-500'
+                  ? 'bg-clay-300 text-fg-placeholder'
                   : 'bg-peach-500 text-white shadow-clay-sm hover:bg-peach-400',
               )}
             >
               {loading ? 'กำลังยืนยัน...' : 'ยืนยัน'}
             </button>
 
-            <p className="text-center text-xs text-clay-500">
-              รหัสสำหรับทดสอบ: <span className="font-mono text-peach-600">123456</span>
+            <p className="text-center text-xs text-fg-placeholder">
+              รหัสสำหรับทดสอบ: <span className="font-mono text-fg-brand">123456</span>
             </p>
           </form>
         )}

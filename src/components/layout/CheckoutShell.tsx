@@ -35,8 +35,8 @@ export function CheckoutShell({
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-clay-50">
-      <header className="border-b border-clay-200 px-4 py-4 md:px-8">
+    <div className="min-h-screen bg-surface-base">
+      <header className="border-b border-line-subtle px-4 py-4 md:px-8">
         <div className="mx-auto flex max-w-content items-center justify-between">
           {currentStep === 2 ? (
             <button type="button" onClick={() => setConfirmOpen(true)} aria-label="Nong-Kati">
@@ -56,8 +56,8 @@ export function CheckoutShell({
                   <span
                     className={cn(
                       'font-medium',
-                      isCurrent && 'text-peach-600',
-                      isDone && !isCurrent && 'cursor-pointer text-clay-700',
+                      isCurrent && 'text-fg-brand',
+                      isDone && !isCurrent && 'cursor-pointer text-fg-secondary',
                       !isDone && !isCurrent && 'text-clay-9000',
                     )}
                     aria-disabled={!isClickable && !isCurrent}

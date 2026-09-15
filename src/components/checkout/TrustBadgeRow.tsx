@@ -21,8 +21,8 @@ export function TrustBadgeRow({ className }: TrustBadgeRowProps): React.JSX.Elem
   return (
     <div className={cn('flex items-center justify-center gap-6', className)}>
       {BADGES.map((badge) => (
-        <div key={badge.label} className="flex items-center gap-1.5 text-xs text-clay-500">
-          <badge.icon size={14} strokeWidth={1.5} className="text-clay-500" />
+        <div key={badge.label} className="flex items-center gap-1.5 text-xs text-fg-placeholder">
+          <badge.icon size={14} strokeWidth={1.5} className="text-fg-placeholder" />
           <span>{badge.label}</span>
         </div>
       ))}

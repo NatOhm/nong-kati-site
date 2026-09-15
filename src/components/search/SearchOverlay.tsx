@@ -77,28 +77,28 @@ export function SearchOverlay({
 
   return (
     <div
-      className="bg-clay-50/98 fixed inset-0 z-[100] flex flex-col backdrop-blur-md"
+      className="bg-surface-base/98 fixed inset-0 z-[100] flex flex-col backdrop-blur-md"
       role="dialog"
       aria-label="ค้นหาสินค้า"
       aria-modal="true"
     >
       {/* Header */}
-      <div className="flex items-center gap-3 border-b border-clay-200 px-4 py-3">
+      <div className="flex items-center gap-3 border-b border-line-subtle px-4 py-3">
         <form onSubmit={handleSubmit} className="flex flex-1 items-center gap-3">
-          <Search size={20} className="shrink-0 text-clay-500" strokeWidth={1.5} />
+          <Search size={20} className="shrink-0 text-fg-placeholder" strokeWidth={1.5} />
           <input
             ref={inputRef}
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="ค้นหาสินค้า..."
-            className="flex-1 bg-transparent text-base text-clay-900 placeholder:text-clay-500 focus:outline-none"
+            className="flex-1 bg-transparent text-base text-fg placeholder:text-fg-placeholder focus:outline-none"
             aria-label="ค้นหาสินค้า"
           />
         </form>
         <button
           onClick={onClose}
-          className="rounded-md p-2 text-clay-500 hover:bg-clay-100 hover:text-clay-700"
+          className="rounded-md p-2 text-fg-placeholder hover:bg-surface hover:text-fg-secondary"
           aria-label="ปิดการค้นหา"
         >
           <X size={20} strokeWidth={1.5} />
@@ -111,7 +111,7 @@ export function SearchOverlay({
           // Show suggestions
           suggestions.length > 0 ? (
             <div className="mx-auto max-w-2xl">
-              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-clay-500">
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-fg-placeholder">
                 ผลการค้นหา
               </h3>
               <div className="flex flex-col gap-1">
@@ -135,13 +135,13 @@ export function SearchOverlay({
             {recentSearches.length > 0 && (
               <div>
                 <div className="mb-3 flex items-center justify-between">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-clay-500">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-placeholder">
                     <Clock size={14} className="mr-1 inline" />
                     ค้นหาล่าสุด
                   </h3>
                   <button
                     onClick={onClearRecent}
-                    className="text-xs text-clay-500 hover:text-peach-700"
+                    className="text-xs text-fg-placeholder hover:text-fg-brand"
                   >
                     ล้างทั้งหมด
                   </button>
@@ -155,7 +155,7 @@ export function SearchOverlay({
                         onSearch?.(term);
                         onClose();
                       }}
-                      className="rounded-full border border-clay-300 bg-clay-100 px-3 py-1.5 text-sm text-clay-700 hover:border-peach-400 hover:text-peach-700"
+                      className="rounded-full border border-line bg-surface px-3 py-1.5 text-sm text-fg-secondary hover:border-peach-400 hover:text-fg-brand"
                     >
                       {term}
                     </button>
@@ -165,7 +165,7 @@ export function SearchOverlay({
             )}
 
             <div>
-              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-clay-500">
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-fg-placeholder">
                 <TrendingUp size={14} className="mr-1 inline" />
                 ยอดนิยม
               </h3>
@@ -178,7 +178,7 @@ export function SearchOverlay({
                       onSearch?.(term);
                       onClose();
                     }}
-                    className="rounded-full border border-clay-300 bg-clay-100 px-3 py-1.5 text-sm text-clay-700 hover:border-peach-400 hover:text-peach-700"
+                    className="rounded-full border border-line bg-surface px-3 py-1.5 text-sm text-fg-secondary hover:border-peach-400 hover:text-fg-brand"
                   >
                     {term}
                   </button>

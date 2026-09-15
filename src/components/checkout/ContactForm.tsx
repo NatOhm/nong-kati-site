@@ -95,7 +95,10 @@ export function ContactForm({
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Email */}
       <div>
-        <label htmlFor="checkout-email" className="mb-1 block text-sm font-medium text-clay-700">
+        <label
+          htmlFor="checkout-email"
+          className="mb-1 block text-sm font-medium text-fg-secondary"
+        >
           อีเมล *
         </label>
         <input
@@ -107,8 +110,8 @@ export function ContactForm({
           required
           placeholder="kaem@example.com"
           className={cn(
-            'w-full rounded-md border bg-clay-100 px-3 py-2.5 text-sm text-clay-900 placeholder:text-clay-500 focus:outline-none focus:ring-2 focus:ring-peach-500',
-            errors.email ? 'border-crimson-500' : 'border-clay-300',
+            'w-full rounded-md border bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-fg-placeholder focus:outline-none focus:ring-2 focus:ring-peach-500',
+            errors.email ? 'border-crimson-500' : 'border-line',
             readOnlyEmail && 'cursor-not-allowed opacity-70',
           )}
         />
@@ -117,9 +120,12 @@ export function ContactForm({
 
       {/* Phone */}
       <div>
-        <label htmlFor="checkout-phone" className="mb-1 block text-sm font-medium text-clay-700">
+        <label
+          htmlFor="checkout-phone"
+          className="mb-1 block text-sm font-medium text-fg-secondary"
+        >
           เบอร์โทรศัพท์ (LINE)
-          <span className="ml-1 text-clay-500">(ไม่บังคับ)</span>
+          <span className="ml-1 text-fg-placeholder">(ไม่บังคับ)</span>
         </label>
         <input
           id="checkout-phone"
@@ -127,7 +133,7 @@ export function ContactForm({
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           placeholder="0812345678"
-          className="w-full rounded-md border border-clay-300 bg-clay-100 px-3 py-2.5 text-sm text-clay-900 placeholder:text-clay-500 focus:outline-none focus:ring-2 focus:ring-peach-500"
+          className="w-full rounded-md border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-fg-placeholder focus:outline-none focus:ring-2 focus:ring-peach-500"
         />
       </div>
 
@@ -158,7 +164,7 @@ export function ContactForm({
               ยอมรับ{' '}
               <a
                 href="/terms"
-                className="text-peach-600 hover:underline"
+                className="text-fg-brand hover:underline"
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -167,7 +173,7 @@ export function ContactForm({
               และ{' '}
               <a
                 href="/privacy"
-                className="text-peach-600 hover:underline"
+                className="text-fg-brand hover:underline"
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -197,7 +203,7 @@ export function ContactForm({
         className={cn(
           'w-full rounded-md px-5 py-3 text-base font-semibold transition-colors',
           loading
-            ? 'cursor-wait bg-clay-300 text-clay-500'
+            ? 'cursor-wait bg-clay-300 text-fg-placeholder'
             : 'bg-peach-500 text-white shadow-clay-sm hover:bg-peach-400',
         )}
       >

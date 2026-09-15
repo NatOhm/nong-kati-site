@@ -22,7 +22,7 @@ import { cn } from '@/utils/cn';
 import { useState, useEffect, type MouseEventHandler } from 'react';
 
 const NAV_ITEMS = [
-  { icon: Home, href: '/', label: 'หน้าหลัก', color: 'text-peach-600' },
+  { icon: Home, href: '/', label: 'หน้าหลัก', color: 'text-fg-brand' },
   { icon: Grid3X3, href: '/search', label: 'สินค้าทั้งหมด', color: 'text-sapphire-400' },
   { icon: Tv, href: '/category/streaming', label: 'สตรีมมิ่ง', color: 'text-coral-500' },
   { icon: Gamepad2, href: '/category/games', label: 'เกม', color: 'text-jade-500' },
@@ -68,16 +68,16 @@ function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
     <div className="flex h-full flex-col">
       {/* Mobile close button */}
       {onClose && (
-        <div className="flex items-center justify-between border-b border-clay-200 px-4 py-3 lg:hidden">
+        <div className="flex items-center justify-between border-b border-line-subtle px-4 py-3 lg:hidden">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-peach-400">
               <span className="text-lg font-bold text-peach-900">NK</span>
             </div>
-            <span className="text-lg font-bold text-clay-900">Nong-Kati</span>
+            <span className="text-lg font-bold text-fg">Nong-Kati</span>
           </div>
           <button
             onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-full text-clay-600 hover:bg-clay-200"
+            className="flex h-10 w-10 items-center justify-center rounded-full text-fg-muted hover:bg-clay-200"
           >
             <X size={22} />
           </button>
@@ -101,7 +101,7 @@ function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
                   'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150',
                   isActive
                     ? 'bg-peach-100 text-peach-800'
-                    : 'text-clay-700 hover:bg-clay-200 hover:text-clay-900',
+                    : 'text-fg-secondary hover:bg-clay-200 hover:text-fg',
                 )}
               >
                 <div
@@ -112,7 +112,7 @@ function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
                 >
                   <Icon
                     size={18}
-                    className={isActive ? 'text-peach-700' : item.color}
+                    className={isActive ? 'text-fg-brand' : item.color}
                     strokeWidth={1.5}
                   />
                 </div>
@@ -124,13 +124,13 @@ function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
           {/* See more / See less */}
           <button
             onClick={() => setShowMore(!showMore)}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-clay-600 transition-all duration-150 hover:bg-clay-200 hover:text-clay-900"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-fg-muted transition-all duration-150 hover:bg-clay-200 hover:text-fg"
           >
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-clay-200">
               {showMore ? (
-                <ChevronUp size={18} className="text-clay-500" />
+                <ChevronUp size={18} className="text-fg-placeholder" />
               ) : (
-                <ChevronDown size={18} className="text-clay-500" />
+                <ChevronDown size={18} className="text-fg-placeholder" />
               )}
             </div>
             <span>{showMore ? 'แสดงน้อยลง' : 'ดูเพิ่มเติม'}</span>
@@ -142,7 +142,7 @@ function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
 
         {/* Shortcuts */}
         <div>
-          <h3 className="mb-3 px-3 text-xs font-semibold uppercase tracking-wider text-clay-500">
+          <h3 className="mb-3 px-3 text-xs font-semibold uppercase tracking-wider text-fg-placeholder">
             ทางลัดของคุณ
           </h3>
           <div className="space-y-1">
@@ -153,7 +153,7 @@ function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
                   key={shortcut.href}
                   href={shortcut.href}
                   onClick={linkClickHandler}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-clay-700 transition-all duration-150 hover:bg-clay-200 hover:text-clay-900"
+                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-fg-secondary transition-all duration-150 hover:bg-clay-200 hover:text-fg"
                 >
                   <div
                     className={cn(
@@ -172,8 +172,8 @@ function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
       </div>
 
       {/* Footer copyright */}
-      <div className="border-t border-clay-200 px-4 py-3">
-        <p className="text-xs text-clay-500">© 2024 Nong-Kati Store</p>
+      <div className="border-t border-line-subtle px-4 py-3">
+        <p className="text-xs text-fg-placeholder">© 2024 Nong-Kati Store</p>
       </div>
     </div>
   );
@@ -187,7 +187,7 @@ export function FacebookSidebar({
     <>
       {/* Desktop sidebar - scrollable within page flow */}
       <aside className="hidden w-[280px] shrink-0 lg:block">
-        <div className="sticky top-16 z-40 h-[calc(100vh-64px)] w-[280px] overflow-y-auto border-r border-clay-200 bg-clay-50">
+        <div className="sticky top-16 z-40 h-[calc(100vh-64px)] w-[280px] overflow-y-auto border-r border-line-subtle bg-surface-base">
           <SidebarContent />
         </div>
       </aside>
@@ -198,7 +198,7 @@ export function FacebookSidebar({
           {/* Backdrop */}
           <div className="fixed inset-0 z-50 bg-black/60 lg:hidden" onClick={onClose} />
           {/* Drawer */}
-          <div className="fixed left-0 top-0 z-50 h-full w-[300px] overflow-y-auto bg-clay-50 shadow-2xl lg:hidden">
+          <div className="fixed left-0 top-0 z-50 h-full w-[300px] overflow-y-auto bg-surface-base shadow-2xl lg:hidden">
             <SidebarContent onClose={onClose} />
           </div>
         </>

@@ -53,12 +53,12 @@ export function DenominationSelector({
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-peach-500 focus-visible:ring-offset-2 focus-visible:ring-offset-clay-50',
               isSelected
                 ? 'border-peach-500 bg-peach-100 text-peach-800 shadow-brand-glow'
-                : 'border-clay-300 bg-clay-100 text-clay-700 hover:border-peach-300 hover:bg-clay-200',
+                : 'border-line bg-surface text-fg-secondary hover:border-line-brand hover:bg-clay-200',
               (!isAvailable || disabled) && 'cursor-not-allowed opacity-40',
             )}
           >
             <span className="font-medium">{denom.label}</span>
-            <span className="text-xs text-clay-500">{formatThb(denom.price)}</span>
+            <span className="text-xs text-fg-placeholder">{formatThb(denom.price)}</span>
           </button>
         );
       })}

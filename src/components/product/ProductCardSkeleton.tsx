@@ -13,12 +13,12 @@ export function ProductCardSkeleton({ className }: ProductCardSkeletonProps): Re
   return (
     <div
       className={cn(
-        'flex animate-pulse flex-col overflow-hidden rounded-lg border border-clay-200 bg-white',
+        'flex animate-pulse flex-col overflow-hidden rounded-lg border border-line-subtle bg-white',
         className,
       )}
     >
       {/* Image skeleton */}
-      <div className="aspect-square bg-clay-100" />
+      <div className="aspect-square bg-surface" />
 
       {/* Content skeleton */}
       <div className="flex flex-1 flex-col gap-2 p-3">

@@ -97,7 +97,7 @@ export default async function SearchPage({
 
             {/* Header */}
             <section className="pb-6">
-              <h1 className="font-display text-2xl font-bold text-clay-900">
+              <h1 className="font-display text-2xl font-bold text-fg">
                 {query ? (
                   <>ผลการค้นหา &ldquo;{query}&rdquo;</>
                 ) : category ? (
@@ -106,7 +106,7 @@ export default async function SearchPage({
                   'สินค้าทั้งหมด'
                 )}
               </h1>
-              <p className="mt-2 text-clay-500">พบ {total} รายการ</p>
+              <p className="mt-2 text-fg-placeholder">พบ {total} รายการ</p>
             </section>
 
             {/* Category chips + sort */}
@@ -117,7 +117,7 @@ export default async function SearchPage({
                   className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
                     !category
                       ? 'border-peach-500 bg-peach-100 text-peach-800'
-                      : 'border-clay-300 bg-clay-100 text-clay-700 hover:border-peach-400 hover:text-peach-700'
+                      : 'border-line bg-surface text-fg-secondary hover:border-peach-400 hover:text-fg-brand'
                   }`}
                 >
                   ทั้งหมด
@@ -129,7 +129,7 @@ export default async function SearchPage({
                     className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
                       category === cat.slug
                         ? 'border-peach-500 bg-peach-100 text-peach-800'
-                        : 'border-clay-300 bg-clay-100 text-clay-700 hover:border-peach-400 hover:text-peach-700'
+                        : 'border-line bg-surface text-fg-secondary hover:border-peach-400 hover:text-fg-brand'
                     }`}
                   >
                     {cat.name} <span className="text-clay-9000">({cat.productCount})</span>
@@ -138,15 +138,15 @@ export default async function SearchPage({
               </div>
 
               <div className="mt-4 flex items-center gap-2">
-                <span className="text-sm text-clay-500">เรียงตาม:</span>
+                <span className="text-sm text-fg-placeholder">เรียงตาม:</span>
                 {SORT_OPTIONS.map((opt) => (
                   <Link
                     key={opt.value}
                     href={sortUrl(opt.value)}
                     className={`rounded-md px-2.5 py-1 text-sm transition-colors ${
                       sort === opt.value
-                        ? 'bg-peach-100 font-semibold text-peach-600'
-                        : 'text-clay-600 hover:bg-clay-100 hover:text-clay-900'
+                        ? 'bg-peach-100 font-semibold text-fg-brand'
+                        : 'text-fg-muted hover:bg-surface hover:text-fg'
                     }`}
                   >
                     {opt.label}
@@ -186,12 +186,12 @@ export default async function SearchPage({
                           sort: sortParam,
                           page: page - 1,
                         })}
-                        className="rounded-md border border-clay-300 bg-clay-100 px-3 py-1.5 text-sm text-clay-700 hover:border-peach-400 hover:text-peach-700"
+                        className="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-fg-secondary hover:border-peach-400 hover:text-fg-brand"
                       >
                         ← ก่อนหน้า
                       </Link>
                     )}
-                    <span className="text-sm text-clay-500">
+                    <span className="text-sm text-fg-placeholder">
                       หน้า {page} จาก {totalPages}
                     </span>
                     {page < totalPages && (
@@ -202,7 +202,7 @@ export default async function SearchPage({
                           sort: sortParam,
                           page: page + 1,
                         })}
-                        className="rounded-md border border-clay-300 bg-clay-100 px-3 py-1.5 text-sm text-clay-700 hover:border-peach-400 hover:text-peach-700"
+                        className="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-fg-secondary hover:border-peach-400 hover:text-fg-brand"
                       >
                         ถัดไป →
                       </Link>
@@ -212,21 +212,23 @@ export default async function SearchPage({
               </section>
             ) : query || category ? (
               <section className="py-16 text-center">
-                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-clay-100">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-surface">
                   <span className="text-2xl">🔍</span>
                 </div>
-                <h2 className="mb-2 text-lg font-semibold text-clay-900">
+                <h2 className="mb-2 text-lg font-semibold text-fg">
                   {query ? <>ไม่พบสินค้า &ldquo;{query}&rdquo;</> : 'ไม่พบสินค้าในหมวดหมู่นี้'}
                 </h2>
-                <p className="text-sm text-clay-500">ลองค้นหาด้วยคำอื่น หรือเลือกหมวดหมู่อื่น</p>
+                <p className="text-sm text-fg-placeholder">
+                  ลองค้นหาด้วยคำอื่น หรือเลือกหมวดหมู่อื่น
+                </p>
               </section>
             ) : (
               <section className="py-16 text-center">
-                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-clay-100">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-surface">
                   <span className="text-2xl">🛒</span>
                 </div>
-                <h2 className="mb-2 text-lg font-semibold text-clay-900">ยังไม่มีสินค้าในร้าน</h2>
-                <p className="text-sm text-clay-500">
+                <h2 className="mb-2 text-lg font-semibold text-fg">ยังไม่มีสินค้าในร้าน</h2>
+                <p className="text-sm text-fg-placeholder">
                   กลับมาใหม่ภายหลัง หรือติดต่อทีมงานเพื่อสอบถาม
                 </p>
               </section>

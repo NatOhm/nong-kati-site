@@ -21,11 +21,11 @@ export function Divider({
     return (
       <div className={cn('flex items-center gap-3', className)} role="separator">
         <span className="h-px flex-1 bg-clay-300" />
-        <span className="text-xs text-clay-500">{label}</span>
+        <span className="text-xs text-fg-placeholder">{label}</span>
         <span className="h-px flex-1 bg-clay-300" />
       </div>
     );
   }
 
-  return <hr className={cn('border-t border-clay-300', className)} />;
+  return <hr className={cn('border-t border-line', className)} />;
 }

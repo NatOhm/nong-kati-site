@@ -47,12 +47,12 @@ export function OrderDetailCard({
   const isCompleted = order.status === 'completed';
 
   return (
-    <div className={cn('rounded-md border border-clay-200 bg-white p-6', className)}>
+    <div className={cn('rounded-md border border-line-subtle bg-white p-6', className)}>
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <p className="text-xs text-clay-500">หมายเลขคำสั่งซื้อ</p>
-          <p className="font-mono text-lg font-bold text-peach-600">{order.orderNumber}</p>
+          <p className="text-xs text-fg-placeholder">หมายเลขคำสั่งซื้อ</p>
+          <p className="font-mono text-lg font-bold text-fg-brand">{order.orderNumber}</p>
         </div>
         <OrderStatusBadge status={order.status} />
       </div>
@@ -62,15 +62,15 @@ export function OrderDetailCard({
         {order.items.map((item, idx) => (
           <div
             key={idx}
-            className="flex items-center justify-between rounded-md border border-clay-200 bg-clay-100 px-3 py-2"
+            className="flex items-center justify-between rounded-md border border-line-subtle bg-surface px-3 py-2"
           >
             <div>
-              <p className="text-sm font-medium text-clay-900">{item.productNameTh}</p>
-              <p className="text-xs text-clay-500">
+              <p className="text-sm font-medium text-fg">{item.productNameTh}</p>
+              <p className="text-xs text-fg-placeholder">
                 {item.skuCode} × {item.quantity}
               </p>
             </div>
-            <span className="text-sm font-medium text-clay-700">
+            <span className="text-sm font-medium text-fg-secondary">
               {formatThb(item.lineTotalThb)}
             </span>
           </div>
@@ -80,7 +80,7 @@ export function OrderDetailCard({
       {/* Codes (if delivered) */}
       {isCompleted && order.codes.length > 0 && (
         <div className="mb-4">
-          <h3 className="mb-2 text-sm font-semibold text-clay-700">โค้ดของคุณ</h3>
+          <h3 className="mb-2 text-sm font-semibold text-fg-secondary">โค้ดของคุณ</h3>
           <div className="space-y-2">
             {order.codes.map((code, idx) => (
               <CodeBlock
@@ -96,32 +96,30 @@ export function OrderDetailCard({
 
       {/* Pending manual fulfilment message */}
       {order.status === 'pending_manual_fulfilment' && (
-        <div className="mb-4 rounded-md border border-peach-300 bg-peach-50 px-4 py-3 text-sm text-peach-800">
+        <div className="mb-4 rounded-md border border-line-brand bg-peach-50 px-4 py-3 text-sm text-peach-800">
           การชำระเงินสำเร็จ โค้ดจะถูกส่งภายใน 2 ชั่วโมง
         </div>
       )}
 
       {/* Summary */}
-      <div className="border-t border-clay-200 pt-4">
-        <div className="flex items-center justify-between text-sm text-clay-600">
+      <div className="border-t border-line-subtle pt-4">
+        <div className="flex items-center justify-between text-sm text-fg-muted">
           <span>ยอดรวม</span>
           <span>{formatThb(order.subtotalThb)}</span>
         </div>
-        <div className="flex items-center justify-between text-sm text-clay-600">
+        <div className="flex items-center justify-between text-sm text-fg-muted">
           <span>VAT 7%</span>
           <span>{formatThb(order.vatAmountThb)}</span>
         </div>
-        <div className="mt-2 flex items-center justify-between border-t border-clay-200 pt-2">
-          <span className="font-bold text-clay-900">รวมทั้งสิ้น</span>
-          <span className="text-lg font-bold text-peach-600">
-            {formatThb(order.totalAmountThb)}
-          </span>
+        <div className="mt-2 flex items-center justify-between border-t border-line-subtle pt-2">
+          <span className="font-bold text-fg">รวมทั้งสิ้น</span>
+          <span className="text-lg font-bold text-fg-brand">{formatThb(order.totalAmountThb)}</span>
         </div>
       </div>
 
       {/* Email + Resend */}
-      <div className="mt-4 flex items-center justify-between border-t border-clay-200 pt-4">
-        <div className="flex items-center gap-2 text-sm text-clay-500">
+      <div className="mt-4 flex items-center justify-between border-t border-line-subtle pt-4">
+        <div className="flex items-center gap-2 text-sm text-fg-placeholder">
           <Mail size={14} />
           <span>{order.customerEmail}</span>
         </div>
@@ -129,7 +127,7 @@ export function OrderDetailCard({
           <button
             onClick={onResend}
             disabled={resendLoading}
-            className="text-sm text-peach-600 hover:text-peach-700 disabled:opacity-50"
+            className="text-sm text-fg-brand hover:text-fg-brand disabled:opacity-50"
           >
             {resendLoading ? 'กำลังส่ง...' : 'ส่งอีเมลใหม่'}
           </button>
@@ -137,7 +135,7 @@ export function OrderDetailCard({
       </div>
 
       {/* Created at */}
-      <p className="mt-2 text-xs text-clay-500">
+      <p className="mt-2 text-xs text-fg-placeholder">
         สั่งซื้อเมื่อ: {new Date(order.createdAt).toLocaleString('th-TH')}
       </p>
     </div>

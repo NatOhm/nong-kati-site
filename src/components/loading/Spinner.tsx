@@ -11,9 +11,9 @@ export interface SpinnerProps {
 
 const sizePx: Record<SpinnerSize, number> = { sm: 16, md: 24, lg: 40 };
 const colorClass: Record<SpinnerColor, string> = {
-  brand: 'text-peach-600',
+  brand: 'text-fg-brand',
   white: 'text-white',
-  muted: 'text-clay-600',
+  muted: 'text-fg-muted',
 };
 
 /** 05-components.md §9.1 — role="status" spinner, Thai aria-label. */

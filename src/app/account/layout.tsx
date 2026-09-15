@@ -66,7 +66,7 @@ export default function AccountLayout({
                         'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
                         isActive
                           ? 'bg-peach-100 text-peach-800'
-                          : 'text-clay-600 hover:bg-clay-100 hover:text-clay-900',
+                          : 'text-fg-muted hover:bg-surface hover:text-fg',
                       )}
                     >
                       <Icon size={16} />
@@ -77,8 +77,8 @@ export default function AccountLayout({
               })}
             </ul>
 
-            <div className="mt-4 border-t border-clay-200 pt-4">
-              <button className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-clay-500 transition-colors hover:bg-clay-100 hover:text-coral-600">
+            <div className="mt-4 border-t border-line-subtle pt-4">
+              <button className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-fg-placeholder transition-colors hover:bg-surface hover:text-coral-600">
                 <LogOut size={16} />
                 ออกจากระบบ
               </button>

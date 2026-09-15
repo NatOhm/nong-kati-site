@@ -44,14 +44,18 @@ export function Breadcrumb({ items, className }: BreadcrumbProps): React.JSX.Ele
           return (
             <Fragment key={index}>
               {index > 0 && (
-                <ChevronRight size={14} className="shrink-0 text-clay-500" strokeWidth={1.5} />
+                <ChevronRight
+                  size={14}
+                  className="shrink-0 text-fg-placeholder"
+                  strokeWidth={1.5}
+                />
               )}
               {isLast || !item.href ? (
-                <span className="text-clay-600">{item.label}</span>
+                <span className="text-fg-muted">{item.label}</span>
               ) : (
                 <Link
                   href={item.href}
-                  className="text-clay-500 transition-colors hover:text-peach-700"
+                  className="text-fg-placeholder transition-colors hover:text-fg-brand"
                 >
                   {item.label}
                 </Link>

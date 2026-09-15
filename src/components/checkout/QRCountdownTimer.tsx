@@ -92,7 +92,7 @@ export function QRCountdownTimer({
           strokeDashoffset={dashOffset}
           className={cn(
             'transition-colors duration-300',
-            isWarning ? 'text-coral-600' : 'text-peach-600',
+            isWarning ? 'text-coral-600' : 'text-fg-brand',
           )}
           style={{
             transform: 'rotate(-90deg)',
@@ -105,7 +105,7 @@ export function QRCountdownTimer({
       <span
         className={cn(
           'font-mono text-xl font-medium',
-          isExpired ? 'text-coral-600' : isWarning ? 'text-coral-600' : 'text-clay-900',
+          isExpired ? 'text-coral-600' : isWarning ? 'text-coral-600' : 'text-fg',
         )}
       >
         {isExpired ? 'หมดเวลา' : timeStr}

@@ -209,9 +209,9 @@
   --bg-elevated: #ffffff;
   --bg-sunken: var(--clay-200);
   --bg-overlay: rgba(74, 51, 32, 0.45);
-  --bg-brand: var(--peach-400);
-  --bg-brand-hover: var(--peach-300);
-  --bg-brand-subtle: var(--peach-100);
+  --bg-brand: var(--peach-500);
+  --bg-brand-hover: var(--peach-400);
+  --bg-brand-subtle: var(--peach-50);
   --bg-success: #eaf7ee;
   --bg-error: var(--coral-50);
   --bg-warning: #fff6e0;
@@ -222,7 +222,7 @@
   --fg-muted: var(--clay-600);
   --fg-placeholder: var(--clay-500);
   --fg-inverse: var(--clay-50);
-  --fg-brand: var(--peach-700);
+  --fg-brand: var(--peach-600);
   --fg-brand-strong: var(--peach-800);
   --fg-success: #2e7d4f;
   --fg-error: var(--coral-700);
@@ -233,7 +233,7 @@
   --border-subtle: var(--clay-200);
   --border-default: var(--clay-300);
   --border-strong: var(--clay-400);
-  --border-brand: var(--peach-500);
+  --border-brand: var(--peach-300);
   --border-success: #9fd4b0;
   --border-error: var(--coral-300);
   --border-warning: #f0d48a;

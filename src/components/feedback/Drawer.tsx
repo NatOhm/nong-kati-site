@@ -71,13 +71,13 @@ export function Drawer({
         )}
       >
         {title && (
-          <div className="flex items-center justify-between border-b border-clay-200 p-4">
-            <h2 className="font-ui text-lg font-semibold text-clay-900">{title}</h2>
+          <div className="flex items-center justify-between border-b border-line-subtle p-4">
+            <h2 className="font-ui text-lg font-semibold text-fg">{title}</h2>
             <button
               type="button"
               aria-label="ปิด"
               onClick={onClose}
-              className="text-clay-500 hover:text-clay-700"
+              className="text-fg-placeholder hover:text-fg-secondary"
             >
               <X size={20} />
             </button>

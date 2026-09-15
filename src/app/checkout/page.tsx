@@ -160,8 +160,8 @@ export default function CheckoutPage(): React.JSX.Element {
     return (
       <PageShell>
         <div className="flex flex-col items-center justify-center py-24 text-center">
-          <h1 className="mb-4 text-2xl font-bold text-clay-900">ตะกร้าว่างเปล่า</h1>
-          <p className="mb-6 text-clay-500">กรุณาเพิ่มสินค้าในตะกร้าก่อนดำเนินการชำระเงิน</p>
+          <h1 className="mb-4 text-2xl font-bold text-fg">ตะกร้าว่างเปล่า</h1>
+          <p className="mb-6 text-fg-placeholder">กรุณาเพิ่มสินค้าในตะกร้าก่อนดำเนินการชำระเงิน</p>
           <Link
             href="/"
             className="inline-flex items-center gap-2 rounded-md bg-peach-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-peach-400"
@@ -180,12 +180,12 @@ export default function CheckoutPage(): React.JSX.Element {
       <div className="flex items-center justify-between py-6">
         <Link
           href="/"
-          className="flex items-center gap-2 text-sm text-clay-500 hover:text-peach-700"
+          className="flex items-center gap-2 text-sm text-fg-placeholder hover:text-fg-brand"
         >
           <ArrowLeft size={16} />
           กลับ
         </Link>
-        <h1 className="font-display text-xl font-bold text-clay-900">ชำระเงิน</h1>
+        <h1 className="font-display text-xl font-bold text-fg">ชำระเงิน</h1>
         <CartIcon count={itemCount} />
       </div>
 
@@ -210,14 +210,14 @@ export default function CheckoutPage(): React.JSX.Element {
         {/* Main area */}
         <div>
           {step === 1 && (
-            <div className="rounded-md border border-clay-200 bg-white p-6">
-              <h2 className="mb-4 text-lg font-semibold text-clay-900">ข้อมูลการติดต่อ</h2>
+            <div className="rounded-md border border-line-subtle bg-white p-6">
+              <h2 className="mb-4 text-lg font-semibold text-fg">ข้อมูลการติดต่อ</h2>
               <ContactForm onSubmit={handleContactSubmit} loading={loading} />
             </div>
           )}
 
           {step === 2 && (
-            <div className="rounded-md border border-clay-200 bg-white p-6">
+            <div className="rounded-md border border-line-subtle bg-white p-6">
               {/* Payment method selector */}
               <PaymentMethodSelector
                 selected={paymentMethod}
@@ -262,12 +262,12 @@ export default function CheckoutPage(): React.JSX.Element {
               {/* Card payment placeholder */}
               {paymentMethod === 'card' && (
                 <div className="mt-6">
-                  <div className="rounded-md border border-peach-300 bg-peach-50 px-4 py-6 text-center">
-                    <Construction size={24} className="mx-auto mb-2 text-peach-600" />
-                    <p className="text-sm text-peach-700">
+                  <div className="rounded-md border border-line-brand bg-peach-50 px-4 py-6 text-center">
+                    <Construction size={24} className="mx-auto mb-2 text-fg-brand" />
+                    <p className="text-sm text-fg-brand">
                       ระบบชำระเงินด้วยบัตรเครดิตจะพร้อมใช้งานในเร็วๆ นี้
                     </p>
-                    <p className="mt-1 text-xs text-clay-500">
+                    <p className="mt-1 text-xs text-fg-placeholder">
                       ฿{(order?.totalAmountThb ?? 0).toLocaleString()} — รองรับ Visa, Mastercard
                       (3DS2)
                     </p>
@@ -279,7 +279,7 @@ export default function CheckoutPage(): React.JSX.Element {
               {!paymentState && (
                 <button
                   onClick={() => setStep(1)}
-                  className="mt-6 w-full rounded-md border border-clay-300 bg-clay-100 px-5 py-2.5 text-sm font-medium text-clay-700 hover:border-clay-400 hover:text-clay-900"
+                  className="mt-6 w-full rounded-md border border-line bg-surface px-5 py-2.5 text-sm font-medium text-fg-secondary hover:border-clay-400 hover:text-fg"
                 >
                   กลับไปแก้ไขข้อมูล
                 </button>

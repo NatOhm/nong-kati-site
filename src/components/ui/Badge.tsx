@@ -14,7 +14,7 @@ const variantClasses: Record<BadgeVariant, string> = {
   error: 'bg-crimson-900 text-coral-700 border-crimson-700',
   warning: 'bg-topaz-900 text-topaz-200 border-topaz-400',
   info: 'bg-sapphire-900 text-sapphire-200 border-sapphire-700',
-  neutral: 'bg-clay-100 text-clay-600 border-clay-200',
+  neutral: 'bg-surface text-fg-muted border-line-subtle',
   brand: 'bg-peach-500 text-white border-peach-600',
 };
 

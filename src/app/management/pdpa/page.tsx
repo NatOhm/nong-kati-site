@@ -24,7 +24,7 @@ const STATUS_LABELS: Record<
   pending: {
     label: 'รอดำเนินการ',
     icon: <Clock size={14} />,
-    color: 'text-peach-600 bg-peach-100',
+    color: 'text-fg-brand bg-peach-100',
   },
   processing: {
     label: 'กำลังดำเนินการ',
@@ -98,7 +98,7 @@ export default function AdminPdpaPage(): React.JSX.Element {
       breadcrumbs={[{ label: 'PDPA Requests' }]}
     >
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold text-clay-900">คำขอ PDPA</h1>
+        <h1 className="text-2xl font-bold text-fg">คำขอ PDPA</h1>
 
         {actionMessage && (
           <div className="rounded-md border border-jade-500/40 bg-jade-500/10 px-4 py-3 text-sm text-jade-700">
@@ -111,7 +111,7 @@ export default function AdminPdpaPage(): React.JSX.Element {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as DataRequestStatus | '')}
-            className="rounded-md border border-clay-200 bg-white px-3 py-2 text-sm text-clay-700 focus:border-peach-300 focus:outline-none"
+            className="rounded-md border border-line-subtle bg-white px-3 py-2 text-sm text-fg-secondary focus:border-line-brand focus:outline-none"
           >
             <option value="">ทุกสถานะ</option>
             <option value="pending">รอดำเนินการ</option>
@@ -122,26 +122,26 @@ export default function AdminPdpaPage(): React.JSX.Element {
           <button
             onClick={() => handleLoad()}
             disabled={loading}
-            className="rounded-md bg-peach-500 px-4 py-2 text-sm font-medium text-clay-900 hover:bg-peach-400 disabled:opacity-50"
+            className="rounded-md bg-peach-500 px-4 py-2 text-sm font-medium text-fg hover:bg-peach-400 disabled:opacity-50"
           >
             {loading ? 'กำลังโหลด...' : 'โหลด'}
           </button>
         </div>
 
-        <div className="text-sm text-clay-500">พบ {total} รายการ</div>
+        <div className="text-sm text-fg-placeholder">พบ {total} รายการ</div>
 
         {/* Requests Table */}
-        <div className="overflow-x-auto rounded-md border border-clay-200">
+        <div className="overflow-x-auto rounded-md border border-line-subtle">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-clay-200 bg-clay-100">
-                <th className="px-4 py-3 text-left font-medium text-clay-600">ID</th>
-                <th className="px-4 py-3 text-left font-medium text-clay-600">ประเภท</th>
-                <th className="px-4 py-3 text-left font-medium text-clay-600">อีเมล</th>
-                <th className="px-4 py-3 text-left font-medium text-clay-600">รายละเอียด</th>
-                <th className="px-4 py-3 text-center font-medium text-clay-600">สถานะ</th>
-                <th className="px-4 py-3 text-center font-medium text-clay-600">วันที่</th>
-                <th className="px-4 py-3 text-right font-medium text-clay-600">จัดการ</th>
+              <tr className="border-b border-line-subtle bg-surface">
+                <th className="px-4 py-3 text-left font-medium text-fg-muted">ID</th>
+                <th className="px-4 py-3 text-left font-medium text-fg-muted">ประเภท</th>
+                <th className="px-4 py-3 text-left font-medium text-fg-muted">อีเมล</th>
+                <th className="px-4 py-3 text-left font-medium text-fg-muted">รายละเอียด</th>
+                <th className="px-4 py-3 text-center font-medium text-fg-muted">สถานะ</th>
+                <th className="px-4 py-3 text-center font-medium text-fg-muted">วันที่</th>
+                <th className="px-4 py-3 text-right font-medium text-fg-muted">จัดการ</th>
               </tr>
             </thead>
             <tbody>
@@ -153,13 +153,17 @@ export default function AdminPdpaPage(): React.JSX.Element {
                 </tr>
               ) : (
                 requests.map((req) => (
-                  <tr key={req.id} className="border-b border-clay-200 hover:bg-white">
-                    <td className="px-4 py-3 font-mono text-xs text-clay-500">
+                  <tr key={req.id} className="border-b border-line-subtle hover:bg-white">
+                    <td className="px-4 py-3 font-mono text-xs text-fg-placeholder">
                       {req.id.slice(0, 12)}...
                     </td>
-                    <td className="px-4 py-3 text-clay-700">{TYPE_LABELS[req.type] ?? req.type}</td>
-                    <td className="px-4 py-3 text-clay-700">{req.email}</td>
-                    <td className="max-w-xs truncate px-4 py-3 text-clay-500">{req.details}</td>
+                    <td className="px-4 py-3 text-fg-secondary">
+                      {TYPE_LABELS[req.type] ?? req.type}
+                    </td>
+                    <td className="px-4 py-3 text-fg-secondary">{req.email}</td>
+                    <td className="max-w-xs truncate px-4 py-3 text-fg-placeholder">
+                      {req.details}
+                    </td>
                     <td className="px-4 py-3 text-center">
                       <span
                         className={cn(
@@ -171,7 +175,7 @@ export default function AdminPdpaPage(): React.JSX.Element {
                         {STATUS_LABELS[req.status].label}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-center text-xs text-clay-500">
+                    <td className="px-4 py-3 text-center text-xs text-fg-placeholder">
                       {req.createdAt.toLocaleDateString('th-TH')}
                     </td>
                     <td className="px-4 py-3 text-right">

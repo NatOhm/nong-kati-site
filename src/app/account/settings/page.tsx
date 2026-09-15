@@ -28,7 +28,7 @@ export default function AccountSettingsPage(): React.JSX.Element {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-clay-900">ตั้งค่าบัญชี</h1>
+      <h1 className="text-2xl font-bold text-fg">ตั้งค่าบัญชี</h1>
 
       {saved && (
         <div className="flex items-center gap-2 rounded-md border border-jade-500/40 bg-jade-500/10 px-4 py-3 text-sm text-jade-700">
@@ -38,35 +38,35 @@ export default function AccountSettingsPage(): React.JSX.Element {
 
       <form onSubmit={handleSave} className="space-y-6">
         {/* Profile */}
-        <div className="rounded-md border border-clay-200 bg-white p-6">
-          <h2 className="mb-4 text-lg font-semibold text-clay-900">ข้อมูลส่วนตัว</h2>
+        <div className="rounded-md border border-line-subtle bg-white p-6">
+          <h2 className="mb-4 text-lg font-semibold text-fg">ข้อมูลส่วนตัว</h2>
           <div className="space-y-4">
             <div>
-              <label className="mb-1 block text-sm text-clay-600">อีเมล</label>
+              <label className="mb-1 block text-sm text-fg-muted">อีเมล</label>
               <input
                 type="email"
                 value="kaem@example.com"
                 disabled
-                className="text-clay-9000 w-full rounded-md border border-clay-200 bg-clay-100 px-3 py-2 text-sm"
+                className="text-clay-9000 w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm"
               />
               <p className="text-clay-9000 mt-1 text-xs">อีเมลไม่สามารถเปลี่ยนแปลงได้</p>
             </div>
             <div>
-              <label className="mb-1 block text-sm text-clay-600">ชื่อ-นามสกุล</label>
+              <label className="mb-1 block text-sm text-fg-muted">ชื่อ-นามสกุล</label>
               <input
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="w-full rounded-md border border-clay-200 bg-clay-100 px-3 py-2 text-sm text-clay-900 focus:border-peach-300 focus:outline-none"
+                className="w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg focus:border-line-brand focus:outline-none"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm text-clay-600">หมายเลขโทรศัพท์</label>
+              <label className="mb-1 block text-sm text-fg-muted">หมายเลขโทรศัพท์</label>
               <input
                 type="tel"
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
-                className="w-full rounded-md border border-clay-200 bg-clay-100 px-3 py-2 text-sm text-clay-900 focus:border-peach-300 focus:outline-none"
+                className="w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg focus:border-line-brand focus:outline-none"
                 placeholder="08XXXXXXXX"
               />
             </div>
@@ -74,8 +74,8 @@ export default function AccountSettingsPage(): React.JSX.Element {
         </div>
 
         {/* Marketing */}
-        <div className="rounded-md border border-clay-200 bg-white p-6">
-          <h2 className="mb-4 text-lg font-semibold text-clay-900">การตลาด</h2>
+        <div className="rounded-md border border-line-subtle bg-white p-6">
+          <h2 className="mb-4 text-lg font-semibold text-fg">การตลาด</h2>
           <label className="flex items-center gap-3">
             <input
               type="checkbox"
@@ -84,7 +84,7 @@ export default function AccountSettingsPage(): React.JSX.Element {
               className="rounded"
             />
             <div>
-              <p className="text-sm text-clay-700">รับข่าวสารและโปรโมชั่น</p>
+              <p className="text-sm text-fg-secondary">รับข่าวสารและโปรโมชั่น</p>
               <p className="text-clay-9000 text-xs">รับอีเมลเกี่ยวกับโปรโมชั่นและสินค้าใหม่</p>
             </div>
           </label>

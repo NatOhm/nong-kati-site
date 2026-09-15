@@ -29,7 +29,7 @@ export function AdminShell({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-clay-50">
+    <div className="flex h-screen overflow-hidden bg-surface-base">
       {/* Sidebar */}
       <AdminSidebar
         role={staffRole}

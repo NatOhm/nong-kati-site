@@ -82,27 +82,27 @@ export default function AdminAuditPage(): React.JSX.Element {
     <AdminShell staffName="Founder" staffRole="super_admin" breadcrumbs={[{ label: 'Audit Log' }]}>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-clay-900">Audit Log</h1>
+          <h1 className="text-2xl font-bold text-fg">Audit Log</h1>
           <button
             onClick={handleExport}
-            className="inline-flex items-center gap-2 rounded-md border border-clay-200 px-4 py-2 text-sm text-clay-700 hover:bg-clay-100"
+            className="inline-flex items-center gap-2 rounded-md border border-line-subtle px-4 py-2 text-sm text-fg-secondary hover:bg-surface"
           >
             <Download size={14} /> ส่งออก CSV
           </button>
         </div>
 
         {/* Filters */}
-        <div className="rounded-md border border-clay-200 bg-white p-4">
-          <div className="mb-3 flex items-center gap-2 text-sm text-clay-600">
+        <div className="rounded-md border border-line-subtle bg-white p-4">
+          <div className="mb-3 flex items-center gap-2 text-sm text-fg-muted">
             <Filter size={14} /> ตัวกรอง
           </div>
           <div className="grid gap-3 md:grid-cols-5">
             <div>
-              <label className="mb-1 block text-xs text-clay-500">การกระทำ</label>
+              <label className="mb-1 block text-xs text-fg-placeholder">การกระทำ</label>
               <select
                 value={actionFilter}
                 onChange={(e) => setActionFilter(e.target.value)}
-                className="w-full rounded border border-clay-200 bg-clay-100 px-2 py-1.5 text-sm text-clay-700 focus:border-peach-300 focus:outline-none"
+                className="w-full rounded border border-line-subtle bg-surface px-2 py-1.5 text-sm text-fg-secondary focus:border-line-brand focus:outline-none"
               >
                 <option value="">ทั้งหมด</option>
                 {Object.entries(ACTION_LABELS).map(([key, label]) => (
@@ -113,21 +113,21 @@ export default function AdminAuditPage(): React.JSX.Element {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs text-clay-500">ตาราง</label>
+              <label className="mb-1 block text-xs text-fg-placeholder">ตาราง</label>
               <input
                 type="text"
                 value={tableFilter}
                 onChange={(e) => setTableFilter(e.target.value)}
                 placeholder="store.orders"
-                className="w-full rounded border border-clay-200 bg-clay-100 px-2 py-1.5 text-sm text-clay-700 placeholder:text-clay-400 focus:border-peach-300 focus:outline-none"
+                className="w-full rounded border border-line-subtle bg-surface px-2 py-1.5 text-sm text-fg-secondary placeholder:text-clay-400 focus:border-line-brand focus:outline-none"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs text-clay-500">ผู้กระทำ</label>
+              <label className="mb-1 block text-xs text-fg-placeholder">ผู้กระทำ</label>
               <select
                 value={actorTypeFilter}
                 onChange={(e) => setActorTypeFilter(e.target.value)}
-                className="w-full rounded border border-clay-200 bg-clay-100 px-2 py-1.5 text-sm text-clay-700 focus:border-peach-300 focus:outline-none"
+                className="w-full rounded border border-line-subtle bg-surface px-2 py-1.5 text-sm text-fg-secondary focus:border-line-brand focus:outline-none"
               >
                 <option value="">ทั้งหมด</option>
                 <option value="admin">Admin</option>
@@ -136,21 +136,21 @@ export default function AdminAuditPage(): React.JSX.Element {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs text-clay-500">จากวันที่</label>
+              <label className="mb-1 block text-xs text-fg-placeholder">จากวันที่</label>
               <input
                 type="date"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
-                className="w-full rounded border border-clay-200 bg-clay-100 px-2 py-1.5 text-sm text-clay-700 focus:border-peach-300 focus:outline-none"
+                className="w-full rounded border border-line-subtle bg-surface px-2 py-1.5 text-sm text-fg-secondary focus:border-line-brand focus:outline-none"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs text-clay-500">ถึงวันที่</label>
+              <label className="mb-1 block text-xs text-fg-placeholder">ถึงวันที่</label>
               <input
                 type="date"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
-                className="w-full rounded border border-clay-200 bg-clay-100 px-2 py-1.5 text-sm text-clay-700 focus:border-peach-300 focus:outline-none"
+                className="w-full rounded border border-line-subtle bg-surface px-2 py-1.5 text-sm text-fg-secondary focus:border-line-brand focus:outline-none"
               />
             </div>
           </div>
@@ -158,7 +158,7 @@ export default function AdminAuditPage(): React.JSX.Element {
             <button
               onClick={() => handleSearch(1)}
               disabled={loading}
-              className="rounded-md bg-peach-500 px-4 py-2 text-sm font-medium text-clay-900 hover:bg-peach-400 disabled:opacity-50"
+              className="rounded-md bg-peach-500 px-4 py-2 text-sm font-medium text-fg hover:bg-peach-400 disabled:opacity-50"
             >
               {loading ? 'กำลังโหลด...' : 'ค้นหา'}
             </button>
@@ -166,20 +166,20 @@ export default function AdminAuditPage(): React.JSX.Element {
         </div>
 
         {/* Results */}
-        <div className="text-sm text-clay-500">พบ {total} รายการ</div>
+        <div className="text-sm text-fg-placeholder">พบ {total} รายการ</div>
 
         {/* Audit Log Table */}
-        <div className="overflow-x-auto rounded-md border border-clay-200">
+        <div className="overflow-x-auto rounded-md border border-line-subtle">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-clay-200 bg-clay-100">
-                <th className="px-4 py-3 text-left font-medium text-clay-600">วันที่</th>
-                <th className="px-4 py-3 text-left font-medium text-clay-600">ผู้กระทำ</th>
-                <th className="px-4 py-3 text-left font-medium text-clay-600">การกระทำ</th>
-                <th className="px-4 py-3 text-left font-medium text-clay-600">ตาราง</th>
-                <th className="px-4 py-3 text-left font-medium text-clay-600">Record ID</th>
-                <th className="px-4 py-3 text-left font-medium text-clay-600">รายละเอียด</th>
-                <th className="px-4 py-3 text-left font-medium text-clay-600">IP</th>
+              <tr className="border-b border-line-subtle bg-surface">
+                <th className="px-4 py-3 text-left font-medium text-fg-muted">วันที่</th>
+                <th className="px-4 py-3 text-left font-medium text-fg-muted">ผู้กระทำ</th>
+                <th className="px-4 py-3 text-left font-medium text-fg-muted">การกระทำ</th>
+                <th className="px-4 py-3 text-left font-medium text-fg-muted">ตาราง</th>
+                <th className="px-4 py-3 text-left font-medium text-fg-muted">Record ID</th>
+                <th className="px-4 py-3 text-left font-medium text-fg-muted">รายละเอียด</th>
+                <th className="px-4 py-3 text-left font-medium text-fg-muted">IP</th>
               </tr>
             </thead>
             <tbody>
@@ -191,12 +191,12 @@ export default function AdminAuditPage(): React.JSX.Element {
                 </tr>
               ) : (
                 entries.map((entry) => (
-                  <tr key={entry.id} className="border-b border-clay-200 hover:bg-white">
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-clay-500">
+                  <tr key={entry.id} className="border-b border-line-subtle hover:bg-white">
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-fg-placeholder">
                       {entry.createdAt.toLocaleString('th-TH')}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="text-xs text-clay-600">{entry.actorEmail}</div>
+                      <div className="text-xs text-fg-muted">{entry.actorEmail}</div>
                       <div className="text-[10px] text-clay-400">
                         {ACTOR_TYPE_LABELS[entry.actorType] ?? entry.actorType}
                       </div>
@@ -208,18 +208,20 @@ export default function AdminAuditPage(): React.JSX.Element {
                           entry.action.includes('refund')
                             ? 'bg-coral-500/15 text-coral-700'
                             : entry.action.includes('block')
-                              ? 'bg-peach-100 text-peach-600'
-                              : 'bg-clay-100 text-clay-600',
+                              ? 'bg-peach-100 text-fg-brand'
+                              : 'bg-surface text-fg-muted',
                         )}
                       >
                         {ACTION_LABELS[entry.action] ?? entry.action}
                       </span>
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-clay-500">{entry.tableName}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-clay-500">
+                    <td className="px-4 py-3 font-mono text-xs text-fg-placeholder">
+                      {entry.tableName}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs text-fg-placeholder">
                       {entry.recordId.slice(0, 8)}...
                     </td>
-                    <td className="px-4 py-3 text-xs text-clay-500">
+                    <td className="px-4 py-3 text-xs text-fg-placeholder">
                       {entry.diff ? (
                         <span>
                           {entry.diff.before && <span className="text-coral-600/70">-</span>}
@@ -247,17 +249,17 @@ export default function AdminAuditPage(): React.JSX.Element {
             <button
               onClick={() => handleSearch(page - 1)}
               disabled={page <= 1}
-              className="rounded border border-clay-200 px-3 py-1 text-sm text-clay-600 hover:bg-clay-100 disabled:opacity-50"
+              className="rounded border border-line-subtle px-3 py-1 text-sm text-fg-muted hover:bg-surface disabled:opacity-50"
             >
               ก่อนหน้า
             </button>
-            <span className="text-sm text-clay-500">
+            <span className="text-sm text-fg-placeholder">
               หน้า {page} / {totalPages}
             </span>
             <button
               onClick={() => handleSearch(page + 1)}
               disabled={page >= totalPages}
-              className="rounded border border-clay-200 px-3 py-1 text-sm text-clay-600 hover:bg-clay-100 disabled:opacity-50"
+              className="rounded border border-line-subtle px-3 py-1 text-sm text-fg-muted hover:bg-surface disabled:opacity-50"
             >
               ถัดไป
             </button>

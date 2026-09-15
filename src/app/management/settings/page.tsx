@@ -50,14 +50,14 @@ export default function AdminSettingsPage(): React.JSX.Element {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-clay-900">ตั้งค่า</h1>
-            <p className="mt-1 text-sm text-clay-500">
+            <h1 className="text-2xl font-bold text-fg">ตั้งค่า</h1>
+            <p className="mt-1 text-sm text-fg-placeholder">
               จัดการการตั้งค่าร้านค้า ระบบชำระเงิน และความปลอดภัย
             </p>
           </div>
           <button
             onClick={handleSave}
-            className="flex items-center gap-2 rounded-lg bg-peach-500 px-4 py-2 text-sm font-semibold text-clay-900 transition-colors hover:bg-peach-400"
+            className="flex items-center gap-2 rounded-lg bg-peach-500 px-4 py-2 text-sm font-semibold text-fg transition-colors hover:bg-peach-400"
           >
             {saved ? <CheckCircle2 size={16} /> : <Save size={16} />}
             {saved ? 'บันทึกแล้ว!' : 'บันทึกการตั้งค่า'}
@@ -77,8 +77,8 @@ export default function AdminSettingsPage(): React.JSX.Element {
                     className={cn(
                       'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
                       activeTab === tab.id
-                        ? 'border border-peach-300/30 bg-peach-100 text-peach-600'
-                        : 'border border-transparent text-clay-500 hover:bg-clay-100 hover:text-clay-900',
+                        ? 'border-line-brand/30 border bg-peach-100 text-fg-brand'
+                        : 'border border-transparent text-fg-placeholder hover:bg-surface hover:text-fg',
                     )}
                   >
                     <Icon size={16} />
@@ -120,7 +120,7 @@ function StoreSettings({ onSave }: { onSave: () => void }) {
         <input
           value={storeName}
           onChange={(e) => setStoreName(e.target.value)}
-          className="w-full rounded-lg border border-clay-300 bg-clay-100 px-3 py-2.5 text-sm text-clay-900 placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+          className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
         />
       </Field>
       <Field label="คำอธิบายร้านค้า">
@@ -128,7 +128,7 @@ function StoreSettings({ onSave }: { onSave: () => void }) {
           value={storeDesc}
           onChange={(e) => setStoreDesc(e.target.value)}
           rows={3}
-          className="w-full resize-none rounded-lg border border-clay-300 bg-clay-100 px-3 py-2.5 text-sm text-clay-900 placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+          className="w-full resize-none rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
         />
       </Field>
       <div className="grid grid-cols-2 gap-4">
@@ -136,14 +136,14 @@ function StoreSettings({ onSave }: { onSave: () => void }) {
           <input
             value={contactEmail}
             onChange={(e) => setContactEmail(e.target.value)}
-            className="w-full rounded-lg border border-clay-300 bg-clay-100 px-3 py-2.5 text-sm text-clay-900 placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+            className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
           />
         </Field>
         <Field label="เบอร์โทรศัพท์">
           <input
             value={contactPhone}
             onChange={(e) => setContactPhone(e.target.value)}
-            className="w-full rounded-lg border border-clay-300 bg-clay-100 px-3 py-2.5 text-sm text-clay-900 placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+            className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
           />
         </Field>
       </div>
@@ -152,7 +152,7 @@ function StoreSettings({ onSave }: { onSave: () => void }) {
           <select
             value={currency}
             onChange={(e) => setCurrency(e.target.value)}
-            className="w-full rounded-lg border border-clay-300 bg-clay-100 px-3 py-2.5 text-sm text-clay-900 placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+            className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
           >
             <option value="THB">THB — ฿ บาทยอด</option>
             <option value="USD">USD — $ ดอลลาร์</option>
@@ -162,7 +162,7 @@ function StoreSettings({ onSave }: { onSave: () => void }) {
           <select
             value={timezone}
             onChange={(e) => setTimezone(e.target.value)}
-            className="w-full rounded-lg border border-clay-300 bg-clay-100 px-3 py-2.5 text-sm text-clay-900 placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+            className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
           >
             <option value="Asia/Bangkok">Asia/Bangkok (ICT, UTC+7)</option>
             <option value="UTC">UTC</option>
@@ -188,15 +188,15 @@ function PaymentSettings({ onSave }: { onSave: () => void }) {
   return (
     <Section title="การชำระเงิน" subtitle="ตั้งค่าช่องทางการชำระเงินและ Payment Gateway">
       {/* PromptPay */}
-      <div className="rounded-lg border border-clay-200 bg-clay-100 p-4">
+      <div className="rounded-lg border border-line-subtle bg-surface p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-jade-500/15 text-jade-700">
               <Smartphone size={20} />
             </div>
             <div>
-              <p className="text-sm font-semibold text-clay-900">PromptPay</p>
-              <p className="text-xs text-clay-500">สแกน QR Code ชำระเงินผ่านแอปธนาคาร</p>
+              <p className="text-sm font-semibold text-fg">PromptPay</p>
+              <p className="text-xs text-fg-placeholder">สแกน QR Code ชำระเงินผ่านแอปธนาคาร</p>
             </div>
           </div>
           <ToggleSwitch enabled={promptpayEnabled} onChange={setPromptpayEnabled} />
@@ -207,13 +207,13 @@ function PaymentSettings({ onSave }: { onSave: () => void }) {
               <input
                 value={promptpayId}
                 onChange={(e) => setPromptpayId(e.target.value)}
-                className="w-full rounded-lg border border-clay-300 bg-clay-100 px-3 py-2.5 font-mono text-sm text-clay-900 placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+                className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 font-mono text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
               />
             </Field>
-            <div className="rounded-md bg-white p-3 text-xs text-clay-500">
+            <div className="rounded-md bg-white p-3 text-xs text-fg-placeholder">
               <p>ใช้ PromptPay ID ของร้านค้าในการสร้าง QR Code</p>
               <p className="mt-1">
-                ทดสอบ: ใช้ <code className="text-peach-600">0123456789012</code>
+                ทดสอบ: ใช้ <code className="text-fg-brand">0123456789012</code>
               </p>
             </div>
           </div>
@@ -221,15 +221,17 @@ function PaymentSettings({ onSave }: { onSave: () => void }) {
       </div>
 
       {/* Credit Card */}
-      <div className="rounded-lg border border-clay-200 bg-clay-100 p-4">
+      <div className="rounded-lg border border-line-subtle bg-surface p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sapphire-400/15 text-sapphire-700">
               <CreditCard size={20} />
             </div>
             <div>
-              <p className="text-sm font-semibold text-clay-900">บัตรเครดิต / เดบิต (Omise)</p>
-              <p className="text-xs text-clay-500">Visa, Mastercard, JCB ผ่าน Omise Gateway</p>
+              <p className="text-sm font-semibold text-fg">บัตรเครดิต / เดบิต (Omise)</p>
+              <p className="text-xs text-fg-placeholder">
+                Visa, Mastercard, JCB ผ่าน Omise Gateway
+              </p>
             </div>
           </div>
           <ToggleSwitch enabled={cardEnabled} onChange={setCardEnabled} />
@@ -241,7 +243,7 @@ function PaymentSettings({ onSave }: { onSave: () => void }) {
                 <input
                   value={omisePublicKey}
                   onChange={(e) => setOmisePublicKey(e.target.value)}
-                  className="flex-1 rounded-lg border border-clay-300 bg-clay-100 px-3 py-2.5 font-mono text-sm text-clay-900 placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+                  className="flex-1 rounded-lg border border-line bg-surface px-3 py-2.5 font-mono text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
                 />
                 <CopyButton text={omisePublicKey} />
               </div>
@@ -252,26 +254,26 @@ function PaymentSettings({ onSave }: { onSave: () => void }) {
                   type={showSecret ? 'text' : 'password'}
                   value={showSecret ? 'sk_test_xxxxxxxxxxxxxxxx' : omiseSecretKey}
                   readOnly
-                  className="flex-1 rounded-lg border border-clay-300 bg-clay-100 px-3 py-2.5 font-mono text-sm text-clay-900 placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+                  className="flex-1 rounded-lg border border-line bg-surface px-3 py-2.5 font-mono text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
                 />
                 <button
                   onClick={() => setShowSecret(!showSecret)}
-                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-clay-300 text-clay-500 hover:bg-clay-100 hover:text-clay-900"
+                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-line text-fg-placeholder hover:bg-surface hover:text-fg"
                 >
                   {showSecret ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
             </Field>
-            <div className="rounded-md bg-white p-3 text-xs text-clay-500">
+            <div className="rounded-md bg-white p-3 text-xs text-fg-placeholder">
               <p>
-                🧪 <strong className="text-clay-700">โหมดทดสอบ:</strong> ใช้ keys ที่ขึ้นต้นด้วย{' '}
-                <code className="text-peach-600">pkey_test_</code> /{' '}
-                <code className="text-peach-600">sk_test_</code>
+                🧪 <strong className="text-fg-secondary">โหมดทดสอบ:</strong> ใช้ keys ที่ขึ้นต้นด้วย{' '}
+                <code className="text-fg-brand">pkey_test_</code> /{' '}
+                <code className="text-fg-brand">sk_test_</code>
               </p>
               <p className="mt-1">
-                🔑 <strong className="text-clay-700">โหมดจริง:</strong> เปลี่ยนเป็น{' '}
-                <code className="text-peach-600">pkey_live_</code> /{' '}
-                <code className="text-peach-600">sk_live_</code>
+                🔑 <strong className="text-fg-secondary">โหมดจริง:</strong> เปลี่ยนเป็น{' '}
+                <code className="text-fg-brand">pkey_live_</code> /{' '}
+                <code className="text-fg-brand">sk_live_</code>
               </p>
             </div>
           </div>
@@ -279,11 +281,11 @@ function PaymentSettings({ onSave }: { onSave: () => void }) {
       </div>
 
       {/* Test Mode Badge */}
-      <div className="flex items-center gap-3 rounded-lg border border-peach-300/30 bg-peach-50 p-4">
-        <AlertTriangle size={20} className="flex-shrink-0 text-peach-600" />
+      <div className="border-line-brand/30 flex items-center gap-3 rounded-lg border bg-peach-50 p-4">
+        <AlertTriangle size={20} className="flex-shrink-0 text-fg-brand" />
         <div>
-          <p className="text-sm font-medium text-peach-600">โหมดทดสอบเปิดใช้งานอยู่</p>
-          <p className="text-xs text-clay-500">
+          <p className="text-sm font-medium text-fg-brand">โหมดทดสอบเปิดใช้งานอยู่</p>
+          <p className="text-xs text-fg-placeholder">
             ระบบจะไม่เรียกเก็บเงินจริง เหมาะสำหรับการทดสอบก่อนเปิดใช้งานจริง
           </p>
         </div>
@@ -311,14 +313,14 @@ function EmailSettings({ onSave }: { onSave: () => void }) {
           <input
             value={smtpHost}
             onChange={(e) => setSmtpHost(e.target.value)}
-            className="w-full rounded-lg border border-clay-300 bg-clay-100 px-3 py-2.5 font-mono text-sm text-clay-900 placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+            className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 font-mono text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
           />
         </Field>
         <Field label="SMTP Port">
           <input
             value={smtpPort}
             onChange={(e) => setSmtpPort(e.target.value)}
-            className="w-full rounded-lg border border-clay-300 bg-clay-100 px-3 py-2.5 font-mono text-sm text-clay-900 placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+            className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 font-mono text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
           />
         </Field>
       </div>
@@ -326,7 +328,7 @@ function EmailSettings({ onSave }: { onSave: () => void }) {
         <input
           value={smtpUser}
           onChange={(e) => setSmtpUser(e.target.value)}
-          className="w-full rounded-lg border border-clay-300 bg-clay-100 px-3 py-2.5 text-sm text-clay-900 placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+          className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
         />
       </Field>
       <div className="grid grid-cols-2 gap-4">
@@ -334,20 +336,20 @@ function EmailSettings({ onSave }: { onSave: () => void }) {
           <input
             value={fromName}
             onChange={(e) => setFromName(e.target.value)}
-            className="w-full rounded-lg border border-clay-300 bg-clay-100 px-3 py-2.5 text-sm text-clay-900 placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+            className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
           />
         </Field>
         <Field label="อีเมลผู้ส่ง (From Email)">
           <input
             value={fromEmail}
             onChange={(e) => setFromEmail(e.target.value)}
-            className="w-full rounded-lg border border-clay-300 bg-clay-100 px-3 py-2.5 text-sm text-clay-900 placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+            className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
           />
         </Field>
       </div>
 
-      <div className="rounded-lg border border-clay-200 bg-clay-100 p-4">
-        <h3 className="mb-3 text-sm font-semibold text-clay-700">เทมเพลตอีเมล</h3>
+      <div className="rounded-lg border border-line-subtle bg-surface p-4">
+        <h3 className="mb-3 text-sm font-semibold text-fg-secondary">เทมเพลตอีเมล</h3>
         <div className="space-y-2">
           {[
             { name: 'ยืนยันคำสั่งซื้อ', desc: 'ส่งเมื่อลูกค้าชำระเงินสำเร็จ', active: true },
@@ -360,13 +362,13 @@ function EmailSettings({ onSave }: { onSave: () => void }) {
               className="flex items-center justify-between rounded-md bg-white px-3 py-2"
             >
               <div>
-                <p className="text-xs font-medium text-clay-700">{tpl.name}</p>
+                <p className="text-xs font-medium text-fg-secondary">{tpl.name}</p>
                 <p className="text-[10px] text-clay-400">{tpl.desc}</p>
               </div>
               <span
                 className={cn(
                   'inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium',
-                  tpl.active ? 'bg-jade-500/15 text-jade-700' : 'bg-clay-100 text-clay-400',
+                  tpl.active ? 'bg-jade-500/15 text-jade-700' : 'bg-surface text-clay-400',
                 )}
               >
                 {tpl.active ? 'เปิดใช้งาน' : 'ปิด'}
@@ -388,14 +390,14 @@ function SecuritySettings({ onSave }: { onSave: () => void }) {
   return (
     <Section title="ความปลอดภัย" subtitle="จัดการ 2FA, Sessions, และ Password Policy">
       {/* 2FA */}
-      <div className="rounded-lg border border-clay-200 bg-clay-100 p-4">
+      <div className="rounded-lg border border-line-subtle bg-surface p-4">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-jade-500/15 text-jade-700">
             <Lock size={20} />
           </div>
           <div className="flex-1">
-            <p className="text-sm font-semibold text-clay-900">การยืนยันตัวตนสองชั้น (2FA)</p>
-            <p className="text-xs text-clay-500">บังคับใช้ TOTP สำหรับพนักงานทุกคน</p>
+            <p className="text-sm font-semibold text-fg">การยืนยันตัวตนสองชั้น (2FA)</p>
+            <p className="text-xs text-fg-placeholder">บังคับใช้ TOTP สำหรับพนักงานทุกคน</p>
           </div>
           <span className="inline-flex items-center gap-1.5 rounded-full bg-jade-500/15 px-2.5 py-1 text-xs font-medium text-jade-700">
             <CheckCircle2 size={12} />
@@ -405,8 +407,8 @@ function SecuritySettings({ onSave }: { onSave: () => void }) {
       </div>
 
       {/* Password Policy */}
-      <div className="rounded-lg border border-clay-200 bg-clay-100 p-4">
-        <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-clay-700">
+      <div className="rounded-lg border border-line-subtle bg-surface p-4">
+        <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-fg-secondary">
           <Key size={14} />
           นโยบายรหัสผ่าน
         </h3>
@@ -417,16 +419,16 @@ function SecuritySettings({ onSave }: { onSave: () => void }) {
               defaultValue={12}
               min={8}
               max={64}
-              className="w-24 rounded-lg border border-clay-300 bg-clay-100 px-3 py-2.5 text-sm text-clay-900 placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+              className="w-24 rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
             />
           </Field>
           <div className="flex flex-wrap gap-3">
             {['ตัวเลข', 'ตัวพิมพ์ใหญ่', 'ตัวพิมพ์เล็ก', 'อักขระพิเศษ'].map((rule) => (
-              <label key={rule} className="flex items-center gap-2 text-xs text-clay-600">
+              <label key={rule} className="flex items-center gap-2 text-xs text-fg-muted">
                 <input
                   type="checkbox"
                   defaultChecked
-                  className="h-4 w-4 rounded border-clay-300 bg-clay-100 accent-peach-500"
+                  className="h-4 w-4 rounded border-line bg-surface accent-peach-500"
                 />
                 {rule}
               </label>
@@ -436,8 +438,8 @@ function SecuritySettings({ onSave }: { onSave: () => void }) {
       </div>
 
       {/* Active Sessions */}
-      <div className="rounded-lg border border-clay-200 bg-clay-100 p-4">
-        <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-clay-700">
+      <div className="rounded-lg border border-line-subtle bg-surface p-4">
+        <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-fg-secondary">
           <Shield size={14} />
           Sessions ที่ใช้งานอยู่
         </h3>
@@ -463,7 +465,7 @@ function SecuritySettings({ onSave }: { onSave: () => void }) {
                   )}
                 />
                 <div>
-                  <p className="text-xs font-medium text-clay-700">{session.device}</p>
+                  <p className="text-xs font-medium text-fg-secondary">{session.device}</p>
                   <p className="text-[10px] text-clay-400">
                     IP: {session.ip} · {session.lastActive}
                   </p>
@@ -471,7 +473,7 @@ function SecuritySettings({ onSave }: { onSave: () => void }) {
               </div>
               {!session.current && (
                 <button
-                  className="rounded p-1.5 text-clay-400 hover:bg-clay-100 hover:text-coral-600"
+                  className="rounded p-1.5 text-clay-400 hover:bg-surface hover:text-coral-600"
                   aria-label="ยกเลิก session"
                 >
                   <Trash2 size={14} />
@@ -483,8 +485,8 @@ function SecuritySettings({ onSave }: { onSave: () => void }) {
       </div>
 
       {/* Login Attempt Limits */}
-      <div className="rounded-lg border border-clay-200 bg-clay-100 p-4">
-        <h3 className="mb-3 text-sm font-semibold text-clay-700">ล็อกอินล้มเหลว</h3>
+      <div className="rounded-lg border border-line-subtle bg-surface p-4">
+        <h3 className="mb-3 text-sm font-semibold text-fg-secondary">ล็อกอินล้มเหลว</h3>
         <div className="grid grid-cols-2 gap-4">
           <Field label="ล็อกบัญชีหลังจาก (ครั้ง)">
             <input
@@ -492,7 +494,7 @@ function SecuritySettings({ onSave }: { onSave: () => void }) {
               defaultValue={5}
               min={3}
               max={10}
-              className="w-24 rounded-lg border border-clay-300 bg-clay-100 px-3 py-2.5 text-sm text-clay-900 placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+              className="w-24 rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
             />
           </Field>
           <Field label="ล็อกอิน (นาที)">
@@ -501,7 +503,7 @@ function SecuritySettings({ onSave }: { onSave: () => void }) {
               defaultValue={30}
               min={5}
               max={1440}
-              className="w-24 rounded-lg border border-clay-300 bg-clay-100 px-3 py-2.5 text-sm text-clay-900 placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+              className="w-24 rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
             />
           </Field>
         </div>
@@ -557,17 +559,17 @@ function NotificationSettings({ onSave }: { onSave: () => void }) {
       <div className="space-y-6">
         {notifications.map((group) => (
           <div key={group.category}>
-            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-clay-500">
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-fg-placeholder">
               {group.category}
             </h3>
             <div className="space-y-2">
               {group.items.map((item) => (
                 <div
                   key={item.label}
-                  className="flex items-center justify-between rounded-lg border border-clay-200 bg-clay-100 px-4 py-3"
+                  className="flex items-center justify-between rounded-lg border border-line-subtle bg-surface px-4 py-3"
                 >
                   <div>
-                    <p className="text-sm font-medium text-clay-700">{item.label}</p>
+                    <p className="text-sm font-medium text-fg-secondary">{item.label}</p>
                     <p className="text-xs text-clay-400">{item.desc}</p>
                   </div>
                   <ToggleSwitch enabled={item.enabled} onChange={() => {}} />
@@ -596,10 +598,10 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-clay-200 bg-white p-6">
+    <div className="rounded-xl border border-line-subtle bg-white p-6">
       <div className="mb-6">
-        <h2 className="text-lg font-semibold text-clay-900">{title}</h2>
-        <p className="mt-1 text-sm text-clay-500">{subtitle}</p>
+        <h2 className="text-lg font-semibold text-fg">{title}</h2>
+        <p className="mt-1 text-sm text-fg-placeholder">{subtitle}</p>
       </div>
       <div className="space-y-5">{children}</div>
     </div>
@@ -609,7 +611,7 @@ function Section({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="mb-1.5 block text-sm font-medium text-clay-600">{label}</label>
+      <label className="mb-1.5 block text-sm font-medium text-fg-muted">{label}</label>
       {children}
     </div>
   );
@@ -640,7 +642,7 @@ function SaveButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-2 rounded-lg bg-peach-500 px-4 py-2 text-sm font-semibold text-clay-900 transition-colors hover:bg-peach-400"
+      className="flex items-center gap-2 rounded-lg bg-peach-500 px-4 py-2 text-sm font-semibold text-fg transition-colors hover:bg-peach-400"
     >
       <Save size={14} />
       บันทึก
@@ -660,7 +662,7 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="flex h-10 w-10 items-center justify-center rounded-lg border border-clay-300 text-clay-500 hover:bg-clay-100 hover:text-clay-900"
+      className="flex h-10 w-10 items-center justify-center rounded-lg border border-line text-fg-placeholder hover:bg-surface hover:text-fg"
       title="คัดลอก"
     >
       {copied ? <CheckCircle2 size={14} className="text-jade-600" /> : <Copy size={14} />}

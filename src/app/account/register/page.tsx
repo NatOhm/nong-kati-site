@@ -60,8 +60,8 @@ export default function RegisterPage(): React.JSX.Element {
       <div className="flex min-h-[80vh] items-center justify-center px-4">
         <div className="w-full max-w-md text-center">
           <div className="mb-6 text-4xl">✉️</div>
-          <h1 className="mb-2 text-2xl font-bold text-clay-900">สมัครสมาชิกสำเร็จ</h1>
-          <p className="mb-6 text-sm text-clay-500">
+          <h1 className="mb-2 text-2xl font-bold text-fg">สมัครสมาชิกสำเร็จ</h1>
+          <p className="mb-6 text-sm text-fg-placeholder">
             เราได้ส่งลิงก์ยืนยันไปยังอีเมลของคุณแล้ว กรุณาคลิกลิงก์ในอีเมลเพื่อยืนยันบัญชี
           </p>
           <Link
@@ -79,38 +79,38 @@ export default function RegisterPage(): React.JSX.Element {
     <div className="flex min-h-[80vh] items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <h1 className="mb-2 text-2xl font-bold text-clay-900">สมัครสมาชิก</h1>
-          <p className="text-sm text-clay-500">สร้างบัญชีเพื่อจัดการคำสั่งซื้อและโค้ด</p>
+          <h1 className="mb-2 text-2xl font-bold text-fg">สมัครสมาชิก</h1>
+          <p className="text-sm text-fg-placeholder">สร้างบัญชีเพื่อจัดการคำสั่งซื้อและโค้ด</p>
         </div>
 
-        <div className="rounded-lg border border-clay-200 bg-white p-6">
+        <div className="rounded-lg border border-line-subtle bg-white p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Full Name */}
             <div>
-              <label className="mb-1 block text-sm text-clay-600">ชื่อ-นามสกุล (ไม่บังคับ)</label>
+              <label className="mb-1 block text-sm text-fg-muted">ชื่อ-นามสกุล (ไม่บังคับ)</label>
               <input
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="placeholder:text-clay-9000 w-full rounded-md border border-clay-200 bg-clay-100 px-3 py-2 text-sm text-clay-900 focus:border-peach-300 focus:outline-none"
+                className="placeholder:text-clay-9000 w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg focus:border-line-brand focus:outline-none"
                 placeholder="ชื่อที่แสดง"
               />
             </div>
 
             {/* Email */}
             <div>
-              <label className="mb-1 block text-sm text-clay-600">อีเมล *</label>
+              <label className="mb-1 block text-sm text-fg-muted">อีเมล *</label>
               <div className="relative">
                 <Mail
                   size={16}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-clay-500"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-placeholder"
                 />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="placeholder:text-clay-9000 w-full rounded-md border border-clay-200 bg-clay-100 py-2 pl-9 pr-3 text-sm text-clay-900 focus:border-peach-300 focus:outline-none"
+                  className="placeholder:text-clay-9000 w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-3 text-sm text-fg focus:border-line-brand focus:outline-none"
                   placeholder="your@email.com"
                 />
               </div>
@@ -118,11 +118,11 @@ export default function RegisterPage(): React.JSX.Element {
 
             {/* Password */}
             <div>
-              <label className="mb-1 block text-sm text-clay-600">รหัสผ่าน *</label>
+              <label className="mb-1 block text-sm text-fg-muted">รหัสผ่าน *</label>
               <div className="relative">
                 <Lock
                   size={16}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-clay-500"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-placeholder"
                 />
                 <input
                   type={showPassword ? 'text' : 'password'}
@@ -130,13 +130,13 @@ export default function RegisterPage(): React.JSX.Element {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={8}
-                  className="placeholder:text-clay-9000 w-full rounded-md border border-clay-200 bg-clay-100 py-2 pl-9 pr-10 text-sm text-clay-900 focus:border-peach-300 focus:outline-none"
+                  className="placeholder:text-clay-9000 w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-10 text-sm text-fg focus:border-line-brand focus:outline-none"
                   placeholder="อย่างน้อย 8 ตัวอักษร"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-clay-500 hover:text-clay-700"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-placeholder hover:text-fg-secondary"
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -145,18 +145,18 @@ export default function RegisterPage(): React.JSX.Element {
 
             {/* Confirm Password */}
             <div>
-              <label className="mb-1 block text-sm text-clay-600">ยืนยันรหัสผ่าน *</label>
+              <label className="mb-1 block text-sm text-fg-muted">ยืนยันรหัสผ่าน *</label>
               <div className="relative">
                 <Lock
                   size={16}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-clay-500"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-placeholder"
                 />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
-                  className="placeholder:text-clay-9000 w-full rounded-md border border-clay-200 bg-clay-100 py-2 pl-9 pr-3 text-sm text-clay-900 focus:border-peach-300 focus:outline-none"
+                  className="placeholder:text-clay-9000 w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-3 text-sm text-fg focus:border-line-brand focus:outline-none"
                   placeholder="กรอกรหัสผ่านอีกครั้ง"
                 />
               </div>
@@ -170,7 +170,7 @@ export default function RegisterPage(): React.JSX.Element {
                 onChange={(e) => setMarketingOptIn(e.target.checked)}
                 className="mt-0.5 rounded"
               />
-              <span className="text-xs text-clay-500">
+              <span className="text-xs text-fg-placeholder">
                 ต้องการรับข่าวสารและโปรโมชั่นจาก Nong-Kati
               </span>
             </label>
@@ -194,9 +194,9 @@ export default function RegisterPage(): React.JSX.Element {
           </form>
         </div>
 
-        <p className="mt-4 text-center text-sm text-clay-500">
+        <p className="mt-4 text-center text-sm text-fg-placeholder">
           มีบัญชีอยู่แล้ว?{' '}
-          <Link href="/account/login" className="text-peach-600 hover:text-peach-700">
+          <Link href="/account/login" className="text-fg-brand hover:text-fg-brand">
             เข้าสู่ระบบ
           </Link>
         </p>

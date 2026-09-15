@@ -29,7 +29,7 @@ export function Checkbox({
       <label
         htmlFor={checkboxId}
         className={cn(
-          'flex cursor-pointer items-start gap-2.5 text-sm text-clay-700',
+          'flex cursor-pointer items-start gap-2.5 text-sm text-fg-secondary',
           disabled && 'cursor-not-allowed opacity-50',
         )}
       >
@@ -41,7 +41,7 @@ export function Checkbox({
             disabled={disabled}
             aria-invalid={!!error}
             onChange={(e) => onChange(e.target.checked)}
-            className="peer absolute h-5 w-5 cursor-pointer appearance-none rounded-xs border border-clay-300 bg-clay-100 transition-colors checked:border-peach-500 checked:bg-peach-500 focus-visible:shadow-focus-ring disabled:cursor-not-allowed"
+            className="peer absolute h-5 w-5 cursor-pointer appearance-none rounded-xs border border-line bg-surface transition-colors checked:border-peach-500 checked:bg-peach-500 focus-visible:shadow-focus-ring disabled:cursor-not-allowed"
           />
           <Check
             size={14}

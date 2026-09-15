@@ -61,7 +61,7 @@ export function Alert({
       <span className={s.fg}>{s.icon}</span>
       <div className="flex-1">
         {title && <p className={cn('text-sm font-semibold', s.fg)}>{title}</p>}
-        <p className={cn('text-sm', title ? 'mt-0.5 text-clay-700' : s.fg)}>{message}</p>
+        <p className={cn('text-sm', title ? 'mt-0.5 text-fg-secondary' : s.fg)}>{message}</p>
         {action && (
           <button
             type="button"
@@ -77,7 +77,7 @@ export function Alert({
           type="button"
           aria-label="ปิด"
           onClick={onDismiss}
-          className="text-clay-500 hover:text-clay-700"
+          className="text-fg-placeholder hover:text-fg-secondary"
         >
           <X size={16} />
         </button>

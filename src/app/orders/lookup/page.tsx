@@ -43,25 +43,25 @@ export default function OrderLookupPage(): React.JSX.Element {
         {/* Back link */}
         <Link
           href="/"
-          className="mb-6 inline-flex items-center gap-2 text-sm text-clay-500 hover:text-peach-700"
+          className="mb-6 inline-flex items-center gap-2 text-sm text-fg-placeholder hover:text-fg-brand"
         >
           <ArrowLeft size={16} />
           กลับ
         </Link>
 
         {/* Header */}
-        <h1 className="mb-2 font-display text-2xl font-bold text-clay-900">ค้นหาคำสั่งซื้อ</h1>
-        <p className="mb-8 text-clay-500">ค้นหาคำสั่งซื้อของคุณด้วยอีเมลและรหัสคำสั่งซื้อ</p>
+        <h1 className="mb-2 font-display text-2xl font-bold text-fg">ค้นหาคำสั่งซื้อ</h1>
+        <p className="mb-8 text-fg-placeholder">ค้นหาคำสั่งซื้อของคุณด้วยอีเมลและรหัสคำสั่งซื้อ</p>
 
         {/* Form */}
-        <div className="rounded-md border border-clay-200 bg-white p-6">
+        <div className="rounded-md border border-line-subtle bg-white p-6">
           <OrderLookupForm onSubmit={handleSubmit} loading={loading} error={error ?? undefined} />
         </div>
 
         {/* Help text */}
-        <div className="mt-8 rounded-md border border-clay-200 bg-white p-6">
-          <h2 className="mb-3 text-sm font-semibold text-clay-700">ไม่พบคำสั่งซื้อ?</h2>
-          <ul className="space-y-2 text-sm text-clay-500">
+        <div className="mt-8 rounded-md border border-line-subtle bg-white p-6">
+          <h2 className="mb-3 text-sm font-semibold text-fg-secondary">ไม่พบคำสั่งซื้อ?</h2>
+          <ul className="space-y-2 text-sm text-fg-placeholder">
             <li>• ตรวจสอบอีเมลที่ใช้สั่งซื้อ</li>
             <li>• รหัสคำสั่งซื้ออยู่ในอีเมลยืนยัน (เช่น NK-2026-XXXXXX)</li>
             <li>• ติดต่อเราหากยังมีปัญหา</li>

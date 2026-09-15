@@ -30,7 +30,7 @@ export function TaxInvoiceToggle({
   errors,
 }: TaxInvoiceToggleProps): React.JSX.Element {
   return (
-    <div className="rounded-md border border-clay-300 bg-clay-100 p-4">
+    <div className="rounded-md border border-line bg-surface p-4">
       {/* Toggle header */}
       <label className="flex cursor-pointer items-center gap-3">
         <button
@@ -50,15 +50,15 @@ export function TaxInvoiceToggle({
             )}
           />
         </button>
-        <span className="text-sm font-medium text-clay-700">ต้องการใบกำกับภาษี</span>
+        <span className="text-sm font-medium text-fg-secondary">ต้องการใบกำกับภาษี</span>
       </label>
 
       {/* Expanded fields */}
       {enabled && (
-        <div className="mt-4 space-y-4 border-t border-clay-300 pt-4">
+        <div className="mt-4 space-y-4 border-t border-line pt-4">
           {/* Name / Company */}
           <div>
-            <label htmlFor="tax-name" className="mb-1 block text-sm text-clay-600">
+            <label htmlFor="tax-name" className="mb-1 block text-sm text-fg-muted">
               ชื่อ / บริษัท *
             </label>
             <input
@@ -68,8 +68,8 @@ export function TaxInvoiceToggle({
               onChange={(e) => onChange?.({ name: e.target.value, taxId: value?.taxId ?? '' })}
               placeholder="ชื่อหรือชื่อบริษัท"
               className={cn(
-                'w-full rounded-md border bg-clay-50 px-3 py-2 text-sm text-clay-900 placeholder:text-clay-500 focus:outline-none focus:ring-2 focus:ring-peach-500',
-                errors?.name ? 'border-crimson-500' : 'border-clay-300',
+                'w-full rounded-md border bg-surface-base px-3 py-2 text-sm text-fg placeholder:text-fg-placeholder focus:outline-none focus:ring-2 focus:ring-peach-500',
+                errors?.name ? 'border-crimson-500' : 'border-line',
               )}
             />
             {errors?.name && <p className="mt-1 text-xs text-coral-600">{errors.name}</p>}
@@ -77,7 +77,7 @@ export function TaxInvoiceToggle({
 
           {/* Tax ID */}
           <div>
-            <label htmlFor="tax-id" className="mb-1 block text-sm text-clay-600">
+            <label htmlFor="tax-id" className="mb-1 block text-sm text-fg-muted">
               เลขประจำตัวผู้เสียภาษี *
             </label>
             <input
@@ -88,8 +88,8 @@ export function TaxInvoiceToggle({
               placeholder="0-0000-00000-00-0"
               maxLength={13}
               className={cn(
-                'w-full rounded-md border bg-clay-50 px-3 py-2 text-sm text-clay-900 placeholder:text-clay-500 focus:outline-none focus:ring-2 focus:ring-peach-500',
-                errors?.taxId ? 'border-crimson-500' : 'border-clay-300',
+                'w-full rounded-md border bg-surface-base px-3 py-2 text-sm text-fg placeholder:text-fg-placeholder focus:outline-none focus:ring-2 focus:ring-peach-500',
+                errors?.taxId ? 'border-crimson-500' : 'border-line',
               )}
             />
             {errors?.taxId && <p className="mt-1 text-xs text-coral-600">{errors.taxId}</p>}

@@ -39,7 +39,7 @@ export function MegaMenu({
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 top-16 z-40 bg-clay-50/50 backdrop-blur-sm"
+        className="bg-surface-base/50 fixed inset-0 top-16 z-40 backdrop-blur-sm"
         onMouseLeave={onClose}
         aria-hidden="true"
       />
@@ -47,7 +47,7 @@ export function MegaMenu({
       {/* Menu panel */}
       <div
         className={cn(
-          'bg-clay-50/98 fixed left-0 top-16 z-50 w-full border-b border-clay-200 shadow-xl backdrop-blur-md',
+          'bg-surface-base/98 fixed left-0 top-16 z-50 w-full border-b border-line-subtle shadow-xl backdrop-blur-md',
           className,
         )}
         onMouseLeave={onClose}
@@ -60,7 +60,7 @@ export function MegaMenu({
               {/* L1 category header */}
               <Link
                 href={`/category/${cat.slug}`}
-                className="flex items-center gap-2 text-sm font-semibold text-peach-600 hover:text-peach-800"
+                className="flex items-center gap-2 text-sm font-semibold text-fg-brand hover:text-peach-800"
                 onClick={onClose}
               >
                 <span className="text-lg">{cat.icon || '🎮'}</span>
@@ -74,7 +74,7 @@ export function MegaMenu({
                     <li key={child.id}>
                       <Link
                         href={`/category/${child.slug}`}
-                        className="block rounded-md px-2 py-1.5 text-sm text-clay-700 transition-colors hover:bg-clay-200 hover:text-peach-700"
+                        className="block rounded-md px-2 py-1.5 text-sm text-fg-secondary transition-colors hover:bg-clay-200 hover:text-fg-brand"
                         onClick={onClose}
                       >
                         {child.name}

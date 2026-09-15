@@ -102,7 +102,9 @@ export default function ComponentsPreviewPage(): React.JSX.Element {
       <Divider label="หรือ" />
 
       <section className="flex items-center gap-3">
-        <h2 className="w-full text-lg font-semibold text-amber-300">Tooltip / Spinner / Skeleton</h2>
+        <h2 className="w-full text-lg font-semibold text-amber-300">
+          Tooltip / Spinner / Skeleton
+        </h2>
         <Tooltip content="คัดลอกรหัส">
           <Button variant="ghost">Hover me</Button>
         </Tooltip>
@@ -113,7 +115,12 @@ export default function ComponentsPreviewPage(): React.JSX.Element {
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-amber-300">Alert</h2>
         <Alert type="success" title="ชำระเงินสำเร็จ" message="โค้ดถูกส่งไปยังอีเมลแล้ว" />
-        <Alert type="error" message="เกิดข้อผิดพลาดในการชำระเงิน" dismissible onDismiss={() => {}} />
+        <Alert
+          type="error"
+          message="เกิดข้อผิดพลาดในการชำระเงิน"
+          dismissible
+          onDismiss={() => {}}
+        />
       </section>
 
       <section className="space-y-3">
@@ -122,7 +129,12 @@ export default function ComponentsPreviewPage(): React.JSX.Element {
           <Button onClick={() => setModalOpen(true)}>เปิด Modal</Button>
           <Button onClick={() => setDrawerOpen(true)}>เปิด Drawer</Button>
         </div>
-        <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title="ตัวอย่าง Modal" description="ข้อความอธิบาย">
+        <Modal
+          isOpen={modalOpen}
+          onClose={() => setModalOpen(false)}
+          title="ตัวอย่าง Modal"
+          description="ข้อความอธิบาย"
+        >
           <p className="text-sm text-ink-300">เนื้อหาภายใน Modal</p>
         </Modal>
         <Drawer isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} title="ตัวอย่าง Drawer">

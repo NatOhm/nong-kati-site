@@ -22,8 +22,8 @@ const sizeClasses: Record<IconButtonSize, string> = {
 };
 
 const variantClasses: Record<IconButtonVariant, string> = {
-  ghost: 'bg-transparent text-clay-700 hover:bg-clay-200 hover:text-peach-700',
-  subtle: 'bg-clay-100 text-clay-700 hover:bg-clay-200',
+  ghost: 'bg-transparent text-fg-secondary hover:bg-clay-200 hover:text-fg-brand',
+  subtle: 'bg-surface text-fg-secondary hover:bg-clay-200',
   primary: 'bg-peach-500 text-white hover:bg-peach-400 shadow-clay-brand',
 };
 

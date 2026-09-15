@@ -24,7 +24,7 @@ export function CartSummary({
 }: CartSummaryProps): React.JSX.Element {
   return (
     <div className={cn('space-y-2 text-sm', className)}>
-      <div className="flex items-center justify-between text-clay-600">
+      <div className="flex items-center justify-between text-fg-muted">
         <span>ยอดรวม (ไม่รวม VAT)</span>
         <span>{formatThb(subtotal)}</span>
       </div>
@@ -36,13 +36,13 @@ export function CartSummary({
         </div>
       )}
 
-      <div className="flex items-center justify-between text-clay-600">
+      <div className="flex items-center justify-between text-fg-muted">
         <span>VAT 7%</span>
         <span>{formatThb(vat)}</span>
       </div>
 
-      <div className="border-t border-clay-200 pt-2">
-        <div className="flex items-center justify-between text-lg font-bold text-peach-600">
+      <div className="border-t border-line-subtle pt-2">
+        <div className="flex items-center justify-between text-lg font-bold text-fg-brand">
           <span>รวมทั้งสิ้น</span>
           <span>{formatThb(total)}</span>
         </div>

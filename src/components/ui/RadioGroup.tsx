@@ -33,7 +33,7 @@ export function RadioGroup({
 
   return (
     <fieldset className="flex flex-col gap-2">
-      {label && <legend className="mb-1 text-sm font-medium text-clay-700">{label}</legend>}
+      {label && <legend className="mb-1 text-sm font-medium text-fg-secondary">{label}</legend>}
       <div
         role="radiogroup"
         aria-label={label}
@@ -46,7 +46,7 @@ export function RadioGroup({
               key={opt.value}
               htmlFor={optionId}
               className={cn(
-                'flex cursor-pointer items-start gap-2.5 text-sm text-clay-700',
+                'flex cursor-pointer items-start gap-2.5 text-sm text-fg-secondary',
                 opt.disabled && 'cursor-not-allowed opacity-50',
               )}
             >
@@ -58,12 +58,12 @@ export function RadioGroup({
                 checked={value === opt.value}
                 disabled={opt.disabled}
                 onChange={() => onChange(opt.value)}
-                className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer border-clay-300 bg-clay-100 text-peach-600 focus-visible:shadow-focus-ring"
+                className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer border-line bg-surface text-fg-brand focus-visible:shadow-focus-ring"
               />
               <span>
                 <span className="block">{opt.label}</span>
                 {opt.sublabel && (
-                  <span className="block text-xs text-clay-500">{opt.sublabel}</span>
+                  <span className="block text-xs text-fg-placeholder">{opt.sublabel}</span>
                 )}
               </span>
             </label>

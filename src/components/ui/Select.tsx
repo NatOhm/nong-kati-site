@@ -41,7 +41,7 @@ export function Select({
   return (
     <div className={cn('flex flex-col gap-1.5', fullWidth && 'w-full')}>
       {label && (
-        <label htmlFor={selectId} className="text-sm font-medium text-clay-700">
+        <label htmlFor={selectId} className="text-sm font-medium text-fg-secondary">
           {label}
         </label>
       )}
@@ -54,10 +54,10 @@ export function Select({
           aria-invalid={!!error}
           onChange={(e) => onChange(e.target.value)}
           className={cn(
-            'w-full appearance-none rounded-sm border border-clay-300 bg-clay-100 py-2.5 pl-3.5 pr-9 font-ui text-base text-clay-900 shadow-[inset_0_1px_3px_rgba(147,107,73,0.15)] transition-colors duration-fast ease-out-quart',
-            'hover:border-peach-300',
+            'w-full appearance-none rounded-sm border border-line bg-surface py-2.5 pl-3.5 pr-9 font-ui text-base text-fg shadow-[inset_0_1px_3px_rgba(147,107,73,0.15)] transition-colors duration-fast ease-out-quart',
+            'hover:border-line-brand',
             'focus:border-peach-500 focus:shadow-focus-ring',
-            'disabled:cursor-not-allowed disabled:border-clay-200 disabled:opacity-50',
+            'disabled:cursor-not-allowed disabled:border-line-subtle disabled:opacity-50',
             error && 'border-crimson-400',
           )}
         >
@@ -76,7 +76,7 @@ export function Select({
           size={18}
           strokeWidth={1.5}
           aria-hidden="true"
-          className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-clay-500"
+          className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-fg-placeholder"
         />
       </div>
       {error && (

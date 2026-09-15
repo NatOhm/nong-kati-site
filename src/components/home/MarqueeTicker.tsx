@@ -17,10 +17,10 @@ const DEALS = [
 
 export function MarqueeTicker() {
   return (
-    <div className="overflow-hidden border-b border-clay-200 bg-clay-100 py-2">
+    <div className="overflow-hidden border-b border-line-subtle bg-surface py-2">
       <div className="animate-marquee flex whitespace-nowrap">
         {[...DEALS, ...DEALS].map((deal, i) => (
-          <span key={i} className="mx-6 text-sm font-medium text-clay-700">
+          <span key={i} className="mx-6 text-sm font-medium text-fg-secondary">
             {deal}
           </span>
         ))}

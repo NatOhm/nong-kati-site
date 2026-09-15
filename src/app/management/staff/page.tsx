@@ -126,18 +126,18 @@ export default function AdminStaffPage(): React.JSX.Element {
     <AdminShell staffName="Founder" staffRole="super_admin" breadcrumbs={[{ label: 'พนักงาน' }]}>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-clay-900">พนักงาน</h1>
+          <h1 className="text-2xl font-bold text-fg">พนักงาน</h1>
           <div className="flex gap-3">
             <button
               onClick={handleLoadStaff}
               disabled={loading}
-              className="rounded-md border border-clay-200 px-4 py-2 text-sm text-clay-700 hover:bg-clay-100"
+              className="rounded-md border border-line-subtle px-4 py-2 text-sm text-fg-secondary hover:bg-surface"
             >
               {loading ? 'กำลังโหลด...' : 'โหลดรายชื่อ'}
             </button>
             <button
               onClick={() => setShowCreateForm(true)}
-              className="inline-flex items-center gap-2 rounded-md bg-peach-500 px-4 py-2 text-sm font-medium text-clay-900 hover:bg-peach-400"
+              className="inline-flex items-center gap-2 rounded-md bg-peach-500 px-4 py-2 text-sm font-medium text-fg hover:bg-peach-400"
             >
               <Plus size={16} /> เพิ่มพนักงาน
             </button>
@@ -153,7 +153,7 @@ export default function AdminStaffPage(): React.JSX.Element {
                   navigator.clipboard.writeText(tempPassword);
                   setActionMessage('คัดลอกรหัสผ่านแล้ว');
                 }}
-                className="ml-2 inline-flex items-center gap-1 text-peach-600 hover:text-peach-700"
+                className="ml-2 inline-flex items-center gap-1 text-fg-brand hover:text-fg-brand"
               >
                 <Copy size={12} /> คัดลอก
               </button>
@@ -163,43 +163,43 @@ export default function AdminStaffPage(): React.JSX.Element {
 
         {/* Create Staff Form */}
         {showCreateForm && (
-          <div className="rounded-md border border-clay-200 bg-white p-6">
+          <div className="rounded-md border border-line-subtle bg-white p-6">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-clay-900">เพิ่มพนักงานใหม่</h2>
+              <h2 className="text-lg font-semibold text-fg">เพิ่มพนักงานใหม่</h2>
               <button
                 onClick={() => setShowCreateForm(false)}
-                className="text-clay-500 hover:text-clay-900"
+                className="text-fg-placeholder hover:text-fg"
               >
                 <XCircle size={20} />
               </button>
             </div>
             <div className="grid gap-4 md:grid-cols-3">
               <div>
-                <label className="mb-1 block text-sm text-clay-600">อีเมล</label>
+                <label className="mb-1 block text-sm text-fg-muted">อีเมล</label>
                 <input
                   type="email"
                   value={newEmail}
                   onChange={(e) => setNewEmail(e.target.value)}
-                  className="w-full rounded-md border border-clay-200 bg-clay-100 px-3 py-2 text-sm text-clay-900 focus:border-peach-300 focus:outline-none"
+                  className="w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg focus:border-line-brand focus:outline-none"
                   placeholder="staff@nong-kati.co.th"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm text-clay-600">ชื่อ</label>
+                <label className="mb-1 block text-sm text-fg-muted">ชื่อ</label>
                 <input
                   type="text"
                   value={newFullName}
                   onChange={(e) => setNewFullName(e.target.value)}
-                  className="w-full rounded-md border border-clay-200 bg-clay-100 px-3 py-2 text-sm text-clay-900 focus:border-peach-300 focus:outline-none"
+                  className="w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg focus:border-line-brand focus:outline-none"
                   placeholder="ชื่อ-นามสกุล"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm text-clay-600">บทบาท</label>
+                <label className="mb-1 block text-sm text-fg-muted">บทบาท</label>
                 <select
                   value={newRole}
                   onChange={(e) => setNewRole(e.target.value as AdminRole)}
-                  className="w-full rounded-md border border-clay-200 bg-clay-100 px-3 py-2 text-sm text-clay-900 focus:border-peach-300 focus:outline-none"
+                  className="w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg focus:border-line-brand focus:outline-none"
                 >
                   {ALL_ROLES.map((role) => (
                     <option key={role} value={role}>
@@ -213,13 +213,13 @@ export default function AdminStaffPage(): React.JSX.Element {
               <button
                 onClick={handleCreateStaff}
                 disabled={!newEmail || !newFullName}
-                className="rounded-md bg-peach-500 px-4 py-2 text-sm font-medium text-clay-900 hover:bg-peach-400 disabled:opacity-50"
+                className="rounded-md bg-peach-500 px-4 py-2 text-sm font-medium text-fg hover:bg-peach-400 disabled:opacity-50"
               >
                 สร้าง
               </button>
               <button
                 onClick={() => setShowCreateForm(false)}
-                className="rounded-md border border-clay-200 px-4 py-2 text-sm text-clay-600 hover:bg-clay-100"
+                className="rounded-md border border-line-subtle px-4 py-2 text-sm text-fg-muted hover:bg-surface"
               >
                 ยกเลิก
               </button>
@@ -228,19 +228,19 @@ export default function AdminStaffPage(): React.JSX.Element {
         )}
 
         {/* Staff Table */}
-        <div className="overflow-x-auto rounded-md border border-clay-200">
+        <div className="overflow-x-auto rounded-md border border-line-subtle">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-clay-200 bg-clay-100">
-                <th className="px-4 py-3 text-left font-medium text-clay-600">อีเมล</th>
-                <th className="px-4 py-3 text-left font-medium text-clay-600">ชื่อ</th>
-                <th className="px-4 py-3 text-center font-medium text-clay-600">บทบาท</th>
-                <th className="px-4 py-3 text-center font-medium text-clay-600">สถานะ</th>
-                <th className="px-4 py-3 text-center font-medium text-clay-600">2FA</th>
-                <th className="px-4 py-3 text-center font-medium text-clay-600">
+              <tr className="border-b border-line-subtle bg-surface">
+                <th className="px-4 py-3 text-left font-medium text-fg-muted">อีเมล</th>
+                <th className="px-4 py-3 text-left font-medium text-fg-muted">ชื่อ</th>
+                <th className="px-4 py-3 text-center font-medium text-fg-muted">บทบาท</th>
+                <th className="px-4 py-3 text-center font-medium text-fg-muted">สถานะ</th>
+                <th className="px-4 py-3 text-center font-medium text-fg-muted">2FA</th>
+                <th className="px-4 py-3 text-center font-medium text-fg-muted">
                   เข้าสู่ระบบล่าสุด
                 </th>
-                <th className="px-4 py-3 text-right font-medium text-clay-600">จัดการ</th>
+                <th className="px-4 py-3 text-right font-medium text-fg-muted">จัดการ</th>
               </tr>
             </thead>
             <tbody>
@@ -252,14 +252,14 @@ export default function AdminStaffPage(): React.JSX.Element {
                 </tr>
               ) : (
                 staff.map((member) => (
-                  <tr key={member.id} className="border-b border-clay-200 hover:bg-white">
-                    <td className="px-4 py-3 text-clay-700">{member.email}</td>
-                    <td className="px-4 py-3 text-clay-700">{member.fullName}</td>
+                  <tr key={member.id} className="border-b border-line-subtle hover:bg-white">
+                    <td className="px-4 py-3 text-fg-secondary">{member.email}</td>
+                    <td className="px-4 py-3 text-fg-secondary">{member.fullName}</td>
                     <td className="px-4 py-3 text-center">
                       <select
                         value={member.role}
                         onChange={(e) => handleChangeRole(member.id, e.target.value as AdminRole)}
-                        className="rounded border border-clay-200 bg-clay-100 px-2 py-1 text-xs text-clay-700 focus:border-peach-300 focus:outline-none"
+                        className="rounded border border-line-subtle bg-surface px-2 py-1 text-xs text-fg-secondary focus:border-line-brand focus:outline-none"
                       >
                         {ALL_ROLES.map((role) => (
                           <option key={role} value={role}>
@@ -280,10 +280,10 @@ export default function AdminStaffPage(): React.JSX.Element {
                         {member.status === 'active' ? 'ใช้งาน' : 'ปิดใช้งาน'}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-center text-xs text-clay-500">
+                    <td className="px-4 py-3 text-center text-xs text-fg-placeholder">
                       {member.totpConfirmed ? '✓' : '✗'}
                     </td>
-                    <td className="px-4 py-3 text-center text-xs text-clay-500">
+                    <td className="px-4 py-3 text-center text-xs text-fg-placeholder">
                       {member.lastLoginAt ? member.lastLoginAt.toLocaleDateString('th-TH') : '—'}
                     </td>
                     <td className="px-4 py-3 text-right">

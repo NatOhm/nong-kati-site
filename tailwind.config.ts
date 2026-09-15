@@ -46,6 +46,39 @@ const config: Config = {
           800: '#8F2E38',
           900: '#6B222B',
         },
+
+        /* Semantic aliases — bind to CSS vars from tokens.css so a theme change
+           is a one-file edit in tokens.css. Prefer these over raw step classes. */
+        surface: {
+          base: 'var(--bg-base)',
+          DEFAULT: 'var(--bg-surface)',
+          elevated: 'var(--bg-elevated)',
+          sunken: 'var(--bg-sunken)',
+          overlay: 'var(--bg-overlay)',
+          brand: 'var(--bg-brand)',
+          'brand-hover': 'var(--bg-brand-hover)',
+          'brand-subtle': 'var(--bg-brand-subtle)',
+        },
+        fg: {
+          DEFAULT: 'var(--fg-primary)',
+          secondary: 'var(--fg-secondary)',
+          muted: 'var(--fg-muted)',
+          placeholder: 'var(--fg-placeholder)',
+          inverse: 'var(--fg-inverse)',
+          brand: 'var(--fg-brand)',
+          'brand-strong': 'var(--fg-brand-strong)',
+          success: 'var(--fg-success)',
+          error: 'var(--fg-error)',
+          warning: 'var(--fg-warning)',
+          info: 'var(--fg-info)',
+        },
+        line: {
+          subtle: 'var(--border-subtle)',
+          DEFAULT: 'var(--border-default)',
+          strong: 'var(--border-strong)',
+          brand: 'var(--border-brand)',
+          error: 'var(--border-error)',
+        },
         ink: {
           950: '#2C1E12',
           900: '#382718',

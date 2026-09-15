@@ -66,17 +66,17 @@ export function CartDrawer({
         role="dialog"
         aria-modal="true"
         aria-label="ตะกร้าสินค้า"
-        className="fixed right-0 top-0 z-[90] flex h-full w-full max-w-[400px] flex-col border-l border-clay-200 bg-clay-50 shadow-xl"
+        className="fixed right-0 top-0 z-[90] flex h-full w-full max-w-[400px] flex-col border-l border-line-subtle bg-surface-base shadow-xl"
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-clay-200 px-4 py-3">
-          <h2 className="flex items-center gap-2 text-lg font-semibold text-clay-900">
+        <div className="flex items-center justify-between border-b border-line-subtle px-4 py-3">
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-fg">
             <ShoppingCart size={20} strokeWidth={1.5} />
             ตะกร้าสินค้า ({items.length})
           </h2>
           <button
             onClick={onClose}
-            className="rounded p-1 text-clay-500 transition-colors hover:bg-clay-100 hover:text-clay-700"
+            className="rounded p-1 text-fg-placeholder transition-colors hover:bg-surface hover:text-fg-secondary"
             aria-label="ปิดตะกร้า"
           >
             <X size={20} strokeWidth={1.5} />
@@ -110,7 +110,7 @@ export function CartDrawer({
 
         {/* Footer — Summary + Checkout */}
         {items.length > 0 && (
-          <div className="border-t border-clay-200 p-4">
+          <div className="border-t border-line-subtle p-4">
             <CartSummary
               subtotal={items.reduce(
                 (sum, i) => Math.round((sum + i.unitPriceThb * i.quantity) * 100) / 100,
@@ -145,7 +145,7 @@ export function CartDrawer({
                 className={cn(
                   'flex w-full items-center justify-center rounded-md px-5 py-2.5 text-sm font-semibold transition-colors',
                   hasOutOfStock
-                    ? 'cursor-not-allowed bg-clay-300 text-clay-500'
+                    ? 'cursor-not-allowed bg-clay-300 text-fg-placeholder'
                     : 'bg-peach-500 text-white shadow-clay-sm hover:bg-peach-400',
                 )}
                 aria-disabled={hasOutOfStock}
@@ -155,7 +155,7 @@ export function CartDrawer({
               </Link>
               <button
                 onClick={onClose}
-                className="w-full text-center text-sm text-clay-500 hover:text-peach-600"
+                className="w-full text-center text-sm text-fg-placeholder hover:text-fg-brand"
               >
                 ช้อปปิ้งต่อ
               </button>

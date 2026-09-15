@@ -59,7 +59,7 @@ export default function AdminCustomersPage(): React.JSX.Element {
   return (
     <AdminShell staffName="Founder" staffRole="super_admin" breadcrumbs={[{ label: 'ลูกค้า' }]}>
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold text-clay-900">ลูกค้า</h1>
+        <h1 className="text-2xl font-bold text-fg">ลูกค้า</h1>
 
         {actionMessage && (
           <div className="rounded-md border border-jade-500/40 bg-jade-500/10 px-4 py-3 text-sm text-jade-700">
@@ -70,20 +70,23 @@ export default function AdminCustomersPage(): React.JSX.Element {
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative flex-1 md:max-w-md">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-clay-500" />
+            <Search
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-placeholder"
+            />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               placeholder="ค้นหาอีเมล หรือชื่อ..."
-              className="w-full rounded-md border border-clay-200 bg-white py-2 pl-9 pr-3 text-sm text-clay-900 placeholder:text-clay-400 focus:border-peach-300 focus:outline-none"
+              className="w-full rounded-md border border-line-subtle bg-white py-2 pl-9 pr-3 text-sm text-fg placeholder:text-clay-400 focus:border-line-brand focus:outline-none"
             />
           </div>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="rounded-md border border-clay-200 bg-white px-3 py-2 text-sm text-clay-700 focus:border-peach-300 focus:outline-none"
+            className="rounded-md border border-line-subtle bg-white px-3 py-2 text-sm text-fg-secondary focus:border-line-brand focus:outline-none"
           >
             <option value="">ทุกสถานะ</option>
             <option value="active">ใช้งาน</option>
@@ -92,7 +95,7 @@ export default function AdminCustomersPage(): React.JSX.Element {
           <button
             onClick={handleSearch}
             disabled={loading}
-            className="rounded-md bg-peach-500 px-4 py-2 text-sm font-medium text-clay-900 hover:bg-peach-400 disabled:opacity-50"
+            className="rounded-md bg-peach-500 px-4 py-2 text-sm font-medium text-fg hover:bg-peach-400 disabled:opacity-50"
           >
             {loading ? 'กำลังค้นหา...' : 'ค้นหา'}
           </button>
@@ -101,12 +104,12 @@ export default function AdminCustomersPage(): React.JSX.Element {
         {/* Customer Detail Modal */}
         {selectedCustomer && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-clay-200 bg-clay-50 p-6">
+            <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-line-subtle bg-surface-base p-6">
               <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-bold text-clay-900">{selectedCustomer.fullName}</h2>
+                <h2 className="text-lg font-bold text-fg">{selectedCustomer.fullName}</h2>
                 <button
                   onClick={() => setSelectedCustomer(null)}
-                  className="text-clay-500 hover:text-clay-900"
+                  className="text-fg-placeholder hover:text-fg"
                 >
                   <XCircle size={20} />
                 </button>
@@ -115,15 +118,15 @@ export default function AdminCustomersPage(): React.JSX.Element {
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <p className="text-clay-500">อีเมล</p>
-                    <p className="text-clay-900">{selectedCustomer.email}</p>
+                    <p className="text-fg-placeholder">อีเมล</p>
+                    <p className="text-fg">{selectedCustomer.email}</p>
                   </div>
                   <div>
-                    <p className="text-clay-500">โทรศัพท์</p>
-                    <p className="text-clay-900">{selectedCustomer.phoneNumber ?? '—'}</p>
+                    <p className="text-fg-placeholder">โทรศัพท์</p>
+                    <p className="text-fg">{selectedCustomer.phoneNumber ?? '—'}</p>
                   </div>
                   <div>
-                    <p className="text-clay-500">สถานะ</p>
+                    <p className="text-fg-placeholder">สถานะ</p>
                     <p
                       className={cn(
                         'font-medium',
@@ -134,44 +137,44 @@ export default function AdminCustomersPage(): React.JSX.Element {
                     </p>
                   </div>
                   <div>
-                    <p className="text-clay-500">อีเมลยืนยัน</p>
-                    <p className="text-clay-900">
+                    <p className="text-fg-placeholder">อีเมลยืนยัน</p>
+                    <p className="text-fg">
                       {selectedCustomer.emailVerified ? '✓ ยืนยันแล้ว' : '✗ ยังไม่ยืนยัน'}
                     </p>
                   </div>
                   <div>
-                    <p className="text-clay-500">คำสั่งซื้อทั้งหมด</p>
-                    <p className="text-clay-900">{selectedCustomer.totalOrders}</p>
+                    <p className="text-fg-placeholder">คำสั่งซื้อทั้งหมด</p>
+                    <p className="text-fg">{selectedCustomer.totalOrders}</p>
                   </div>
                   <div>
-                    <p className="text-clay-500">ยอดซื้อรวม</p>
-                    <p className="text-clay-900">{formatThb(selectedCustomer.totalSpendThb)}</p>
+                    <p className="text-fg-placeholder">ยอดซื้อรวม</p>
+                    <p className="text-fg">{formatThb(selectedCustomer.totalSpendThb)}</p>
                   </div>
                 </div>
 
                 {/* Recent Orders */}
                 {selectedCustomer.recentOrders.length > 0 && (
                   <div>
-                    <p className="mb-2 text-sm font-medium text-clay-600">คำสั่งซื้อล่าสุด</p>
+                    <p className="mb-2 text-sm font-medium text-fg-muted">คำสั่งซื้อล่าสุด</p>
                     {selectedCustomer.recentOrders.map((order, idx) => (
                       <div
                         key={idx}
-                        className="flex items-center justify-between rounded border border-clay-200 p-2 text-sm"
+                        className="flex items-center justify-between rounded border border-line-subtle p-2 text-sm"
                       >
                         <div>
-                          <p className="text-clay-700">{order.orderNumber}</p>
-                          <p className="text-xs text-clay-500">
+                          <p className="text-fg-secondary">{order.orderNumber}</p>
+                          <p className="text-xs text-fg-placeholder">
                             {order.createdAt.toLocaleDateString('th-TH')}
                           </p>
                         </div>
-                        <p className="text-clay-700">{formatThb(order.totalAmountThb)}</p>
+                        <p className="text-fg-secondary">{formatThb(order.totalAmountThb)}</p>
                       </div>
                     ))}
                   </div>
                 )}
 
                 {/* Actions */}
-                <div className="flex gap-3 border-t border-clay-200 pt-4">
+                <div className="flex gap-3 border-t border-line-subtle pt-4">
                   <button
                     onClick={() => handleBlockToggle(selectedCustomer.id, selectedCustomer.status)}
                     className={cn(
@@ -198,17 +201,17 @@ export default function AdminCustomersPage(): React.JSX.Element {
         )}
 
         {/* Customers Table */}
-        <div className="overflow-x-auto rounded-md border border-clay-200">
+        <div className="overflow-x-auto rounded-md border border-line-subtle">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-clay-200 bg-clay-100">
-                <th className="px-4 py-3 text-left font-medium text-clay-600">อีเมล</th>
-                <th className="px-4 py-3 text-left font-medium text-clay-600">ชื่อ</th>
-                <th className="px-4 py-3 text-center font-medium text-clay-600">สถานะ</th>
-                <th className="px-4 py-3 text-center font-medium text-clay-600">คำสั่งซื้อ</th>
-                <th className="px-4 py-3 text-right font-medium text-clay-600">ยอดซื้อรวม</th>
-                <th className="px-4 py-3 text-center font-medium text-clay-600">สมัครเมื่อ</th>
-                <th className="px-4 py-3 text-right font-medium text-clay-600">จัดการ</th>
+              <tr className="border-b border-line-subtle bg-surface">
+                <th className="px-4 py-3 text-left font-medium text-fg-muted">อีเมล</th>
+                <th className="px-4 py-3 text-left font-medium text-fg-muted">ชื่อ</th>
+                <th className="px-4 py-3 text-center font-medium text-fg-muted">สถานะ</th>
+                <th className="px-4 py-3 text-center font-medium text-fg-muted">คำสั่งซื้อ</th>
+                <th className="px-4 py-3 text-right font-medium text-fg-muted">ยอดซื้อรวม</th>
+                <th className="px-4 py-3 text-center font-medium text-fg-muted">สมัครเมื่อ</th>
+                <th className="px-4 py-3 text-right font-medium text-fg-muted">จัดการ</th>
               </tr>
             </thead>
             <tbody>
@@ -220,9 +223,9 @@ export default function AdminCustomersPage(): React.JSX.Element {
                 </tr>
               ) : (
                 customers.map((customer) => (
-                  <tr key={customer.id} className="border-b border-clay-200 hover:bg-white">
-                    <td className="px-4 py-3 text-clay-700">{customer.email}</td>
-                    <td className="px-4 py-3 text-clay-700">{customer.fullName}</td>
+                  <tr key={customer.id} className="border-b border-line-subtle hover:bg-white">
+                    <td className="px-4 py-3 text-fg-secondary">{customer.email}</td>
+                    <td className="px-4 py-3 text-fg-secondary">{customer.fullName}</td>
                     <td className="px-4 py-3 text-center">
                       <span
                         className={cn(
@@ -235,17 +238,17 @@ export default function AdminCustomersPage(): React.JSX.Element {
                         {customer.status === 'blocked' ? 'บล็อค' : 'ใช้งาน'}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-center text-clay-600">{customer.totalOrders}</td>
-                    <td className="px-4 py-3 text-right text-clay-700">
+                    <td className="px-4 py-3 text-center text-fg-muted">{customer.totalOrders}</td>
+                    <td className="px-4 py-3 text-right text-fg-secondary">
                       {formatThb(customer.totalSpendThb)}
                     </td>
-                    <td className="px-4 py-3 text-center text-xs text-clay-500">
+                    <td className="px-4 py-3 text-center text-xs text-fg-placeholder">
                       {customer.createdAt.toLocaleDateString('th-TH')}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button
                         onClick={() => handleViewCustomer(customer.id)}
-                        className="inline-flex items-center gap-1 rounded bg-clay-100 px-2 py-1 text-xs text-clay-600 hover:bg-clay-300 hover:text-clay-900"
+                        className="inline-flex items-center gap-1 rounded bg-surface px-2 py-1 text-xs text-fg-muted hover:bg-clay-300 hover:text-fg"
                       >
                         <Eye size={12} /> ดู
                       </button>

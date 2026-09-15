@@ -74,9 +74,9 @@ export default async function CategoryPage({
         <main>
           <PageShell>
             <section className="py-16 text-center">
-              <h1 className="text-2xl font-bold text-clay-900">หมวดหมู่สินค้า</h1>
-              <p className="mt-4 text-clay-500">ไม่สามารถโหลดข้อมูลได้ในขณะนี้</p>
-              <Link href="/" className="mt-4 inline-block text-peach-600 hover:underline">
+              <h1 className="text-2xl font-bold text-fg">หมวดหมู่สินค้า</h1>
+              <p className="mt-4 text-fg-placeholder">ไม่สามารถโหลดข้อมูลได้ในขณะนี้</p>
+              <Link href="/" className="mt-4 inline-block text-fg-brand hover:underline">
                 กลับหน้าหลัก
               </Link>
             </section>
@@ -125,17 +125,17 @@ export default async function CategoryPage({
 
           {/* Category Header */}
           <section className="pb-8">
-            <h1 className="font-display text-3xl font-bold text-clay-900">
+            <h1 className="font-display text-3xl font-bold text-fg">
               <span className="mr-2">{category.icon}</span>
               {category.name}
             </h1>
-            <p className="mt-2 text-clay-500">{total} สินค้า</p>
+            <p className="mt-2 text-fg-placeholder">{total} สินค้า</p>
           </section>
 
           {/* Sub-categories (if L1) */}
           {category.children.length > 0 && (
             <section className="pb-8">
-              <h2 className="mb-4 text-lg font-semibold text-clay-700">หมวดหมู่ย่อย</h2>
+              <h2 className="mb-4 text-lg font-semibold text-fg-secondary">หมวดหมู่ย่อย</h2>
               <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
                 {category.children.map((child) => (
                   <CategoryCard
@@ -153,7 +153,7 @@ export default async function CategoryPage({
           {/* Products */}
           {products.length > 0 ? (
             <section className="pb-16">
-              <h2 className="mb-4 text-lg font-semibold text-clay-700">สินค้าทั้งหมด</h2>
+              <h2 className="mb-4 text-lg font-semibold text-fg-secondary">สินค้าทั้งหมด</h2>
               <ProductGrid>
                 {products.map((product) => (
                   <ProductCard
@@ -173,7 +173,7 @@ export default async function CategoryPage({
             </section>
           ) : (
             <section className="py-16 text-center">
-              <p className="text-clay-500">ยังไม่มีสินค้าในหมวดหมู่นี้</p>
+              <p className="text-fg-placeholder">ยังไม่มีสินค้าในหมวดหมู่นี้</p>
             </section>
           )}
         </PageShell>
