@@ -51,7 +51,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }):
       className={`${ibmPlexSansThai.variable} ${notoSerifThai.variable} ${jetbrainsMono.variable}`}
     >
       <body className="text-thai font-ui">
-        <ThemeProvider defaultTheme="dark">
+        <ThemeProvider defaultTheme="light">
           <CartProvider>{children}</CartProvider>
           <ToastMount />
           <CookieConsentBanner />

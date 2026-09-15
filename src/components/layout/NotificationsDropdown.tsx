@@ -81,7 +81,7 @@ export function NotificationsDropdown(): React.JSX.Element {
         aria-haspopup="true"
         aria-expanded={open}
         aria-label={`การแจ้งเตือน (${unreadCount} ยังไม่ได้อ่าน)`}
-        className="relative flex h-10 w-10 items-center justify-center rounded-full text-ink-300 transition-colors hover:bg-ink-800 hover:text-amber-300"
+        className="relative flex h-10 w-10 items-center justify-center rounded-full text-clay-600 transition-colors hover:bg-clay-200 hover:text-peach-700"
       >
         <Bell size={20} strokeWidth={1.5} />
         {unreadCount > 0 && (
@@ -95,15 +95,15 @@ export function NotificationsDropdown(): React.JSX.Element {
         <div
           role="dialog"
           aria-label="รายการแจ้งเตือน"
-          className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-lg border border-ink-700 bg-ink-850 shadow-xl"
+          className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-lg border border-clay-200 bg-white shadow-xl"
         >
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-ink-700 px-4 py-2.5">
-            <h2 className="text-sm font-semibold text-ink-100">การแจ้งเตือน</h2>
+          <div className="flex items-center justify-between border-b border-clay-200 px-4 py-2.5">
+            <h2 className="text-sm font-semibold text-clay-900">การแจ้งเตือน</h2>
             {unreadCount > 0 && (
               <button
                 onClick={markAllRead}
-                className="flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300"
+                className="flex items-center gap-1 text-xs text-peach-600 hover:text-peach-700"
               >
                 <CheckCheck size={14} />
                 อ่านทั้งหมด
@@ -119,20 +119,20 @@ export function NotificationsDropdown(): React.JSX.Element {
                 <li
                   key={n.id}
                   className={cn(
-                    'flex gap-3 border-b border-ink-800 px-4 py-3 last:border-b-0',
-                    !n.read && 'bg-ink-800/40',
+                    'flex gap-3 border-b border-clay-200 px-4 py-3 last:border-b-0',
+                    !n.read && 'bg-peach-50',
                   )}
                 >
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink-800 text-amber-400">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-clay-100 text-peach-600">
                     <Icon size={16} />
                   </div>
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-ink-100">{n.title}</p>
-                    <p className="text-xs text-ink-400">{n.body}</p>
-                    <p className="text-ink-500 mt-0.5 text-[11px]">{n.time}</p>
+                    <p className="truncate text-sm font-medium text-clay-900">{n.title}</p>
+                    <p className="text-xs text-clay-500">{n.body}</p>
+                    <p className="mt-0.5 text-[11px] text-clay-400">{n.time}</p>
                   </div>
                   {!n.read && (
-                    <span className="ml-auto mt-1 h-2 w-2 shrink-0 rounded-full bg-amber-400" />
+                    <span className="ml-auto mt-1 h-2 w-2 shrink-0 rounded-full bg-peach-500" />
                   )}
                 </li>
               );
@@ -143,7 +143,7 @@ export function NotificationsDropdown(): React.JSX.Element {
           <Link
             href="/account/orders"
             onClick={() => setOpen(false)}
-            className="block border-t border-ink-700 py-2.5 text-center text-sm text-amber-400 hover:bg-ink-800 hover:text-amber-300"
+            className="block border-t border-clay-200 py-2.5 text-center text-sm text-peach-600 hover:bg-clay-200 hover:text-peach-700"
           >
             ดูคำสั่งซื้อทั้งหมด
           </Link>

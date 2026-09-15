@@ -54,14 +54,14 @@ export function FacebookNavbar({
 
   return (
     <>
-      <nav className="sticky top-0 z-50 border-b border-ink-700 bg-ink-900/95 backdrop-blur-md">
+      <nav className="sticky top-0 z-50 border-b border-clay-200 bg-clay-50/95 shadow-clay-xs backdrop-blur-md">
         <div className="mx-auto flex h-14 items-center justify-between px-4 md:h-16 md:px-6">
           {/* Left: Logo + Search */}
           <div className="flex items-center gap-3">
             {/* Mobile menu button - opens sidebar drawer */}
             <button
               onClick={onMenuToggle}
-              className="cursor-pointer rounded-lg p-2 text-ink-300 hover:bg-ink-800 hover:text-amber-300 lg:hidden"
+              className="cursor-pointer rounded-lg p-2 text-clay-600 hover:bg-clay-200 hover:text-peach-700 lg:hidden"
               aria-label="เปิดเมนู"
             >
               <Menu size={22} />
@@ -69,8 +69,8 @@ export function FacebookNavbar({
 
             {/* Logo */}
             <Link href="/" className="flex items-center gap-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-400">
-                <span className="text-lg font-bold text-ink-900">NK</span>
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-peach-400 shadow-clay-sm">
+                <span className="text-lg font-bold text-peach-800">NK</span>
               </div>
             </Link>
 
@@ -79,7 +79,7 @@ export function FacebookNavbar({
               <div
                 className={cn(
                   'flex items-center gap-2 rounded-full border px-3 py-2 transition-colors',
-                  searchFocused ? 'border-amber-500 bg-ink-800' : 'border-ink-700 bg-ink-800',
+                  searchFocused ? 'border-peach-500 bg-white' : 'border-clay-300 bg-white',
                 )}
               >
                 <Search size={16} className="text-ink-400" />
@@ -111,14 +111,14 @@ export function FacebookNavbar({
                     'group relative flex h-12 w-24 items-center justify-center rounded-lg transition-colors',
                     isActive
                       ? 'text-amber-400'
-                      : 'text-ink-400 hover:bg-ink-800 hover:text-ink-200',
+                      : 'text-clay-500 hover:bg-clay-200 hover:text-clay-800',
                   )}
                   title={item.label}
                   aria-label={item.label}
                 >
                   <Icon size={22} strokeWidth={isActive ? 2.5 : 1.5} />
                   {isActive && (
-                    <div className="absolute bottom-0 left-1/2 h-[3px] w-12 -translate-x-1/2 rounded-full bg-amber-400" />
+                    <div className="absolute bottom-0 left-1/2 h-[3px] w-12 -translate-x-1/2 rounded-full bg-peach-500" />
                   )}
                 </Link>
               );
@@ -138,7 +138,7 @@ export function FacebookNavbar({
               href="/account/support"
               aria-label="ฝ่ายสนับสนุน"
               title="ฝ่ายสนับสนุน"
-              className="flex h-10 w-10 items-center justify-center rounded-full text-ink-300 transition-colors hover:bg-ink-800 hover:text-amber-300"
+              className="flex h-10 w-10 items-center justify-center rounded-full text-clay-600 transition-colors hover:bg-clay-200 hover:text-peach-700"
             >
               <MessageCircle size={20} strokeWidth={1.5} />
             </Link>
@@ -148,7 +148,7 @@ export function FacebookNavbar({
               href={isAuthenticated ? '/account/dashboard' : '/account/login'}
               aria-label={isAuthenticated ? 'บัญชีของฉัน' : 'เข้าสู่ระบบ'}
               title={isAuthenticated ? 'บัญชีของฉัน' : 'เข้าสู่ระบบ'}
-              className="flex h-10 w-10 items-center justify-center rounded-full text-ink-300 hover:bg-ink-800 hover:text-amber-300"
+              className="flex h-10 w-10 items-center justify-center rounded-full text-clay-600 hover:bg-clay-200 hover:text-peach-700"
             >
               <User size={20} />
             </Link>

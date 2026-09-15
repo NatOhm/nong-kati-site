@@ -6,16 +6,25 @@
 
 @layer base {
   * {
-    @apply border-ink-700;
+    @apply border-clay-200;
   }
 
   /* Add cursor-pointer to all clickable elements */
-  a, button, [role='button'], input[type='submit'], input[type='button'] {
+  a,
+  button,
+  [role='button'],
+  input[type='submit'],
+  input[type='button'] {
     @apply cursor-pointer;
   }
 
   html {
     @apply scroll-smooth;
+    color-scheme: light;
+  }
+
+  [data-theme='dark'] {
+    color-scheme: dark;
   }
 
   body {
@@ -90,4 +99,17 @@
 
 .animate-marquee {
   animation: marquee 30s linear infinite;
+}
+
+/* ── Claymorphism utilities ── */
+@layer components {
+  .clay-card {
+    background: #ffffff;
+    border-radius: 1rem;
+    box-shadow:
+      0 6px 16px rgba(147, 107, 73, 0.14),
+      0 2px 4px rgba(147, 107, 73, 0.08),
+      inset 0 3px 6px rgba(255, 255, 255, 0.9),
+      inset 0 -3px 6px rgba(147, 107, 73, 0.06);
+  }
 }

@@ -55,7 +55,7 @@ export function CartDrawer({
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-[80] bg-ink-950/60 backdrop-blur-sm"
+        className="fixed inset-0 z-[80] bg-clay-950/50 backdrop-blur-sm"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -66,17 +66,17 @@ export function CartDrawer({
         role="dialog"
         aria-modal="true"
         aria-label="ตะกร้าสินค้า"
-        className="fixed right-0 top-0 z-[90] flex h-full w-full max-w-[400px] flex-col border-l border-ink-700 bg-ink-900 shadow-xl"
+        className="fixed right-0 top-0 z-[90] flex h-full w-full max-w-[400px] flex-col border-l border-clay-200 bg-clay-50 shadow-xl"
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-ink-700 px-4 py-3">
-          <h2 className="flex items-center gap-2 text-lg font-semibold text-ink-100">
+        <div className="flex items-center justify-between border-b border-clay-200 px-4 py-3">
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-clay-900">
             <ShoppingCart size={20} strokeWidth={1.5} />
             ตะกร้าสินค้า ({items.length})
           </h2>
           <button
             onClick={onClose}
-            className="rounded p-1 text-ink-400 transition-colors hover:bg-ink-800 hover:text-ink-200"
+            className="rounded p-1 text-clay-500 transition-colors hover:bg-clay-100 hover:text-clay-700"
             aria-label="ปิดตะกร้า"
           >
             <X size={20} strokeWidth={1.5} />
@@ -110,7 +110,7 @@ export function CartDrawer({
 
         {/* Footer — Summary + Checkout */}
         {items.length > 0 && (
-          <div className="border-t border-ink-700 p-4">
+          <div className="border-t border-clay-200 p-4">
             <CartSummary
               subtotal={items.reduce(
                 (sum, i) => Math.round((sum + i.unitPriceThb * i.quantity) * 100) / 100,
@@ -123,17 +123,19 @@ export function CartDrawer({
                   ) / 100,
                 0,
               )}
-              total={items.reduce(
-                (sum, i) => Math.round((sum + i.unitPriceThb * i.quantity) * 100) / 100,
-                0,
-              ) +
+              total={
+                items.reduce(
+                  (sum, i) => Math.round((sum + i.unitPriceThb * i.quantity) * 100) / 100,
+                  0,
+                ) +
                 items.reduce(
                   (sum, i) =>
                     Math.round(
                       (sum + Math.round(i.unitPriceThb * i.quantity * 0.07 * 100) / 100) * 100,
                     ) / 100,
                   0,
-                )}
+                )
+              }
             />
 
             <div className="mt-4 space-y-2">
@@ -143,8 +145,8 @@ export function CartDrawer({
                 className={cn(
                   'flex w-full items-center justify-center rounded-md px-5 py-2.5 text-sm font-semibold transition-colors',
                   hasOutOfStock
-                    ? 'cursor-not-allowed bg-ink-700 text-ink-400'
-                    : 'bg-amber-400 text-ink-900 hover:bg-amber-300',
+                    ? 'cursor-not-allowed bg-clay-300 text-clay-500'
+                    : 'bg-peach-500 text-white shadow-clay-sm hover:bg-peach-400',
                 )}
                 aria-disabled={hasOutOfStock}
                 tabIndex={hasOutOfStock ? -1 : 0}
@@ -153,7 +155,7 @@ export function CartDrawer({
               </Link>
               <button
                 onClick={onClose}
-                className="w-full text-center text-sm text-ink-400 hover:text-amber-300"
+                className="w-full text-center text-sm text-clay-500 hover:text-peach-600"
               >
                 ช้อปปิ้งต่อ
               </button>

@@ -4,10 +4,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, Copy, MailCheck } from 'lucide-react';
 
 /**
- * Hero right-hand visual: a mock "delivered code" email card.
+ * Hero right-hand visual: a mock "delivered code" email card (clay style).
  * The one orchestrated moment: the code types itself in on load
  * (skipped under prefers-reduced-motion). Click-to-copy is the
- * single interaction; everything else stays still.
+ * single interaction; the card floats gently.
  */
 
 const DEMO_CODE = 'NKTX-7H2K-9QW4-PLM8';
@@ -52,47 +52,47 @@ export function DeliveredCodeCard(): React.JSX.Element {
   }, []);
 
   return (
-    <div className="relative mx-auto w-full max-w-sm rotate-2 rounded-lg border border-ink-700 bg-ink-900 p-5 shadow-2xl">
+    <div className="clay-card relative mx-auto w-full max-w-sm rotate-2 animate-float rounded-2xl p-5">
       {/* Email header */}
-      <div className="flex items-center gap-2 border-b border-ink-800 pb-3">
-        <MailCheck size={16} className="text-jade-400" aria-hidden="true" />
-        <span className="text-xs text-ink-400">รหัสสินค้าของคุณถูกส่งแล้ว</span>
+      <div className="flex items-center gap-2 border-b border-clay-200 pb-3">
+        <MailCheck size={16} className="text-jade-600" aria-hidden="true" />
+        <span className="text-xs text-clay-600">รหัสสินค้าของคุณถูกส่งแล้ว</span>
       </div>
 
       {/* The code itself */}
       <button
         onClick={handleCopy}
         aria-label={`คัดลอกรหัส ${DEMO_CODE}`}
-        className="mt-4 flex w-full items-center justify-between gap-3 rounded-md border border-ink-700 bg-ink-950 px-4 py-3 text-left transition-colors hover:border-amber-500/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+        className="mt-4 flex w-full items-center justify-between gap-3 rounded-xl bg-clay-100 px-4 py-3 text-left shadow-clay-press transition-colors hover:bg-clay-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-peach-500"
       >
-        <span className="font-mono text-sm tracking-wider text-amber-300 md:text-base">
+        <span className="font-mono text-sm tracking-wider text-peach-800 md:text-base">
           {DEMO_CODE.slice(0, typedCount)}
-          {typedCount < DEMO_CODE.length && <span className="text-ink-500 animate-pulse">▍</span>}
+          {typedCount < DEMO_CODE.length && <span className="animate-pulse text-clay-500">▍</span>}
         </span>
         {copyState === 'copied' ? (
-          <Check size={16} className="shrink-0 text-jade-400" aria-hidden="true" />
+          <Check size={16} className="text-jade-600 shrink-0" aria-hidden="true" />
         ) : (
-          <Copy size={16} className="text-ink-500 shrink-0" aria-hidden="true" />
+          <Copy size={16} className="shrink-0 text-clay-500" aria-hidden="true" />
         )}
       </button>
       <p aria-live="polite" className="mt-2 min-h-4 text-xs">
-        {copyState === 'copied' && <span className="text-jade-400">คัดลอกแล้ว</span>}
+        {copyState === 'copied' && <span className="text-jade-600">คัดลอกแล้ว</span>}
         {copyState === 'failed' && (
-          <span className="text-crimson-300">
+          <span className="text-coral-600">
             คัดลอกไม่สำเร็จ — เลือกข้อความรหัสด้านบนแล้วคัดลอกเอง
           </span>
         )}
       </p>
 
       {/* Meta rows */}
-      <div className="text-ink-500 mt-1 space-y-1.5 text-xs">
+      <div className="mt-1 space-y-1.5 text-xs text-clay-500">
         <div className="flex justify-between">
           <span>HBO Max 7 4K — 1 เดือน</span>
           <span>฿25.00</span>
         </div>
         <div className="flex justify-between">
           <span>สถานะ</span>
-          <span className="text-jade-400">ส่งสำเร็จ</span>
+          <span className="text-jade-600">ส่งสำเร็จ</span>
         </div>
       </div>
     </div>

@@ -69,7 +69,7 @@ export default async function HomePage(): Promise<React.JSX.Element> {
 
       <FacebookLayout>
         {/* Hero — asymmetric: oversized serif headline left, delivered-code card right */}
-        <section className="border-b border-ink-700 bg-ink-900/50">
+        <section className="border-b border-clay-200">
           <div className="grid items-center gap-10 px-4 py-12 md:grid-cols-[1.2fr_1fr] md:px-8 md:py-20 lg:gap-16">
             <div>
               <ScrollReveal>
@@ -78,15 +78,15 @@ export default async function HomePage(): Promise<React.JSX.Element> {
                   <br />
                   และอีคอมเมิร์ซ
                   <br />
-                  <span className="text-amber-400">ส่งถึงอีเมลใน 60 วินาที</span>
+                  <span className="text-peach-600">ส่งถึงอีเมลใน 60 วินาที</span>
                 </h1>
-                <p className="mt-5 max-w-md text-base leading-relaxed text-ink-300">
+                <p className="mt-5 max-w-md text-base leading-relaxed text-clay-600">
                   จ่ายผ่าน PromptPay หรือบัตรเครดิต รหัสสินค้าถูกส่งอัตโนมัติ ไม่ต้องรอแอดมิน
                 </p>
                 <div className="mt-8">
                   <Link
                     href="/search"
-                    className="inline-flex items-center justify-center rounded-full bg-amber-400 px-8 py-3 text-sm font-semibold text-ink-900 transition-colors hover:bg-amber-300 active:scale-95"
+                    className="inline-flex items-center justify-center rounded-full bg-peach-500 px-8 py-3 text-sm font-semibold text-white shadow-clay-brand transition-all hover:bg-peach-400 hover:shadow-clay-lg active:scale-95 active:shadow-clay-press"
                   >
                     เลือกซื้อสินค้า
                   </Link>
@@ -102,10 +102,13 @@ export default async function HomePage(): Promise<React.JSX.Element> {
 
         {/* Categories Section */}
         <ScrollReveal>
-          <section className="border-b border-ink-700 bg-ink-900/30 px-4 py-6 md:px-8">
+          <section className="px-4 py-6 md:px-8">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-ink-100">หมวดหมู่สินค้า</h2>
-              <Link href="/search" className="text-sm text-amber-400 hover:text-amber-300">
+              <h2 className="text-lg font-bold text-clay-900">หมวดหมู่สินค้า</h2>
+              <Link
+                href="/search"
+                className="text-sm font-medium text-peach-600 hover:text-peach-700"
+              >
                 ดูทั้งหมด
               </Link>
             </div>
@@ -127,10 +130,13 @@ export default async function HomePage(): Promise<React.JSX.Element> {
         {/* Featured Products Section */}
         {featuredProducts.length > 0 && (
           <ScrollReveal>
-            <section className="border-b border-ink-700 bg-ink-900/50 px-4 py-6 md:px-8">
+            <section className="px-4 py-6 md:px-8">
               <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-bold text-ink-100">สินค้าแนะนำ</h2>
-                <Link href="/search?q=" className="text-sm text-amber-400 hover:text-amber-300">
+                <h2 className="text-lg font-bold text-clay-900">สินค้าแนะนำ</h2>
+                <Link
+                  href="/search?q="
+                  className="text-sm font-medium text-peach-600 hover:text-peach-700"
+                >
                   ดูทั้งหมด →
                 </Link>
               </div>
@@ -156,8 +162,8 @@ export default async function HomePage(): Promise<React.JSX.Element> {
 
         {/* How It Works Section */}
         <ScrollReveal>
-          <section className="bg-ink-900/30 px-4 py-8 md:px-8">
-            <h2 className="mb-6 text-center text-lg font-bold text-ink-100">วิธีการซื้อ</h2>
+          <section className="px-4 py-8 md:px-8">
+            <h2 className="mb-6 text-center text-lg font-bold text-clay-900">วิธีการซื้อ</h2>
             <div className="grid gap-4 md:grid-cols-3">
               {[
                 { step: '01', title: 'เลือกสินค้า', desc: 'เลือกประเภทบัตรและราคาที่ต้องการ' },
@@ -166,12 +172,12 @@ export default async function HomePage(): Promise<React.JSX.Element> {
               ].map((item) => (
                 <div
                   key={item.step}
-                  className="flex items-center gap-4 rounded-lg border border-ink-700 bg-ink-850 p-4"
+                  className="clay-card flex items-center gap-4 rounded-xl p-4 transition-transform duration-fast ease-out-quart hover:-translate-y-0.5"
                 >
-                  <span className="shrink-0 text-2xl font-bold text-amber-400">{item.step}</span>
+                  <span className="shrink-0 text-2xl font-bold text-peach-500">{item.step}</span>
                   <div>
-                    <h3 className="text-sm font-semibold text-ink-100">{item.title}</h3>
-                    <p className="text-xs text-ink-300">{item.desc}</p>
+                    <h3 className="text-sm font-semibold text-clay-800">{item.title}</h3>
+                    <p className="text-xs text-clay-600">{item.desc}</p>
                   </div>
                 </div>
               ))}

@@ -1,7 +1,7 @@
 // tailwind.config.ts
 // Source of truth: 04-design-system.md §13. Do not hand-edit token values here —
 // amend 04-design-system.md first, then mirror the change into this file.
-import type { Config } from 'tailwindcss'
+import type { Config } from 'tailwindcss';
 
 const config: Config = {
   content: ['./src/**/*.{ts,tsx}'],
@@ -9,31 +9,90 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        clay: {
+          50: '#FFFCF5',
+          100: '#FFF5E1',
+          200: '#FBEBD3',
+          300: '#F3DDBF',
+          400: '#E3C39C',
+          500: '#C9A276',
+          600: '#A9835C',
+          700: '#936B49',
+          800: '#6E5138',
+          900: '#4A3320',
+          950: '#382718',
+        },
+        peach: {
+          50: '#FFF3E8',
+          100: '#FFE9D4',
+          200: '#FECFAD',
+          300: '#F8C09A',
+          400: '#F5B07E',
+          500: '#E89455',
+          600: '#D97F3E',
+          700: '#B8652C',
+          800: '#8F4E20',
+          900: '#6B3A18',
+        },
+        coral: {
+          50: '#FDF1F2',
+          100: '#FADCDE',
+          200: '#F8C3C6',
+          300: '#F3A3A8',
+          400: '#F08A91',
+          500: '#EB737B',
+          600: '#D95560',
+          700: '#B8404B',
+          800: '#8F2E38',
+          900: '#6B222B',
+        },
         ink: {
-          950: '#070B14', 900: '#0D1424', 850: '#111B30',
-          800: '#162038', 700: '#1E2D4E', 600: '#2A3D66',
-          400: '#5A6F99', 300: '#8A9BBF', 200: '#B8C4D9',
-          100: '#DDE3EF', 50: '#F2F5FA',
+          950: '#2C1E12',
+          900: '#382718',
+          850: '#4A3320',
+          800: '#6e5138',
+          700: '#7D5F42',
+          600: '#936B49',
+          400: '#C9A276',
+          300: '#E3C39C',
+          200: '#F3DDBF',
+          100: '#FBEBD3',
+          50: '#FFF5E1',
         },
         amber: {
-          950: '#2A1A00', 900: '#3D2600', 700: '#8A5200',
-          500: '#D4820A', 400: '#F0A020', 300: '#F5B840',
-          200: '#FAD070', 100: '#FDE8A8',
+          950: '#3D2410',
+          900: '#4A3320',
+          700: '#B8652C',
+          500: '#D97F3E',
+          400: '#F5B07E',
+          300: '#F8C09A',
+          200: '#FECFAD',
+          100: '#FFE9D4',
         },
         jade: {
-          900: '#052213', 700: '#0A5C30', 500: '#16A257',
-          400: '#22C76E', 200: '#86EBB4',
+          900: '#052213',
+          700: '#0A5C30',
+          500: '#16A257',
+          400: '#22C76E',
+          200: '#86EBB4',
         },
         crimson: {
-          900: '#220408', 700: '#6B0A18', 500: '#C41230',
-          400: '#E8203C', 200: '#F8A0AB',
+          900: '#220408',
+          700: '#6B0A18',
+          500: '#C41230',
+          400: '#E8203C',
+          200: '#F8A0AB',
         },
         sapphire: {
-          900: '#050E22', 700: '#0A236B',
-          400: '#2C6EF0', 200: '#9CBCF8',
+          900: '#050E22',
+          700: '#0A236B',
+          400: '#2C6EF0',
+          200: '#9CBCF8',
         },
         topaz: {
-          900: '#1A1000', 400: '#E8A020', 200: '#F8D890',
+          900: '#1A1000',
+          400: '#E8A020',
+          200: '#F8D890',
         },
       },
       fontFamily: {
@@ -55,32 +114,65 @@ const config: Config = {
       },
       spacing: {
         px: '1px',
-        '0.5': '0.125rem', '1': '0.25rem', '1.5': '0.375rem',
-        '2': '0.5rem', '2.5': '0.625rem', '3': '0.75rem',
-        '4': '1rem', '5': '1.25rem', '6': '1.5rem',
-        '8': '2rem', '10': '2.5rem', '12': '3rem',
-        '16': '4rem', '20': '5rem', '24': '6rem',
+        '0.5': '0.125rem',
+        '1': '0.25rem',
+        '1.5': '0.375rem',
+        '2': '0.5rem',
+        '2.5': '0.625rem',
+        '3': '0.75rem',
+        '4': '1rem',
+        '5': '1.25rem',
+        '6': '1.5rem',
+        '8': '2rem',
+        '10': '2.5rem',
+        '12': '3rem',
+        '16': '4rem',
+        '20': '5rem',
+        '24': '6rem',
         '32': '8rem',
       },
       borderRadius: {
-        none: '0', xs: '4px', sm: '6px',
-        md: '8px', lg: '12px', xl: '16px',
-        '2xl': '20px', '3xl': '24px', full: '9999px',
+        none: '0',
+        xs: '4px',
+        sm: '6px',
+        md: '10px',
+        lg: '14px',
+        xl: '18px',
+        '2xl': '24px',
+        '3xl': '32px',
+        full: '9999px',
       },
       boxShadow: {
+        'clay-xs': '0 1px 2px rgba(147,107,73,0.10), inset 0 1px 2px rgba(255,255,255,0.7)',
+        'clay-sm':
+          '0 2px 6px rgba(147,107,73,0.14), 0 1px 2px rgba(147,107,73,0.08), inset 0 2px 4px rgba(255,255,255,0.8)',
+        clay: '0 6px 16px rgba(147,107,73,0.16), 0 2px 4px rgba(147,107,73,0.10), inset 0 3px 6px rgba(255,255,255,0.85), inset 0 -3px 6px rgba(147,107,73,0.08)',
+        'clay-lg':
+          '0 12px 28px rgba(147,107,73,0.20), 0 4px 8px rgba(147,107,73,0.12), inset 0 4px 8px rgba(255,255,255,0.9), inset 0 -4px 8px rgba(147,107,73,0.10)',
+        'clay-press':
+          'inset 0 3px 8px rgba(147,107,73,0.22), inset 0 -1px 2px rgba(255,255,255,0.6)',
+        'clay-brand':
+          '0 6px 16px rgba(245,176,126,0.45), 0 2px 4px rgba(217,127,62,0.25), inset 0 3px 6px rgba(255,255,255,0.6), inset 0 -3px 6px rgba(147,107,73,0.15)',
         xs: '0 1px 2px rgba(7,11,20,0.4)',
         sm: '0 2px 4px rgba(7,11,20,0.5), 0 1px 2px rgba(7,11,20,0.4)',
         md: '0 4px 8px rgba(7,11,20,0.6), 0 2px 4px rgba(7,11,20,0.4)',
         lg: '0 8px 24px rgba(7,11,20,0.7), 0 4px 8px rgba(7,11,20,0.5)',
         xl: '0 16px 40px rgba(7,11,20,0.8), 0 8px 16px rgba(7,11,20,0.6)',
-        'brand-glow': '0 0 0 1px rgba(240,160,32,0.15), 0 4px 16px rgba(240,160,32,0.25), 0 8px 32px rgba(240,160,32,0.12)',
-        'brand-glow-hover': '0 0 0 1px rgba(240,160,32,0.25), 0 4px 20px rgba(240,160,32,0.40), 0 12px 40px rgba(240,160,32,0.20)',
-        'code-glow': '0 0 0 1px rgba(240,160,32,0.20), 0 2px 12px rgba(240,160,32,0.15), inset 0 1px 0 rgba(240,160,32,0.10)',
-        'focus-ring': '0 0 0 2px var(--bg-base), 0 0 0 4px rgba(240,160,32,0.60)',
+        'brand-glow':
+          '0 0 0 1px rgba(245,176,126,0.25), 0 4px 16px rgba(245,176,126,0.40), 0 8px 32px rgba(245,176,126,0.20)',
+        'brand-glow-hover':
+          '0 0 0 1px rgba(245,176,126,0.35), 0 4px 20px rgba(245,176,126,0.55), 0 12px 40px rgba(245,176,126,0.30)',
+        'code-glow':
+          '0 0 0 1px rgba(245,176,126,0.30), 0 2px 12px rgba(245,176,126,0.25), inset 0 1px 0 rgba(255,255,255,0.5)',
+        'focus-ring': '0 0 0 2px var(--bg-base), 0 0 0 4px rgba(232,148,85,0.65)',
       },
       transitionDuration: {
-        instant: '80ms', fast: '150ms', default: '200ms',
-        moderate: '300ms', slow: '400ms', deliberate: '600ms',
+        instant: '80ms',
+        fast: '150ms',
+        default: '200ms',
+        moderate: '300ms',
+        slow: '400ms',
+        deliberate: '600ms',
       },
       transitionTimingFunction: {
         'out-quart': 'cubic-bezier(0.25, 1, 0.5, 1)',
@@ -88,14 +180,19 @@ const config: Config = {
         spring: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
       },
       screens: {
-        xs: '320px', sm: '480px', md: '768px',
-        lg: '1024px', xl: '1280px', '2xl': '1536px',
+        xs: '320px',
+        sm: '480px',
+        md: '768px',
+        lg: '1024px',
+        xl: '1280px',
+        '2xl': '1536px',
       },
       maxWidth: {
         content: '1280px',
         prose: '680px',
       },
       animation: {
+        float: 'float 6s ease-in-out infinite',
         'glow-pulse': 'glow-pulse 3s cubic-bezier(0.4,0,0.2,1) infinite',
         shimmer: 'shimmer 1.5s linear infinite',
         'page-enter': 'page-enter 300ms cubic-bezier(0.25,1,0.5,1)',
@@ -104,9 +201,19 @@ const config: Config = {
         'copy-bounce': 'copy-bounce 300ms cubic-bezier(0.34,1.56,0.64,1)',
       },
       keyframes: {
+        float: {
+          '0%, 100%': { transform: 'translateY(0) rotate(2deg)' },
+          '50%': { transform: 'translateY(-8px) rotate(2deg)' },
+        },
         'glow-pulse': {
-          '0%, 100%': { boxShadow: '0 0 0 1px rgba(240,160,32,0.15), 0 4px 16px rgba(240,160,32,0.25), 0 8px 32px rgba(240,160,32,0.12)' },
-          '50%': { boxShadow: '0 0 0 1px rgba(240,160,32,0.25), 0 4px 20px rgba(240,160,32,0.40), 0 12px 40px rgba(240,160,32,0.20)' },
+          '0%, 100%': {
+            boxShadow:
+              '0 0 0 1px rgba(240,160,32,0.15), 0 4px 16px rgba(240,160,32,0.25), 0 8px 32px rgba(240,160,32,0.12)',
+          },
+          '50%': {
+            boxShadow:
+              '0 0 0 1px rgba(240,160,32,0.25), 0 4px 20px rgba(240,160,32,0.40), 0 12px 40px rgba(240,160,32,0.20)',
+          },
         },
         shimmer: {
           '0%': { backgroundPosition: '-400px 0' },
@@ -134,6 +241,6 @@ const config: Config = {
     },
   },
   plugins: [],
-}
+};
 
-export default config
+export default config;

@@ -36,20 +36,20 @@ const LEGAL_LINKS = [
 /** 05-components.md §1.4 — 4-col desktop, accordion-shaped stack on mobile (accordion interaction deferred to M2 content pass). */
 export function Footer(): React.JSX.Element {
   return (
-    <footer className="border-t border-ink-700 bg-ink-900 py-16 relative z-50">
+    <footer className="relative z-50 border-t border-clay-200 bg-clay-50 py-16">
       <div className="mx-auto max-w-content px-4 md:px-8">
         <div className="grid grid-cols-1 gap-10 md:grid-cols-4">
           <div>
             <Logo />
-            <p className="mt-3 text-sm text-ink-300">ซื้อง่าย จ่ายเร็ว ได้โค้ดทันที</p>
+            <p className="mt-3 text-sm text-clay-600">ซื้อง่าย จ่ายเร็ว ได้โค้ดทันที</p>
           </div>
           {FOOTER_COLUMNS.map((col) => (
             <div key={col.title}>
-              <h3 className="mb-3 text-sm font-semibold text-ink-100">{col.title}</h3>
+              <h3 className="mb-3 text-sm font-semibold text-clay-900">{col.title}</h3>
               <ul className="flex flex-col gap-2">
                 {col.links.map((link) => (
                   <li key={link.href}>
-                    <a href={link.href} className="text-sm text-ink-300 hover:text-amber-300">
+                    <a href={link.href} className="text-sm text-clay-600 hover:text-peach-600">
                       {link.label}
                     </a>
                   </li>
@@ -59,11 +59,11 @@ export function Footer(): React.JSX.Element {
           ))}
         </div>
 
-        <div className="mt-12 flex flex-col items-center gap-3 border-t border-ink-700 pt-6 text-xs text-ink-400 md:flex-row md:justify-between">
+        <div className="mt-12 flex flex-col items-center gap-3 border-t border-clay-200 pt-6 text-xs text-clay-500 md:flex-row md:justify-between">
           <p>© {new Date().getFullYear()} Nong-Kati</p>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
             {LEGAL_LINKS.map((link) => (
-              <a key={link.href} href={link.href} className="hover:text-ink-200">
+              <a key={link.href} href={link.href} className="hover:text-clay-700">
                 {link.label}
               </a>
             ))}
