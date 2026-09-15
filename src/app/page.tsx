@@ -21,11 +21,9 @@ import { MobileBottomNav } from '@/components/home/MobileBottomNav';
 import { LINEChatButton } from '@/components/home/LINEChatButton';
 import { ScrollToTop } from '@/components/home/ScrollToTop';
 import { ScrollReveal } from '@/components/home/ScrollReveal';
+import { DeliveredCodeCard } from '@/components/home/DeliveredCodeCard';
 
-import {
-  getCategoriesWithProductCounts,
-  getFeaturedProducts,
-} from '@/lib/data';
+import { getCategoriesWithProductCounts, getFeaturedProducts } from '@/lib/data';
 
 export const metadata: Metadata = {
   title: 'ซื้อบัตรเกม Netflix Steam และอีคอมเมิร์ซ — Nong-Kati',
@@ -46,7 +44,10 @@ export default async function HomePage(): Promise<React.JSX.Element> {
     categories = await getCategoriesWithProductCounts();
     featuredProducts = await getFeaturedProducts();
   } catch (e) {
-    console.error('[HomePage] Database unavailable, rendering with empty data:', e instanceof Error ? e.message : e);
+    console.error(
+      '[HomePage] Database unavailable, rendering with empty data:',
+      e instanceof Error ? e.message : e,
+    );
   }
 
   return (
@@ -67,31 +68,32 @@ export default async function HomePage(): Promise<React.JSX.Element> {
       <MarqueeTicker />
 
       <FacebookLayout>
-        {/* Hero Section */}
+        {/* Hero — asymmetric: oversized serif headline left, delivered-code card right */}
         <section className="border-b border-ink-700 bg-ink-900/50">
-          <div className="px-4 py-10 text-center md:px-8 md:py-16">
-            <ScrollReveal>
-              <h1 className="font-display text-2xl font-bold text-fg-brand-strong md:text-4xl">
-                ซื้อบัตรเกม สตรีมมิ่ง และอีคอมเมิร์ซ
-              </h1>
-              <p className="mx-auto mt-3 max-w-prose text-ink-300">
-                ส่งโค้ดทันทีภายใน 60 วินาที ชำระผ่าน PromptPay หรือบัตรเครดิต
-              </p>
-              <div className="mt-6 flex justify-center gap-3">
-                <Link
-                  href="/search?q="
-                  className="inline-flex items-center justify-center gap-2 rounded-full bg-amber-400 px-6 py-2.5 text-sm font-semibold text-ink-900 hover:bg-amber-300 transition-colors active:scale-95"
-                >
-                  เลือกซื้อสินค้า
-                </Link>
-                <Link
-                  href="/search?q="
-                  className="inline-flex items-center justify-center gap-2 rounded-full border border-ink-600 px-6 py-2.5 text-sm font-semibold text-ink-200 hover:bg-ink-800 transition-colors active:scale-95"
-                >
-                  ค้นหาสินค้า
-                </Link>
-              </div>
-            </ScrollReveal>
+          <div className="grid items-center gap-10 px-4 py-12 md:grid-cols-[1.2fr_1fr] md:px-8 md:py-20 lg:gap-16">
+            <div>
+              <ScrollReveal>
+                <h1 className="text-fg-brand-strong font-display text-4xl font-bold leading-[1.15] sm:text-5xl lg:text-6xl">
+                  โค้ดเกม สตรีมมิ่ง
+                  <br />
+                  และอีคอมเมิร์ซ
+                  <br />
+                  <span className="text-amber-400">ส่งถึงอีเมลใน 60 วินาที</span>
+                </h1>
+                <p className="mt-5 max-w-md text-base leading-relaxed text-ink-300">
+                  จ่ายผ่าน PromptPay หรือบัตรเครดิต รหัสสินค้าถูกส่งอัตโนมัติ ไม่ต้องรอแอดมิน
+                </p>
+                <div className="mt-8">
+                  <Link
+                    href="/search"
+                    className="inline-flex items-center justify-center rounded-full bg-amber-400 px-8 py-3 text-sm font-semibold text-ink-900 transition-colors hover:bg-amber-300 active:scale-95"
+                  >
+                    เลือกซื้อสินค้า
+                  </Link>
+                </div>
+              </ScrollReveal>
+            </div>
+            <DeliveredCodeCard />
           </div>
         </section>
 
@@ -101,10 +103,8 @@ export default async function HomePage(): Promise<React.JSX.Element> {
         {/* Categories Section */}
         <ScrollReveal>
           <section className="border-b border-ink-700 bg-ink-900/30 px-4 py-6 md:px-8">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-ink-100">
-                หมวดหมู่สินค้า
-              </h2>
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-ink-100">หมวดหมู่สินค้า</h2>
               <Link href="/search" className="text-sm text-amber-400 hover:text-amber-300">
                 ดูทั้งหมด
               </Link>
@@ -128,10 +128,8 @@ export default async function HomePage(): Promise<React.JSX.Element> {
         {featuredProducts.length > 0 && (
           <ScrollReveal>
             <section className="border-b border-ink-700 bg-ink-900/50 px-4 py-6 md:px-8">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold text-ink-100">
-                  สินค้าแนะนำ
-                </h2>
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-lg font-bold text-ink-100">สินค้าแนะนำ</h2>
                 <Link href="/search?q=" className="text-sm text-amber-400 hover:text-amber-300">
                   ดูทั้งหมด →
                 </Link>
@@ -159,9 +157,7 @@ export default async function HomePage(): Promise<React.JSX.Element> {
         {/* How It Works Section */}
         <ScrollReveal>
           <section className="bg-ink-900/30 px-4 py-8 md:px-8">
-            <h2 className="mb-6 text-center text-lg font-bold text-ink-100">
-              วิธีการซื้อ
-            </h2>
+            <h2 className="mb-6 text-center text-lg font-bold text-ink-100">วิธีการซื้อ</h2>
             <div className="grid gap-4 md:grid-cols-3">
               {[
                 { step: '01', title: 'เลือกสินค้า', desc: 'เลือกประเภทบัตรและราคาที่ต้องการ' },
