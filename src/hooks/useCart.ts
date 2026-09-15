@@ -24,6 +24,33 @@ import {
  * instances.
  */
 const CART_UPDATED_EVENT = 'nk-cart-updated';
+const CART_STORAGE_KEY = 'nk_cart:v2';
+const LEGACY_CART_KEY = 'nk_cart';
+
+/** Read the stored cart (v2, migrating the legacy key once). Null when absent/corrupt/foreign-session. */
+function readStoredCart(sessionKey: string): CartState | null {
+  try {
+    let json = localStorage.getItem(CART_STORAGE_KEY);
+    if (!json) json = localStorage.getItem(LEGACY_CART_KEY);
+    if (!json) return null;
+    const parsed = JSON.parse(json) as CartState;
+    if (parsed.sessionKey !== sessionKey) return null;
+    // Summary is derived data — recompute instead of trusting stored values
+    return { ...parsed, summary: calculateCartSummary(parsed.items) };
+  } catch {
+    return null;
+  }
+}
+
+/** Persist the cart. No-ops where writes throw (Safari private mode, quota exceeded). */
+function writeStoredCart(cart: CartState): void {
+  try {
+    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+    localStorage.removeItem(LEGACY_CART_KEY);
+  } catch {
+    // Cart stays in memory only for this session
+  }
+}
 
 export function useCart() {
   const [cart, setCart] = useState<CartState | null>(null);
@@ -33,18 +60,11 @@ export function useCart() {
   // Hydrate from localStorage on mount
   useEffect(() => {
     const sessionKey = getSessionKey();
-    const stored = localStorage.getItem('nk_cart');
+    const stored = readStoredCart(sessionKey);
     if (stored) {
-      try {
-        const parsed = JSON.parse(stored) as CartState;
-        if (parsed.sessionKey === sessionKey) {
-          setCart(parsed);
-          setIsLoaded(true);
-          return;
-        }
-      } catch {
-        // Corrupted data — start fresh
-      }
+      setCart(stored);
+      setIsLoaded(true);
+      return;
     }
     setCart(getEmptyCart());
     setIsLoaded(true);
@@ -56,7 +76,7 @@ export function useCart() {
       const json = JSON.stringify(cart);
       if (json !== lastWrittenJsonRef.current) {
         lastWrittenJsonRef.current = json;
-        localStorage.setItem('nk_cart', json);
+        writeStoredCart(cart);
         window.dispatchEvent(new CustomEvent(CART_UPDATED_EVENT));
       }
     }
@@ -65,17 +85,11 @@ export function useCart() {
   // Sync when another instance (same tab) or another tab updates the cart
   useEffect(() => {
     const syncFromStorage = () => {
-      const stored = localStorage.getItem('nk_cart');
+      const stored = localStorage.getItem(CART_STORAGE_KEY);
       if (!stored || stored === lastWrittenJsonRef.current) return;
       lastWrittenJsonRef.current = stored;
-      try {
-        const parsed = JSON.parse(stored) as CartState;
-        if (parsed.sessionKey === getSessionKey()) {
-          setCart(parsed);
-        }
-      } catch {
-        // Corrupted data — keep current state
-      }
+      const parsed = readStoredCart(getSessionKey());
+      if (parsed) setCart(parsed);
     };
 
     window.addEventListener(CART_UPDATED_EVENT, syncFromStorage);

@@ -113,7 +113,7 @@ export function NotificationsDropdown(): React.JSX.Element {
           </div>
 
           {/* Items */}
-          <ul className="max-h-80 overflow-y-auto">
+          <ul className="max-h-80 overflow-y-auto overscroll-contain">
             {notifications.map((n) => {
               const Icon = n.icon === 'order' ? Package : Tag;
               return (

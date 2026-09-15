@@ -67,7 +67,7 @@ export function FacebookNavbar({ isAuthenticated = false, customerName, onMenuTo
           {/* Search bar */}
           <form onSubmit={handleSearch} className="hidden md:block">
             <div className={cn(
-              'flex items-center gap-2 rounded-full border px-3 py-2 transition-all',
+              'flex items-center gap-2 rounded-full border px-3 py-2 transition-colors',
               searchFocused
                 ? 'border-amber-500 bg-ink-800'
                 : 'border-ink-700 bg-ink-800'
@@ -75,7 +75,8 @@ export function FacebookNavbar({ isAuthenticated = false, customerName, onMenuTo
               <Search size={16} className="text-ink-400" />
               <input
                 type="text"
-                placeholder="ค้นหาสินค้า..."
+                aria-label="ค้นหาสินค้า"
+                placeholder="ค้นหาสินค้า…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onFocus={() => setSearchFocused(true)}
@@ -103,6 +104,7 @@ export function FacebookNavbar({ isAuthenticated = false, customerName, onMenuTo
                     : 'text-ink-400 hover:bg-ink-800 hover:text-ink-200'
                 )}
                 title={item.label}
+                aria-label={item.label}
               >
                 <Icon size={22} strokeWidth={isActive ? 2.5 : 1.5} />
                 {isActive && (
@@ -134,6 +136,8 @@ export function FacebookNavbar({ isAuthenticated = false, customerName, onMenuTo
           {/* Profile */}
           <Link
             href={isAuthenticated ? '/account/dashboard' : '/account/login'}
+            aria-label={isAuthenticated ? 'บัญชีของฉัน' : 'เข้าสู่ระบบ'}
+            title={isAuthenticated ? 'บัญชีของฉัน' : 'เข้าสู่ระบบ'}
             className="flex h-10 w-10 items-center justify-center rounded-full text-ink-300 hover:bg-ink-800 hover:text-amber-300"
           >
             <User size={20} />
