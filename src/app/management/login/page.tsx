@@ -27,119 +27,136 @@ export default function AdminLoginPage(): React.JSX.Element {
   } | null>(null);
 
   // Step 1: Login with credentials
-  const handleCredentialsSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
+  const handleCredentialsSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      setLoading(true);
+      setError(null);
 
-    try {
-      const result = adminLogin(email, password);
+      try {
+        const result = adminLogin(email, password);
 
-      if (!result.success) {
-        setError(result.error === 'INVALID_CREDENTIALS'
-          ? 'อีเมลหรือรหัสผ่านไม่ถูกต้อง'
-          : result.error === 'ACCOUNT_LOCKED'
-            ? `บัญชีถูกล็อค กรุณาลองใหม่ใน ${Math.ceil((result.retryAfter ?? 1800) / 60)} นาที`
-            : 'เกิดข้อผิดพลาด');
-        return;
-      }
-
-      setChallengeToken(result.challengeToken ?? '');
-
-      if (result.requires2faSetup) {
-        // First login — setup 2FA
-        const setup = setup2fa(result.challengeToken ?? '');
-        if (setup.success) {
-          setSetupData({
-            totpUri: setup.totpUri ?? '',
-            secretBase32: setup.secretBase32 ?? '',
-            backupCodes: setup.backupCodes ?? [],
-          });
-          setStep('2fa-setup');
+        if (!result.success) {
+          setError(
+            result.error === 'INVALID_CREDENTIALS'
+              ? 'อีเมลหรือรหัสผ่านไม่ถูกต้อง'
+              : result.error === 'ACCOUNT_LOCKED'
+                ? `บัญชีถูกล็อค กรุณาลองใหม่ใน ${Math.ceil((result.retryAfter ?? 1800) / 60)} นาที`
+                : 'เกิดข้อผิดพลาด',
+          );
+          return;
         }
-      } else {
-        setStep('2fa');
+
+        setChallengeToken(result.challengeToken ?? '');
+
+        if (result.requires2faSetup) {
+          // First login — setup 2FA
+          const setup = setup2fa(result.challengeToken ?? '');
+          if (setup.success) {
+            setSetupData({
+              totpUri: setup.totpUri ?? '',
+              secretBase32: setup.secretBase32 ?? '',
+              backupCodes: setup.backupCodes ?? [],
+            });
+            setStep('2fa-setup');
+          }
+        } else {
+          setStep('2fa');
+        }
+      } catch {
+        setError('เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
+      } finally {
+        setLoading(false);
       }
-    } catch {
-      setError('เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
-    } finally {
-      setLoading(false);
-    }
-  }, [email, password]);
+    },
+    [email, password],
+  );
 
   // Step 2: Verify TOTP
-  const handleTotpSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
+  const handleTotpSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      setLoading(true);
+      setError(null);
 
-    try {
-      const result = await confirm2fa(challengeToken, totpCode);
-      if (result.success) {
-        // Store tokens in localStorage
-        if (result.accessToken) {
-          localStorage.setItem('nk_admin_access_token', result.accessToken);
+      try {
+        const result = await confirm2fa(challengeToken, totpCode);
+        if (result.success) {
+          // Store tokens in localStorage
+          if (result.accessToken) {
+            localStorage.setItem('nk_admin_access_token', result.accessToken);
+          }
+          if (result.refreshToken) {
+            localStorage.setItem('nk_admin_refresh_token', result.refreshToken);
+          }
+          localStorage.setItem('nk_admin_email', email);
+          // Redirect to dashboard
+          router.push('/management/dashboard');
+        } else {
+          setError(
+            result.error === 'TOTP_INVALID' ? 'รหัสไม่ถูกต้อง กรุณาลองใหม่' : 'เกิดข้อผิดพลาด',
+          );
         }
-        if (result.refreshToken) {
-          localStorage.setItem('nk_admin_refresh_token', result.refreshToken);
-        }
-        localStorage.setItem('nk_admin_email', email);
-        // Redirect to dashboard
-        router.push('/management/dashboard');
-      } else {
-        setError(result.error === 'TOTP_INVALID' ? 'รหัสไม่ถูกต้อง กรุณาลองใหม่' : 'เกิดข้อผิดพลาด');
+      } catch {
+        setError('เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
+      } finally {
+        setLoading(false);
       }
-    } catch {
-      setError('เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
-    } finally {
-      setLoading(false);
-    }
-  }, [challengeToken, totpCode]);
+    },
+    [challengeToken, totpCode],
+  );
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-ink-950 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-clay-50 p-4">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-amber-900/30">
-            <Shield size={28} className="text-amber-400" />
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-peach-100">
+            <Shield size={28} className="text-peach-600" />
           </div>
-          <h1 className="text-2xl font-bold text-ink-100">Nong-Kati Admin</h1>
-          <p className="text-sm text-ink-400">ระบบจัดการหลังบ้าน</p>
+          <h1 className="text-2xl font-bold text-clay-900">Nong-Kati Admin</h1>
+          <p className="text-sm text-clay-500">ระบบจัดการหลังบ้าน</p>
         </div>
 
         {/* Step 1: Credentials */}
         {step === 'credentials' && (
-          <form onSubmit={handleCredentialsSubmit} className="space-y-4 rounded-md border border-ink-700 bg-ink-850 p-6">
-            <h2 className="text-lg font-semibold text-ink-100">เข้าสู่ระบบ</h2>
+          <form
+            onSubmit={handleCredentialsSubmit}
+            className="space-y-4 rounded-md border border-clay-200 bg-white p-6"
+          >
+            <h2 className="text-lg font-semibold text-clay-900">เข้าสู่ระบบ</h2>
 
             {error && (
-              <div className="rounded-md border border-crimson-700/50 bg-crimson-900/20 px-3 py-2 text-sm text-crimson-200">
+              <div className="rounded-md border border-coral-300 bg-coral-50 px-3 py-2 text-sm text-coral-700">
                 {error}
               </div>
             )}
 
             <div>
-              <label htmlFor="admin-email" className="mb-1 block text-sm text-ink-300">อีเมล</label>
+              <label htmlFor="admin-email" className="mb-1 block text-sm text-clay-600">
+                อีเมล
+              </label>
               <input
                 id="admin-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full rounded-md border border-ink-600 bg-ink-800 px-3 py-2.5 text-sm text-ink-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                className="w-full rounded-md border border-clay-300 bg-clay-100 px-3 py-2.5 text-sm text-clay-900 focus:outline-none focus:ring-2 focus:ring-peach-500"
               />
             </div>
 
             <div>
-              <label htmlFor="admin-password" className="mb-1 block text-sm text-ink-300">รหัสผ่าน</label>
+              <label htmlFor="admin-password" className="mb-1 block text-sm text-clay-600">
+                รหัสผ่าน
+              </label>
               <input
                 id="admin-password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full rounded-md border border-ink-600 bg-ink-800 px-3 py-2.5 text-sm text-ink-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                className="w-full rounded-md border border-clay-300 bg-clay-100 px-3 py-2.5 text-sm text-clay-900 focus:outline-none focus:ring-2 focus:ring-peach-500"
               />
             </div>
 
@@ -148,7 +165,9 @@ export default function AdminLoginPage(): React.JSX.Element {
               disabled={loading}
               className={cn(
                 'w-full rounded-md px-5 py-2.5 text-sm font-semibold transition-colors',
-                loading ? 'bg-ink-700 text-ink-400' : 'bg-amber-400 text-ink-900 hover:bg-amber-300',
+                loading
+                  ? 'bg-clay-300 text-clay-500'
+                  : 'bg-peach-500 text-white shadow-clay-sm hover:bg-peach-400',
               )}
             >
               {loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
@@ -158,28 +177,35 @@ export default function AdminLoginPage(): React.JSX.Element {
 
         {/* Step 2: 2FA Setup */}
         {step === '2fa-setup' && setupData && (
-          <div className="space-y-4 rounded-md border border-ink-700 bg-ink-850 p-6">
-            <h2 className="text-lg font-semibold text-ink-100">ตั้งค่า 2FA</h2>
-            <p className="text-sm text-ink-400">
+          <div className="space-y-4 rounded-md border border-clay-200 bg-white p-6">
+            <h2 className="text-lg font-semibold text-clay-900">ตั้งค่า 2FA</h2>
+            <p className="text-sm text-clay-500">
               สแกน QR Code ด้วย Google Authenticator หรือ Authy
             </p>
 
             <div className="flex justify-center">
               <div className="rounded-md bg-white p-4">
-                <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(setupData.totpUri)}`} alt="QR Code" width={200} height={200} />
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(setupData.totpUri)}`}
+                  alt="QR Code"
+                  width={200}
+                  height={200}
+                />
               </div>
             </div>
 
-            <div className="rounded-md bg-ink-800 p-3 text-center">
-              <p className="text-xs text-ink-400">รหัสลับ (เก็บไว้ปลอดภัย)</p>
-              <p className="font-mono text-sm font-bold text-amber-300">{setupData.secretBase32}</p>
+            <div className="rounded-md bg-clay-100 p-3 text-center">
+              <p className="text-xs text-clay-500">รหัสลับ (เก็บไว้ปลอดภัย)</p>
+              <p className="font-mono text-sm font-bold text-peach-600">{setupData.secretBase32}</p>
             </div>
 
-            <div className="rounded-md bg-ink-800 p-3">
-              <p className="mb-2 text-xs text-ink-400">รหัสสำรอง (ใช้เมื่อสูญหาย)</p>
+            <div className="rounded-md bg-clay-100 p-3">
+              <p className="mb-2 text-xs text-clay-500">รหัสสำรอง (ใช้เมื่อสูญหาย)</p>
               <div className="grid grid-cols-2 gap-1">
                 {setupData.backupCodes.map((code) => (
-                  <p key={code} className="font-mono text-xs text-ink-300">{code}</p>
+                  <p key={code} className="font-mono text-xs text-clay-600">
+                    {code}
+                  </p>
                 ))}
               </div>
             </div>
@@ -191,13 +217,13 @@ export default function AdminLoginPage(): React.JSX.Element {
                 onChange={(e) => setTotpCode(e.target.value)}
                 placeholder="กรอกรหัส 6 หลัก"
                 maxLength={6}
-                className="w-full rounded-md border border-ink-600 bg-ink-800 px-3 py-2.5 text-center font-mono text-lg tracking-widest text-ink-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                className="w-full rounded-md border border-clay-300 bg-clay-100 px-3 py-2.5 text-center font-mono text-lg tracking-widest text-clay-900 focus:outline-none focus:ring-2 focus:ring-peach-500"
               />
-              {error && <p className="text-sm text-crimson-400">{error}</p>}
+              {error && <p className="text-sm text-coral-600">{error}</p>}
               <button
                 type="submit"
                 disabled={loading || totpCode.length !== 6}
-                className="w-full rounded-md bg-amber-400 px-5 py-2.5 text-sm font-semibold text-ink-900 hover:bg-amber-300 disabled:opacity-50"
+                className="w-full rounded-md bg-peach-500 px-5 py-2.5 text-sm font-semibold text-clay-900 hover:bg-peach-400 disabled:opacity-50"
               >
                 {loading ? 'กำลังยืนยัน...' : 'ยืนยัน'}
               </button>
@@ -207,14 +233,15 @@ export default function AdminLoginPage(): React.JSX.Element {
 
         {/* Step 3: TOTP Verification */}
         {step === '2fa' && (
-          <form onSubmit={handleTotpSubmit} className="space-y-4 rounded-md border border-ink-700 bg-ink-850 p-6">
-            <h2 className="text-lg font-semibold text-ink-100">ยืนยันตัวตน</h2>
-            <p className="text-sm text-ink-400">
-              กรอกรหัส 6 หลักจาก Authenticator App
-            </p>
+          <form
+            onSubmit={handleTotpSubmit}
+            className="space-y-4 rounded-md border border-clay-200 bg-white p-6"
+          >
+            <h2 className="text-lg font-semibold text-clay-900">ยืนยันตัวตน</h2>
+            <p className="text-sm text-clay-500">กรอกรหัส 6 หลักจาก Authenticator App</p>
 
             {error && (
-              <div className="rounded-md border border-crimson-700/50 bg-crimson-900/20 px-3 py-2 text-sm text-crimson-200">
+              <div className="rounded-md border border-coral-300 bg-coral-50 px-3 py-2 text-sm text-coral-700">
                 {error}
               </div>
             )}
@@ -226,7 +253,7 @@ export default function AdminLoginPage(): React.JSX.Element {
               placeholder="กรอกรหัส 6 หลัก"
               maxLength={6}
               autoFocus
-              className="w-full rounded-md border border-ink-600 bg-ink-800 px-3 py-2.5 text-center font-mono text-lg tracking-widest text-ink-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
+              className="w-full rounded-md border border-clay-300 bg-clay-100 px-3 py-2.5 text-center font-mono text-lg tracking-widest text-clay-900 focus:outline-none focus:ring-2 focus:ring-peach-500"
             />
 
             <button
@@ -234,14 +261,16 @@ export default function AdminLoginPage(): React.JSX.Element {
               disabled={loading || totpCode.length !== 6}
               className={cn(
                 'w-full rounded-md px-5 py-2.5 text-sm font-semibold transition-colors',
-                loading ? 'bg-ink-700 text-ink-400' : 'bg-amber-400 text-ink-900 hover:bg-amber-300',
+                loading
+                  ? 'bg-clay-300 text-clay-500'
+                  : 'bg-peach-500 text-white shadow-clay-sm hover:bg-peach-400',
               )}
             >
               {loading ? 'กำลังยืนยัน...' : 'ยืนยัน'}
             </button>
 
-            <p className="text-center text-xs text-ink-400">
-              รหัสสำหรับทดสอบ: <span className="font-mono text-amber-300">123456</span>
+            <p className="text-center text-xs text-clay-500">
+              รหัสสำหรับทดสอบ: <span className="font-mono text-peach-600">123456</span>
             </p>
           </form>
         )}
