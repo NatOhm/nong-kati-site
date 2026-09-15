@@ -18,11 +18,11 @@ export function MobileBottomNav() {
   const { itemCount } = useCart();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-ink-700 bg-ink-900/95 backdrop-blur-md lg:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-clay-200 bg-clay-50/95 backdrop-blur-md lg:hidden">
       <div className="flex items-center justify-around px-2 py-1">
         {NAV_ITEMS.map((item) => {
-          const isActive = pathname === item.href || 
-            (item.href !== '/' && pathname?.startsWith(item.href));
+          const isActive =
+            pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href));
           const Icon = item.icon;
           const isCart = item.label === 'ตะกร้า';
 
@@ -31,10 +31,8 @@ export function MobileBottomNav() {
               key={item.href}
               href={item.href}
               className={cn(
-                'flex flex-col items-center gap-0.5 rounded-lg px-3 py-2 transition-colors min-w-[60px]',
-                isActive
-                  ? 'text-amber-400'
-                  : 'text-ink-400 hover:text-ink-200'
+                'flex min-w-[60px] flex-col items-center gap-0.5 rounded-lg px-3 py-2 transition-colors',
+                isActive ? 'text-peach-600' : 'text-clay-500 hover:text-clay-800',
               )}
             >
               <div className="relative">

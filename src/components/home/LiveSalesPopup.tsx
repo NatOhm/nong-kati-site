@@ -52,36 +52,34 @@ export function LiveSalesPopup() {
       className={cn(
         'fixed bottom-4 left-4 z-50 max-w-[320px] transition-all duration-500',
         'sm:bottom-6 sm:left-6',
-        isVisible
-          ? 'translate-y-0 opacity-100'
-          : 'translate-y-4 opacity-0 pointer-events-none'
+        isVisible ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-4 opacity-0',
       )}
     >
-      <div className="flex items-center gap-3 rounded-xl border border-ink-700 bg-ink-900/95 p-3 shadow-xl backdrop-blur-md">
+      <div className="flex items-center gap-3 rounded-xl border border-clay-200 bg-clay-50/95 p-3 shadow-clay-lg backdrop-blur-md">
         {/* Icon */}
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-green-900/50">
           <ShoppingCart size={18} className="text-green-400" />
         </div>
 
         {/* Content */}
-        <div className="flex-1 min-w-0">
-          <p className="text-xs text-green-400 font-medium">🛒 ยอดขายล่าสุด</p>
-          <p className="text-sm text-ink-100 truncate">
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-medium text-green-400">🛒 ยอดขายล่าสุด</p>
+          <p className="truncate text-sm text-clay-900">
             <span className="font-medium">{sale.name}</span> ซื้อ{' '}
-            <span className="text-amber-300">{sale.product}</span>
+            <span className="text-peach-600">{sale.product}</span>
           </p>
-          <p className="text-xs text-ink-500">{sale.time}</p>
+          <p className="text-xs text-clay-400">{sale.time}</p>
         </div>
 
         {/* Price */}
         <div className="shrink-0 text-right">
-          <p className="text-sm font-bold text-amber-300">฿{sale.price}</p>
+          <p className="text-sm font-bold text-peach-600">฿{sale.price}</p>
         </div>
 
         {/* Close */}
         <button
           onClick={() => setIsDismissed(true)}
-          className="shrink-0 rounded-full p-1 text-ink-500 hover:bg-ink-800 hover:text-ink-300"
+          className="shrink-0 rounded-full p-1 text-clay-400 hover:bg-clay-100 hover:text-clay-600"
         >
           <X size={14} />
         </button>

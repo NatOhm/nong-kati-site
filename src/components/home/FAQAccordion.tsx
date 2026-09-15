@@ -35,25 +35,25 @@ function FAQItem({ q, a }: { q: string; a: string }) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div className="border-b border-ink-700 last:border-b-0">
+    <div className="border-b border-clay-200 last:border-b-0">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex w-full items-center justify-between px-4 py-4 text-left hover:bg-ink-800/50 transition-colors"
+        className="flex w-full items-center justify-between px-4 py-4 text-left transition-colors hover:bg-clay-100"
       >
-        <span className="text-sm font-medium text-ink-100 pr-4">{q}</span>
+        <span className="pr-4 text-sm font-medium text-clay-800">{q}</span>
         {isOpen ? (
-          <ChevronUp size={18} className="shrink-0 text-amber-400" />
+          <ChevronUp size={18} className="shrink-0 text-peach-600" />
         ) : (
-          <ChevronDown size={18} className="shrink-0 text-ink-400" />
+          <ChevronDown size={18} className="shrink-0 text-clay-500" />
         )}
       </button>
       <div
         className={cn(
           'overflow-hidden transition-all duration-300',
-          isOpen ? 'max-h-40' : 'max-h-0'
+          isOpen ? 'max-h-40' : 'max-h-0',
         )}
       >
-        <p className="px-4 pb-4 text-sm text-ink-300 leading-relaxed">{a}</p>
+        <p className="px-4 pb-4 text-sm leading-relaxed text-clay-600">{a}</p>
       </div>
     </div>
   );
@@ -61,11 +61,9 @@ function FAQItem({ q, a }: { q: string; a: string }) {
 
 export function FAQAccordion() {
   return (
-    <section className="border-b border-ink-700 bg-ink-900/50 px-4 py-8 md:px-8">
-      <h2 className="mb-6 text-center text-lg font-bold text-ink-100">
-        คำถามที่พบบ่อย
-      </h2>
-      <div className="mx-auto max-w-2xl rounded-lg border border-ink-700 bg-ink-850">
+    <section className="px-4 py-8 md:px-8">
+      <h2 className="mb-6 text-center text-lg font-bold text-clay-900">คำถามที่พบบ่อย</h2>
+      <div className="clay-card mx-auto max-w-2xl rounded-2xl">
         {FAQ_DATA.map((item) => (
           <FAQItem key={item.q} q={item.q} a={item.a} />
         ))}

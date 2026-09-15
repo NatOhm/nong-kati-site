@@ -44,7 +44,7 @@ export function Navbar({
         role="navigation"
         aria-label="เมนูหลัก"
         className={cn(
-          'sticky top-0 z-50 flex h-14 items-center justify-between border-b border-ink-700 bg-ink-900/95 px-4 backdrop-blur-md md:h-16 md:px-8',
+          'sticky top-0 z-50 flex h-14 items-center justify-between border-b border-clay-200 bg-clay-50/95 px-4 backdrop-blur-md md:h-16 md:px-8',
           className,
         )}
       >
@@ -61,7 +61,7 @@ export function Navbar({
               <button
                 key={cat.id}
                 onMouseEnter={() => setMegaMenuOpen(true)}
-                className="text-sm font-medium text-ink-200 transition-colors hover:text-amber-300"
+                className="text-sm font-medium text-clay-700 transition-colors hover:text-peach-600"
               >
                 {cat.name}
               </button>
@@ -116,16 +116,21 @@ export function Navbar({
       />
 
       {/* Mobile Drawer */}
-      <Drawer isOpen={mobileOpen} onClose={() => setMobileOpen(false)} side="left" title="เมนูนำทาง">
+      <Drawer
+        isOpen={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+        side="left"
+        title="เมนูนำทาง"
+      >
         <div className="flex flex-col gap-1">
-          <a href="/" className="rounded-md px-3 py-2.5 text-sm text-ink-200 hover:bg-ink-800">
+          <a href="/" className="rounded-md px-3 py-2.5 text-sm text-clay-700 hover:bg-clay-100">
             หน้าหลัก
           </a>
           {categories.map((cat) => (
             <div key={cat.id}>
               <a
                 href={`/category/${cat.slug}`}
-                className="rounded-md px-3 py-2.5 text-sm font-medium text-ink-200 hover:bg-ink-800"
+                className="rounded-md px-3 py-2.5 text-sm font-medium text-clay-700 hover:bg-clay-100"
               >
                 {cat.icon} {cat.name}
               </a>
@@ -135,7 +140,7 @@ export function Navbar({
                     <a
                       key={child.id}
                       href={`/category/${child.slug}`}
-                      className="block rounded-md px-3 py-1.5 text-xs text-ink-300 hover:bg-ink-800"
+                      className="block rounded-md px-3 py-1.5 text-xs text-clay-600 hover:bg-clay-100"
                     >
                       {child.name}
                     </a>
