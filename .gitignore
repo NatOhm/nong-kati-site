@@ -8,3 +8,6 @@ node_modules/
 
 # TypeScript incremental build artifact
 tsconfig.tsbuildinfo
+
+# Git worktrees
+.worktrees/
