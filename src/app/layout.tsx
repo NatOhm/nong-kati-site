@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { IBM_Plex_Sans_Thai, JetBrains_Mono, Noto_Serif_Thai } from 'next/font/google';
 
 import { ThemeProvider } from '@/providers/ThemeProvider';
+import { CartProvider } from '@/providers/CartProvider';
 import { CookieConsentBanner } from '@/components/pdpa/CookieConsentBanner';
 import { ToastMount } from './ToastMount';
 
@@ -48,7 +49,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }):
     <html lang="th" className={`${ibmPlexSansThai.variable} ${notoSerifThai.variable} ${jetbrainsMono.variable}`}>
       <body className="text-thai font-ui">
         <ThemeProvider defaultTheme="dark">
-          {children}
+          <CartProvider>
+            {children}
+          </CartProvider>
           <ToastMount />
           <CookieConsentBanner />
         </ThemeProvider>
