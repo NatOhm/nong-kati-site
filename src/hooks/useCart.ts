@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 
 import {
   type CartItemData,
@@ -16,10 +16,19 @@ import {
  * Server-side re-validation happens at checkout (POST /orders).
  *
  * 01-prd.md FR-028: Cart persists 24 hours for guest.
+ *
+ * Each useCart() call is an independent instance (navbar, product page, …),
+ * so instances sync through localStorage writes: the writer dispatches a
+ * same-tab 'nk-cart-updated' event and cross-tab writes arrive as 'storage'
+ * events. lastWrittenJsonRef prevents write→event→write echo loops between
+ * instances.
  */
+const CART_UPDATED_EVENT = 'nk-cart-updated';
+
 export function useCart() {
   const [cart, setCart] = useState<CartState | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const lastWrittenJsonRef = useRef<string | null>(null);
 
   // Hydrate from localStorage on mount
   useEffect(() => {
@@ -41,12 +50,41 @@ export function useCart() {
     setIsLoaded(true);
   }, []);
 
-  // Persist to localStorage whenever cart changes
+  // Persist to localStorage whenever cart changes, and notify other instances
   useEffect(() => {
     if (isLoaded && cart) {
-      localStorage.setItem('nk_cart', JSON.stringify(cart));
+      const json = JSON.stringify(cart);
+      if (json !== lastWrittenJsonRef.current) {
+        lastWrittenJsonRef.current = json;
+        localStorage.setItem('nk_cart', json);
+        window.dispatchEvent(new CustomEvent(CART_UPDATED_EVENT));
+      }
     }
   }, [cart, isLoaded]);
+
+  // Sync when another instance (same tab) or another tab updates the cart
+  useEffect(() => {
+    const syncFromStorage = () => {
+      const stored = localStorage.getItem('nk_cart');
+      if (!stored || stored === lastWrittenJsonRef.current) return;
+      lastWrittenJsonRef.current = stored;
+      try {
+        const parsed = JSON.parse(stored) as CartState;
+        if (parsed.sessionKey === getSessionKey()) {
+          setCart(parsed);
+        }
+      } catch {
+        // Corrupted data — keep current state
+      }
+    };
+
+    window.addEventListener(CART_UPDATED_EVENT, syncFromStorage);
+    window.addEventListener('storage', syncFromStorage);
+    return () => {
+      window.removeEventListener(CART_UPDATED_EVENT, syncFromStorage);
+      window.removeEventListener('storage', syncFromStorage);
+    };
+  }, []);
 
   /**
    * Add an item to the cart.

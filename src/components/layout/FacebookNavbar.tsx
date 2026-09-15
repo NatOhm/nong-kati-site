@@ -4,12 +4,14 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  Home, Search, Grid3X3, ShoppingBag, User,
-  Bell, MessageCircle, Menu, X,
+  Home, Search, Grid3X3, User,
+  MessageCircle, Menu,
   Gamepad2, Tv, Music,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { CartIcon } from '@/components/cart/CartIcon';
+import { CartDrawer } from '@/components/cart/CartDrawer';
+import { NotificationsDropdown } from './NotificationsDropdown';
 import { useCart } from '@/hooks/useCart';
 
 interface FacebookNavbarProps {
@@ -28,9 +30,10 @@ const NAV_ITEMS = [
 
 export function FacebookNavbar({ isAuthenticated = false, customerName, onMenuToggle }: FacebookNavbarProps) {
   const pathname = usePathname();
-  const { itemCount } = useCart();
+  const { cart, updateQuantity, removeItem, itemCount } = useCart();
   const [searchFocused, setSearchFocused] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [cartOpen, setCartOpen] = useState(false);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,6 +43,7 @@ export function FacebookNavbar({ isAuthenticated = false, customerName, onMenuTo
   };
 
   return (
+    <>
     <nav className="sticky top-0 z-50 border-b border-ink-700 bg-ink-900/95 backdrop-blur-md">
       <div className="mx-auto flex h-14 items-center justify-between px-4 md:h-16 md:px-6">
         {/* Left: Logo + Search */}
@@ -47,7 +51,7 @@ export function FacebookNavbar({ isAuthenticated = false, customerName, onMenuTo
           {/* Mobile menu button - opens sidebar drawer */}
           <button
             onClick={onMenuToggle}
-            className="rounded-lg p-2 text-ink-300 hover:bg-ink-800 hover:text-amber-300 lg:hidden"
+            className="cursor-pointer rounded-lg p-2 text-ink-300 hover:bg-ink-800 hover:text-amber-300 lg:hidden"
             aria-label="เปิดเมนู"
           >
             <Menu size={22} />
@@ -111,21 +115,21 @@ export function FacebookNavbar({ isAuthenticated = false, customerName, onMenuTo
 
         {/* Right: Actions */}
         <div className="flex items-center gap-1">
-          {/* Cart */}
-          <CartIcon count={itemCount} />
+          {/* Cart — opens cart drawer */}
+          <CartIcon count={itemCount} onClick={() => setCartOpen(true)} />
 
-          {/* Notifications */}
-          <button className="relative flex h-10 w-10 items-center justify-center rounded-full text-ink-300 hover:bg-ink-800 hover:text-amber-300">
-            <Bell size={20} />
-            <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-              3
-            </span>
-          </button>
+          {/* Notifications — popover */}
+          <NotificationsDropdown />
 
-          {/* Messenger */}
-          <button className="relative flex h-10 w-10 items-center justify-center rounded-full text-ink-300 hover:bg-ink-800 hover:text-amber-300">
-            <MessageCircle size={20} />
-          </button>
+          {/* Messenger — support contact */}
+          <Link
+            href="/account/support"
+            aria-label="ฝ่ายสนับสนุน"
+            title="ฝ่ายสนับสนุน"
+            className="flex h-10 w-10 items-center justify-center rounded-full text-ink-300 transition-colors hover:bg-ink-800 hover:text-amber-300"
+          >
+            <MessageCircle size={20} strokeWidth={1.5} />
+          </Link>
 
           {/* Profile */}
           <Link
@@ -137,5 +141,15 @@ export function FacebookNavbar({ isAuthenticated = false, customerName, onMenuTo
         </div>
       </div>
     </nav>
+
+    {/* Cart drawer */}
+    <CartDrawer
+      isOpen={cartOpen}
+      onClose={() => setCartOpen(false)}
+      items={cart?.items ?? []}
+      onUpdateQty={(variantId, qty) => updateQuantity(variantId, qty)}
+      onRemoveItem={(variantId) => removeItem(variantId)}
+    />
+    </>
   );
 }
