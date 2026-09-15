@@ -19,19 +19,13 @@ export function StockBadge({ stock, className }: StockBadgeProps): React.JSX.Ele
     <span
       className={cn(
         'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold',
-        isOutOfStock && 'bg-crimson-900/80 text-crimson-200 border border-crimson-700/50',
-        isLowStock && 'bg-amber-900/80 text-amber-200 border border-amber-700/50',
-        !isOutOfStock && !isLowStock && 'bg-jade-900/80 text-jade-200 border border-jade-700/50',
+        isOutOfStock && 'bg-coral-500 text-white',
+        isLowStock && 'border border-topaz-200 bg-topaz-400 text-clay-900',
+        !isOutOfStock && !isLowStock && 'bg-jade-500 text-white',
         className,
       )}
     >
-      {isOutOfStock ? (
-        'หมด'
-      ) : isLowStock ? (
-        `เหลือ ${stock}`
-      ) : (
-        'มีสินค้า'
-      )}
+      {isOutOfStock ? 'หมด' : isLowStock ? `เหลือ ${stock}` : 'มีสินค้า'}
     </span>
   );
 }

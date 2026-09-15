@@ -27,8 +27,8 @@ export function ConsentCheckbox({
     <label
       htmlFor={id}
       className={cn(
-        'flex cursor-pointer items-start gap-3 rounded-md border border-ink-600 bg-ink-800 p-3 transition-colors hover:border-ink-400',
-        checked && 'border-amber-700/50 bg-amber-900/10',
+        'flex cursor-pointer items-start gap-3 rounded-md border border-clay-300 bg-clay-100 p-3 transition-colors hover:border-peach-300',
+        checked && 'border-peach-300 bg-peach-50',
         className,
       )}
     >
@@ -38,9 +38,9 @@ export function ConsentCheckbox({
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
         required={required}
-        className="mt-0.5 h-4 w-4 shrink-0 rounded border-ink-500 bg-ink-700 text-amber-400 focus:ring-amber-500"
+        className="mt-0.5 h-4 w-4 shrink-0 rounded border-clay-300 bg-clay-300 text-peach-600 focus:ring-peach-500"
       />
-      <span className="text-sm text-ink-200">{label}</span>
+      <span className="text-sm text-clay-700">{label}</span>
     </label>
   );
 }

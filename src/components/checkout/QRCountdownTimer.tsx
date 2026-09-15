@@ -77,7 +77,7 @@ export function QRCountdownTimer({
           fill="none"
           stroke="currentColor"
           strokeWidth="4"
-          className="text-ink-700"
+          className="text-clay-400"
         />
         {/* Progress ring */}
         <circle
@@ -92,7 +92,7 @@ export function QRCountdownTimer({
           strokeDashoffset={dashOffset}
           className={cn(
             'transition-colors duration-300',
-            isWarning ? 'text-crimson-400' : 'text-amber-400',
+            isWarning ? 'text-coral-600' : 'text-peach-600',
           )}
           style={{
             transform: 'rotate(-90deg)',
@@ -105,7 +105,7 @@ export function QRCountdownTimer({
       <span
         className={cn(
           'font-mono text-xl font-medium',
-          isExpired ? 'text-crimson-400' : isWarning ? 'text-crimson-300' : 'text-ink-100',
+          isExpired ? 'text-coral-600' : isWarning ? 'text-coral-600' : 'text-clay-900',
         )}
       >
         {isExpired ? 'หมดเวลา' : timeStr}

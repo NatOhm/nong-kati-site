@@ -20,7 +20,12 @@ const sideClasses: Record<NonNullable<TooltipProps['side']>, string> = {
 };
 
 /** 05-components.md §2.12 — role="tooltip", aria-describedby on trigger, 500ms hover/focus delay. */
-export function Tooltip({ content, children, side = 'top', delay = 500 }: TooltipProps): React.JSX.Element {
+export function Tooltip({
+  content,
+  children,
+  side = 'top',
+  delay = 500,
+}: TooltipProps): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const tooltipId = useId();

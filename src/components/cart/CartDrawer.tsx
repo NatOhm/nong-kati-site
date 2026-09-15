@@ -91,7 +91,7 @@ export function CartDrawer({
             <div className="space-y-3">
               {/* Out of stock warning */}
               {hasOutOfStock && (
-                <div className="rounded-md border border-crimson-700/50 bg-crimson-900/20 px-3 py-2 text-xs text-crimson-200">
+                <div className="rounded-md border border-crimson-700/50 bg-crimson-900/20 px-3 py-2 text-xs text-coral-700">
                   ⚠ มีสินค้าบางรายการหมดแล้ว — กรุณาลบออกก่อนดำเนินการชำระเงิน
                 </div>
               )}

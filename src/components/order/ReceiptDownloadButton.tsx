@@ -28,7 +28,7 @@ export function ReceiptDownloadButton({
       target="_blank"
       rel="noopener noreferrer"
       className={cn(
-        'inline-flex items-center gap-2 rounded-md border border-ink-600 bg-ink-800 px-4 py-2 text-sm font-medium text-ink-200 transition-colors hover:border-ink-400 hover:text-ink-100',
+        'inline-flex items-center gap-2 rounded-md border border-clay-300 bg-clay-100 px-4 py-2 text-sm font-medium text-clay-700 transition-colors hover:border-peach-300 hover:text-clay-900',
         className,
       )}
     >

@@ -18,14 +18,14 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
-    'bg-amber-400 text-ink-900 border border-amber-300/30 shadow-brand-glow hover:bg-amber-300 hover:shadow-brand-glow-hover disabled:bg-ink-700 disabled:text-ink-400 disabled:shadow-none disabled:cursor-not-allowed',
+    'bg-peach-500 text-white border border-peach-600/30 shadow-clay-brand hover:bg-peach-400 hover:shadow-clay-lg disabled:bg-clay-200 disabled:text-clay-400 disabled:shadow-none disabled:cursor-not-allowed',
   secondary:
-    'bg-transparent text-amber-300 border border-amber-500 hover:bg-amber-900/40 disabled:opacity-50 disabled:cursor-not-allowed',
+    'bg-transparent text-peach-700 border border-peach-500 hover:bg-peach-50 disabled:opacity-50 disabled:cursor-not-allowed',
   ghost:
-    'bg-transparent text-ink-200 border border-transparent hover:bg-ink-800 hover:border-ink-700 disabled:opacity-50 disabled:cursor-not-allowed',
+    'bg-transparent text-clay-700 border border-transparent hover:bg-clay-200 hover:border-clay-300 disabled:opacity-50 disabled:cursor-not-allowed',
   destructive:
     'bg-crimson-500 text-white border border-crimson-700 hover:bg-crimson-400 disabled:opacity-50 disabled:cursor-not-allowed',
-  link: 'bg-transparent text-amber-300 border-none underline-offset-2 hover:underline disabled:opacity-50 disabled:cursor-not-allowed p-0 h-auto',
+  link: 'bg-transparent text-peach-700 border-none underline-offset-2 hover:underline disabled:opacity-50 disabled:cursor-not-allowed p-0 h-auto',
 };
 
 const sizeClasses: Record<ButtonSize, string> = {

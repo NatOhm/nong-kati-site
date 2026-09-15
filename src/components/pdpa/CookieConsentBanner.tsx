@@ -105,17 +105,15 @@ export function CookieConsentBanner(): React.JSX.Element | null {
   if (!visible) return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-ink-700 bg-ink-900 p-4 shadow-lg md:p-6">
+    <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-clay-200 bg-clay-50 p-4 shadow-lg md:p-6">
       <div className="mx-auto max-w-4xl">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           {/* Icon + Text */}
           <div className="flex items-start gap-3">
-            <ShieldCheck size={24} className="mt-0.5 shrink-0 text-amber-400" />
+            <ShieldCheck size={24} className="mt-0.5 shrink-0 text-peach-600" />
             <div>
-              <h3 className="mb-1 text-sm font-semibold text-ink-100">
-                การใช้คุกกี้
-              </h3>
-              <p className="text-xs leading-relaxed text-ink-400">
+              <h3 className="mb-1 text-sm font-semibold text-clay-900">การใช้คุกกี้</h3>
+              <p className="text-xs leading-relaxed text-clay-500">
                 เราใช้คุกกี้เพื่อให้เว็บไซต์ทำงานได้อย่างถูกต้อง
                 และปรับปรุงประสบการณ์การใช้งานของคุณ
                 คุณสามารถเลือกประเภทของคุกกี้ที่ต้องการอนุญาตได้
@@ -127,20 +125,20 @@ export function CookieConsentBanner(): React.JSX.Element | null {
           <div className="flex shrink-0 flex-wrap gap-2">
             <button
               onClick={() => setShowDetails(!showDetails)}
-              className="inline-flex items-center gap-1 rounded-md border border-ink-700 px-3 py-1.5 text-xs text-ink-300 hover:bg-ink-800"
+              className="inline-flex items-center gap-1 rounded-md border border-clay-200 px-3 py-1.5 text-xs text-clay-600 hover:bg-clay-100"
             >
               <Settings size={12} />
               {showDetails ? 'ซ่อน' : 'ตั้งค่า'}
             </button>
             <button
               onClick={handleRejectAll}
-              className="rounded-md border border-ink-700 px-3 py-1.5 text-xs text-ink-300 hover:bg-ink-800"
+              className="rounded-md border border-clay-200 px-3 py-1.5 text-xs text-clay-600 hover:bg-clay-100"
             >
               ปฏิเสธทั้งหมด
             </button>
             <button
               onClick={handleAcceptAll}
-              className="rounded-md bg-amber-400 px-4 py-1.5 text-xs font-medium text-ink-900 hover:bg-amber-300"
+              className="rounded-md bg-peach-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-peach-400"
             >
               ยอมรับทั้งหมด
             </button>
@@ -149,35 +147,37 @@ export function CookieConsentBanner(): React.JSX.Element | null {
 
         {/* Detailed Options */}
         {showDetails && (
-          <div className="mt-4 space-y-3 border-t border-ink-700 pt-4">
+          <div className="mt-4 space-y-3 border-t border-clay-200 pt-4">
             {/* Necessary — always on */}
             <label className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-ink-200">คุกกี้ที่จำเป็น</p>
-                <p className="text-xs text-ink-500">จำเป็นสำหรับเว็บไซต์ทำงานได้ ไม่สามารถปิดได้</p>
+                <p className="text-sm text-clay-700">คุกกี้ที่จำเป็น</p>
+                <p className="text-clay-9000 text-xs">
+                  จำเป็นสำหรับเว็บไซต์ทำงานได้ ไม่สามารถปิดได้
+                </p>
               </div>
-              <div className="h-5 w-9 rounded-full bg-amber-900/50">
-                <div className="ml-auto h-5 w-5 rounded-full bg-amber-400" />
+              <div className="h-5 w-9 rounded-full bg-peach-200">
+                <div className="ml-auto h-5 w-5 rounded-full bg-peach-500" />
               </div>
             </label>
 
             {/* Analytics */}
             <label className="flex cursor-pointer items-center justify-between">
               <div>
-                <p className="text-sm text-ink-200">คุกกี้เพื่อการวิเคราะห์</p>
-                <p className="text-xs text-ink-500">ช่วยเราเข้าใจวิธีที่ผู้เข้าชมใช้เว็บไซต์</p>
+                <p className="text-sm text-clay-700">คุกกี้เพื่อการวิเคราะห์</p>
+                <p className="text-clay-9000 text-xs">ช่วยเราเข้าใจวิธีที่ผู้เข้าชมใช้เว็บไซต์</p>
               </div>
               <button
                 onClick={() => setAnalytics(!analytics)}
                 className={cn(
                   'relative h-5 w-9 rounded-full transition-colors',
-                  analytics ? 'bg-amber-400' : 'bg-ink-700'
+                  analytics ? 'bg-peach-500' : 'bg-clay-300',
                 )}
               >
                 <div
                   className={cn(
                     'absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform',
-                    analytics ? 'left-[18px]' : 'left-0.5'
+                    analytics ? 'left-[18px]' : 'left-0.5',
                   )}
                 />
               </button>
@@ -186,20 +186,20 @@ export function CookieConsentBanner(): React.JSX.Element | null {
             {/* Marketing */}
             <label className="flex cursor-pointer items-center justify-between">
               <div>
-                <p className="text-sm text-ink-200">คุกกี้เพื่อการตลาด</p>
-                <p className="text-xs text-ink-500">ใช้สำหรับแสดงโฆษณาที่เกี่ยวข้อง</p>
+                <p className="text-sm text-clay-700">คุกกี้เพื่อการตลาด</p>
+                <p className="text-clay-9000 text-xs">ใช้สำหรับแสดงโฆษณาที่เกี่ยวข้อง</p>
               </div>
               <button
                 onClick={() => setMarketing(!marketing)}
                 className={cn(
                   'relative h-5 w-9 rounded-full transition-colors',
-                  marketing ? 'bg-amber-400' : 'bg-ink-700'
+                  marketing ? 'bg-peach-500' : 'bg-clay-300',
                 )}
               >
                 <div
                   className={cn(
                     'absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform',
-                    marketing ? 'left-[18px]' : 'left-0.5'
+                    marketing ? 'left-[18px]' : 'left-0.5',
                   )}
                 />
               </button>
@@ -208,7 +208,7 @@ export function CookieConsentBanner(): React.JSX.Element | null {
             <div className="pt-2">
               <button
                 onClick={handleAcceptSelected}
-                className="rounded-md bg-amber-400 px-4 py-1.5 text-xs font-medium text-ink-900 hover:bg-amber-300"
+                className="rounded-md bg-peach-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-peach-400"
               >
                 บันทึกการเลือก
               </button>

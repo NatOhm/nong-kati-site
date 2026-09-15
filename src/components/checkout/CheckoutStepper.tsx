@@ -34,11 +34,7 @@ export function CheckoutStepper({
           const isClickable = isCompleted || isCurrent;
 
           return (
-            <li
-              key={step.number}
-              className="flex flex-1 items-center"
-              role="listitem"
-            >
+            <li key={step.number} className="flex flex-1 items-center" role="listitem">
               <button
                 onClick={() => isClickable && onStepClick(step.number)}
                 disabled={!isClickable}
@@ -54,25 +50,21 @@ export function CheckoutStepper({
                   'flex items-center gap-2 text-sm font-medium transition-colors',
                   isClickable && 'cursor-pointer',
                   !isClickable && 'cursor-not-allowed',
-                  isCurrent && 'text-amber-300',
-                  isCompleted && 'text-jade-400',
-                  isFuture && 'text-ink-400',
+                  isCurrent && 'text-peach-600',
+                  isCompleted && 'text-jade-600',
+                  isFuture && 'text-clay-500',
                 )}
               >
                 {/* Step circle */}
                 <span
                   className={cn(
                     'flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-colors',
-                    isCurrent && 'bg-amber-400 text-ink-900',
+                    isCurrent && 'bg-peach-500 text-white',
                     isCompleted && 'bg-jade-500 text-white',
-                    isFuture && 'border border-ink-600 bg-ink-800 text-ink-400',
+                    isFuture && 'border border-clay-300 bg-clay-100 text-clay-500',
                   )}
                 >
-                  {isCompleted ? (
-                    <Check size={14} strokeWidth={2.5} />
-                  ) : (
-                    step.number
-                  )}
+                  {isCompleted ? <Check size={14} strokeWidth={2.5} /> : step.number}
                 </span>
 
                 {/* Step label — hidden on mobile */}
@@ -82,10 +74,7 @@ export function CheckoutStepper({
               {/* Connector line */}
               {index < STEPS.length - 1 && (
                 <div
-                  className={cn(
-                    'mx-2 h-px flex-1',
-                    isCompleted ? 'bg-jade-500' : 'bg-ink-700',
-                  )}
+                  className={cn('mx-2 h-px flex-1', isCompleted ? 'bg-jade-500' : 'bg-clay-300')}
                 />
               )}
             </li>

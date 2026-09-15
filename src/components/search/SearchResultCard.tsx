@@ -28,16 +28,16 @@ export function SearchResultCard({
       href={`/product/${slug}`}
       {...(onClick ? { onClick } : {})}
       className={cn(
-        'flex items-center gap-3 rounded-md px-3 py-2 transition-colors hover:bg-ink-800',
+        'flex items-center gap-3 rounded-md px-3 py-2 transition-colors hover:bg-clay-100',
         className,
       )}
     >
       {/* Thumbnail */}
-      <div className="h-10 w-10 shrink-0 overflow-hidden rounded bg-ink-800">
+      <div className="h-10 w-10 shrink-0 overflow-hidden rounded bg-clay-100">
         {imageUrl ? (
           <img src={imageUrl} alt={name} className="h-full w-full object-cover" loading="lazy" />
         ) : (
-          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-amber-900/30 to-ink-800 text-lg opacity-40">
+          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-peach-100 to-clay-200 text-lg opacity-40">
             🎮
           </div>
         )}
@@ -45,8 +45,8 @@ export function SearchResultCard({
 
       {/* Text */}
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-ink-100">{name}</p>
-        <p className="truncate text-xs text-ink-400">{categoryName}</p>
+        <p className="truncate text-sm font-medium text-clay-900">{name}</p>
+        <p className="truncate text-xs text-clay-500">{categoryName}</p>
       </div>
     </Link>
   );

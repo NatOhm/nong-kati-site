@@ -23,7 +23,7 @@ export function PageShell({
   return (
     <div
       className={cn(
-        'animate-page-enter mx-auto w-full',
+        'mx-auto w-full animate-page-enter',
         maxWidthClass[maxWidth],
         paddingX && 'px-4 md:px-8 lg:px-12',
         className,

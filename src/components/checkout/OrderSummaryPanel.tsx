@@ -28,27 +28,25 @@ export function OrderSummaryPanel({
 
   if (collapsed) {
     return (
-      <div className={cn('rounded-md border border-ink-700 bg-ink-850 p-4', className)}>
+      <div className={cn('rounded-md border border-clay-200 bg-white p-4', className)}>
         <div className="flex items-center justify-between text-sm">
-          <span className="text-ink-300">
-            {items.length} รายการ
-          </span>
-          <span className="font-bold text-amber-300">{formatThb(total)}</span>
+          <span className="text-clay-600">{items.length} รายการ</span>
+          <span className="font-bold text-peach-600">{formatThb(total)}</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={cn('rounded-md border border-ink-700 bg-ink-850 p-4', className)}>
-      <h3 className="mb-3 text-sm font-semibold text-ink-200">สรุปคำสั่งซื้อ</h3>
+    <div className={cn('rounded-md border border-clay-200 bg-white p-4', className)}>
+      <h3 className="mb-3 text-sm font-semibold text-clay-700">สรุปคำสั่งซื้อ</h3>
 
       {/* Items */}
       <div className="mb-3 space-y-2">
         {items.map((item) => (
           <div key={item.variantId} className="flex items-center gap-3">
             {/* Thumbnail */}
-            <div className="h-10 w-10 shrink-0 overflow-hidden rounded bg-ink-800">
+            <div className="h-10 w-10 shrink-0 overflow-hidden rounded bg-clay-100">
               {item.thumbnailUrl ? (
                 <img
                   src={item.thumbnailUrl}
@@ -65,12 +63,12 @@ export function OrderSummaryPanel({
 
             {/* Name + quantity */}
             <div className="min-w-0 flex-1">
-              <p className="truncate text-xs text-ink-100">{item.productNameTh}</p>
-              <p className="text-xs text-ink-400">× {item.quantity}</p>
+              <p className="truncate text-xs text-clay-900">{item.productNameTh}</p>
+              <p className="text-xs text-clay-500">× {item.quantity}</p>
             </div>
 
             {/* Line total */}
-            <span className="text-xs font-medium text-ink-200">
+            <span className="text-xs font-medium text-clay-700">
               {formatThb(item.unitPriceThb * item.quantity)}
             </span>
           </div>
@@ -78,18 +76,18 @@ export function OrderSummaryPanel({
       </div>
 
       {/* Divider */}
-      <div className="border-t border-ink-700 pt-3">
-        <div className="flex items-center justify-between text-xs text-ink-300">
+      <div className="border-t border-clay-200 pt-3">
+        <div className="flex items-center justify-between text-xs text-clay-600">
           <span>ยอดรวม</span>
           <span>{formatThb(subtotal)}</span>
         </div>
-        <div className="flex items-center justify-between text-xs text-ink-300">
+        <div className="flex items-center justify-between text-xs text-clay-600">
           <span>VAT 7%</span>
           <span>{formatThb(vat)}</span>
         </div>
-        <div className="mt-2 flex items-center justify-between border-t border-ink-700 pt-2">
-          <span className="text-sm font-bold text-ink-100">รวมทั้งสิ้น</span>
-          <span className="text-lg font-bold text-amber-300">{formatThb(total)}</span>
+        <div className="mt-2 flex items-center justify-between border-t border-clay-200 pt-2">
+          <span className="text-sm font-bold text-clay-900">รวมทั้งสิ้น</span>
+          <span className="text-lg font-bold text-peach-600">{formatThb(total)}</span>
         </div>
       </div>
     </div>

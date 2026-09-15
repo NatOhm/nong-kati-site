@@ -104,7 +104,7 @@ export function AdminTopBar({
             localStorage.removeItem('nk_admin_email');
             window.location.href = '/management/login';
           }}
-          className="rounded p-1.5 text-ink-400 hover:bg-ink-800 hover:text-crimson-400"
+          className="rounded p-1.5 text-ink-400 hover:bg-ink-800 hover:text-coral-600"
           aria-label="ออกจากระบบ"
         >
           <LogOut size={18} strokeWidth={1.5} />

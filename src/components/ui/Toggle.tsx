@@ -9,7 +9,13 @@ export interface ToggleProps {
 }
 
 /** 05-components.md §2.8 — 40×22px track switch, amber-filled on, 200ms knob/track transition. */
-export function Toggle({ checked, onChange, label, disabled, size = 'md' }: ToggleProps): React.JSX.Element {
+export function Toggle({
+  checked,
+  onChange,
+  label,
+  disabled,
+  size = 'md',
+}: ToggleProps): React.JSX.Element {
   const isSmall = size === 'sm';
   return (
     <button

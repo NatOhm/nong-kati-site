@@ -23,7 +23,14 @@ const sideTransform: Record<NonNullable<DrawerProps['side']>, string> = {
 };
 
 /** 05-components.md §8.3 — role="dialog", focus trapped, Escape closes, backdrop = bg-overlay. */
-export function Drawer({ isOpen, onClose, side = 'right', title, children, width = '400px' }: DrawerProps): React.JSX.Element | null {
+export function Drawer({
+  isOpen,
+  onClose,
+  side = 'right',
+  title,
+  children,
+  width = '400px',
+}: DrawerProps): React.JSX.Element | null {
   const containerRef = useFocusTrap(isOpen);
 
   useEffect(() => {
@@ -58,15 +65,20 @@ export function Drawer({ isOpen, onClose, side = 'right', title, children, width
         data-open={isOpen}
         style={side !== 'bottom' ? { width } : undefined}
         className={cn(
-          'absolute flex flex-col bg-ink-850 shadow-xl transition-transform duration-slow ease-out-quart',
+          'absolute flex flex-col bg-white shadow-xl transition-transform duration-slow ease-out-quart',
           side === 'bottom' ? 'max-h-[85vh] rounded-t-3xl' : 'w-full max-w-full',
           sideTransform[side],
         )}
       >
         {title && (
-          <div className="flex items-center justify-between border-b border-ink-700 p-4">
-            <h2 className="font-ui text-lg font-semibold text-ink-50">{title}</h2>
-            <button type="button" aria-label="ปิด" onClick={onClose} className="text-ink-400 hover:text-ink-200">
+          <div className="flex items-center justify-between border-b border-clay-200 p-4">
+            <h2 className="font-ui text-lg font-semibold text-clay-900">{title}</h2>
+            <button
+              type="button"
+              aria-label="ปิด"
+              onClick={onClose}
+              className="text-clay-500 hover:text-clay-700"
+            >
               <X size={20} />
             </button>
           </div>

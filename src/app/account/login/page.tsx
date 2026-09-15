@@ -47,23 +47,26 @@ export default function LoginPage(): React.JSX.Element {
     <div className="flex min-h-[80vh] items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <h1 className="mb-2 text-2xl font-bold text-ink-100">เข้าสู่ระบบ</h1>
-          <p className="text-sm text-ink-400">เข้าสู่ระบบเพื่อจัดการคำสั่งซื้อและโค้ดของคุณ</p>
+          <h1 className="mb-2 text-2xl font-bold text-clay-900">เข้าสู่ระบบ</h1>
+          <p className="text-sm text-clay-500">เข้าสู่ระบบเพื่อจัดการคำสั่งซื้อและโค้ดของคุณ</p>
         </div>
 
-        <div className="rounded-lg border border-ink-700 bg-ink-850 p-6">
+        <div className="rounded-lg border border-clay-200 bg-white p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Email */}
             <div>
-              <label className="mb-1 block text-sm text-ink-300">อีเมล</label>
+              <label className="mb-1 block text-sm text-clay-600">อีเมล</label>
               <div className="relative">
-                <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
+                <Mail
+                  size={16}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-clay-500"
+                />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="w-full rounded-md border border-ink-700 bg-ink-800 py-2 pl-9 pr-3 text-sm text-ink-100 placeholder:text-ink-500 focus:border-amber-700 focus:outline-none"
+                  className="placeholder:text-clay-9000 w-full rounded-md border border-clay-200 bg-clay-100 py-2 pl-9 pr-3 text-sm text-clay-900 focus:border-peach-300 focus:outline-none"
                   placeholder="your@email.com"
                 />
               </div>
@@ -71,21 +74,24 @@ export default function LoginPage(): React.JSX.Element {
 
             {/* Password */}
             <div>
-              <label className="mb-1 block text-sm text-ink-300">รหัสผ่าน</label>
+              <label className="mb-1 block text-sm text-clay-600">รหัสผ่าน</label>
               <div className="relative">
-                <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
+                <Lock
+                  size={16}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-clay-500"
+                />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="w-full rounded-md border border-ink-700 bg-ink-800 py-2 pl-9 pr-10 text-sm text-ink-100 placeholder:text-ink-500 focus:border-amber-700 focus:outline-none"
+                  className="placeholder:text-clay-9000 w-full rounded-md border border-clay-200 bg-clay-100 py-2 pl-9 pr-10 text-sm text-clay-900 focus:border-peach-300 focus:outline-none"
                   placeholder="••••••••"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-400 hover:text-ink-200"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-clay-500 hover:text-clay-700"
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -100,12 +106,12 @@ export default function LoginPage(): React.JSX.Element {
                 onChange={(e) => setRememberMe(e.target.checked)}
                 className="rounded"
               />
-              <span className="text-sm text-ink-400">จดจำฉัน</span>
+              <span className="text-sm text-clay-500">จดจำฉัน</span>
             </label>
 
             {/* Error */}
             {error && (
-              <div className="rounded-md border border-crimson-700/50 bg-crimson-900/10 px-3 py-2 text-sm text-crimson-400">
+              <div className="rounded-md border border-coral-300 bg-coral-50 px-3 py-2 text-sm text-coral-600">
                 {error}
               </div>
             )}
@@ -114,7 +120,7 @@ export default function LoginPage(): React.JSX.Element {
             <button
               type="submit"
               disabled={loading || !email || !password}
-              className="flex w-full items-center justify-center gap-2 rounded-md bg-amber-400 px-4 py-2.5 text-sm font-medium text-ink-900 hover:bg-amber-300 disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-2 rounded-md bg-peach-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-peach-400 disabled:opacity-50"
             >
               <LogIn size={16} />
               {loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
@@ -122,17 +128,20 @@ export default function LoginPage(): React.JSX.Element {
           </form>
 
           {/* Magic Link */}
-          <div className="mt-4 border-t border-ink-700 pt-4 text-center">
-            <Link href="/account/magic-link" className="text-sm text-amber-400 hover:text-amber-300">
+          <div className="mt-4 border-t border-clay-200 pt-4 text-center">
+            <Link
+              href="/account/magic-link"
+              className="text-sm text-peach-600 hover:text-peach-700"
+            >
               เข้าสู่ระบบด้วย Magic Link
             </Link>
           </div>
         </div>
 
         {/* Register link */}
-        <p className="mt-4 text-center text-sm text-ink-400">
+        <p className="mt-4 text-center text-sm text-clay-500">
           ยังไม่มีบัญชี?{' '}
-          <Link href="/account/register" className="text-amber-400 hover:text-amber-300">
+          <Link href="/account/register" className="text-peach-600 hover:text-peach-700">
             สมัครสมาชิก
           </Link>
         </p>

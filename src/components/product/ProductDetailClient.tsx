@@ -77,22 +77,20 @@ export function ProductDetailClient({
   return (
     <div className="flex flex-col gap-6">
       {/* Price */}
-      <div className="border-t border-ink-700 pt-4">
-        <span className="text-xs text-ink-400">ราคา</span>
-        <div className="text-2xl font-bold text-amber-300">
+      <div className="border-t border-clay-200 pt-4">
+        <span className="text-xs text-clay-500">ราคา</span>
+        <div className="text-2xl font-bold text-peach-600">
           {selectedVariant ? formatThb(selectedVariant.price) : formatThb(variants[0]?.price ?? 0)}
         </div>
         {selectedVariant && (
-          <p className="text-xs text-ink-500">
-            รวม VAT 7% = {formatThb(selectedVariant.price)}
-          </p>
+          <p className="text-clay-9000 text-xs">รวม VAT 7% = {formatThb(selectedVariant.price)}</p>
         )}
       </div>
 
       {/* Variant Selection */}
       {variants.length > 0 && (
         <div>
-          <h2 className="mb-3 text-sm font-semibold text-ink-200">เลือกประเภท</h2>
+          <h2 className="mb-3 text-sm font-semibold text-clay-700">เลือกประเภท</h2>
           <div className="flex flex-wrap gap-2">
             {variants.map((variant) => {
               const isSelected = selectedVariant?.id === variant.id;
@@ -106,23 +104,21 @@ export function ProductDetailClient({
                     'relative flex flex-col items-center gap-1 rounded-md border px-4 py-2 text-sm transition-all',
                     'disabled:cursor-not-allowed disabled:opacity-40',
                     isSelected
-                      ? 'border-amber-500 bg-amber-900/30 shadow-brand-glow'
-                      : 'border-ink-600 bg-ink-800 hover:border-amber-700 hover:bg-ink-750',
+                      ? 'border-peach-500 bg-peach-100 shadow-brand-glow'
+                      : 'border-clay-300 bg-clay-100 hover:border-peach-300 hover:bg-clay-200',
                   )}
                 >
                   {inCart && (
-                    <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-400 text-[9px] font-bold text-ink-900">
+                    <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-peach-500 text-[9px] font-bold text-white">
                       {getQuantity(variant.id)}
                     </span>
                   )}
-                  <span className="font-medium text-ink-100">{variant.label}</span>
-                  <span className="text-xs text-ink-400">{formatThb(variant.price)}</span>
+                  <span className="font-medium text-clay-900">{variant.label}</span>
+                  <span className="text-xs text-clay-500">{formatThb(variant.price)}</span>
                   {variant.stock <= 10 && variant.stock > 0 && (
-                    <span className="text-xs text-amber-400">เหลือ {variant.stock}</span>
+                    <span className="text-xs text-peach-600">เหลือ {variant.stock}</span>
                   )}
-                  {variant.stock === 0 && (
-                    <span className="text-xs text-crimson-400">หมด</span>
-                  )}
+                  {variant.stock === 0 && <span className="text-xs text-coral-600">หมด</span>}
                 </button>
               );
             })}
@@ -133,28 +129,30 @@ export function ProductDetailClient({
       {/* Quantity */}
       {selectedVariant && selectedVariant.stock > 0 && (
         <div>
-          <h2 className="mb-3 text-sm font-semibold text-ink-200">จำนวน</h2>
+          <h2 className="mb-3 text-sm font-semibold text-clay-700">จำนวน</h2>
           <div className="flex items-center gap-3">
             <button
               onClick={() => setQuantity(Math.max(1, quantity - 1))}
-              className="flex h-8 w-8 items-center justify-center rounded-md border border-ink-600 bg-ink-800 text-ink-200 hover:border-amber-700"
+              className="flex h-8 w-8 items-center justify-center rounded-md border border-clay-300 bg-clay-100 text-clay-700 hover:border-peach-300"
             >
               -
             </button>
-            <span className="w-8 text-center font-mono text-lg text-ink-100">{quantity}</span>
+            <span className="w-8 text-center font-mono text-lg text-clay-900">{quantity}</span>
             <button
-              onClick={() => setQuantity(Math.min(Math.min(10, selectedVariant.stock), quantity + 1))}
-              className="flex h-8 w-8 items-center justify-center rounded-md border border-ink-600 bg-ink-800 text-ink-200 hover:border-amber-700"
+              onClick={() =>
+                setQuantity(Math.min(Math.min(10, selectedVariant.stock), quantity + 1))
+              }
+              className="flex h-8 w-8 items-center justify-center rounded-md border border-clay-300 bg-clay-100 text-clay-700 hover:border-peach-300"
             >
               +
             </button>
-            <span className="text-xs text-ink-500">/ {Math.min(10, selectedVariant.stock)}</span>
+            <span className="text-clay-9000 text-xs">/ {Math.min(10, selectedVariant.stock)}</span>
           </div>
         </div>
       )}
 
       {/* Add to Cart */}
-      <div className="border-t border-ink-700 pt-4">
+      <div className="border-t border-clay-200 pt-4">
         <button
           onClick={handleAddToCart}
           disabled={!selectedVariant || selectedVariant.stock === 0 || addedToCart}
@@ -163,8 +161,8 @@ export function ProductDetailClient({
             addedToCart
               ? 'bg-jade-500 text-white'
               : selectedVariant && selectedVariant.stock > 0
-                ? 'bg-amber-400 text-ink-900 hover:bg-amber-300'
-                : 'bg-ink-700 text-ink-400 cursor-not-allowed',
+                ? 'bg-peach-500 text-white shadow-clay-sm hover:bg-peach-400'
+                : 'cursor-not-allowed bg-clay-300 text-clay-500',
           )}
         >
           {addedToCart ? (
@@ -180,7 +178,7 @@ export function ProductDetailClient({
           )}
         </button>
         {inCartCount > 0 && !addedToCart && (
-          <p className="mt-2 text-center text-xs text-amber-400">
+          <p className="mt-2 text-center text-xs text-peach-600">
             มี {inCartCount} ชิ้นในตะกร้าแล้ว
           </p>
         )}

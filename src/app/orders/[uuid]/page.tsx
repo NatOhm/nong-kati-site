@@ -91,7 +91,7 @@ export default async function OrderDetailPage({
             <div className="mt-6 space-y-3">
               <Link
                 href="/orders/lookup"
-                className="flex w-full items-center justify-center gap-2 rounded-md border border-ink-600 bg-ink-800 px-5 py-3 text-base font-medium text-ink-200 hover:border-ink-400 hover:text-ink-100"
+                className="flex w-full items-center justify-center gap-2 rounded-md border border-clay-300 bg-clay-100 px-5 py-3 text-base font-medium text-clay-700 hover:border-clay-400 hover:text-clay-900"
               >
                 <Search size={16} />
                 ค้นหาคำสั่งซื้ออื่น
@@ -99,7 +99,7 @@ export default async function OrderDetailPage({
 
               <Link
                 href="/"
-                className="flex w-full items-center justify-center gap-2 rounded-md border border-ink-600 bg-ink-800 px-5 py-3 text-base font-medium text-ink-200 hover:border-ink-400 hover:text-ink-100"
+                className="flex w-full items-center justify-center gap-2 rounded-md border border-clay-300 bg-clay-100 px-5 py-3 text-base font-medium text-clay-700 hover:border-clay-400 hover:text-clay-900"
               >
                 <ArrowLeft size={16} />
                 กลับหน้าหลัก

@@ -21,7 +21,7 @@ export function ScrollReveal({ children, className, delay = 0 }: ScrollRevealPro
           observer.disconnect();
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0.1 },
     );
 
     if (ref.current) observer.observe(ref.current);
@@ -33,10 +33,8 @@ export function ScrollReveal({ children, className, delay = 0 }: ScrollRevealPro
       ref={ref}
       className={cn(
         'transition-all duration-700 ease-out',
-        isVisible
-          ? 'translate-y-0 opacity-100'
-          : 'translate-y-8 opacity-0',
-        className
+        isVisible ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0',
+        className,
       )}
     >
       {children}

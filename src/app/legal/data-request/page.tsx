@@ -14,18 +14,18 @@ export const metadata: Metadata = {
 export default function DataRequestPage(): React.JSX.Element {
   return (
     <div className="mx-auto max-w-2xl px-4 py-12">
-      <h1 className="mb-2 text-2xl font-bold text-ink-100">ขอจัดการข้อมูลส่วนบุคคล</h1>
-      <p className="mb-6 text-sm text-ink-400">
+      <h1 className="mb-2 text-2xl font-bold text-clay-900">ขอจัดการข้อมูลส่วนบุคคล</h1>
+      <p className="mb-6 text-sm text-clay-500">
         ภายใต้ พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562 คุณมีสิทธิ์ขอจัดการข้อมูลส่วนบุคคลของคุณ
       </p>
 
-      <div className="rounded-md border border-ink-700 bg-ink-850 p-6">
+      <div className="rounded-md border border-clay-200 bg-white p-6">
         <DataRequestForm />
       </div>
 
-      <p className="mt-4 text-xs text-ink-500">
+      <p className="mt-4 text-xs text-clay-9000">
         เราจะดำเนินการคำขอภายใน 30 วันทำการ หากมีคำถาม กรุณาติดต่อ{' '}
-        <a href="mailto:privacy@nong-kati.co.th" className="text-amber-400 hover:text-amber-300">
+        <a href="mailto:privacy@nong-kati.co.th" className="text-peach-600 hover:text-peach-700">
           privacy@nong-kati.co.th
         </a>
       </p>

@@ -11,13 +11,17 @@ export interface SpinnerProps {
 
 const sizePx: Record<SpinnerSize, number> = { sm: 16, md: 24, lg: 40 };
 const colorClass: Record<SpinnerColor, string> = {
-  brand: 'text-amber-400',
+  brand: 'text-peach-600',
   white: 'text-white',
-  muted: 'text-ink-300',
+  muted: 'text-clay-600',
 };
 
 /** 05-components.md §9.1 — role="status" spinner, Thai aria-label. */
-export function Spinner({ size = 'md', color = 'brand', className }: SpinnerProps): React.JSX.Element {
+export function Spinner({
+  size = 'md',
+  color = 'brand',
+  className,
+}: SpinnerProps): React.JSX.Element {
   const px = sizePx[size];
   return (
     <svg

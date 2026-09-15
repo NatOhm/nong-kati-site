@@ -13,7 +13,10 @@ export interface AlertProps {
   action?: { label: string; onClick: () => void };
 }
 
-const styleByType: Record<AlertType, { bg: string; border: string; fg: string; icon: React.ReactNode }> = {
+const styleByType: Record<
+  AlertType,
+  { bg: string; border: string; fg: string; icon: React.ReactNode }
+> = {
   success: {
     bg: 'bg-jade-900',
     border: 'border-jade-700',
@@ -23,7 +26,7 @@ const styleByType: Record<AlertType, { bg: string; border: string; fg: string; i
   error: {
     bg: 'bg-crimson-900',
     border: 'border-crimson-700',
-    fg: 'text-crimson-200',
+    fg: 'text-coral-700',
     icon: <AlertCircle size={20} strokeWidth={1.5} />,
   },
   warning: {
@@ -41,7 +44,14 @@ const styleByType: Record<AlertType, { bg: string; border: string; fg: string; i
 };
 
 /** 05-components.md §8.5 — inline banner alert. role="alert" for error, "status" otherwise. */
-export function Alert({ type, title, message, dismissible, onDismiss, action }: AlertProps): React.JSX.Element {
+export function Alert({
+  type,
+  title,
+  message,
+  dismissible,
+  onDismiss,
+  action,
+}: AlertProps): React.JSX.Element {
   const s = styleByType[type];
   return (
     <div
@@ -51,7 +61,7 @@ export function Alert({ type, title, message, dismissible, onDismiss, action }: 
       <span className={s.fg}>{s.icon}</span>
       <div className="flex-1">
         {title && <p className={cn('text-sm font-semibold', s.fg)}>{title}</p>}
-        <p className={cn('text-sm', title ? 'mt-0.5 text-ink-200' : s.fg)}>{message}</p>
+        <p className={cn('text-sm', title ? 'mt-0.5 text-clay-700' : s.fg)}>{message}</p>
         {action && (
           <button
             type="button"
@@ -63,7 +73,12 @@ export function Alert({ type, title, message, dismissible, onDismiss, action }: 
         )}
       </div>
       {dismissible && (
-        <button type="button" aria-label="ปิด" onClick={onDismiss} className="text-ink-400 hover:text-ink-200">
+        <button
+          type="button"
+          aria-label="ปิด"
+          onClick={onDismiss}
+          className="text-clay-500 hover:text-clay-700"
+        >
           <X size={16} />
         </button>
       )}

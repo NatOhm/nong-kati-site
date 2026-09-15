@@ -22,13 +22,20 @@ export interface ToastProps extends ToastData {
 
 const iconByType: Record<ToastType, React.ReactNode> = {
   success: <CheckCircle size={20} strokeWidth={1.5} className="text-jade-400" />,
-  error: <AlertCircle size={20} strokeWidth={1.5} className="text-crimson-400" />,
+  error: <AlertCircle size={20} strokeWidth={1.5} className="text-coral-600" />,
   warning: <AlertTriangle size={20} strokeWidth={1.5} className="text-topaz-400" />,
   info: <Info size={20} strokeWidth={1.5} className="text-sapphire-400" />,
 };
 
 /** 05-components.md §8.1 — single toast. role="alert" for error, "status" otherwise. */
-export function Toast({ id, type, title, message, duration = 4000, onDismiss }: ToastProps): React.JSX.Element {
+export function Toast({
+  id,
+  type,
+  title,
+  message,
+  duration = 4000,
+  onDismiss,
+}: ToastProps): React.JSX.Element {
   useEffect(() => {
     if (duration === 0) return;
     const timer = setTimeout(() => onDismiss(id), duration);
@@ -38,18 +45,18 @@ export function Toast({ id, type, title, message, duration = 4000, onDismiss }: 
   return (
     <div
       role={type === 'error' ? 'alert' : 'status'}
-      className="animate-toast-enter flex w-full max-w-sm items-start gap-3 rounded-lg border border-ink-700 bg-ink-850 p-4 shadow-lg"
+      className="flex w-full max-w-sm animate-toast-enter items-start gap-3 rounded-lg border border-clay-200 bg-white p-4 shadow-lg"
     >
       {iconByType[type]}
       <div className="flex-1">
-        <p className="text-sm font-semibold text-ink-50">{title}</p>
-        {message && <p className="mt-0.5 text-xs text-ink-300">{message}</p>}
+        <p className="text-sm font-semibold text-clay-900">{title}</p>
+        {message && <p className="mt-0.5 text-xs text-clay-600">{message}</p>}
       </div>
       <button
         type="button"
         aria-label="ปิดการแจ้งเตือน"
         onClick={() => onDismiss(id)}
-        className="text-ink-400 hover:text-ink-200"
+        className="text-clay-500 hover:text-clay-700"
       >
         <X size={16} />
       </button>
@@ -64,7 +71,11 @@ export interface ToastStackProps {
 }
 
 /** 05-components.md §8.1 — fixed stack, max 5 visible, newest below. */
-export function ToastStack({ toasts, onDismiss, position = 'bottom-right' }: ToastStackProps): React.JSX.Element {
+export function ToastStack({
+  toasts,
+  onDismiss,
+  position = 'bottom-right',
+}: ToastStackProps): React.JSX.Element {
   const visible = toasts.slice(-5);
   return (
     <div

@@ -24,13 +24,13 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   return (
     <div className={cn('flex flex-col gap-1.5', fullWidth && 'w-full')}>
       {label && (
-        <label htmlFor={inputId} className="text-sm font-medium text-ink-200">
+        <label htmlFor={inputId} className="text-sm font-medium text-clay-700">
           {label}
         </label>
       )}
       <div className="relative flex items-center">
         {leftIcon && (
-          <span className="pointer-events-none absolute left-3 text-ink-400">{leftIcon}</span>
+          <span className="pointer-events-none absolute left-3 text-clay-500">{leftIcon}</span>
         )}
         <input
           ref={ref}
@@ -38,10 +38,10 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
           aria-describedby={cn(hintId, errorId) || undefined}
           aria-invalid={!!error}
           className={cn(
-            'w-full rounded-sm border border-ink-600 bg-ink-950 px-3.5 py-2.5 font-ui text-base text-ink-50 shadow-[inset_0_1px_3px_rgba(7,11,20,0.5)] placeholder:text-ink-400 transition-colors duration-fast ease-out-quart',
-            'hover:border-ink-400',
-            'focus:border-amber-400 focus:shadow-focus-ring',
-            'disabled:cursor-not-allowed disabled:border-ink-700 disabled:opacity-50',
+            'w-full rounded-sm border border-clay-300 bg-clay-100 px-3.5 py-2.5 font-ui text-base text-clay-900 shadow-[inset_0_1px_3px_rgba(147,107,73,0.15)] transition-colors duration-fast ease-out-quart placeholder:text-clay-500',
+            'hover:border-peach-300',
+            'focus:border-peach-500 focus:shadow-focus-ring',
+            'disabled:cursor-not-allowed disabled:border-clay-200 disabled:opacity-50',
             leftIcon && 'pl-10',
             rightElement && 'pr-10',
             error && 'border-crimson-400 focus:border-crimson-400',
@@ -52,12 +52,12 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
         {rightElement && <span className="absolute right-3">{rightElement}</span>}
       </div>
       {hint && !error && (
-        <p id={hintId} className="text-xs text-ink-300">
+        <p id={hintId} className="text-xs text-clay-500">
           {hint}
         </p>
       )}
       {error && (
-        <p id={errorId} role="alert" className="text-xs text-crimson-200">
+        <p id={errorId} role="alert" className="text-xs text-coral-700">
           {error}
         </p>
       )}

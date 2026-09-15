@@ -25,9 +25,9 @@ const STATUS_CONFIG: Record<
 > = {
   pending_payment: {
     label: 'รอชำระเงิน',
-    bgClass: 'bg-ink-800',
-    textClass: 'text-ink-200',
-    borderClass: 'border-ink-600',
+    bgClass: 'bg-clay-100',
+    textClass: 'text-clay-700',
+    borderClass: 'border-clay-300',
   },
   payment_confirmed: {
     label: 'ยืนยันการชำระแล้ว',
@@ -43,45 +43,45 @@ const STATUS_CONFIG: Record<
   },
   completed: {
     label: 'สำเร็จ',
-    bgClass: 'bg-jade-900/30',
+    bgClass: 'bg-jade-500/15',
     textClass: 'text-jade-200',
-    borderClass: 'border-jade-700/50',
+    borderClass: 'border-jade-500/40',
   },
   pending_manual_fulfilment: {
     label: 'กำลังดำเนินการ',
-    bgClass: 'bg-amber-900/30',
-    textClass: 'text-amber-200',
-    borderClass: 'border-amber-700/50',
+    bgClass: 'bg-peach-100',
+    textClass: 'text-peach-800',
+    borderClass: 'border-peach-300',
   },
   failed: {
     label: 'ล้มเหลว',
-    bgClass: 'bg-crimson-900/30',
-    textClass: 'text-crimson-200',
-    borderClass: 'border-crimson-700/50',
+    bgClass: 'bg-coral-50',
+    textClass: 'text-coral-700',
+    borderClass: 'border-coral-300',
   },
   failed_final: {
     label: 'ล้มเหลว (สูงสุด)',
-    bgClass: 'bg-crimson-900/30',
-    textClass: 'text-crimson-200',
-    borderClass: 'border-crimson-700/50',
+    bgClass: 'bg-coral-50',
+    textClass: 'text-coral-700',
+    borderClass: 'border-coral-300',
   },
   refunded: {
     label: 'คืนเงินแล้ว',
-    bgClass: 'bg-ink-800',
-    textClass: 'text-ink-300',
-    borderClass: 'border-ink-600',
+    bgClass: 'bg-clay-100',
+    textClass: 'text-clay-600',
+    borderClass: 'border-clay-300',
   },
   expired: {
     label: 'หมดอายุ',
-    bgClass: 'bg-ink-800',
-    textClass: 'text-ink-400',
-    borderClass: 'border-ink-600',
+    bgClass: 'bg-clay-100',
+    textClass: 'text-clay-500',
+    borderClass: 'border-clay-300',
   },
   abandoned: {
     label: 'ยกเลิก',
-    bgClass: 'bg-ink-800',
-    textClass: 'text-ink-400',
-    borderClass: 'border-ink-600',
+    bgClass: 'bg-clay-100',
+    textClass: 'text-clay-500',
+    borderClass: 'border-clay-300',
   },
 };
 
@@ -89,10 +89,7 @@ const STATUS_CONFIG: Record<
  * 05-components.md §6.3 — Order Status Badge.
  * Color-coded badge for order status display.
  */
-export function OrderStatusBadge({
-  status,
-  className,
-}: OrderStatusBadgeProps): React.JSX.Element {
+export function OrderStatusBadge({ status, className }: OrderStatusBadgeProps): React.JSX.Element {
   const config = STATUS_CONFIG[status] ?? STATUS_CONFIG.pending_payment;
 
   return (

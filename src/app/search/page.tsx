@@ -8,11 +8,7 @@ import { ProductCard } from '@/components/product/ProductCard';
 import { ProductGrid } from '@/components/product/ProductGrid';
 import { Breadcrumb } from '@/components/data-display/Breadcrumb';
 
-import {
-  getCatalogProducts,
-  getCategoriesWithProductCounts,
-  type CatalogSort,
-} from '@/lib/data';
+import { getCatalogProducts, getCategoriesWithProductCounts, type CatalogSort } from '@/lib/data';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,12 +53,14 @@ export async function generateMetadata({ searchParams }: SearchPageProps): Promi
   };
 }
 
-export default async function SearchPage({ searchParams }: SearchPageProps): Promise<React.JSX.Element> {
+export default async function SearchPage({
+  searchParams,
+}: SearchPageProps): Promise<React.JSX.Element> {
   const { q, page: pageParam, sort: sortParam, category } = await searchParams;
   const query = q || '';
   const page = parseInt(pageParam || '1', 10);
   const limit = 24;
-  const sort: CatalogSort = (SORT_OPTIONS.find((o) => o.value === sortParam)?.value ?? 'featured');
+  const sort: CatalogSort = SORT_OPTIONS.find((o) => o.value === sortParam)?.value ?? 'featured';
 
   let products: Awaited<ReturnType<typeof getCatalogProducts>>['products'] = [];
   let total = 0;
@@ -99,7 +97,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps): Pro
 
             {/* Header */}
             <section className="pb-6">
-              <h1 className="font-display text-2xl font-bold text-ink-100">
+              <h1 className="font-display text-2xl font-bold text-clay-900">
                 {query ? (
                   <>ผลการค้นหา &ldquo;{query}&rdquo;</>
                 ) : category ? (
@@ -108,9 +106,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps): Pro
                   'สินค้าทั้งหมด'
                 )}
               </h1>
-              <p className="mt-2 text-ink-400">
-                พบ {total} รายการ
-              </p>
+              <p className="mt-2 text-clay-500">พบ {total} รายการ</p>
             </section>
 
             {/* Category chips + sort */}
@@ -120,8 +116,8 @@ export default async function SearchPage({ searchParams }: SearchPageProps): Pro
                   href={buildUrl({ q: query || undefined, sort: sortParam })}
                   className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
                     !category
-                      ? 'border-amber-500 bg-amber-900/30 text-amber-300'
-                      : 'border-ink-600 bg-ink-800 text-ink-200 hover:border-amber-700 hover:text-amber-300'
+                      ? 'border-peach-500 bg-peach-100 text-peach-800'
+                      : 'border-clay-300 bg-clay-100 text-clay-700 hover:border-peach-400 hover:text-peach-700'
                   }`}
                 >
                   ทั้งหมด
@@ -132,25 +128,25 @@ export default async function SearchPage({ searchParams }: SearchPageProps): Pro
                     href={buildUrl({ q: query || undefined, category: cat.slug, sort: sortParam })}
                     className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
                       category === cat.slug
-                        ? 'border-amber-500 bg-amber-900/30 text-amber-300'
-                        : 'border-ink-600 bg-ink-800 text-ink-200 hover:border-amber-700 hover:text-amber-300'
+                        ? 'border-peach-500 bg-peach-100 text-peach-800'
+                        : 'border-clay-300 bg-clay-100 text-clay-700 hover:border-peach-400 hover:text-peach-700'
                     }`}
                   >
-                    {cat.name} <span className="text-ink-500">({cat.productCount})</span>
+                    {cat.name} <span className="text-clay-9000">({cat.productCount})</span>
                   </Link>
                 ))}
               </div>
 
               <div className="mt-4 flex items-center gap-2">
-                <span className="text-sm text-ink-400">เรียงตาม:</span>
+                <span className="text-sm text-clay-500">เรียงตาม:</span>
                 {SORT_OPTIONS.map((opt) => (
                   <Link
                     key={opt.value}
                     href={sortUrl(opt.value)}
                     className={`rounded-md px-2.5 py-1 text-sm transition-colors ${
                       sort === opt.value
-                        ? 'bg-amber-900/30 font-semibold text-amber-300'
-                        : 'text-ink-300 hover:bg-ink-800 hover:text-ink-100'
+                        ? 'bg-peach-100 font-semibold text-peach-600'
+                        : 'text-clay-600 hover:bg-clay-100 hover:text-clay-900'
                     }`}
                   >
                     {opt.label}
@@ -184,19 +180,29 @@ export default async function SearchPage({ searchParams }: SearchPageProps): Pro
                   <div className="mt-8 flex items-center justify-center gap-2">
                     {page > 1 && (
                       <Link
-                        href={buildUrl({ q: query || undefined, category: category || undefined, sort: sortParam, page: page - 1 })}
-                        className="rounded-md border border-ink-600 bg-ink-800 px-3 py-1.5 text-sm text-ink-200 hover:border-amber-700 hover:text-amber-300"
+                        href={buildUrl({
+                          q: query || undefined,
+                          category: category || undefined,
+                          sort: sortParam,
+                          page: page - 1,
+                        })}
+                        className="rounded-md border border-clay-300 bg-clay-100 px-3 py-1.5 text-sm text-clay-700 hover:border-peach-400 hover:text-peach-700"
                       >
                         ← ก่อนหน้า
                       </Link>
                     )}
-                    <span className="text-sm text-ink-400">
+                    <span className="text-sm text-clay-500">
                       หน้า {page} จาก {totalPages}
                     </span>
                     {page < totalPages && (
                       <Link
-                        href={buildUrl({ q: query || undefined, category: category || undefined, sort: sortParam, page: page + 1 })}
-                        className="rounded-md border border-ink-600 bg-ink-800 px-3 py-1.5 text-sm text-ink-200 hover:border-amber-700 hover:text-amber-300"
+                        href={buildUrl({
+                          q: query || undefined,
+                          category: category || undefined,
+                          sort: sortParam,
+                          page: page + 1,
+                        })}
+                        className="rounded-md border border-clay-300 bg-clay-100 px-3 py-1.5 text-sm text-clay-700 hover:border-peach-400 hover:text-peach-700"
                       >
                         ถัดไป →
                       </Link>
@@ -206,25 +212,21 @@ export default async function SearchPage({ searchParams }: SearchPageProps): Pro
               </section>
             ) : query || category ? (
               <section className="py-16 text-center">
-                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-ink-800">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-clay-100">
                   <span className="text-2xl">🔍</span>
                 </div>
-                <h2 className="mb-2 text-lg font-semibold text-ink-100">
+                <h2 className="mb-2 text-lg font-semibold text-clay-900">
                   {query ? <>ไม่พบสินค้า &ldquo;{query}&rdquo;</> : 'ไม่พบสินค้าในหมวดหมู่นี้'}
                 </h2>
-                <p className="text-sm text-ink-400">
-                  ลองค้นหาด้วยคำอื่น หรือเลือกหมวดหมู่อื่น
-                </p>
+                <p className="text-sm text-clay-500">ลองค้นหาด้วยคำอื่น หรือเลือกหมวดหมู่อื่น</p>
               </section>
             ) : (
               <section className="py-16 text-center">
-                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-ink-800">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-clay-100">
                   <span className="text-2xl">🛒</span>
                 </div>
-                <h2 className="mb-2 text-lg font-semibold text-ink-100">
-                  ยังไม่มีสินค้าในร้าน
-                </h2>
-                <p className="text-sm text-ink-400">
+                <h2 className="mb-2 text-lg font-semibold text-clay-900">ยังไม่มีสินค้าในร้าน</h2>
+                <p className="text-sm text-clay-500">
                   กลับมาใหม่ภายหลัง หรือติดต่อทีมงานเพื่อสอบถาม
                 </p>
               </section>

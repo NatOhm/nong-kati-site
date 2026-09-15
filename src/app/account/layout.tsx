@@ -8,8 +8,15 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  LayoutDashboard, ShoppingBag, Key, Download, FileText,
-  Star, Headphones, Settings, LogOut,
+  LayoutDashboard,
+  ShoppingBag,
+  Key,
+  Download,
+  FileText,
+  Star,
+  Headphones,
+  Settings,
+  LogOut,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
@@ -58,8 +65,8 @@ export default function AccountLayout({
                       className={cn(
                         'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
                         isActive
-                          ? 'bg-amber-900/30 text-amber-300'
-                          : 'text-ink-300 hover:bg-ink-800 hover:text-ink-100'
+                          ? 'bg-peach-100 text-peach-800'
+                          : 'text-clay-600 hover:bg-clay-100 hover:text-clay-900',
                       )}
                     >
                       <Icon size={16} />
@@ -70,8 +77,8 @@ export default function AccountLayout({
               })}
             </ul>
 
-            <div className="mt-4 border-t border-ink-700 pt-4">
-              <button className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-ink-400 transition-colors hover:bg-ink-800 hover:text-crimson-400">
+            <div className="mt-4 border-t border-clay-200 pt-4">
+              <button className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-clay-500 transition-colors hover:bg-clay-100 hover:text-coral-600">
                 <LogOut size={16} />
                 ออกจากระบบ
               </button>

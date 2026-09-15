@@ -11,11 +11,11 @@ export interface BadgeProps {
 
 const variantClasses: Record<BadgeVariant, string> = {
   success: 'bg-jade-900 text-jade-200 border-jade-700',
-  error: 'bg-crimson-900 text-crimson-200 border-crimson-700',
+  error: 'bg-crimson-900 text-coral-700 border-crimson-700',
   warning: 'bg-topaz-900 text-topaz-200 border-topaz-400',
   info: 'bg-sapphire-900 text-sapphire-200 border-sapphire-700',
-  neutral: 'bg-ink-800 text-ink-300 border-ink-700',
-  brand: 'bg-amber-900 text-amber-300 border-amber-500',
+  neutral: 'bg-clay-100 text-clay-600 border-clay-200',
+  brand: 'bg-peach-500 text-white border-peach-600',
 };
 
 /** 05-components.md §2.9 — status/state pill. Variant → semantic token mapping per 04-design-system.md §10.5. */

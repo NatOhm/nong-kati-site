@@ -26,11 +26,11 @@ export default function AccountSupportPage(): React.JSX.Element {
   if (submitted) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold text-ink-100">สนับสนุน</h1>
-        <div className="rounded-md border border-jade-700/50 bg-jade-900/10 p-6 text-center">
-          <CheckCircle size={32} className="mx-auto mb-3 text-jade-400" />
-          <h3 className="mb-2 text-lg font-semibold text-ink-100">ส่งข้อความสำเร็จ</h3>
-          <p className="text-sm text-ink-400">
+        <h1 className="text-2xl font-bold text-clay-900">สนับสนุน</h1>
+        <div className="rounded-md border border-jade-500/40 bg-jade-500/10 p-6 text-center">
+          <CheckCircle size={32} className="text-jade-600 mx-auto mb-3" />
+          <h3 className="mb-2 text-lg font-semibold text-clay-900">ส่งข้อความสำเร็จ</h3>
+          <p className="text-sm text-clay-500">
             เราจะตอบกลับภายใน 24 ชั่วโมง ผ่านอีเมลที่คุณลงทะเบียนไว้
           </p>
         </div>
@@ -40,34 +40,34 @@ export default function AccountSupportPage(): React.JSX.Element {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-ink-100">สนับสนุน</h1>
+      <h1 className="text-2xl font-bold text-clay-900">สนับสนุน</h1>
 
-      <div className="rounded-md border border-ink-700 bg-ink-850 p-6">
-        <p className="mb-4 text-sm text-ink-400">
+      <div className="rounded-md border border-clay-200 bg-white p-6">
+        <p className="mb-4 text-sm text-clay-500">
           มีปัญหา? ส่งข้อความหาเรา เราจะตอบกลับภายใน 24 ชั่วโมง
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm text-ink-300">หัวข้อ</label>
+            <label className="mb-1 block text-sm text-clay-600">หัวข้อ</label>
             <input
               type="text"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               required
-              className="w-full rounded-md border border-ink-700 bg-ink-800 px-3 py-2 text-sm text-ink-100 placeholder:text-ink-500 focus:border-amber-700 focus:outline-none"
+              className="placeholder:text-clay-9000 w-full rounded-md border border-clay-200 bg-clay-100 px-3 py-2 text-sm text-clay-900 focus:border-peach-300 focus:outline-none"
               placeholder="ปัญหาเกี่ยวกับ..."
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-sm text-ink-300">รายละเอียด</label>
+            <label className="mb-1 block text-sm text-clay-600">รายละเอียด</label>
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               required
               rows={5}
-              className="w-full rounded-md border border-ink-700 bg-ink-800 px-3 py-2 text-sm text-ink-100 placeholder:text-ink-500 focus:border-amber-700 focus:outline-none"
+              className="placeholder:text-clay-9000 w-full rounded-md border border-clay-200 bg-clay-100 px-3 py-2 text-sm text-clay-900 focus:border-peach-300 focus:outline-none"
               placeholder="อธิบายปัญหาของคุณ..."
             />
           </div>
@@ -75,7 +75,7 @@ export default function AccountSupportPage(): React.JSX.Element {
           <button
             type="submit"
             disabled={loading || !subject || !message}
-            className="inline-flex items-center gap-2 rounded-md bg-amber-400 px-4 py-2 text-sm font-medium text-ink-900 hover:bg-amber-300 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-md bg-peach-500 px-4 py-2 text-sm font-medium text-white hover:bg-peach-400 disabled:opacity-50"
           >
             <Send size={14} />
             {loading ? 'กำลังส่ง...' : 'ส่งข้อความ'}
@@ -84,10 +84,18 @@ export default function AccountSupportPage(): React.JSX.Element {
       </div>
 
       {/* Contact Info */}
-      <div className="rounded-md border border-ink-700 bg-ink-850 p-6">
-        <h2 className="mb-3 text-lg font-semibold text-ink-100">ช่องทางอื่น</h2>
-        <div className="space-y-2 text-sm text-ink-300">
-          <p>อีเมล: <a href="mailto:support@nong-kati.co.th" className="text-amber-400 hover:text-amber-300">support@nong-kati.co.th</a></p>
+      <div className="rounded-md border border-clay-200 bg-white p-6">
+        <h2 className="mb-3 text-lg font-semibold text-clay-900">ช่องทางอื่น</h2>
+        <div className="space-y-2 text-sm text-clay-600">
+          <p>
+            อีเมล:{' '}
+            <a
+              href="mailto:support@nong-kati.co.th"
+              className="text-peach-600 hover:text-peach-700"
+            >
+              support@nong-kati.co.th
+            </a>
+          </p>
           <p>เวลาทำการ: จันทร์-ศุกร์ 9:00-18:00</p>
         </div>
       </div>

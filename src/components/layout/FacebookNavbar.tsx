@@ -82,7 +82,7 @@ export function FacebookNavbar({
                   searchFocused ? 'border-peach-500 bg-white' : 'border-clay-300 bg-white',
                 )}
               >
-                <Search size={16} className="text-ink-400" />
+                <Search size={16} className="text-clay-500" />
                 <input
                   type="text"
                   aria-label="ค้นหาสินค้า"
@@ -91,7 +91,7 @@ export function FacebookNavbar({
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onFocus={() => setSearchFocused(true)}
                   onBlur={() => setSearchFocused(false)}
-                  className="placeholder:text-ink-500 w-48 bg-transparent text-sm text-ink-100 focus:outline-none lg:w-64"
+                  className="placeholder:text-clay-9000 w-48 bg-transparent text-sm text-clay-900 focus:outline-none lg:w-64"
                 />
               </div>
             </form>
@@ -110,7 +110,7 @@ export function FacebookNavbar({
                   className={cn(
                     'group relative flex h-12 w-24 items-center justify-center rounded-lg transition-colors',
                     isActive
-                      ? 'text-amber-400'
+                      ? 'text-peach-600'
                       : 'text-clay-500 hover:bg-clay-200 hover:text-clay-800',
                   )}
                   title={item.label}

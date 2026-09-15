@@ -49,9 +49,7 @@ export function AdminShell({
         />
 
         {/* Page content */}
-        <main className={cn('flex-1 overflow-y-auto p-6', className)}>
-          {children}
-        </main>
+        <main className={cn('flex-1 overflow-y-auto p-6', className)}>{children}</main>
       </div>
     </div>
   );

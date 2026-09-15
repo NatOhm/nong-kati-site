@@ -26,12 +26,17 @@ const STEPS: Array<{ n: 1 | 2 | 3; label: string }> = [
  * Logo is non-clickable on step 2 and triggers a leave-confirmation dialog instead
  * (02-user-flow.md UF-01's "Are you sure you want to leave?" gate).
  */
-export function CheckoutShell({ children, currentStep, completedSteps, onLeave }: CheckoutShellProps): React.JSX.Element {
+export function CheckoutShell({
+  children,
+  currentStep,
+  completedSteps,
+  onLeave,
+}: CheckoutShellProps): React.JSX.Element {
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-ink-900">
-      <header className="border-b border-ink-700 px-4 py-4 md:px-8">
+    <div className="min-h-screen bg-clay-50">
+      <header className="border-b border-clay-200 px-4 py-4 md:px-8">
         <div className="mx-auto flex max-w-content items-center justify-between">
           {currentStep === 2 ? (
             <button type="button" onClick={() => setConfirmOpen(true)} aria-label="Nong-Kati">
@@ -51,15 +56,15 @@ export function CheckoutShell({ children, currentStep, completedSteps, onLeave }
                   <span
                     className={cn(
                       'font-medium',
-                      isCurrent && 'text-amber-300',
-                      isDone && !isCurrent && 'cursor-pointer text-ink-200',
-                      !isDone && !isCurrent && 'text-ink-500',
+                      isCurrent && 'text-peach-600',
+                      isDone && !isCurrent && 'cursor-pointer text-clay-700',
+                      !isDone && !isCurrent && 'text-clay-9000',
                     )}
                     aria-disabled={!isClickable && !isCurrent}
                   >
                     ({step.n}) {step.label}
                   </span>
-                  {step.n < 3 && <span className="ml-3 text-ink-700">──────</span>}
+                  {step.n < 3 && <span className="ml-3 text-clay-300">──────</span>}
                 </li>
               );
             })}

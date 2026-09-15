@@ -3,8 +3,18 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  LayoutDashboard, Package, Tags, ShoppingCart, Users, BarChart3,
-  Settings, Shield, FileText, ChevronLeft, ChevronRight, LogOut,
+  LayoutDashboard,
+  Package,
+  Tags,
+  ShoppingCart,
+  Users,
+  BarChart3,
+  Settings,
+  Shield,
+  FileText,
+  ChevronLeft,
+  ChevronRight,
+  LogOut,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { type AdminRole } from '@/types/auth';
@@ -25,11 +35,26 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: 'แดชบอร์ด', href: '/management/dashboard', icon: LayoutDashboard, permission: 'products:read' },
+  {
+    label: 'แดชบอร์ด',
+    href: '/management/dashboard',
+    icon: LayoutDashboard,
+    permission: 'products:read',
+  },
   { label: 'สินค้า', href: '/management/products', icon: Package, permission: 'products:read' },
   { label: 'หมวดหมู่', href: '/management/categories', icon: Tags, permission: 'categories:read' },
-  { label: 'คลังสินค้า', href: '/management/inventory', icon: Warehouse, permission: 'inventory:read' },
-  { label: 'คำสั่งซื้อ', href: '/management/orders', icon: ShoppingCart, permission: 'orders:read' },
+  {
+    label: 'คลังสินค้า',
+    href: '/management/inventory',
+    icon: Warehouse,
+    permission: 'inventory:read',
+  },
+  {
+    label: 'คำสั่งซื้อ',
+    href: '/management/orders',
+    icon: ShoppingCart,
+    permission: 'orders:read',
+  },
   { label: 'ลูกค้า', href: '/management/customers', icon: Users, permission: 'customers:read' },
   { label: 'รายงาน', href: '/management/reports', icon: BarChart3, permission: 'reports:read' },
   { label: 'พนักงาน', href: '/management/staff', icon: Shield, permission: 'staff:read' },
@@ -40,7 +65,16 @@ const NAV_ITEMS: NavItem[] = [
 // Simple Warehouse icon replacement (lucide-react may not have it)
 function Warehouse({ size = 20, strokeWidth = 1.5 }: { size?: number; strokeWidth?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M22 8.35V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.35A2 2 0 0 1 3.26 6.5l8-3.2a2 2 0 0 1 1.48 0l8 3.2A2 2 0 0 1 22 8.35Z" />
       <path d="M6 18h12" />
       <path d="M6 14h12" />
@@ -61,9 +95,7 @@ export function AdminSidebar({
 }: AdminSidebarProps): React.JSX.Element {
   const pathname = usePathname();
 
-  const visibleItems = NAV_ITEMS.filter((item) =>
-    roleHasPermission(role, item.permission),
-  );
+  const visibleItems = NAV_ITEMS.filter((item) => roleHasPermission(role, item.permission));
 
   return (
     <aside

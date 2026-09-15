@@ -22,9 +22,9 @@ const sizeClasses: Record<IconButtonSize, string> = {
 };
 
 const variantClasses: Record<IconButtonVariant, string> = {
-  ghost: 'bg-transparent text-ink-200 hover:bg-ink-800 hover:text-amber-300',
-  subtle: 'bg-ink-800 text-ink-200 hover:bg-ink-700',
-  primary: 'bg-amber-400 text-ink-900 hover:bg-amber-300 shadow-brand-glow',
+  ghost: 'bg-transparent text-clay-700 hover:bg-clay-200 hover:text-peach-700',
+  subtle: 'bg-clay-100 text-clay-700 hover:bg-clay-200',
+  primary: 'bg-peach-500 text-white hover:bg-peach-400 shadow-clay-brand',
 };
 
 /** 05-components.md §2.2 — icon-only button with a required aria-label and optional count badge. */
@@ -48,7 +48,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
       {typeof badge === 'number' && badge > 0 && (
         <span
           aria-hidden="true"
-          className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-400 px-1 text-xs font-bold leading-none text-ink-900"
+          className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-coral-500 px-1 text-xs font-bold leading-none text-white"
         >
           {badge > 99 ? '99+' : badge}
         </span>

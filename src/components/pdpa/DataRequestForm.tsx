@@ -14,7 +14,11 @@ const REQUEST_TYPES: { value: DataRequestType; label: string; description: strin
   { value: 'access', label: 'ขอเข้าถึงข้อมูล', description: 'ขอรับสำเนาข้อมูลส่วนบุคคลของคุณ' },
   { value: 'correct', label: 'ขอแก้ไขข้อมูล', description: 'ขอแก้ไขข้อมูลส่วนบุคคลที่ไม่ถูกต้อง' },
   { value: 'delete', label: 'ขอลบข้อมูล', description: 'ขอให้ลบหรือทำให้ข้อมูลเป็นนิรนาม' },
-  { value: 'port', label: 'ขอโอนย้ายข้อมูล', description: 'ขอรับข้อมูลในรูปแบบที่สามารถโอนย้ายได้' },
+  {
+    value: 'port',
+    label: 'ขอโอนย้ายข้อมูล',
+    description: 'ขอรับข้อมูลในรูปแบบที่สามารถโอนย้ายได้',
+  },
 ];
 
 export function DataRequestForm(): React.JSX.Element {
@@ -43,8 +47,8 @@ export function DataRequestForm(): React.JSX.Element {
         result.error === 'INVALID_EMAIL'
           ? 'กรุณากรอกอีเมลที่ถูกต้อง'
           : result.error === 'DETAILS_TOO_SHORT'
-          ? 'กรุณาระบุรายละเอียดอย่างน้อย 10 ตัวอักษร'
-          : 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง'
+            ? 'กรุณาระบุรายละเอียดอย่างน้อย 10 ตัวอักษร'
+            : 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง',
       );
     }
 
@@ -55,10 +59,9 @@ export function DataRequestForm(): React.JSX.Element {
     return (
       <div className="rounded-md border border-jade-700/50 bg-jade-900/10 p-6 text-center">
         <CheckCircle size={32} className="mx-auto mb-3 text-jade-400" />
-        <h3 className="mb-2 text-lg font-semibold text-ink-100">ส่งคำขอสำเร็จ</h3>
-        <p className="text-sm text-ink-400">
-          เราจะดำเนินการคำขอภายใน 30 วันทำการ
-          ผลลัพธ์จะถูกส่งไปยังอีเมลที่คุณระบุ
+        <h3 className="mb-2 text-lg font-semibold text-clay-900">ส่งคำขอสำเร็จ</h3>
+        <p className="text-sm text-clay-500">
+          เราจะดำเนินการคำขอภายใน 30 วันทำการ ผลลัพธ์จะถูกส่งไปยังอีเมลที่คุณระบุ
         </p>
       </div>
     );
@@ -67,7 +70,7 @@ export function DataRequestForm(): React.JSX.Element {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="mb-2 block text-sm font-medium text-ink-300">ประเภทคำขอ</label>
+        <label className="mb-2 block text-sm font-medium text-clay-600">ประเภทคำขอ</label>
         <div className="space-y-2">
           {REQUEST_TYPES.map((type) => (
             <label
@@ -75,8 +78,8 @@ export function DataRequestForm(): React.JSX.Element {
               className={cn(
                 'flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors',
                 requestType === type.value
-                  ? 'border-amber-700 bg-amber-900/10'
-                  : 'border-ink-700 hover:border-ink-600'
+                  ? 'border-peach-300 bg-peach-50'
+                  : 'border-clay-200 hover:border-clay-300',
               )}
             >
               <input
@@ -88,8 +91,8 @@ export function DataRequestForm(): React.JSX.Element {
                 className="mt-0.5"
               />
               <div>
-                <p className="text-sm text-ink-100">{type.label}</p>
-                <p className="text-xs text-ink-500">{type.description}</p>
+                <p className="text-sm text-clay-900">{type.label}</p>
+                <p className="text-clay-9000 text-xs">{type.description}</p>
               </div>
             </label>
           ))}
@@ -97,37 +100,35 @@ export function DataRequestForm(): React.JSX.Element {
       </div>
 
       <div>
-        <label className="mb-1 block text-sm text-ink-300">อีเมล</label>
+        <label className="mb-1 block text-sm text-clay-600">อีเมล</label>
         <input
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          className="w-full rounded-md border border-ink-700 bg-ink-850 px-3 py-2 text-sm text-ink-100 placeholder:text-ink-500 focus:border-amber-700 focus:outline-none"
+          className="placeholder:text-clay-9000 w-full rounded-md border border-clay-200 bg-white px-3 py-2 text-sm text-clay-900 focus:border-peach-300 focus:outline-none"
           placeholder="your@email.com"
         />
       </div>
 
       <div>
-        <label className="mb-1 block text-sm text-ink-300">รายละเอียด</label>
+        <label className="mb-1 block text-sm text-clay-600">รายละเอียด</label>
         <textarea
           value={details}
           onChange={(e) => setDetails(e.target.value)}
           required
           rows={4}
-          className="w-full rounded-md border border-ink-700 bg-ink-850 px-3 py-2 text-sm text-ink-100 placeholder:text-ink-500 focus:border-amber-700 focus:outline-none"
+          className="placeholder:text-clay-9000 w-full rounded-md border border-clay-200 bg-white px-3 py-2 text-sm text-clay-900 focus:border-peach-300 focus:outline-none"
           placeholder="กรุณาระบุรายละเอียดเพิ่มเติม..."
         />
       </div>
 
-      {error && (
-        <p className="text-sm text-crimson-400">{error}</p>
-      )}
+      {error && <p className="text-sm text-coral-600">{error}</p>}
 
       <button
         type="submit"
         disabled={loading || !email || !details}
-        className="inline-flex items-center gap-2 rounded-md bg-amber-400 px-4 py-2 text-sm font-medium text-ink-900 hover:bg-amber-300 disabled:opacity-50"
+        className="inline-flex items-center gap-2 rounded-md bg-peach-500 px-4 py-2 text-sm font-medium text-white hover:bg-peach-400 disabled:opacity-50"
       >
         <Send size={14} />
         {loading ? 'กำลังส่ง...' : 'ส่งคำขอ'}

@@ -25,7 +25,9 @@ export function Breadcrumb({ items, className }: BreadcrumbProps): React.JSX.Ele
       '@type': 'ListItem',
       position: index + 1,
       name: item.label,
-      ...(item.href ? { item: `${process.env['NEXT_PUBLIC_SITE_URL'] || 'https://nong-kati.com'}${item.href}` } : {}),
+      ...(item.href
+        ? { item: `${process.env['NEXT_PUBLIC_SITE_URL'] || 'https://nong-kati.com'}${item.href}` }
+        : {}),
     })),
   };
 
@@ -42,14 +44,14 @@ export function Breadcrumb({ items, className }: BreadcrumbProps): React.JSX.Ele
           return (
             <Fragment key={index}>
               {index > 0 && (
-                <ChevronRight size={14} className="shrink-0 text-ink-400" strokeWidth={1.5} />
+                <ChevronRight size={14} className="shrink-0 text-clay-500" strokeWidth={1.5} />
               )}
               {isLast || !item.href ? (
-                <span className="text-ink-300">{item.label}</span>
+                <span className="text-clay-600">{item.label}</span>
               ) : (
                 <Link
                   href={item.href}
-                  className="text-ink-400 transition-colors hover:text-amber-300"
+                  className="text-clay-500 transition-colors hover:text-peach-700"
                 >
                   {item.label}
                 </Link>

@@ -30,7 +30,11 @@ export function DenominationSelector({
   className,
 }: DenominationSelectorProps): React.JSX.Element {
   return (
-    <div className={cn('flex flex-wrap gap-2', className)} role="radiogroup" aria-label="เลือกประเภทสินค้า">
+    <div
+      className={cn('flex flex-wrap gap-2', className)}
+      role="radiogroup"
+      aria-label="เลือกประเภทสินค้า"
+    >
       {denominations.map((denom) => {
         const isSelected = denom.id === selectedId;
         const isAvailable = denom.stock > 0;
@@ -46,15 +50,15 @@ export function DenominationSelector({
             onClick={() => onSelect?.(denom.id)}
             className={cn(
               'flex flex-col items-center gap-1 rounded-md border px-4 py-2 text-sm transition-all duration-fast ease-out-quart',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-peach-500 focus-visible:ring-offset-2 focus-visible:ring-offset-clay-50',
               isSelected
-                ? 'border-amber-500 bg-amber-900/40 text-amber-300 shadow-brand-glow'
-                : 'border-ink-600 bg-ink-800 text-ink-200 hover:border-ink-400 hover:bg-ink-750',
+                ? 'border-peach-500 bg-peach-100 text-peach-800 shadow-brand-glow'
+                : 'border-clay-300 bg-clay-100 text-clay-700 hover:border-peach-300 hover:bg-clay-200',
               (!isAvailable || disabled) && 'cursor-not-allowed opacity-40',
             )}
           >
             <span className="font-medium">{denom.label}</span>
-            <span className="text-xs text-ink-400">{formatThb(denom.price)}</span>
+            <span className="text-xs text-clay-500">{formatThb(denom.price)}</span>
           </button>
         );
       })}

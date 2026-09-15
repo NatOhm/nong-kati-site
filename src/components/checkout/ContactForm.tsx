@@ -38,18 +38,10 @@ export function ContactForm({
   const [requiresTaxInvoice, setRequiresTaxInvoice] = useState(
     defaultValues?.requiresTaxInvoice ?? false,
   );
-  const [taxInvoiceName, setTaxInvoiceName] = useState(
-    defaultValues?.taxInvoiceName ?? '',
-  );
-  const [taxInvoiceTaxId, setTaxInvoiceTaxId] = useState(
-    defaultValues?.taxInvoiceTaxId ?? '',
-  );
-  const [tosAccepted, setTosAccepted] = useState(
-    defaultValues?.tosAccepted ?? false,
-  );
-  const [marketingOptIn, setMarketingOptIn] = useState(
-    defaultValues?.marketingOptIn ?? false,
-  );
+  const [taxInvoiceName, setTaxInvoiceName] = useState(defaultValues?.taxInvoiceName ?? '');
+  const [taxInvoiceTaxId, setTaxInvoiceTaxId] = useState(defaultValues?.taxInvoiceTaxId ?? '');
+  const [tosAccepted, setTosAccepted] = useState(defaultValues?.tosAccepted ?? false);
+  const [marketingOptIn, setMarketingOptIn] = useState(defaultValues?.marketingOptIn ?? false);
 
   interface FormErrors {
     email?: string;
@@ -103,7 +95,7 @@ export function ContactForm({
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Email */}
       <div>
-        <label htmlFor="checkout-email" className="mb-1 block text-sm font-medium text-ink-200">
+        <label htmlFor="checkout-email" className="mb-1 block text-sm font-medium text-clay-700">
           อีเมล *
         </label>
         <input
@@ -115,21 +107,19 @@ export function ContactForm({
           required
           placeholder="kaem@example.com"
           className={cn(
-            'w-full rounded-md border bg-ink-800 px-3 py-2.5 text-sm text-ink-100 placeholder:text-ink-400 focus:outline-none focus:ring-2 focus:ring-amber-500',
-            errors.email ? 'border-crimson-500' : 'border-ink-600',
+            'w-full rounded-md border bg-clay-100 px-3 py-2.5 text-sm text-clay-900 placeholder:text-clay-500 focus:outline-none focus:ring-2 focus:ring-peach-500',
+            errors.email ? 'border-crimson-500' : 'border-clay-300',
             readOnlyEmail && 'cursor-not-allowed opacity-70',
           )}
         />
-        {errors.email && (
-          <p className="mt-1 text-xs text-crimson-400">{errors.email}</p>
-        )}
+        {errors.email && <p className="mt-1 text-xs text-coral-600">{errors.email}</p>}
       </div>
 
       {/* Phone */}
       <div>
-        <label htmlFor="checkout-phone" className="mb-1 block text-sm font-medium text-ink-200">
+        <label htmlFor="checkout-phone" className="mb-1 block text-sm font-medium text-clay-700">
           เบอร์โทรศัพท์ (LINE)
-          <span className="ml-1 text-ink-400">(ไม่บังคับ)</span>
+          <span className="ml-1 text-clay-500">(ไม่บังคับ)</span>
         </label>
         <input
           id="checkout-phone"
@@ -137,7 +127,7 @@ export function ContactForm({
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           placeholder="0812345678"
-          className="w-full rounded-md border border-ink-600 bg-ink-800 px-3 py-2.5 text-sm text-ink-100 placeholder:text-ink-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
+          className="w-full rounded-md border border-clay-300 bg-clay-100 px-3 py-2.5 text-sm text-clay-900 placeholder:text-clay-500 focus:outline-none focus:ring-2 focus:ring-peach-500"
         />
       </div>
 
@@ -166,11 +156,21 @@ export function ContactForm({
           label={
             <>
               ยอมรับ{' '}
-              <a href="/terms" className="text-amber-300 hover:underline" target="_blank" rel="noopener noreferrer">
+              <a
+                href="/terms"
+                className="text-peach-600 hover:underline"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 เงื่อนไขการใช้งาน
               </a>{' '}
               และ{' '}
-              <a href="/privacy" className="text-amber-300 hover:underline" target="_blank" rel="noopener noreferrer">
+              <a
+                href="/privacy"
+                className="text-peach-600 hover:underline"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 นโยบายความเป็นส่วนตัว
               </a>{' '}
               *
@@ -180,9 +180,7 @@ export function ContactForm({
           onChange={setTosAccepted}
           required
         />
-        {errors.tos && (
-          <p className="text-xs text-crimson-400">{errors.tos}</p>
-        )}
+        {errors.tos && <p className="text-xs text-coral-600">{errors.tos}</p>}
 
         <ConsentCheckbox
           id="marketing"
@@ -199,8 +197,8 @@ export function ContactForm({
         className={cn(
           'w-full rounded-md px-5 py-3 text-base font-semibold transition-colors',
           loading
-            ? 'cursor-wait bg-ink-700 text-ink-400'
-            : 'bg-amber-400 text-ink-900 hover:bg-amber-300',
+            ? 'cursor-wait bg-clay-300 text-clay-500'
+            : 'bg-peach-500 text-white shadow-clay-sm hover:bg-peach-400',
         )}
       >
         {loading ? 'กำลังดำเนินการ...' : 'ดำเนินการต่อ'}

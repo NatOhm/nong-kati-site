@@ -13,11 +13,7 @@ import { CategoryCard } from '@/components/product/CategoryCard';
 import { Breadcrumb } from '@/components/data-display/Breadcrumb';
 import { StructuredData } from '@/components/data-display/StructuredData';
 
-import {
-  getCategoryBySlug,
-  getTopLevelCategories,
-  getProductsByCategory,
-} from '@/lib/data';
+import { getCategoryBySlug, getTopLevelCategories, getProductsByCategory } from '@/lib/data';
 
 interface CategoryPageProps {
   params: Promise<{ slug: string[] }>;
@@ -52,7 +48,9 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
   };
 }
 
-export default async function CategoryPage({ params }: CategoryPageProps): Promise<React.JSX.Element> {
+export default async function CategoryPage({
+  params,
+}: CategoryPageProps): Promise<React.JSX.Element> {
   const { slug } = await params;
   const slugPath = slug.join('/');
 
@@ -76,9 +74,11 @@ export default async function CategoryPage({ params }: CategoryPageProps): Promi
         <main>
           <PageShell>
             <section className="py-16 text-center">
-              <h1 className="text-2xl font-bold text-ink-100">หมวดหมู่สินค้า</h1>
-              <p className="mt-4 text-ink-400">ไม่สามารถโหลดข้อมูลได้ในขณะนี้</p>
-              <Link href="/" className="mt-4 inline-block text-amber-400 hover:underline">กลับหน้าหลัก</Link>
+              <h1 className="text-2xl font-bold text-clay-900">หมวดหมู่สินค้า</h1>
+              <p className="mt-4 text-clay-500">ไม่สามารถโหลดข้อมูลได้ในขณะนี้</p>
+              <Link href="/" className="mt-4 inline-block text-peach-600 hover:underline">
+                กลับหน้าหลัก
+              </Link>
             </section>
           </PageShell>
         </main>
@@ -125,19 +125,17 @@ export default async function CategoryPage({ params }: CategoryPageProps): Promi
 
           {/* Category Header */}
           <section className="pb-8">
-            <h1 className="font-display text-3xl font-bold text-ink-100">
+            <h1 className="font-display text-3xl font-bold text-clay-900">
               <span className="mr-2">{category.icon}</span>
               {category.name}
             </h1>
-            <p className="mt-2 text-ink-400">
-              {total} สินค้า
-            </p>
+            <p className="mt-2 text-clay-500">{total} สินค้า</p>
           </section>
 
           {/* Sub-categories (if L1) */}
           {category.children.length > 0 && (
             <section className="pb-8">
-              <h2 className="mb-4 text-lg font-semibold text-ink-200">หมวดหมู่ย่อย</h2>
+              <h2 className="mb-4 text-lg font-semibold text-clay-700">หมวดหมู่ย่อย</h2>
               <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
                 {category.children.map((child) => (
                   <CategoryCard
@@ -155,7 +153,7 @@ export default async function CategoryPage({ params }: CategoryPageProps): Promi
           {/* Products */}
           {products.length > 0 ? (
             <section className="pb-16">
-              <h2 className="mb-4 text-lg font-semibold text-ink-200">สินค้าทั้งหมด</h2>
+              <h2 className="mb-4 text-lg font-semibold text-clay-700">สินค้าทั้งหมด</h2>
               <ProductGrid>
                 {products.map((product) => (
                   <ProductCard
@@ -175,7 +173,7 @@ export default async function CategoryPage({ params }: CategoryPageProps): Promi
             </section>
           ) : (
             <section className="py-16 text-center">
-              <p className="text-ink-400">ยังไม่มีสินค้าในหมวดหมู่นี้</p>
+              <p className="text-clay-500">ยังไม่มีสินค้าในหมวดหมู่นี้</p>
             </section>
           )}
         </PageShell>

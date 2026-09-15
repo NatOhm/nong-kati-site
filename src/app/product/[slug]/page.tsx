@@ -67,9 +67,9 @@ export default async function ProductPage({ params }: ProductPageProps): Promise
         <main>
           <PageShell>
             <section className="py-16 text-center">
-              <h1 className="text-2xl font-bold text-ink-100">ไม่พบสินค้า</h1>
-              <p className="mt-4 text-ink-400">ไม่สามารถโหลดข้อมูลได้ในขณะนี้</p>
-              <Link href="/" className="mt-4 inline-block text-amber-400 hover:underline">กลับหน้าหลัก</Link>
+              <h1 className="text-2xl font-bold text-clay-900">ไม่พบสินค้า</h1>
+              <p className="mt-4 text-clay-500">ไม่สามารถโหลดข้อมูลได้ในขณะนี้</p>
+              <Link href="/" className="mt-4 inline-block text-peach-600 hover:underline">กลับหน้าหลัก</Link>
             </section>
           </PageShell>
         </main>
@@ -133,7 +133,7 @@ export default async function ProductPage({ params }: ProductPageProps): Promise
           {/* Product Detail */}
           <div className="grid gap-8 pb-16 md:grid-cols-2">
             {/* Image */}
-            <div className="flex aspect-square items-center justify-center overflow-hidden rounded-lg border border-ink-700 bg-ink-800">
+            <div className="flex aspect-square items-center justify-center overflow-hidden rounded-lg border border-clay-200 bg-clay-100">
               {product.imageUrl ? (
                 <img
                   src={product.imageUrl}
@@ -141,7 +141,7 @@ export default async function ProductPage({ params }: ProductPageProps): Promise
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <div className="flex flex-col items-center gap-4 text-ink-500">
+                <div className="flex flex-col items-center gap-4 text-clay-9000">
                   <span className="text-6xl">🎮</span>
                   <span className="text-sm">ไม่มีรูปภาพ</span>
                 </div>
@@ -153,13 +153,13 @@ export default async function ProductPage({ params }: ProductPageProps): Promise
               {/* Category tag */}
               <Link
                 href={`/category/${product.category.slug}`}
-                className="text-sm font-medium text-amber-400 hover:text-amber-300"
+                className="text-sm font-medium text-peach-600 hover:text-peach-700"
               >
                 {product.category.name}
               </Link>
 
               {/* Title */}
-              <h1 className="font-display text-2xl font-bold text-ink-50 md:text-3xl">
+              <h1 className="font-display text-2xl font-bold text-clay-900 md:text-3xl">
                 {product.name}
               </h1>
 
@@ -170,7 +170,7 @@ export default async function ProductPage({ params }: ProductPageProps): Promise
 
               {/* Description */}
               {product.description && (
-                <div className="prose prose-invert max-w-none text-sm text-ink-300">
+                <div className="prose prose-invert max-w-none text-sm text-clay-600">
                   <p>{product.description}</p>
                 </div>
               )}

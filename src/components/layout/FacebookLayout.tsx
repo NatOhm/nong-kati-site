@@ -19,16 +19,11 @@ export function FacebookLayout({ children }: FacebookLayoutProps) {
       {/* Main content area with sidebar */}
       <div className="flex">
         {/* Left sidebar - fixed on desktop, drawer on mobile */}
-        <FacebookSidebar
-          isOpen={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-        />
+        <FacebookSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
         {/* Main content - centered in the remaining space (add pb-16 lg:pb-0 for mobile bottom nav) */}
         <main className="min-w-0 flex-1 bg-gradient-to-b from-peach-50 to-clay-100 pb-16 lg:pb-0">
-          <div className="mx-auto max-w-[1440px]">
-            {children}
-          </div>
+          <div className="mx-auto max-w-[1440px]">{children}</div>
         </main>
       </div>
     </>

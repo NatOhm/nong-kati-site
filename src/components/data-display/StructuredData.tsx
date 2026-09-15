@@ -107,8 +107,8 @@ export function StructuredData({ type, data }: StructuredDataProps): React.JSX.E
     type === 'organization'
       ? buildOrganizationSchema(data as OrganizationSchema)
       : type === 'website'
-      ? buildWebSiteSchema(data as WebSiteSchema)
-      : buildProductSchema(data as ProductSchema);
+        ? buildWebSiteSchema(data as WebSiteSchema)
+        : buildProductSchema(data as ProductSchema);
 
   return (
     <script

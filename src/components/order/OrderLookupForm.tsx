@@ -35,7 +35,7 @@ export function OrderLookupForm({
     <form onSubmit={handleSubmit} className={cn('space-y-4', className)}>
       {/* Email */}
       <div>
-        <label htmlFor="lookup-email" className="mb-1 block text-sm font-medium text-ink-200">
+        <label htmlFor="lookup-email" className="mb-1 block text-sm font-medium text-clay-700">
           อีเมล *
         </label>
         <input
@@ -45,13 +45,13 @@ export function OrderLookupForm({
           onChange={(e) => setEmail(e.target.value)}
           required
           placeholder="kaem@example.com"
-          className="w-full rounded-md border border-ink-600 bg-ink-800 px-3 py-2.5 text-sm text-ink-100 placeholder:text-ink-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
+          className="w-full rounded-md border border-clay-300 bg-clay-100 px-3 py-2.5 text-sm text-clay-900 placeholder:text-clay-500 focus:outline-none focus:ring-2 focus:ring-peach-500"
         />
       </div>
 
       {/* Order Number */}
       <div>
-        <label htmlFor="lookup-order" className="mb-1 block text-sm font-medium text-ink-200">
+        <label htmlFor="lookup-order" className="mb-1 block text-sm font-medium text-clay-700">
           รหัสคำสั่งซื้อ *
         </label>
         <input
@@ -61,16 +61,14 @@ export function OrderLookupForm({
           onChange={(e) => setOrderNumber(e.target.value)}
           required
           placeholder="NK-2026-XXXXXX"
-          className="w-full rounded-md border border-ink-600 bg-ink-800 px-3 py-2.5 text-sm text-ink-100 placeholder:text-ink-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
+          className="w-full rounded-md border border-clay-300 bg-clay-100 px-3 py-2.5 text-sm text-clay-900 placeholder:text-clay-500 focus:outline-none focus:ring-2 focus:ring-peach-500"
         />
-        <p className="mt-1 text-xs text-ink-400">
-          พบในอีเมลยืนยันคำสั่งซื้อ
-        </p>
+        <p className="mt-1 text-xs text-clay-500">พบในอีเมลยืนยันคำสั่งซื้อ</p>
       </div>
 
       {/* Error */}
       {error && (
-        <div className="rounded-md border border-crimson-700/50 bg-crimson-900/20 px-3 py-2 text-sm text-crimson-200">
+        <div className="rounded-md border border-coral-300 bg-coral-50 px-3 py-2 text-sm text-coral-700">
           {error}
         </div>
       )}
@@ -82,8 +80,8 @@ export function OrderLookupForm({
         className={cn(
           'flex w-full items-center justify-center gap-2 rounded-md px-5 py-2.5 text-sm font-semibold transition-colors',
           loading
-            ? 'cursor-wait bg-ink-700 text-ink-400'
-            : 'bg-amber-400 text-ink-900 hover:bg-amber-300',
+            ? 'cursor-wait bg-clay-300 text-clay-500'
+            : 'bg-peach-500 text-white shadow-clay-sm hover:bg-peach-400',
         )}
       >
         <Search size={16} />
