@@ -1,18 +1,108 @@
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/utils/cn';
 
 /**
  * Cute clay hamster grass-field band — sits under the main content as a
- * cartoonish ground line. Decorative only (aria-hidden), adapts to dark mode
- * via semantic tokens, and respects reduced motion through the global rule.
+ * cartoonish ground line. Adapts to dark mode via semantic tokens and
+ * respects reduced motion through the global rule.
+ *
+ * Easter egg: click the grass hamster and it pops up with a squeak,
+ * scattering clay seeds that arc into the grass.
  */
+
+interface ScatterSeed {
+  id: number;
+  x: number; // px offset from hamster center
+  rot: number;
+  delay: number;
+}
+
+/** Tiny WebAudio squeak — two quick rising chirps. No audio files needed. */
+function playSqueak(): void {
+  try {
+    const Ctx =
+      window.AudioContext ??
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const now = ctx.currentTime;
+    for (const [start, base] of [
+      [0, 900],
+      [0.12, 1200],
+    ] as const) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(base, now + start);
+      osc.frequency.exponentialRampToValueAtTime(base * 1.6, now + start + 0.08);
+      gain.gain.setValueAtTime(0.0001, now + start);
+      gain.gain.exponentialRampToValueAtTime(0.06, now + start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + start + 0.1);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(now + start);
+      osc.stop(now + start + 0.12);
+    }
+    setTimeout(() => void ctx.close().catch(() => {}), 400);
+  } catch {
+    /* audio unavailable — the visual squeak still plays */
+  }
+}
+
+const HAMSTER_POP_KEYFRAMES = `@keyframes hamster-pop {
+  0% { transform: translateY(0) scale(1); }
+  30% { transform: translateY(-16px) scale(1.15); }
+  50% { transform: translateY(-6px) scale(0.95); }
+  70% { transform: translateY(-10px) scale(1.05); }
+  100% { transform: translateY(0) scale(1); }
+}
+@keyframes seed-scatter {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.4) rotate(0deg); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--sx), var(--sy)) scale(1) rotate(var(--sr)); }
+}`;
+
 export function HamsterGrassScene({ className }: { className?: string }): React.JSX.Element {
+  const [seeds, setSeeds] = useState<ScatterSeed[]>([]);
+  const [squeaking, setSqueaking] = useState(false);
+  const seedId = useRef(0);
+  const coolDown = useRef(false);
+
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = HAMSTER_POP_KEYFRAMES;
+    document.head.appendChild(style);
+    return () => void style.remove();
+  }, []);
+
+  const handleHamsterClick = useCallback(() => {
+    if (coolDown.current) return;
+    coolDown.current = true;
+    setTimeout(() => (coolDown.current = false), 900);
+
+    // Visual squeak: hamster pops up
+    setSqueaking(true);
+    setTimeout(() => setSqueaking(false), 900);
+    playSqueak();
+
+    // Scatter 7 seeds in a fan
+    const batch: ScatterSeed[] = Array.from({ length: 7 }, (_, i) => ({
+      id: seedId.current++,
+      x: (i - 3) * 26 + (Math.random() * 10 - 5),
+      rot: Math.random() * 260 - 130,
+      delay: i * 40,
+    }));
+    setSeeds((s) => [...s, ...batch]);
+    setTimeout(() => {
+      setSeeds((s) => s.filter((seed) => !batch.includes(seed)));
+    }, 1400);
+  }, []);
+
   return (
-    <div
-      aria-hidden="true"
-      className={cn('pointer-events-none absolute inset-x-0 bottom-0 z-0', className)}
-    >
+    <div className={cn('absolute inset-x-0 bottom-0 z-0', className)} aria-hidden="true">
       {/* Rolling clay hills */}
-      <div className="absolute bottom-0 left-0 right-0 h-28">
+      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-28">
         {/* back hill */}
         <div className="absolute bottom-6 left-[8%] h-24 w-72 rounded-[100%] bg-jade-200/50 dark:bg-jade-900/40" />
         <div className="absolute bottom-4 right-[6%] h-28 w-96 rounded-[100%] bg-jade-200/40 dark:bg-jade-900/30" />
@@ -24,7 +114,7 @@ export function HamsterGrassScene({ className }: { className?: string }): React.
       {/* Swaying grass blades */}
       <svg
         viewBox="0 0 120 40"
-        className="absolute bottom-4 left-[12%] h-8 w-24 origin-bottom animate-grass-sway"
+        className="pointer-events-none absolute bottom-4 left-[12%] h-8 w-24 origin-bottom animate-grass-sway"
         fill="none"
       >
         <path
@@ -51,7 +141,7 @@ export function HamsterGrassScene({ className }: { className?: string }): React.
       </svg>
       <svg
         viewBox="0 0 120 40"
-        className="absolute bottom-6 right-[14%] h-8 w-24 origin-bottom animate-grass-sway"
+        className="pointer-events-none absolute bottom-6 right-[14%] h-8 w-24 origin-bottom animate-grass-sway"
         style={{ animationDelay: '1.2s' }}
         fill="none"
       >
@@ -71,38 +161,104 @@ export function HamsterGrassScene({ className }: { className?: string }): React.
         />
       </svg>
 
-      {/* Little clay hamster peeking from the grass */}
-      <div className="absolute bottom-2 right-[9%] animate-hamster-peek">
+      {/* Scattered seeds (rendered behind the hamster) */}
+      {seeds.map((seed) => (
+        <span
+          key={seed.id}
+          className="pointer-events-none absolute h-2.5 w-2 rounded-[40%] bg-fawn-500 shadow-sm"
+          style={{
+            bottom: 10,
+            right: 'calc(9% + 8px)',
+            ['--sx' as string]: `${seed.x}px`,
+            ['--sy' as string]: `${-30 - Math.random() * 34}px`,
+            ['--sr' as string]: `${seed.rot}deg`,
+            animation: `seed-scatter 900ms cubic-bezier(0, 0, 0.2, 1) ${seed.delay}ms both`,
+            transform: `rotate(${seed.rot}deg)`,
+          }}
+        />
+      ))}
+
+      {/* Little clay hamster — click me! */}
+      <button
+        type="button"
+        onClick={handleHamsterClick}
+        aria-label="สัตว์เลี้ยงตัวน้อย: ลองกดจิ๊กเกอร์ดูสิ!"
+        title="กดดูสิ!"
+        className="absolute bottom-2 right-[9%] cursor-pointer border-0 bg-transparent p-0"
+      >
         <svg
           viewBox="0 0 64 44"
-          className="h-10 w-14 drop-shadow-[0_3px_5px_rgba(147,107,73,0.25)]"
+          className={cn(
+            'h-10 w-14 drop-shadow-[0_3px_5px_rgba(147,107,73,0.25)] transition-transform duration-fast',
+            squeaking ? 'scale-110' : 'animate-hamster-peek hover:scale-105',
+          )}
+          style={
+            squeaking
+              ? { animation: 'hamster-pop 900ms cubic-bezier(0.34, 1.56, 0.64, 1)' }
+              : undefined
+          }
           fill="none"
         >
           {/* ears */}
-          <circle cx="18" cy="10" r="6" fill="#F5B07E" />
-          <circle cx="46" cy="10" r="6" fill="#F5B07E" />
-          <circle cx="18" cy="10" r="3" fill="#FECFAD" />
-          <circle cx="46" cy="10" r="3" fill="#FECFAD" />
+          <circle cx="18" cy="10" r="6" fill="#FDBA74" />
+          <circle cx="46" cy="10" r="6" fill="#FDBA74" />
+          <circle cx="18" cy="10" r="3" fill="#FFEDD5" />
+          <circle cx="46" cy="10" r="3" fill="#FFEDD5" />
           {/* head */}
-          <ellipse cx="32" cy="26" rx="22" ry="17" fill="#F5B07E" />
-          {/* cheeks */}
-          <circle cx="16" cy="30" r="5" fill="#F8C09A" opacity="0.9" />
-          <circle cx="48" cy="30" r="5" fill="#F8C09A" opacity="0.9" />
-          {/* eyes (closed, happy) */}
-          <path d="M22 24 q3 2.6 6 0" stroke="#4A3320" strokeWidth="1.8" strokeLinecap="round" />
-          <path d="M38 24 q3 2.6 6 0" stroke="#4A3320" strokeWidth="1.8" strokeLinecap="round" />
-          {/* nose + mouth */}
-          <ellipse cx="32" cy="29" rx="2.2" ry="1.6" fill="#EB737B" />
-          <path d="M29 33 q3 2.4 6 0" stroke="#4A3320" strokeWidth="1.4" strokeLinecap="round" />
+          <ellipse cx="32" cy="26" rx="22" ry="17" fill="#FDBA74" />
+          {/* cheeks — bigger while squeaking */}
+          <circle cx="16" cy="30" r={squeaking ? 7.5 : 5} fill="#FED7AA" />
+          <circle cx="48" cy="30" r={squeaking ? 7.5 : 5} fill="#FED7AA" />
+          {/* eyes (closed happy / > < while squeaking) */}
+          {squeaking ? (
+            <>
+              <path
+                d="M21 23 l5 3 -5 3"
+                stroke="#4E3820"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                fill="none"
+              />
+              <path
+                d="M43 23 l-5 3 5 3"
+                stroke="#4E3820"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                fill="none"
+              />
+            </>
+          ) : (
+            <>
+              <path
+                d="M22 24 q3 2.6 6 0"
+                stroke="#4E3820"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+              <path
+                d="M38 24 q3 2.6 6 0"
+                stroke="#4E3820"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+            </>
+          )}
+          {/* nose + mouth (o-shape while squeaking) */}
+          <ellipse cx="32" cy="29" rx="2.2" ry="1.6" fill="#FB7185" />
+          {squeaking ? (
+            <ellipse cx="32" cy="33" rx="2.4" ry="2.8" fill="#4E3820" opacity="0.85" />
+          ) : (
+            <path d="M29 33 q3 2.4 6 0" stroke="#4E3820" strokeWidth="1.4" strokeLinecap="round" />
+          )}
           {/* seed in paws */}
-          <ellipse cx="32" cy="37" rx="2.6" ry="3.2" fill="#936B49" />
+          <ellipse cx="32" cy="37" rx="2.6" ry="3.2" fill="#8C6D46" />
         </svg>
-      </div>
+      </button>
 
       {/* Tiny seed sprinkles */}
-      <div className="absolute bottom-3 left-[26%] h-2 w-1.5 rotate-45 rounded-full bg-clay-500/50" />
-      <div className="absolute bottom-6 left-[58%] h-2 w-1.5 -rotate-12 rounded-full bg-clay-500/40" />
-      <div className="absolute bottom-2 right-[30%] h-2 w-1.5 rotate-12 rounded-full bg-clay-500/50" />
+      <div className="pointer-events-none absolute bottom-3 left-[26%] h-2 w-1.5 rotate-45 rounded-full bg-clay-500/50" />
+      <div className="pointer-events-none absolute bottom-6 left-[58%] h-2 w-1.5 -rotate-12 rounded-full bg-clay-500/40" />
+      <div className="pointer-events-none absolute bottom-2 right-[30%] h-2 w-1.5 rotate-12 rounded-full bg-clay-500/50" />
     </div>
   );
 }
