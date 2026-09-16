@@ -175,3 +175,50 @@ body {
 .group:hover .mascot-hello {
   animation: mascot-hello 600ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
+
+/* Empty-cart mascot: slow friendly wave loop (the only ambient animation
+   in the drawer; reduced-motion kills it via the global rule). */
+@keyframes mascot-wave {
+  0%,
+  45%,
+  100% {
+    transform: rotate(0deg);
+  }
+  55% {
+    transform: rotate(9deg);
+  }
+  65% {
+    transform: rotate(-7deg);
+  }
+  75% {
+    transform: rotate(5deg);
+  }
+}
+.mascot-wave {
+  animation: mascot-wave 3s ease-in-out infinite;
+  transform-origin: 70% 90%;
+}
+
+/* 404/error mascot: drifting Zzz letters above the sleeping hamster. */
+@keyframes zzz-drift {
+  0% {
+    opacity: 0;
+    transform: translate(0, 6px) scale(0.7);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(16px, -26px) scale(1.2);
+  }
+}
+.zzz span {
+  animation: zzz-drift 2.4s ease-out infinite;
+}
+.zzz span:nth-child(2) {
+  animation-delay: 0.8s;
+}
+.zzz span:nth-child(3) {
+  animation-delay: 1.6s;
+}

@@ -81,17 +81,28 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
               />
             </Link>
 
-            {/* Search bar */}
+            {/* Search bar — mascot peeks over the edge while you type */}
             <form onSubmit={handleSearch} className="hidden md:block">
               {' '}
               <div
                 className={cn(
-                  'shadow-inset-sm flex items-center gap-2 rounded-full border bg-surface-elevated px-3 py-2 transition-all duration-interactive ease-ease-out',
+                  'shadow-inset-sm group/search relative flex items-center gap-2 rounded-full border bg-surface-elevated px-3 py-2 transition-all duration-interactive ease-ease-out',
                   searchFocused
                     ? 'border-peach-500 shadow-clay-sm'
                     : 'border-line hover:border-line-strong',
                 )}
               >
+                <div
+                  aria-hidden="true"
+                  className={cn(
+                    'pointer-events-none absolute -top-7 right-3 origin-bottom transition-all duration-interactive ease-spring',
+                    searchFocused
+                      ? 'translate-y-0 scale-100 opacity-100'
+                      : 'translate-y-4 scale-75 opacity-0',
+                  )}
+                >
+                  <MascotImage size={36} className="drop-shadow-[0_3px_4px_rgba(147,107,73,0.3)]" />
+                </div>
                 <Search size={16} className="text-fg-placeholder" />
                 <input
                   type="text"
