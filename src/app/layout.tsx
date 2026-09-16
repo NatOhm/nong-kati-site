@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { IBM_Plex_Sans_Thai, JetBrains_Mono, Noto_Serif_Thai } from 'next/font/google';
+import { JetBrains_Mono, Mitr, Noto_Sans_Thai_Looped } from 'next/font/google';
 
 import { ThemeProvider } from '@/providers/ThemeProvider';
 import { CartProvider } from '@/providers/CartProvider';
@@ -8,17 +8,18 @@ import { ToastMount } from './ToastMount';
 
 import './globals.css';
 
-const ibmPlexSansThai = IBM_Plex_Sans_Thai({
+// Rounded, friendly faces: Mitr for display, Noto Sans Thai Looped for UI body.
+const mitr = Mitr({
   subsets: ['thai', 'latin'],
-  weight: ['300', '400', '500', '600', '700'],
-  variable: '--font-ibm-plex-sans-thai',
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-mitr',
   display: 'swap',
 });
 
-const notoSerifThai = Noto_Serif_Thai({
+const notoSansThaiLooped = Noto_Sans_Thai_Looped({
   subsets: ['thai', 'latin'],
-  weight: ['400', '600', '700'],
-  variable: '--font-noto-serif-thai',
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-noto-sans-thai-looped',
   display: 'swap',
 });
 
@@ -49,7 +50,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }):
   return (
     <html
       lang="th"
-      className={`${ibmPlexSansThai.variable} ${notoSerifThai.variable} ${jetbrainsMono.variable}`}
+      className={`${mitr.variable} ${notoSansThaiLooped.variable} ${jetbrainsMono.variable}`}
       suppressHydrationWarning
     >
       <head>

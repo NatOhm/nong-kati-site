@@ -16,18 +16,16 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   fullWidth?: boolean;
 }
 
-/* Claymorphism buttons: puffy dual shadows (white inner highlight + cocoa drop),
-   squish-press on active, spring lift on hover. Colors stay semantic so dark
-   mode inherits automatically. */
+/* Inflated pill clay buttons: hover gently expands (1.03), click squishes (0.96). */
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
-    'clay-btn bg-surface-brand text-fg-inverse border border-peach-600/30 shadow-clay-brand rounded-xl hover:bg-surface-brand-hover hover:shadow-clay-lg hover:-translate-y-0.5 active:shadow-clay-press active:translate-y-0 disabled:bg-surface-sunken disabled:text-fg-placeholder disabled:shadow-none disabled:cursor-not-allowed',
+    'clay-btn bg-surface-brand text-fg-inverse border border-peach-700/25 shadow-clay-brand rounded-full hover:bg-peach-600 hover:shadow-clay-lg hover:scale-[1.03] active:scale-[0.96] active:shadow-clay-press disabled:bg-surface-sunken disabled:text-fg-placeholder disabled:shadow-none disabled:cursor-not-allowed',
   secondary:
-    'clay-btn bg-surface-elevated text-fg-brand border border-line-brand shadow-clay-sm rounded-xl hover:shadow-clay hover:-translate-y-0.5 active:shadow-clay-press active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed',
+    'clay-btn bg-surface-elevated text-fg-brand border border-line-brand shadow-clay-sm rounded-full hover:shadow-clay hover:scale-[1.03] active:scale-[0.96] active:shadow-clay-press disabled:opacity-50 disabled:cursor-not-allowed',
   ghost:
-    'clay-btn bg-transparent text-fg-secondary border border-transparent rounded-xl shadow-none hover:bg-surface-sunken hover:border-line hover:shadow-clay-xs active:shadow-clay-press disabled:opacity-50 disabled:cursor-not-allowed',
+    'clay-btn bg-transparent text-fg-secondary border border-transparent rounded-full shadow-none hover:bg-surface-sunken hover:border-line hover:shadow-clay-xs active:scale-[0.96] active:shadow-clay-press disabled:opacity-50 disabled:cursor-not-allowed',
   destructive:
-    'clay-btn bg-crimson-500 text-white border border-crimson-700/40 shadow-clay-sm rounded-xl hover:shadow-clay hover:-translate-y-0.5 active:shadow-clay-press active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed',
+    'clay-btn bg-crimson-500 text-white border border-crimson-700/40 shadow-clay-sm rounded-full hover:shadow-clay hover:scale-[1.03] active:scale-[0.96] active:shadow-clay-press disabled:opacity-50 disabled:cursor-not-allowed',
   link: 'bg-transparent text-fg-brand border-none underline-offset-2 hover:underline disabled:opacity-50 disabled:cursor-not-allowed p-0 h-auto',
 };
 

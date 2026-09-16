@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ChevronUp } from 'lucide-react';
+import { AcornIcon } from '@/components/ui/ClayIcons';
 import { cn } from '@/utils/cn';
 
+/** Scroll-to-top: clay acorn that pops in with a bounce when you've scrolled down. */
 export function ScrollToTop() {
   const [isVisible, setIsVisible] = useState(false);
 
@@ -12,7 +13,7 @@ export function ScrollToTop() {
       setIsVisible(window.scrollY > 300);
     };
 
-    window.addEventListener('scroll', toggleVisibility);
+    window.addEventListener('scroll', toggleVisibility, { passive: true });
     return () => window.removeEventListener('scroll', toggleVisibility);
   }, []);
 
@@ -24,13 +25,16 @@ export function ScrollToTop() {
     <button
       onClick={scrollToTop}
       className={cn(
-        'fixed bottom-20 right-4 z-40 flex h-10 w-10 items-center justify-center rounded-full border border-line-subtle bg-surface text-fg-muted shadow-lg transition-all hover:border-peach-400 hover:bg-peach-500 hover:text-white',
+        'clay-btn fixed bottom-20 right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-surface-elevated shadow-clay transition-all duration-interactive ease-spring hover:scale-110 hover:shadow-clay-lg active:scale-90 active:shadow-clay-press',
         'lg:bottom-6 lg:right-6',
-        isVisible ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-4 opacity-0',
+        isVisible
+          ? 'translate-y-0 animate-seed-pop opacity-100'
+          : 'pointer-events-none translate-y-4 opacity-0',
       )}
       aria-label="เลื่อนขึ้นด้านบน"
+      title="เลื่อนขึ้นด้านบน"
     >
-      <ChevronUp size={20} />
+      <AcornIcon size={28} />
     </button>
   );
 }

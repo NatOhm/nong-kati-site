@@ -7,28 +7,39 @@
 
 :root {
   /* ── Primitive Colours ── */
-  --clay-50: #fffcf5;
-  --clay-100: #fff5e1;
-  --clay-200: #fbebd3;
-  --clay-300: #f3ddbf;
-  --clay-400: #e3c39c;
-  --clay-500: #c9a276;
-  --clay-600: #a9835c;
-  --clay-700: #936b49;
-  --clay-800: #6e5138;
-  --clay-900: #4a3320;
-  --clay-950: #382718;
+  /* Cozy clay ramp: warm white → oat → sand → cocoa text */
+  --clay-50: #fafaf9;
+  --clay-100: #fdf8ee;
+  --clay-200: #f5ebd8;
+  --clay-300: #eadcc3;
+  --clay-400: #d9c4a5;
+  --clay-500: #c2a57f;
+  --clay-600: #a98b63;
+  --clay-700: #8c6d46;
+  --clay-800: #6b4f2e;
+  --clay-900: #4e3820;
+  --clay-950: #3a2a18;
 
-  --peach-50: #fff3e8;
-  --peach-100: #ffe9d4;
-  --peach-200: #fecfad;
-  --peach-300: #f8c09a;
-  --peach-400: #f5b07e;
-  --peach-500: #e89455;
-  --peach-600: #d97f3e;
-  --peach-700: #b8652c;
-  --peach-800: #8f4e20;
-  --peach-900: #6b3a18;
+  /* Butterscotch ramp (primary accents) */
+  --peach-50: #fff7ed;
+  --peach-100: #ffedd5;
+  --peach-200: #fed7aa;
+  --peach-300: #fdba74;
+  --peach-400: #fb923c;
+  --peach-500: #f97316;
+  --peach-600: #ea580c;
+  --peach-700: #c2410c;
+  --peach-800: #9a3412;
+  --peach-900: #7c2d12;
+
+  /* Named motif colours */
+  --fawn: #d97706;
+  --blush: #fecdd3;
+  --warm-peach: #ffedd5;
+  --oat: #fef3c7;
+  --warm-white: #fafaf9;
+  --mint: #ecfdf5;
+  --sky: #f0f9ff;
 
   --coral-50: #fdf1f2;
   --coral-100: #fadcde;
@@ -41,26 +52,26 @@
   --coral-800: #8f2e38;
   --coral-900: #6b222b;
 
-  --ink-950: #2c1e12;
-  --ink-900: #382718;
-  --ink-850: #4a3320;
-  --ink-800: #6e5138;
-  --ink-700: #7d5f42;
-  --ink-600: #936b49;
-  --ink-400: #c9a276;
-  --ink-300: #e3c39c;
-  --ink-200: #f3ddbf;
-  --ink-100: #fbebd3;
-  --ink-50: #fff5e1;
+  --ink-950: #3a2a18;
+  --ink-900: #4e3820;
+  --ink-850: #6b4f2e;
+  --ink-800: #8c6d46;
+  --ink-700: #a98b63;
+  --ink-600: #c2a57f;
+  --ink-400: #d9c4a5;
+  --ink-300: #eadcc3;
+  --ink-200: #f5ebd8;
+  --ink-100: #fdf8ee;
+  --ink-50: #fafaf9;
 
-  --amber-950: #3d2410;
-  --amber-900: #4a3320;
-  --amber-700: #b8652c;
-  --amber-500: #d97f3e;
-  --amber-400: #f5b07e;
-  --amber-300: #f8c09a;
-  --amber-200: #fecfad;
-  --amber-100: #ffe9d4;
+  --amber-950: #7c2d12;
+  --amber-900: #9a3412;
+  --amber-700: #c2410c;
+  --amber-500: #f97316;
+  --amber-400: #fb923c;
+  --amber-300: #fdba74;
+  --amber-200: #fed7aa;
+  --amber-100: #ffedd5;
 
   --jade-900: #052213;
   --jade-700: #0a5c30;
@@ -84,8 +95,10 @@
   --topaz-200: #f8d890;
 
   /* ── Typography ── */
-  --font-display: 'Noto Serif Thai', 'Noto Serif', Georgia, serif;
-  --font-ui: 'IBM Plex Sans Thai', 'IBM Plex Sans', system-ui, sans-serif;
+  /* Rounded, friendly faces: Mitr (rounded Thai+Latin display),
+     Noto Sans Thai Looped (rounded looped Thai body), Quicksand/Nunito Latin. */
+  --font-display: var(--font-mitr), 'Quicksand', sans-serif;
+  --font-ui: var(--font-noto-sans-thai-looped), 'Nunito', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 
   --text-xs: 0.75rem;
@@ -144,27 +157,28 @@
   --shadow-lg: 0 8px 24px rgba(7, 11, 20, 0.7), 0 4px 8px rgba(7, 11, 20, 0.5);
   --shadow-xl: 0 16px 40px rgba(7, 11, 20, 0.8), 0 8px 16px rgba(7, 11, 20, 0.6);
 
-  --shadow-clay-xs: 0 1px 2px rgba(147, 107, 73, 0.1), inset 0 1px 2px rgba(255, 255, 255, 0.7);
-  --shadow-clay-sm: 0 2px 6px rgba(147, 107, 73, 0.14), 0 1px 2px rgba(147, 107, 73, 0.08),
-    inset 0 2px 4px rgba(255, 255, 255, 0.8);
-  --shadow-clay: 0 6px 16px rgba(147, 107, 73, 0.16), 0 2px 4px rgba(147, 107, 73, 0.1),
-    inset 0 3px 6px rgba(255, 255, 255, 0.85), inset 0 -3px 6px rgba(147, 107, 73, 0.08);
-  --shadow-clay-lg: 0 12px 28px rgba(147, 107, 73, 0.2), 0 4px 8px rgba(147, 107, 73, 0.12),
-    inset 0 4px 8px rgba(255, 255, 255, 0.9), inset 0 -4px 8px rgba(147, 107, 73, 0.1);
-  --shadow-clay-press: inset 0 3px 8px rgba(147, 107, 73, 0.22),
-    inset 0 -1px 2px rgba(255, 255, 255, 0.6);
-  --shadow-clay-brand: 0 6px 16px rgba(245, 176, 126, 0.45), 0 2px 4px rgba(217, 127, 62, 0.25),
-    inset 0 3px 6px rgba(255, 255, 255, 0.6), inset 0 -3px 6px rgba(147, 107, 73, 0.15);
+  /* Dual-volume clay: light inset top-left + soft dark drop bottom-right */
+  --shadow-clay-xs: 1px 1px 2px rgba(124, 45, 18, 0.08), inset 1px 1px 2px rgba(255, 255, 255, 0.9);
+  --shadow-clay-sm: 2px 3px 8px rgba(124, 45, 18, 0.1), inset 2px 2px 4px rgba(255, 255, 255, 0.95),
+    inset -1px -1px 2px rgba(217, 119, 6, 0.08);
+  --shadow-clay: 3px 6px 18px rgba(124, 45, 18, 0.12), 1px 2px 6px rgba(124, 45, 18, 0.08),
+    inset 3px 3px 6px rgba(255, 255, 255, 0.95), inset -2px -2px 5px rgba(217, 119, 6, 0.1);
+  --shadow-clay-lg: 4px 10px 28px rgba(124, 45, 18, 0.16), 2px 4px 10px rgba(124, 45, 18, 0.1),
+    inset 4px 4px 8px rgba(255, 255, 255, 1), inset -3px -3px 6px rgba(217, 119, 6, 0.12);
+  --shadow-clay-press: inset 3px 3px 8px rgba(124, 45, 18, 0.18),
+    inset -2px -2px 4px rgba(255, 255, 255, 0.5);
+  --shadow-clay-brand: 2px 6px 20px rgba(249, 115, 22, 0.35), 1px 2px 6px rgba(124, 45, 18, 0.2),
+    inset 2px 2px 4px rgba(255, 255, 255, 0.4), inset -2px -2px 4px rgba(124, 45, 18, 0.2);
 
-  --shadow-brand-glow: 0 0 0 1px rgba(245, 176, 126, 0.25), 0 4px 16px rgba(245, 176, 126, 0.4),
-    0 8px 32px rgba(245, 176, 126, 0.2);
-  --shadow-brand-glow-hover: 0 0 0 1px rgba(245, 176, 126, 0.35),
-    0 4px 20px rgba(245, 176, 126, 0.55), 0 12px 40px rgba(245, 176, 126, 0.3);
-  --shadow-code-glow: 0 0 0 1px rgba(245, 176, 126, 0.3), 0 2px 12px rgba(245, 176, 126, 0.25),
+  --shadow-brand-glow: 0 0 0 1px rgba(249, 115, 22, 0.25), 0 4px 16px rgba(249, 115, 22, 0.35),
+    0 8px 32px rgba(249, 115, 22, 0.18);
+  --shadow-brand-glow-hover: 0 0 0 1px rgba(249, 115, 22, 0.35), 0 4px 20px rgba(249, 115, 22, 0.5),
+    0 12px 40px rgba(249, 115, 22, 0.28);
+  --shadow-code-glow: 0 0 0 1px rgba(249, 115, 22, 0.3), 0 2px 12px rgba(249, 115, 22, 0.22),
     inset 0 1px 0 rgba(255, 255, 255, 0.5);
-  --shadow-focus-ring: 0 0 0 2px var(--bg-base), 0 0 0 4px rgba(232, 148, 85, 0.65);
-  --shadow-inset-sm: inset 0 1px 3px rgba(147, 107, 73, 0.15);
-  --shadow-inset-md: inset 0 2px 6px rgba(147, 107, 73, 0.2);
+  --shadow-focus-ring: 0 0 0 2px var(--bg-base), 0 0 0 4px rgba(249, 115, 22, 0.6);
+  --shadow-inset-sm: inset 2px 2px 4px rgba(124, 45, 18, 0.1);
+  --shadow-inset-md: inset 3px 3px 8px rgba(124, 45, 18, 0.14);
 
   /* ── Animation ── */
   --duration-instant: 80ms;
@@ -206,15 +220,15 @@
 /* ── Semantic Tokens: Light Clay (Default) ── */
 :root,
 [data-theme='light'] {
-  --bg-base: var(--peach-50);
-  --bg-surface: var(--clay-100);
-  --bg-nav: #f8e7cb; /* navbar sits visibly darker than the page base */
+  --bg-base: var(--peach-50); /* cream / warm vanilla #FFF7ED */
+  --bg-surface: var(--warm-white); /* warm white #FAFAF9 */
+  --bg-nav: #fdebd3; /* navbar sits visibly darker than the page base */
   --bg-elevated: #ffffff;
-  --bg-sunken: var(--clay-200);
-  --bg-overlay: rgba(74, 51, 32, 0.45);
-  --bg-brand: var(--peach-500);
-  --bg-brand-hover: var(--peach-400);
-  --bg-brand-subtle: var(--peach-50);
+  --bg-sunken: var(--oat); /* soft oat #FEF3C7 */
+  --bg-overlay: rgba(78, 56, 32, 0.45);
+  --bg-brand: var(--peach-500); /* butterscotch #F97316 */
+  --bg-brand-hover: var(--peach-600);
+  --bg-brand-subtle: var(--peach-100);
   --bg-success: #eaf7ee;
   --bg-error: var(--coral-50);
   --bg-warning: #fff6e0;

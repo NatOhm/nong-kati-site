@@ -2,15 +2,16 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Search, ShoppingCart, User } from 'lucide-react';
+import { Search, ShoppingCart } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { useCart } from '@/hooks/useCart';
+import { AcornIcon, SeedIcon, WheelIcon, PawIcon } from '@/components/ui/ClayIcons';
 
 const NAV_ITEMS = [
-  { icon: Home, href: '/', label: 'หน้าหลัก' },
-  { icon: Search, href: '/search', label: 'ค้นหา' },
-  { icon: ShoppingCart, href: '/checkout', label: 'ตะกร้า' },
-  { icon: User, href: '/account/login', label: 'บัญชี' },
+  { icon: AcornIcon, href: '/', label: 'หน้าหลัก', clay: true },
+  { icon: Search, href: '/search', label: 'ค้นหา', clay: false },
+  { icon: ShoppingCart, href: '/checkout', label: 'ตะกร้า', clay: false },
+  { icon: PawIcon, href: '/account/login', label: 'บัญชี', clay: true },
 ];
 
 export function MobileBottomNav() {
@@ -35,8 +36,17 @@ export function MobileBottomNav() {
                 isActive ? 'text-fg-brand' : 'text-fg-placeholder hover:text-clay-800',
               )}
             >
-              <div className="relative">
-                <Icon size={22} strokeWidth={isActive ? 2.5 : 1.5} />
+              <div
+                className={cn(
+                  'relative transition-transform duration-interactive ease-spring',
+                  isActive && 'scale-110',
+                )}
+              >
+                {item.clay ? (
+                  <Icon size={24} />
+                ) : (
+                  <Icon size={22} strokeWidth={isActive ? 2.5 : 1.5} />
+                )}
                 {isCart && itemCount > 0 && (
                   <span className="absolute -right-2 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
                     {itemCount}

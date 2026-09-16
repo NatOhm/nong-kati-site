@@ -19,6 +19,7 @@ import { CartIcon } from '@/components/cart/CartIcon';
 import { CartDrawer } from '@/components/cart/CartDrawer';
 import { NotificationsDropdown } from './NotificationsDropdown';
 import { ThemeToggle } from './ThemeToggle';
+import { AcornIcon } from '@/components/ui/ClayIcons';
 import { useCart } from '@/hooks/useCart';
 
 interface FacebookNavbarProps {
@@ -28,7 +29,7 @@ interface FacebookNavbarProps {
 }
 
 const NAV_ITEMS = [
-  { icon: Home, href: '/', label: 'หน้าหลัก' },
+  { icon: AcornIcon, href: '/', label: 'หน้าหลัก' },
   { icon: Grid3X3, href: '/search', label: 'สินค้าทั้งหมด' },
   { icon: Gamepad2, href: '/category/streaming', label: 'สตรีมมิ่ง' },
   { icon: Tv, href: '/category/asian-streaming', label: 'เอเชีย' },
@@ -121,7 +122,10 @@ export function FacebookNavbar({
                   title={item.label}
                   aria-label={item.label}
                 >
-                  <Icon size={22} strokeWidth={isActive ? 2.5 : 1.5} />
+                  <Icon
+                    size={item.icon === AcornIcon ? 24 : 22}
+                    strokeWidth={isActive ? 2.5 : 1.5}
+                  />
                   {isActive && (
                     <div className="absolute bottom-0 left-1/2 h-[3px] w-12 -translate-x-1/2 rounded-full bg-peach-500" />
                   )}

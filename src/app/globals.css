@@ -104,13 +104,13 @@
 /* ── Claymorphism utilities ── */
 @layer components {
   .clay-card {
-    background: #ffffff;
-    border-radius: 1rem;
+    background: var(--warm-white, #fafaf9);
+    border-radius: 28px;
     box-shadow:
-      0 6px 16px rgba(147, 107, 73, 0.14),
-      0 2px 4px rgba(147, 107, 73, 0.08),
-      inset 0 3px 6px rgba(255, 255, 255, 0.9),
-      inset 0 -3px 6px rgba(147, 107, 73, 0.06);
+      3px 6px 18px rgba(124, 45, 18, 0.12),
+      1px 2px 6px rgba(124, 45, 18, 0.08),
+      inset 3px 3px 6px rgba(255, 255, 255, 0.95),
+      inset -2px -2px 5px rgba(217, 119, 6, 0.1);
   }
 
   [data-theme='dark'] .clay-card {
@@ -144,4 +144,20 @@ aside {
     border-color 550ms cubic-bezier(0, 0, 0.2, 1),
     color 550ms cubic-bezier(0, 0, 0.2, 1),
     box-shadow 550ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+/* Body text: generous spacing per the cozy-clay spec */
+body {
+  letter-spacing: 0.01em;
+  line-height: 1.7;
+}
+
+/* Hamster mascot cheek-puff on group hover */
+.mascot-cheeks .cheek-l,
+.mascot-cheeks .cheek-r {
+  transition: r 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.group:hover .mascot-cheeks .cheek-l,
+.group:hover .mascot-cheeks .cheek-r {
+  r: 12;
 }
