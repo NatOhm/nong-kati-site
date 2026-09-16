@@ -4,6 +4,7 @@ import { AlertCircle, AlertTriangle, CheckCircle, Info, X } from 'lucide-react';
 import { useEffect } from 'react';
 
 import { cn } from '@/utils/cn';
+import { SuccessToast } from './SuccessToast';
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
 
@@ -14,6 +15,8 @@ export interface ToastData {
   message?: string;
   /** ms, default 4000; 0 = persist until dismissed. */
   duration?: number;
+  /** 'cart' renders the hamster-mascot success layout. */
+  variant?: 'cart' | undefined;
 }
 
 export interface ToastProps extends ToastData {
@@ -21,7 +24,7 @@ export interface ToastProps extends ToastData {
 }
 
 const iconByType: Record<ToastType, React.ReactNode> = {
-  success: <CheckCircle size={20} strokeWidth={1.5} className="text-jade-400" />,
+  success: <CheckCircle size={20} strokeWidth={1.5} className="text-jade-500" />,
   error: <AlertCircle size={20} strokeWidth={1.5} className="text-coral-600" />,
   warning: <AlertTriangle size={20} strokeWidth={1.5} className="text-topaz-400" />,
   info: <Info size={20} strokeWidth={1.5} className="text-sapphire-400" />,
@@ -34,6 +37,7 @@ export function Toast({
   title,
   message,
   duration = 4000,
+  variant,
   onDismiss,
 }: ToastProps): React.JSX.Element {
   useEffect(() => {
@@ -42,10 +46,29 @@ export function Toast({
     return () => clearTimeout(timer);
   }, [id, duration, onDismiss]);
 
+  if (variant === 'cart') {
+    return (
+      <div
+        role="status"
+        className="clay-card flex w-full max-w-sm animate-toast-enter items-start gap-3 rounded-xl p-4"
+      >
+        <SuccessToast title={title} message={message} />
+        <button
+          type="button"
+          aria-label="ปิดการแจ้งเตือน"
+          onClick={() => onDismiss(id)}
+          className="clay-btn rounded-full p-1 text-fg-placeholder transition-all hover:bg-surface-sunken hover:text-fg-secondary active:scale-90"
+        >
+          <X size={16} />
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div
       role={type === 'error' ? 'alert' : 'status'}
-      className="flex w-full max-w-sm animate-toast-enter items-start gap-3 rounded-lg border border-line-subtle bg-white p-4 shadow-lg"
+      className="clay-card flex w-full max-w-sm animate-toast-enter items-start gap-3 rounded-xl p-4"
     >
       {iconByType[type]}
       <div className="flex-1">
@@ -56,7 +79,7 @@ export function Toast({
         type="button"
         aria-label="ปิดการแจ้งเตือน"
         onClick={() => onDismiss(id)}
-        className="text-fg-placeholder hover:text-fg-secondary"
+        className="clay-btn rounded-full p-1 text-fg-placeholder transition-all hover:bg-surface-sunken hover:text-fg-secondary active:scale-90"
       >
         <X size={16} />
       </button>

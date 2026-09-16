@@ -7,6 +7,8 @@ import type { ToastData, ToastType } from '@/components/feedback/Toast';
 interface ToastOptions {
   message?: string;
   duration?: number;
+  /** 'cart' renders the hamster-mascot success layout. */
+  variant?: 'cart';
 }
 
 interface UseToastResult {
@@ -30,6 +32,7 @@ function push(type: ToastType, title: string, options?: ToastOptions): void {
   const id = crypto.randomUUID();
   const entry: ToastData = { id, type, title, duration: options?.duration ?? 4000 };
   if (options?.message) entry.message = options.message;
+  if (options?.variant) entry.variant = options.variant;
   toastState = [...toastState, entry];
   emit();
 }
@@ -50,9 +53,18 @@ export function useToast(): UseToastResult {
   }, []);
 
   const toast = {
-    success: useCallback((title: string, options?: ToastOptions) => push('success', title, options), []),
-    error: useCallback((title: string, options?: ToastOptions) => push('error', title, options), []),
-    warning: useCallback((title: string, options?: ToastOptions) => push('warning', title, options), []),
+    success: useCallback(
+      (title: string, options?: ToastOptions) => push('success', title, options),
+      [],
+    ),
+    error: useCallback(
+      (title: string, options?: ToastOptions) => push('error', title, options),
+      [],
+    ),
+    warning: useCallback(
+      (title: string, options?: ToastOptions) => push('warning', title, options),
+      [],
+    ),
     info: useCallback((title: string, options?: ToastOptions) => push('info', title, options), []),
   };
 

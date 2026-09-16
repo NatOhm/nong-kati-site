@@ -6,6 +6,7 @@ import { Check } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { formatThb } from '@/utils/format';
 import { useCart } from '@/hooks/useCart';
+import { useToast } from '@/hooks/useToast';
 import { QuickViewModal, type QuickViewVariant } from './QuickViewModal';
 import { StockBadge } from './StockBadge';
 
@@ -52,6 +53,7 @@ export function ProductCard({
   className,
 }: ProductCardProps): React.JSX.Element {
   const { addItem } = useCart();
+  const { toast } = useToast();
   const [buyState, setBuyState] = useState<BuyState>('idle');
   const [quickViewOpen, setQuickViewOpen] = useState(false);
   const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -84,9 +86,14 @@ export function ProductCard({
         1,
       );
       setBuyState('added');
+      toast.success('เพิ่มลงตะกร้าแล้ว', {
+        message: `${name} × 1`,
+        duration: 2600,
+        variant: 'cart',
+      });
       resetTimer.current = setTimeout(() => setBuyState('idle'), 1600);
     }, 450);
-  }, [canDirectAdd, variantId, buyState, addItem, slug, name, imageUrl, price, stock]);
+  }, [canDirectAdd, variantId, buyState, addItem, slug, name, imageUrl, price, stock, toast]);
 
   const buyLabel = buyState === 'added' ? 'เพิ่มแล้ว' : canDirectAdd ? 'ซื้อสินค้า' : 'เลือกราคา';
 

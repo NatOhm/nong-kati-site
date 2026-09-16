@@ -7,6 +7,7 @@ import { cn } from '@/utils/cn';
 import { formatThb } from '@/utils/format';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { useCart } from '@/hooks/useCart';
+import { useToast } from '@/hooks/useToast';
 
 export interface QuickViewVariant {
   id: string;
@@ -42,6 +43,7 @@ export function QuickViewModal({
   product,
 }: QuickViewModalProps): React.JSX.Element {
   const { addItem } = useCart();
+  const { toast } = useToast();
   const modalRef = useFocusTrap(isOpen);
   const available = product.variants.filter((v) => v.stock > 0);
   const [selectedId, setSelectedId] = useState<string | null>(available[0]?.id ?? null);
@@ -107,10 +109,15 @@ export function QuickViewModal({
           quantity,
         );
         setAddState('added');
+        toast.success('เพิ่มลงตะกร้าแล้ว', {
+          message: `${product.name} × ${quantity}`,
+          duration: 2600,
+          variant: 'cart',
+        });
         timers.current.push(setTimeout(onClose, 900));
       }, 450),
     );
-  }, [selected, addState, addItem, product, quantity, onClose]);
+  }, [selected, addState, addItem, product, quantity, onClose, toast]);
 
   if (!isOpen) return <></>;
 
