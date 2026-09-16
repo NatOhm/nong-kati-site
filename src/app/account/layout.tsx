@@ -6,7 +6,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import {
   LayoutDashboard,
   ShoppingBag,
@@ -19,6 +20,10 @@ import {
   LogOut,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
+import {
+  useCustomerSession,
+  type CustomerSessionState,
+} from '@/components/layout/useCustomerSession';
 
 const NAV_ITEMS = [
   { label: 'ภาพรวม', href: '/account/dashboard', icon: LayoutDashboard },
@@ -31,6 +36,25 @@ const NAV_ITEMS = [
   { label: 'ตั้งค่า', href: '/account/settings', icon: Settings },
 ];
 
+/**
+ * Customer auth guard: checks the real session cookie via /api/v1/auth/me.
+ * Guests browsing any /account/* page (except login/register) are redirected
+ * to login with a ?next= param so they land back where they started.
+ */
+function useRequireCustomer(isPublicPage: boolean): CustomerSessionState {
+  const router = useRouter();
+  const pathname = usePathname();
+  const state = useCustomerSession();
+
+  useEffect(() => {
+    if (state === 'guest' && !isPublicPage) {
+      router.replace(`/account/login?next=${encodeURIComponent(pathname ?? '/account/dashboard')}`);
+    }
+  }, [state, router, pathname, isPublicPage]);
+
+  return state;
+}
+
 // Pages that should NOT show the sidebar (auth pages)
 const PUBLIC_ACCOUNT_ROUTES = ['/account/login', '/account/register'];
 
@@ -39,12 +63,34 @@ export default function AccountLayout({
 }: {
   children: React.ReactNode;
 }): React.JSX.Element {
+  const router = useRouter();
   const pathname = usePathname();
   const isPublicPage = PUBLIC_ACCOUNT_ROUTES.some((r) => pathname?.startsWith(r));
+  const authState = useRequireCustomer(isPublicPage);
 
-  // Auth pages (login, register) render without sidebar
+  const handleLogout = async (): Promise<void> => {
+    await fetch('/api/v1/auth/logout', { method: 'POST' });
+    router.replace('/');
+    router.refresh();
+  };
+
+  // Auth pages (login, register) render without sidebar or guard
   if (isPublicPage) {
     return <>{children}</>;
+  }
+
+  // Private pages: block render until the session check resolves so a guest
+  // never sees dashboard content flash (and crawlers/no-JS get nothing private).
+  if (authState !== 'authed') {
+    return (
+      <div
+        className="flex min-h-[60vh] items-center justify-center"
+        role="status"
+        aria-label="กำลังตรวจสอบการเข้าสู่ระบบ"
+      >
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-peach-200 border-t-peach-500" />
+      </div>
+    );
   }
 
   return (
@@ -78,7 +124,13 @@ export default function AccountLayout({
             </ul>
 
             <div className="mt-4 border-t border-line-subtle pt-4">
-              <button className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-fg-placeholder transition-colors hover:bg-surface hover:text-coral-600">
+              <button
+                type="button"
+                onClick={() => {
+                  void handleLogout();
+                }}
+                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-fg-placeholder transition-colors hover:bg-surface hover:text-coral-600"
+              >
                 <LogOut size={16} />
                 ออกจากระบบ
               </button>

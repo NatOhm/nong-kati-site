@@ -19,12 +19,11 @@ import { CartIcon } from '@/components/cart/CartIcon';
 import { CartDrawer } from '@/components/cart/CartDrawer';
 import { NotificationsDropdown } from './NotificationsDropdown';
 import { ThemeToggle } from './ThemeToggle';
+import { useCustomerSession } from './useCustomerSession';
 import { AcornIcon } from '@/components/ui/ClayIcons';
 import { useCart } from '@/hooks/useCart';
 
 interface FacebookNavbarProps {
-  isAuthenticated?: boolean;
-  customerName?: string;
   onMenuToggle?: () => void;
 }
 
@@ -36,12 +35,11 @@ const NAV_ITEMS = [
   { icon: Music, href: '/category/music', label: 'เพลง' },
 ];
 
-export function FacebookNavbar({
-  isAuthenticated = false,
-  customerName,
-  onMenuToggle,
-}: FacebookNavbarProps) {
+export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
   const pathname = usePathname();
+  // Real session state — the support desk and profile links depend on it
+  const sessionState = useCustomerSession();
+  const isAuthenticated = sessionState === 'authed';
   const { cart, updateQuantity, removeItem, itemCount } = useCart();
   const [searchFocused, setSearchFocused] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -142,9 +140,13 @@ export function FacebookNavbar({
             {/* Notifications — popover */}
             <NotificationsDropdown />
 
-            {/* Messenger — support contact */}
+            {/* Messenger — support contact. The support desk lives inside the
+                logged-in area; guests are sent to login first and land back
+                on the support form after signing in. */}
             <Link
-              href="/account/support"
+              href={
+                isAuthenticated ? '/account/support' : '/account/login?next=%2Faccount%2Fsupport'
+              }
               aria-label="ฝ่ายสนับสนุน"
               title="ฝ่ายสนับสนุน"
               className="clay-btn flex h-10 w-10 items-center justify-center rounded-full text-fg-muted transition-all duration-interactive ease-ease-out hover:-translate-y-0.5 hover:text-fg-brand active:translate-y-0 active:scale-95 active:shadow-clay-press"

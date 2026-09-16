@@ -7,11 +7,18 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { LogIn, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
+/** Only allow same-site relative paths in ?next= (no open redirect). */
+function safeNext(raw: string | null): string {
+  if (raw && raw.startsWith('/') && !raw.startsWith('//')) return raw;
+  return '/account/dashboard';
+}
 
 export default function LoginPage(): React.JSX.Element {
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -33,7 +40,7 @@ export default function LoginPage(): React.JSX.Element {
       const data = await res.json();
 
       if (res.ok && data.success) {
-        window.location.href = '/account/dashboard';
+        window.location.href = safeNext(searchParams.get('next'));
         return;
       }
       if (data.error === 'ACCOUNT_LOCKED') {

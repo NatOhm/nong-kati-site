@@ -41,7 +41,6 @@ export default function AccountSupportPage(): React.JSX.Element {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-fg">สนับสนุน</h1>
-
       <div className="rounded-md border border-line-subtle bg-white p-6">
         <p className="mb-4 text-sm text-fg-placeholder">
           มีปัญหา? ส่งข้อความหาเรา เราจะตอบกลับภายใน 24 ชั่วโมง
@@ -82,7 +81,6 @@ export default function AccountSupportPage(): React.JSX.Element {
           </button>
         </form>
       </div>
-
       {/* Contact Info */}
       <div className="rounded-md border border-line-subtle bg-white p-6">
         <h2 className="mb-3 text-lg font-semibold text-fg">ช่องทางอื่น</h2>
@@ -95,7 +93,7 @@ export default function AccountSupportPage(): React.JSX.Element {
           </p>
           <p>เวลาทำการ: จันทร์-ศุกร์ 9:00-18:00</p>
         </div>
-      </div>
+      </div>{' '}
     </div>
   );
 }
