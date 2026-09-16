@@ -171,6 +171,8 @@ export default async function SearchPage({
                       categorySlug={product.category.slug}
                       price={product.variants[0]?.price ?? 0}
                       stock={product.variants.reduce((sum, v) => sum + v.stock, 0)}
+                      variantId={product.variants[0]?.id}
+                      variantCount={product.variants.length}
                     />
                   ))}
                 </ProductGrid>
