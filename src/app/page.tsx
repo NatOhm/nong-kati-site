@@ -162,6 +162,12 @@ export default async function HomePage(): Promise<React.JSX.Element> {
                     stock={product.variants.reduce((sum, v) => sum + v.stock, 0)}
                     variantId={product.variants[0]?.id}
                     variantCount={product.variants.length}
+                    variants={product.variants.map((v) => ({
+                      id: v.id,
+                      label: v.label,
+                      price: v.price,
+                      stock: v.stock,
+                    }))}
                   />
                 ))}
               </ProductGrid>
