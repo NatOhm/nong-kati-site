@@ -196,7 +196,7 @@ export default async function HomePage(): Promise<React.JSX.Element> {
                 >
                   <span className="shrink-0 text-2xl font-bold text-peach-500">{item.step}</span>
                   <div>
-                    <h3 className="text-sm font-semibold text-clay-800">{item.title}</h3>
+                    <h3 className="text-sm font-semibold text-fg">{item.title}</h3>
                     <p className="text-xs text-fg-muted">{item.desc}</p>
                   </div>
                 </div>

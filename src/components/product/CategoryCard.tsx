@@ -84,7 +84,7 @@ export function CategoryCard({
       </div>
 
       {/* Name */}
-      <h3 className="text-sm font-semibold text-clay-800 transition-colors group-hover:text-fg-brand">
+      <h3 className="text-sm font-semibold text-fg transition-colors group-hover:text-fg-brand">
         {name}
       </h3>
 

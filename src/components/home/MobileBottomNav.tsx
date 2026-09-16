@@ -33,7 +33,7 @@ export function MobileBottomNav() {
               href={item.href}
               className={cn(
                 'flex min-w-[60px] flex-col items-center gap-0.5 rounded-lg px-3 py-2 transition-colors',
-                isActive ? 'text-fg-brand' : 'text-fg-placeholder hover:text-clay-800',
+                isActive ? 'text-fg-brand' : 'text-fg-placeholder hover:text-fg-secondary',
               )}
             >
               <div

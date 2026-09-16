@@ -133,7 +133,7 @@ export function ProductCard({
 
           <div className="flex flex-col gap-1.5 p-3 pb-0">
             <span className="text-xs font-medium text-fg-brand">{categoryName}</span>
-            <h3 className="line-clamp-2 text-sm font-semibold text-clay-800 transition-colors group-hover:text-fg-brand dark:text-clay-200 dark:group-hover:text-fg-brand">
+            <h3 className="line-clamp-2 text-sm font-semibold text-fg transition-colors group-hover:text-fg-brand">
               {name}
             </h3>
             {shortDescription && (
