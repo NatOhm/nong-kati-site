@@ -47,7 +47,7 @@ model Product {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  category  Category          @relation(fields: [categoryId], references: [id])
+  category  Category            @relation(fields: [categoryId], references: [id])
   variants  ProductVariant[]
   aliases   ProductAlias[]
   inventory InventorySnapshot[]
@@ -70,7 +70,7 @@ model ProductVariant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  product       Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product       Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
   inventory     InventorySnapshot[]
   cartItems     CartItem[]
   orderItems    OrderItem[]
@@ -97,15 +97,15 @@ model ProductAlias {
 // ─── Inventory Snapshots (for stock tracking) ─────────────
 
 model InventorySnapshot {
-  id              String   @id @default(cuid())
-  productId       String
+  id               String   @id @default(cuid())
+  productId        String
   productVariantId String
-  previousStock   Int
-  newStock        Int
-  reason          String
-  createdAt       DateTime @default(now())
+  previousStock    Int
+  newStock         Int
+  reason           String
+  createdAt        DateTime @default(now())
 
-  product       Product        @relation(fields: [productId], references: [id])
+  product        Product        @relation(fields: [productId], references: [id])
   productVariant ProductVariant @relation(fields: [productVariantId], references: [id])
 
   @@index([productId])
@@ -115,12 +115,12 @@ model InventorySnapshot {
 // ─── Carts (§9) ──────────────────────────────────────────
 
 model Cart {
-  id          String   @id @default(cuid())
-  customerId  String?
-  sessionKey  String   @unique
-  expiresAt   DateTime
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(cuid())
+  customerId String?
+  sessionKey String   @unique
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   items CartItem[]
 
@@ -132,13 +132,13 @@ model Cart {
 // ─── Cart Items (§9) ─────────────────────────────────────
 
 model CartItem {
-  id            String   @id @default(cuid())
-  cartId        String
-  variantId     String
-  quantity      Int      @default(1)
-  unitPriceThb  Decimal  @db.Decimal(10, 2)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String   @id @default(cuid())
+  cartId       String
+  variantId    String
+  quantity     Int      @default(1)
+  unitPriceThb Decimal  @db.Decimal(10, 2)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   cart    Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
   variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
@@ -148,41 +148,64 @@ model CartItem {
   @@index([variantId])
 }
 
+// ─── Customers (08-auth.md §3) ───────────────────────────
+
+model Customer {
+  id                  String    @id @default(cuid())
+  email               String    @unique
+  passwordHash        String
+  fullName            String?
+  phoneNumber         String?
+  status              String    @default("active") // active | blocked | anonymised
+  emailVerified       Boolean   @default(false)
+  marketingOptIn      Boolean   @default(false)
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+  lastLoginAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  orders Order[]
+
+  @@index([email])
+}
+
 // ─── Orders (§10) ────────────────────────────────────────
 
 model Order {
-  id                    String   @id @default(cuid())
-  orderNumber           String   @unique
-  customerId            String?
-  customerEmail         String
-  customerPhone         String?
-  status                String   @default("pending_payment")
-  paymentMethod         String?
-  subtotalThb           Decimal  @db.Decimal(10, 2)
-  vatAmountThb          Decimal  @db.Decimal(10, 2)
-  totalAmountThb        Decimal  @db.Decimal(10, 2)
-  lineOptIn             Boolean  @default(false)
-  marketingOptIn        Boolean  @default(false)
-  tosAcceptedAt         DateTime
-  tosVersion            String   @default("1.0")
-  requiresTaxInvoice    Boolean  @default(false)
-  taxInvoiceName        String?
-  taxInvoiceTaxId       String?
-  ipAddress             String?
-  userAgent             String?
-  confirmationUuid      String   @default("") @unique
-  notes                 String?
+  id                     String    @id @default(cuid())
+  orderNumber            String    @unique
+  customerId             String?
+  customerEmail          String
+  customerPhone          String?
+  status                 String    @default("pending_payment")
+  paymentMethod          String?
+  subtotalThb            Decimal   @db.Decimal(10, 2)
+  vatAmountThb           Decimal   @db.Decimal(10, 2)
+  totalAmountThb         Decimal   @db.Decimal(10, 2)
+  lineOptIn              Boolean   @default(false)
+  marketingOptIn         Boolean   @default(false)
+  tosAcceptedAt          DateTime
+  tosVersion             String    @default("1.0")
+  requiresTaxInvoice     Boolean   @default(false)
+  taxInvoiceName         String?
+  taxInvoiceTaxId        String?
+  ipAddress              String?
+  userAgent              String?
+  confirmationUuid       String    @unique @default("")
+  notes                  String?
   manualFulfilmentReason String?
-  completedAt           DateTime?
-  expiredAt             DateTime?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  completedAt            DateTime?
+  expiredAt              DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
-  items          OrderItem[]
+  customer        Customer?        @relation(fields: [customerId], references: [id])
+  items           OrderItem[]
   paymentAttempts PaymentAttempt[]
-  giftCodes      GiftCode[]
-  invoices       Invoice[]
-  refunds        Refund[]
+  giftCodes       GiftCode[]
+  invoices        Invoice[]
+  refunds         Refund[]
 
   @@index([customerId])
   @@index([customerEmail])
@@ -194,25 +217,25 @@ model Order {
 // ─── Order Items (§10) ───────────────────────────────────
 
 model OrderItem {
-  id                String   @id @default(cuid())
-  orderId           String
-  variantId         String
-  productNameTh     String
-  productNameEn     String
-  skuCode           String
-  denominationThb   Decimal  @db.Decimal(10, 2)
-  quantity          Int
-  unitPriceThb      Decimal  @db.Decimal(10, 2)
-  unitPriceExVat    Decimal  @db.Decimal(10, 2)
-  unitVatAmount     Decimal  @db.Decimal(10, 2)
-  lineTotalThb      Decimal  @db.Decimal(10, 2)
-  deliveryStatus    String   @default("pending")
-  deliveredAt       DateTime?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id              String    @id @default(cuid())
+  orderId         String
+  variantId       String
+  productNameTh   String
+  productNameEn   String
+  skuCode         String
+  denominationThb Decimal   @db.Decimal(10, 2)
+  quantity        Int
+  unitPriceThb    Decimal   @db.Decimal(10, 2)
+  unitPriceExVat  Decimal   @db.Decimal(10, 2)
+  unitVatAmount   Decimal   @db.Decimal(10, 2)
+  lineTotalThb    Decimal   @db.Decimal(10, 2)
+  deliveryStatus  String    @default("pending")
+  deliveredAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  order     Order           @relation(fields: [orderId], references: [id], onDelete: Restrict)
-  variant   ProductVariant  @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  order     Order          @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
   giftCodes GiftCode[]
 
   @@index([orderId])
@@ -222,30 +245,30 @@ model OrderItem {
 // ─── Gift Codes (§8) ─────────────────────────────────────
 
 model GiftCode {
-  id              String   @id @default(cuid())
-  variantId       String
-  codeEncrypted   Bytes
-  codeHash        Bytes    @unique
-  nonce           Bytes
-  keyVersion      Int      @default(1)
-  status          String   @default("available")
-  orderId         String?
-  orderItemId     String?
-  voidedById      String?
-  voidReason      String?
-  uploadedById    String?
-  uploadBatchId   String?
-  reservedAt      DateTime?
-  deliveredAt     DateTime?
-  voidedAt        DateTime?
-  expiresAt       DateTime?
-  expiredAt       DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id            String    @id @default(cuid())
+  variantId     String
+  codeEncrypted Bytes
+  codeHash      Bytes     @unique
+  nonce         Bytes
+  keyVersion    Int       @default(1)
+  status        String    @default("available")
+  orderId       String?
+  orderItemId   String?
+  voidedById    String?
+  voidReason    String?
+  uploadedById  String?
+  uploadBatchId String?
+  reservedAt    DateTime?
+  deliveredAt   DateTime?
+  voidedAt      DateTime?
+  expiresAt     DateTime?
+  expiredAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  variant     ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
-  order       Order?         @relation(fields: [orderId], references: [id], onDelete: Restrict)
-  orderItem   OrderItem?     @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  variant     ProductVariant   @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  order       Order?           @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  orderItem   OrderItem?       @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
   uploadBatch CodeUploadBatch? @relation(fields: [uploadBatchId], references: [id], onDelete: Restrict)
 
   @@index([variantId, status])
@@ -257,17 +280,17 @@ model GiftCode {
 // ─── Code Upload Batches (§8) ────────────────────────────
 
 model CodeUploadBatch {
-  id               String   @id @default(cuid())
+  id               String    @id @default(cuid())
   variantId        String
   uploadedById     String
   originalFilename String
-  totalRows        Int      @default(0)
-  importedCount    Int      @default(0)
-  rejectedCount    Int      @default(0)
+  totalRows        Int       @default(0)
+  importedCount    Int       @default(0)
+  rejectedCount    Int       @default(0)
   rejectionDetails Json?
-  status           String   @default("processing")
+  status           String    @default("processing")
   completedAt      DateTime?
-  createdAt        DateTime @default(now())
+  createdAt        DateTime  @default(now())
 
   variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
   codes   GiftCode[]
@@ -278,24 +301,24 @@ model CodeUploadBatch {
 // ─── Payment Attempts (§10) ──────────────────────────────
 
 model PaymentAttempt {
-  id                    String   @id @default(cuid())
+  id                    String    @id @default(cuid())
   orderId               String
   paymentMethod         String
-  status                String   @default("pending")
-  amountThb             Decimal  @db.Decimal(10, 2)
+  status                String    @default("pending")
+  amountThb             Decimal   @db.Decimal(10, 2)
   gatewayName           String
   gatewayRef            String?
   gatewayStatusCode     String?
   gatewayResponse       Json?
   failureReason         String?
   qrExpiresAt           DateTime?
-  threeDsRequired       Boolean  @default(false)
+  threeDsRequired       Boolean   @default(false)
   threeDsStatus         String?
   webhookReceivedAt     DateTime?
   webhookSignatureValid Boolean?
-  attemptNumber         Int      @default(1)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  attemptNumber         Int       @default(1)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
 
@@ -308,15 +331,15 @@ model PaymentAttempt {
 // ─── Invoices (§12) ──────────────────────────────────────
 
 model Invoice {
-  id                 String   @id @default(cuid())
-  orderId            String
-  invoiceType        String
-  invoiceNumber      String   @unique
-  pdfStorageKey      String?
-  pdfGeneratedAt     DateTime?
-  pdfGenerationFailed Boolean @default(false)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                  String    @id @default(cuid())
+  orderId             String
+  invoiceType         String
+  invoiceNumber       String    @unique
+  pdfStorageKey       String?
+  pdfGeneratedAt      DateTime?
+  pdfGenerationFailed Boolean   @default(false)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
 
@@ -327,15 +350,15 @@ model Invoice {
 // ─── Refunds (11-admin.md §14.1) ──────────────────────────
 
 model Refund {
-  id                    String   @id @default(cuid())
-  orderId               String
-  amountThb             Decimal  @db.Decimal(10, 2)
-  reasonCategory        String
-  reasonDetail          String?
+  id                     String   @id @default(cuid())
+  orderId                String
+  amountThb              Decimal  @db.Decimal(10, 2)
+  reasonCategory         String
+  reasonDetail           String?
   gatewayRefundReference String
-  codesVoidedCount      Int      @default(0)
-  initiatedBy           String
-  createdAt             DateTime @default(now())
+  codesVoidedCount       Int      @default(0)
+  initiatedBy            String
+  createdAt              DateTime @default(now())
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
 
@@ -349,18 +372,18 @@ model Refund {
 // ─── Audit Logs (06-database.md §14, 11-admin.md §14.1) ────
 
 model AuditLog {
-  id          String   @id @default(cuid())
-  actorType   String
-  actorId     String
-  actorEmail  String
-  action      String
-  tableName   String
-  recordId    String
-  diffBefore  Json?
-  diffAfter   Json?
-  ipAddress   String?
-  metadata    Json?
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  actorType  String
+  actorId    String
+  actorEmail String
+  action     String
+  tableName  String
+  recordId   String
+  diffBefore Json?
+  diffAfter  Json?
+  ipAddress  String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
 
   @@index([actorType, actorId])
   @@index([action])

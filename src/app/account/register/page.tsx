@@ -8,7 +8,6 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { UserPlus, Mail, Lock, Eye, EyeOff } from 'lucide-react';
-import { registerCustomer } from '@/api/customerAuth';
 
 export default function RegisterPage(): React.JSX.Element {
   const [email, setEmail] = useState('');
@@ -38,18 +37,28 @@ export default function RegisterPage(): React.JSX.Element {
       return;
     }
 
-    const params: Parameters<typeof registerCustomer>[0] = { email, password, marketingOptIn };
-    if (fullName) params.fullName = fullName;
-    const result = await registerCustomer(params);
+    try {
+      const res = await fetch('/api/v1/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, fullName: fullName || undefined, marketingOptIn }),
+      });
+      const data = await res.json();
 
-    if (result.success) {
-      setSuccess(true);
-    } else {
+      if (res.ok && data.success) {
+        // Registered and auto-logged-in via session cookie
+        window.location.href = '/account/dashboard';
+        return;
+      }
       setError(
-        result.error === 'EMAIL_ALREADY_EXISTS'
+        data.error === 'EMAIL_ALREADY_EXISTS'
           ? 'อีเมลนี้ถูกใช้งานแล้ว'
-          : 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง',
+          : data.error === 'PASSWORD_TOO_SHORT'
+            ? 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร'
+            : 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง',
       );
+    } catch {
+      setError('เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
     }
 
     setLoading(false);

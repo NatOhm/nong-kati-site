@@ -9,7 +9,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { LogIn, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { cn } from '@/utils/cn';
-import { loginCustomer } from '@/api/customerAuth';
+
 
 export default function LoginPage(): React.JSX.Element {
   const [email, setEmail] = useState('');
@@ -24,20 +24,28 @@ export default function LoginPage(): React.JSX.Element {
     setLoading(true);
     setError(null);
 
-    const result = await loginCustomer({ email, password, rememberMe });
+    try {
+      const res = await fetch('/api/v1/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, rememberMe }),
+      });
+      const data = await res.json();
 
-    if (result.success) {
-      // In production: store access token in memory, set refresh cookie
-      window.location.href = '/account/dashboard';
-    } else {
-      if (result.error === 'ACCOUNT_LOCKED') {
-        const retryMin = Math.ceil((result.retryAfterMs ?? 0) / 60000);
+      if (res.ok && data.success) {
+        window.location.href = '/account/dashboard';
+        return;
+      }
+      if (data.error === 'ACCOUNT_LOCKED') {
+        const retryMin = Math.ceil((data.retryAfterMs ?? 0) / 60000);
         setError(`บัญชีถูกล็อคชั่วคราว กรุณารอ ${retryMin} นาที`);
-      } else if (result.error === 'ACCOUNT_BLOCKED') {
+      } else if (data.error === 'ACCOUNT_BLOCKED') {
         setError('บัญชีถูกบล็อค กรุณาติดต่อฝ่ายสนับสนุน');
       } else {
         setError('อีเมลหรือรหัสผ่านไม่ถูกต้อง');
       }
+    } catch {
+      setError('เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
     }
 
     setLoading(false);

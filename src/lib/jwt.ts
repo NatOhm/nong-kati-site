@@ -4,7 +4,7 @@
  *
  * In production: real RSA key pairs from env vars.
  * For M4/M5/M6 mock: HMAC-SHA256 with shared secret for simplicity.
- * 
+ *
  * Browser-compatible: uses Web Crypto API instead of Node.js crypto.
  */
 
@@ -31,7 +31,9 @@ function toBase64Url(data: Uint8Array): string {
 
 function stringToBase64Url(str: string): string {
   return btoa(unescape(encodeURIComponent(str)))
-    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
 }
 
 function base64UrlToString(b64: string): string {
@@ -50,27 +52,33 @@ function getRandomHex(length: number): string {
       bytes[i] = Math.floor(Math.random() * 256);
     }
   }
-  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 async function hmacSha256(key: string, message: string): Promise<string> {
   const encoder = new TextEncoder();
   const keyData = encoder.encode(key);
   const msgData = encoder.encode(message);
-  
+
   if (typeof globalThis.crypto !== 'undefined' && globalThis.crypto.subtle) {
     const cryptoKey = await globalThis.crypto.subtle.importKey(
-      'raw', keyData, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+      'raw',
+      keyData,
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign'],
     );
     const sig = await globalThis.crypto.subtle.sign('HMAC', cryptoKey, msgData);
     return toBase64Url(new Uint8Array(sig));
   }
-  
+
   // Fallback: simple hash for mock mode
   let hash = 0;
   for (let i = 0; i < message.length; i++) {
     const char = message.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
+    hash = (hash << 5) - hash + char;
     hash = hash & hash;
   }
   return stringToBase64Url(JSON.stringify({ hash, key: key.slice(0, 8) }));
@@ -81,7 +89,10 @@ async function hmacSha256(key: string, message: string): Promise<string> {
 /**
  * Sign a JWT token (mock HMAC mode).
  */
-export async function signJwt(payload: Record<string, unknown>, expiresIn: number = ACCESS_TOKEN_TTL): Promise<string> {
+export async function signJwt(
+  payload: Record<string, unknown>,
+  expiresIn: number = ACCESS_TOKEN_TTL,
+): Promise<string> {
   const header = { alg: ALGORITHM, typ: 'JWT' };
   const now = Math.floor(Date.now() / 1000);
 
@@ -176,7 +187,7 @@ export async function hashRefreshToken(token: string): Promise<string> {
   // Simple hash fallback for mock mode
   let h = 0;
   for (let i = 0; i < token.length; i++) {
-    h = ((h << 5) - h) + token.charCodeAt(i);
+    h = (h << 5) - h + token.charCodeAt(i);
     h = h & h;
   }
   return Math.abs(h).toString(16).padStart(8, '0');
@@ -188,7 +199,10 @@ export async function hashRefreshToken(token: string): Promise<string> {
  */
 export function generateTotpSecret(): string {
   const bytes = getRandomHex(20);
-  return bytes.toUpperCase().replace(/[^A-Z2-7]/g, '').slice(0, 32);
+  return bytes
+    .toUpperCase()
+    .replace(/[^A-Z2-7]/g, '')
+    .slice(0, 32);
 }
 
 /**
