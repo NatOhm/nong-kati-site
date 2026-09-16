@@ -97,10 +97,12 @@ export default async function HomePage(): Promise<React.JSX.Element> {
             {/* Clay hamster mascot peeking over the CTA card — cheeks puff on card hover */}
             <div className="group relative">
               <div className="pointer-events-none absolute -top-16 right-2 z-10 animate-float md:-top-20">
-                <MascotImage
-                  size={120}
-                  className="drop-shadow-[0_10px_18px_rgba(147,107,73,0.35)]"
-                />
+                <div className="mascot-hello">
+                  <MascotImage
+                    size={120}
+                    className="drop-shadow-[0_10px_18px_rgba(147,107,73,0.35)]"
+                  />
+                </div>
               </div>
               <DeliveredCodeCard />
             </div>
