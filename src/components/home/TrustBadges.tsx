@@ -50,7 +50,7 @@ export function TrustBadges() {
             >
               {badge.icon}
             </div>
-            <h3 className="text-sm font-semibold text-clay-800">{badge.title}</h3>
+            <h3 className="text-sm font-semibold text-fg-secondary">{badge.title}</h3>
             <p className="text-xs text-fg-muted">{badge.desc}</p>
           </div>
         ))}

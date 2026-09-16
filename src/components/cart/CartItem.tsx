@@ -30,7 +30,9 @@ export function CartItem({ item, onUpdateQty, onRemove }: CartItemProps): React.
     <div
       className={cn(
         'flex gap-3 rounded-md border p-3 transition-colors',
-        item.inStock ? 'border-line-subtle bg-white' : 'border-crimson-700/50 bg-crimson-900/10',
+        item.inStock
+          ? 'border-line-subtle bg-surface-elevated'
+          : 'border-crimson-700/50 bg-crimson-900/10',
       )}
     >
       {/* Thumbnail */}

@@ -18,6 +18,7 @@ import { cn } from '@/utils/cn';
 import { CartIcon } from '@/components/cart/CartIcon';
 import { CartDrawer } from '@/components/cart/CartDrawer';
 import { NotificationsDropdown } from './NotificationsDropdown';
+import { ThemeToggle } from './ThemeToggle';
 import { useCart } from '@/hooks/useCart';
 
 interface FacebookNavbarProps {
@@ -54,32 +55,36 @@ export function FacebookNavbar({
 
   return (
     <>
-      <nav className="bg-surface-base/95 sticky top-0 z-50 border-b border-line-subtle shadow-clay-xs backdrop-blur-md">
+      {/* Slightly darker than the page base — anchors the chrome without going dark */}
+      <nav className="sticky top-0 z-50 border-b border-line bg-surface-nav shadow-clay-sm backdrop-blur-md">
         <div className="mx-auto flex h-14 items-center justify-between px-4 md:h-16 md:px-6">
           {/* Left: Logo + Search */}
           <div className="flex items-center gap-3">
             {/* Mobile menu button - opens sidebar drawer */}
             <button
               onClick={onMenuToggle}
-              className="cursor-pointer rounded-lg p-2 text-fg-muted hover:bg-clay-200 hover:text-fg-brand lg:hidden"
+              className="clay-btn cursor-pointer rounded-lg p-2 text-fg-muted transition-all duration-interactive ease-ease-out hover:-translate-y-0.5 hover:text-fg-brand active:translate-y-0 active:scale-95 active:shadow-clay-press lg:hidden"
               aria-label="เปิดเมนู"
             >
               <Menu size={22} />
             </button>
 
             {/* Logo */}
-            <Link href="/" className="flex items-center gap-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-peach-400 shadow-clay-sm">
+            <Link href="/" className="group flex items-center gap-2">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-peach-400 shadow-clay-sm transition-transform duration-interactive ease-spring group-hover:scale-110 group-active:scale-95">
                 <span className="text-lg font-bold text-peach-800">NK</span>
               </div>
             </Link>
 
             {/* Search bar */}
             <form onSubmit={handleSearch} className="hidden md:block">
+              {' '}
               <div
                 className={cn(
-                  'flex items-center gap-2 rounded-full border px-3 py-2 transition-colors',
-                  searchFocused ? 'border-peach-500 bg-white' : 'border-line bg-white',
+                  'shadow-inset-sm flex items-center gap-2 rounded-full border bg-surface-elevated px-3 py-2 transition-all duration-interactive ease-ease-out',
+                  searchFocused
+                    ? 'border-peach-500 shadow-clay-sm'
+                    : 'border-line hover:border-line-strong',
                 )}
               >
                 <Search size={16} className="text-fg-placeholder" />
@@ -108,10 +113,10 @@ export function FacebookNavbar({
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    'group relative flex h-12 w-24 items-center justify-center rounded-lg transition-colors',
+                    'group relative flex h-12 w-24 items-center justify-center rounded-xl transition-all duration-interactive ease-ease-out',
                     isActive
                       ? 'text-fg-brand'
-                      : 'text-fg-placeholder hover:bg-clay-200 hover:text-clay-800',
+                      : 'text-fg-placeholder hover:-translate-y-0.5 hover:bg-surface-sunken hover:text-fg-secondary active:translate-y-0 active:scale-95',
                   )}
                   title={item.label}
                   aria-label={item.label}
@@ -138,7 +143,7 @@ export function FacebookNavbar({
               href="/account/support"
               aria-label="ฝ่ายสนับสนุน"
               title="ฝ่ายสนับสนุน"
-              className="flex h-10 w-10 items-center justify-center rounded-full text-fg-muted transition-colors hover:bg-clay-200 hover:text-fg-brand"
+              className="clay-btn flex h-10 w-10 items-center justify-center rounded-full text-fg-muted transition-all duration-interactive ease-ease-out hover:-translate-y-0.5 hover:text-fg-brand active:translate-y-0 active:scale-95 active:shadow-clay-press"
             >
               <MessageCircle size={20} strokeWidth={1.5} />
             </Link>
@@ -148,10 +153,13 @@ export function FacebookNavbar({
               href={isAuthenticated ? '/account/dashboard' : '/account/login'}
               aria-label={isAuthenticated ? 'บัญชีของฉัน' : 'เข้าสู่ระบบ'}
               title={isAuthenticated ? 'บัญชีของฉัน' : 'เข้าสู่ระบบ'}
-              className="flex h-10 w-10 items-center justify-center rounded-full text-fg-muted hover:bg-clay-200 hover:text-fg-brand"
+              className="clay-btn flex h-10 w-10 items-center justify-center rounded-full text-fg-muted transition-all duration-interactive ease-ease-out hover:-translate-y-0.5 hover:text-fg-brand active:translate-y-0 active:scale-95 active:shadow-clay-press"
             >
               <User size={20} />
             </Link>
+
+            {/* Light/dark */}
+            <ThemeToggle />
           </div>
         </div>
       </nav>

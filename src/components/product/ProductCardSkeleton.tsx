@@ -13,7 +13,7 @@ export function ProductCardSkeleton({ className }: ProductCardSkeletonProps): Re
   return (
     <div
       className={cn(
-        'flex animate-pulse flex-col overflow-hidden rounded-lg border border-line-subtle bg-white',
+        'flex animate-pulse flex-col overflow-hidden rounded-xl border border-line-subtle bg-surface-elevated',
         className,
       )}
     >

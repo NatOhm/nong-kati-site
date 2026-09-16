@@ -77,7 +77,7 @@ function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
           </div>
           <button
             onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-full text-fg-muted hover:bg-clay-200"
+            className="flex h-10 w-10 items-center justify-center rounded-full text-fg-muted hover:bg-surface-sunken"
           >
             <X size={22} />
           </button>
@@ -100,14 +100,14 @@ function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
                 className={cn(
                   'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150',
                   isActive
-                    ? 'bg-peach-100 text-peach-800'
-                    : 'text-fg-secondary hover:bg-clay-200 hover:text-fg',
+                    ? 'bg-peach-100 text-peach-800 dark:bg-peach-900/40 dark:text-peach-200'
+                    : 'text-fg-secondary hover:bg-surface-sunken hover:text-fg',
                 )}
               >
                 <div
                   className={cn(
                     'flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
-                    isActive ? 'bg-peach-200' : 'bg-clay-200',
+                    isActive ? 'bg-peach-200' : 'bg-surface-sunken',
                   )}
                 >
                   <Icon
@@ -124,9 +124,9 @@ function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
           {/* See more / See less */}
           <button
             onClick={() => setShowMore(!showMore)}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-fg-muted transition-all duration-150 hover:bg-clay-200 hover:text-fg"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-fg-muted transition-all duration-150 hover:bg-surface-sunken hover:text-fg"
           >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-clay-200">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-sunken">
               {showMore ? (
                 <ChevronUp size={18} className="text-fg-placeholder" />
               ) : (
@@ -138,7 +138,7 @@ function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
         </nav>
 
         {/* Divider */}
-        <div className="my-4 h-px bg-clay-300" />
+        <div className="my-4 h-px bg-line" />
 
         {/* Shortcuts */}
         <div>
@@ -153,7 +153,7 @@ function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
                   key={shortcut.href}
                   href={shortcut.href}
                   onClick={linkClickHandler}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-fg-secondary transition-all duration-150 hover:bg-clay-200 hover:text-fg"
+                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-fg-secondary transition-all duration-150 hover:bg-surface-sunken hover:text-fg"
                 >
                   <div
                     className={cn(

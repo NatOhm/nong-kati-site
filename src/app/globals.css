@@ -112,4 +112,36 @@
       inset 0 3px 6px rgba(255, 255, 255, 0.9),
       inset 0 -3px 6px rgba(147, 107, 73, 0.06);
   }
+
+  [data-theme='dark'] .clay-card {
+    background: var(--clay-800);
+    box-shadow: var(--shadow-clay);
+  }
+
+  [data-theme='dark'] .clay-btn {
+    box-shadow: var(--shadow-clay-sm);
+  }
+
+  [data-theme='dark'] .clay-btn:active {
+    box-shadow: var(--shadow-clay-press);
+  }
+
+  /* 550ms ease-out state/page transition — put on route containers */
+  .page-enter {
+    animation: var(--animate-page-enter, page-enter 550ms cubic-bezier(0, 0, 0.2, 1) both);
+  }
+}
+
+/* Theme cross-fade: colors/shadows ease instead of snapping when toggling */
+body,
+.clay-card,
+.clay-btn,
+nav,
+footer,
+aside {
+  transition:
+    background-color 550ms cubic-bezier(0, 0, 0.2, 1),
+    border-color 550ms cubic-bezier(0, 0, 0.2, 1),
+    color 550ms cubic-bezier(0, 0, 0.2, 1),
+    box-shadow 550ms cubic-bezier(0, 0, 0.2, 1);
 }

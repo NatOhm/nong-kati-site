@@ -40,7 +40,7 @@ function FAQItem({ q, a }: { q: string; a: string }) {
         onClick={() => setIsOpen(!isOpen)}
         className="flex w-full items-center justify-between px-4 py-4 text-left transition-colors hover:bg-surface"
       >
-        <span className="pr-4 text-sm font-medium text-clay-800">{q}</span>
+        <span className="pr-4 text-sm font-medium text-fg-secondary">{q}</span>
         {isOpen ? (
           <ChevronUp size={18} className="shrink-0 text-fg-brand" />
         ) : (

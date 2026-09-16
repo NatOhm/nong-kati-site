@@ -15,7 +15,7 @@ export function SkeletonBlock({
     <div
       aria-hidden="true"
       className={cn(
-        'animate-shimmer bg-gradient-to-r from-ink-850 via-ink-800 to-ink-850 bg-[length:800px_100%]',
+        'animate-shimmer bg-gradient-to-r from-surface-sunken via-surface-elevated to-surface-sunken bg-[length:800px_100%]',
         rounded && 'rounded-sm',
         className,
       )}

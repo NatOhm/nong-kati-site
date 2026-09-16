@@ -52,6 +52,7 @@ const config: Config = {
         surface: {
           base: 'var(--bg-base)',
           DEFAULT: 'var(--bg-surface)',
+          nav: 'var(--bg-nav)',
           elevated: 'var(--bg-elevated)',
           sunken: 'var(--bg-sunken)',
           overlay: 'var(--bg-overlay)',
@@ -206,10 +207,12 @@ const config: Config = {
         moderate: '300ms',
         slow: '400ms',
         deliberate: '600ms',
+        interactive: '550ms',
       },
       transitionTimingFunction: {
         'out-quart': 'cubic-bezier(0.25, 1, 0.5, 1)',
         'in-quart': 'cubic-bezier(0.5, 0, 0.75, 0)',
+        'ease-out': 'cubic-bezier(0, 0, 0.2, 1)',
         spring: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
       },
       screens: {
@@ -232,6 +235,12 @@ const config: Config = {
         'modal-enter': 'modal-enter 300ms cubic-bezier(0.25,1,0.5,1)',
         'toast-enter': 'toast-enter 300ms cubic-bezier(0.25,1,0.5,1)',
         'copy-bounce': 'copy-bounce 300ms cubic-bezier(0.34,1.56,0.64,1)',
+        'squish-press': 'squish-press 450ms cubic-bezier(0.34,1.56,0.64,1)',
+        'reveal-up': 'reveal-up 550ms cubic-bezier(0, 0, 0.2, 1) both',
+        'grass-sway': 'grass-sway 5s ease-in-out infinite',
+        'hamster-peek': 'hamster-peek 3.5s cubic-bezier(0.34,1.56,0.64,1) infinite',
+        'clay-bounce': 'clay-bounce 1.1s cubic-bezier(0.34,1.56,0.64,1) infinite',
+        'seed-pop': 'seed-pop 550ms cubic-bezier(0.34,1.56,0.64,1) both',
       },
       keyframes: {
         float: {
@@ -269,6 +278,33 @@ const config: Config = {
           '40%': { transform: 'scale(1.15)' },
           '70%': { transform: 'scale(0.95)' },
           '100%': { transform: 'scale(1)' },
+        },
+        'squish-press': {
+          '0%': { transform: 'scale(1)' },
+          '35%': { transform: 'scale(0.94, 0.9)' },
+          '70%': { transform: 'scale(1.03, 1.05)' },
+          '100%': { transform: 'scale(1)' },
+        },
+        'reveal-up': {
+          from: { opacity: '0', transform: 'translateY(24px) scale(0.98)' },
+          to: { opacity: '1', transform: 'translateY(0) scale(1)' },
+        },
+        'grass-sway': {
+          '0%, 100%': { transform: 'rotate(-2deg)' },
+          '50%': { transform: 'rotate(2.5deg)' },
+        },
+        'hamster-peek': {
+          '0%, 15%': { transform: 'translateY(14px) rotate(0deg)' },
+          '35%, 55%': { transform: 'translateY(0px) rotate(-4deg)' },
+          '75%, 100%': { transform: 'translateY(14px) rotate(0deg)' },
+        },
+        'clay-bounce': {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-10px)' },
+        },
+        'seed-pop': {
+          '0%': { opacity: '0', transform: 'scale(0)' },
+          '100%': { opacity: '1', transform: 'scale(1)' },
         },
       },
     },

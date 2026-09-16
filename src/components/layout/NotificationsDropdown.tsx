@@ -95,7 +95,7 @@ export function NotificationsDropdown(): React.JSX.Element {
         <div
           role="dialog"
           aria-label="รายการแจ้งเตือน"
-          className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-lg border border-line-subtle bg-white shadow-xl"
+          className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-xl border border-line-subtle bg-surface-elevated shadow-clay-lg"
         >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-line-subtle px-4 py-2.5">
