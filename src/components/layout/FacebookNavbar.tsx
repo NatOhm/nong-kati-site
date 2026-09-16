@@ -21,6 +21,7 @@ import { NotificationsDropdown } from './NotificationsDropdown';
 import { ThemeToggle } from './ThemeToggle';
 import { useCustomerSession } from './useCustomerSession';
 import { AcornIcon } from '@/components/ui/ClayIcons';
+import { MascotImage } from '@/components/ui/MascotImage';
 import { useCart } from '@/hooks/useCart';
 
 interface FacebookNavbarProps {
@@ -68,11 +69,16 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
               <Menu size={22} />
             </button>
 
-            {/* Logo */}
-            <Link href="/" className="group flex items-center gap-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-peach-400 shadow-clay-sm transition-transform duration-interactive ease-spring group-hover:scale-110 group-active:scale-95">
-                <span className="text-lg font-bold text-peach-800">NK</span>
-              </div>
+            {/* Logo — the Nong-Kati hamster mascot */}
+            <Link
+              href="/"
+              aria-label="Nong-Kati หน้าหลัก"
+              className="group flex items-center gap-2"
+            >
+              <MascotImage
+                size={40}
+                className="shadow-clay-sm transition-transform duration-interactive ease-spring group-hover:scale-110 group-active:scale-95"
+              />
             </Link>
 
             {/* Search bar */}

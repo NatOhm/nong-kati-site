@@ -22,7 +22,7 @@ import { LINEChatButton } from '@/components/home/LINEChatButton';
 import { ScrollToTop } from '@/components/home/ScrollToTop';
 import { ScrollReveal } from '@/components/home/ScrollReveal';
 import { DeliveredCodeCard } from '@/components/home/DeliveredCodeCard';
-import { HamsterMascot } from '@/components/ui/ClayIcons';
+import { MascotImage } from '@/components/ui/MascotImage';
 
 import { getCategoriesWithProductCounts, getFeaturedProducts } from '@/lib/data';
 
@@ -97,7 +97,10 @@ export default async function HomePage(): Promise<React.JSX.Element> {
             {/* Clay hamster mascot peeking over the CTA card — cheeks puff on card hover */}
             <div className="group relative">
               <div className="pointer-events-none absolute -top-16 right-2 z-10 animate-float md:-top-20">
-                <HamsterMascot size={120} />
+                <MascotImage
+                  size={120}
+                  className="drop-shadow-[0_10px_18px_rgba(147,107,73,0.35)]"
+                />
               </div>
               <DeliveredCodeCard />
             </div>

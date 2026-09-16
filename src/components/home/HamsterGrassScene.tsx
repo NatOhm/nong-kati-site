@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { MascotImage } from '@/components/ui/MascotImage';
 import { cn } from '@/utils/cn';
 
 /**
@@ -178,18 +179,17 @@ export function HamsterGrassScene({ className }: { className?: string }): React.
         />
       ))}
 
-      {/* Little clay hamster — click me! */}
+      {/* The Nong-Kati mascot hiding in the grass — click me! */}
       <button
         type="button"
         onClick={handleHamsterClick}
         aria-label="สัตว์เลี้ยงตัวน้อย: ลองกดจิ๊กเกอร์ดูสิ!"
         title="กดดูสิ!"
-        className="absolute bottom-2 right-[9%] cursor-pointer border-0 bg-transparent p-0"
+        className="absolute bottom-1 right-[8%] cursor-pointer border-0 bg-transparent p-0"
       >
-        <svg
-          viewBox="0 0 64 44"
+        <span
           className={cn(
-            'h-10 w-14 drop-shadow-[0_3px_5px_rgba(147,107,73,0.25)] transition-transform duration-fast',
+            'block transition-transform duration-fast',
             squeaking ? 'scale-110' : 'animate-hamster-peek hover:scale-105',
           )}
           style={
@@ -197,62 +197,15 @@ export function HamsterGrassScene({ className }: { className?: string }): React.
               ? { animation: 'hamster-pop 900ms cubic-bezier(0.34, 1.56, 0.64, 1)' }
               : undefined
           }
-          fill="none"
         >
-          {/* ears */}
-          <circle cx="18" cy="10" r="6" fill="#FDBA74" />
-          <circle cx="46" cy="10" r="6" fill="#FDBA74" />
-          <circle cx="18" cy="10" r="3" fill="#FFEDD5" />
-          <circle cx="46" cy="10" r="3" fill="#FFEDD5" />
-          {/* head */}
-          <ellipse cx="32" cy="26" rx="22" ry="17" fill="#FDBA74" />
-          {/* cheeks — bigger while squeaking */}
-          <circle cx="16" cy="30" r={squeaking ? 7.5 : 5} fill="#FED7AA" />
-          <circle cx="48" cy="30" r={squeaking ? 7.5 : 5} fill="#FED7AA" />
-          {/* eyes (closed happy / > < while squeaking) */}
-          {squeaking ? (
-            <>
-              <path
-                d="M21 23 l5 3 -5 3"
-                stroke="#4E3820"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                fill="none"
-              />
-              <path
-                d="M43 23 l-5 3 5 3"
-                stroke="#4E3820"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                fill="none"
-              />
-            </>
-          ) : (
-            <>
-              <path
-                d="M22 24 q3 2.6 6 0"
-                stroke="#4E3820"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-              />
-              <path
-                d="M38 24 q3 2.6 6 0"
-                stroke="#4E3820"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-              />
-            </>
-          )}
-          {/* nose + mouth (o-shape while squeaking) */}
-          <ellipse cx="32" cy="29" rx="2.2" ry="1.6" fill="#FB7185" />
-          {squeaking ? (
-            <ellipse cx="32" cy="33" rx="2.4" ry="2.8" fill="#4E3820" opacity="0.85" />
-          ) : (
-            <path d="M29 33 q3 2.4 6 0" stroke="#4E3820" strokeWidth="1.4" strokeLinecap="round" />
-          )}
-          {/* seed in paws */}
-          <ellipse cx="32" cy="37" rx="2.6" ry="3.2" fill="#8C6D46" />
-        </svg>
+          <MascotImage
+            size={64}
+            className={cn(
+              'drop-shadow-[0_4px_6px_rgba(147,107,73,0.3)] transition-all duration-500',
+              squeaking ? 'rotate-0 saturate-100' : 'rotate-3 saturate-[0.55]',
+            )}
+          />
+        </span>
       </button>
 
       {/* Tiny seed sprinkles */}
