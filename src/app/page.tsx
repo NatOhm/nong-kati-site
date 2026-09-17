@@ -11,7 +11,6 @@ import { ProductGrid } from '@/components/product/ProductGrid';
 import { StructuredData } from '@/components/data-display/StructuredData';
 
 // New components
-import { AnnouncementBar } from '@/components/home/AnnouncementBar';
 import { MarqueeTicker } from '@/components/home/MarqueeTicker';
 import { StatsCounter } from '@/components/home/StatsCounter';
 import { TrustBadges } from '@/components/home/TrustBadges';
@@ -61,9 +60,6 @@ export default async function HomePage(): Promise<React.JSX.Element> {
           description: 'ซื้อ gift card ออนไลน์ ส่งโค้ดทันที',
         }}
       />
-
-      {/* Announcement Bar */}
-      <AnnouncementBar />
 
       {/* Marquee Ticker */}
       <MarqueeTicker />

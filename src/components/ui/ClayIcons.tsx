@@ -183,6 +183,61 @@ export function PawIcon({ size = 22, className }: ClayIconProps): React.JSX.Elem
 }
 
 /**
+ * Clay hamster FACE — round avatar crop for logo/toast scale.
+ * Pure claymorphism: radial-gradient volume, dual lighting, glossy highlight.
+ */
+export function HamsterFace({ size = 40, className }: ClayIconProps): React.JSX.Element {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 80 80"
+      fill="none"
+      className={cn('rounded-full', className)}
+      aria-hidden="true"
+    >
+      {/* ears */}
+      <circle cx="19" cy="15" r="9" fill="#FB923C" />
+      <circle cx="61" cy="15" r="9" fill="#FB923C" />
+      <circle cx="19" cy="15" r="4.5" fill="#FFEDD5" />
+      <circle cx="61" cy="15" r="4.5" fill="#FFEDD5" />
+      {/* head — clay volume via radial gradient light from top-left */}
+      <circle cx="40" cy="44" r="34" fill="url(#hamsterFaceBody)" />
+      {/* glossy highlight */}
+      <ellipse
+        cx="28"
+        cy="28"
+        rx="10"
+        ry="6"
+        fill="#FFFFFF"
+        opacity="0.45"
+        transform="rotate(-24 28 28)"
+      />
+      {/* cheeks */}
+      <circle cx="21" cy="50" r="8" fill="#FED7AA" />
+      <circle cx="59" cy="50" r="8" fill="#FED7AA" />
+      {/* eyes */}
+      <circle cx="29" cy="40" r="4.6" fill="#4E3820" />
+      <circle cx="51" cy="40" r="4.6" fill="#4E3820" />
+      <circle cx="30.6" cy="38.4" r="1.5" fill="#FFFFFF" />
+      <circle cx="52.6" cy="38.4" r="1.5" fill="#FFFFFF" />
+      {/* nose + mouth */}
+      <ellipse cx="40" cy="49" rx="3" ry="2.2" fill="#FB7185" />
+      <path d="M36 53.5 q4 3 8 0" stroke="#4E3820" strokeWidth="1.8" strokeLinecap="round" />
+      {/* blush */}
+      <ellipse cx="16" cy="54" rx="4.4" ry="2.6" fill="#FECDD3" opacity="0.85" />
+      <ellipse cx="64" cy="54" rx="4.4" ry="2.6" fill="#FECDD3" opacity="0.85" />
+      <defs>
+        <radialGradient id="hamsterFaceBody" cx="0.32" cy="0.24" r="1.15">
+          <stop offset="0" stopColor="#FED7AA" />
+          <stop offset="1" stopColor="#FB923C" />
+        </radialGradient>
+      </defs>
+    </svg>
+  );
+}
+
+/**
  * Clay hamster mascot. `cheeksPuff` grows the cheek circles — wire it to a
  * parent group's hover via CSS (see HamsterMascot wrapper below).
  */

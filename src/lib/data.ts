@@ -46,7 +46,15 @@ export interface ProductItem {
 // ─── Category helpers ─────────────────────────────────
 
 function buildCategoryTree(
-  cats: { id: string; name: string; slug: string; icon: string | null; parentId: string | null; sortOrder: number; isActive: boolean }[],
+  cats: {
+    id: string;
+    name: string;
+    slug: string;
+    icon: string | null;
+    parentId: string | null;
+    sortOrder: number;
+    isActive: boolean;
+  }[],
 ): CategoryItem[] {
   const map = new Map<string, CategoryItem>();
   const roots: CategoryItem[] = [];
@@ -94,7 +102,9 @@ export async function getTopLevelCategories(): Promise<CategoryItem[]> {
 /**
  * Get categories with product counts (for homepage cards).
  */
-export async function getCategoriesWithProductCounts(): Promise<(CategoryItem & { productCount: number })[]> {
+export async function getCategoriesWithProductCounts(): Promise<
+  (CategoryItem & { productCount: number })[]
+> {
   const cats = await prisma.category.findMany({
     orderBy: { sortOrder: 'asc' },
     include: { _count: { select: { products: true } } },
@@ -149,18 +159,13 @@ export async function getAllCategorySlugs(): Promise<string[]> {
 
 // ─── Product helpers ───────────────────────────────────
 
-function mapProduct(
-  p: any,
-  cat: { id: string; name: string; slug: string } | null,
-): ProductItem {
+function mapProduct(p: any, cat: { id: string; name: string; slug: string } | null): ProductItem {
   return {
     id: p.id,
     name: p.name,
     slug: p.slug,
     description: p.description,
-    shortDescription: p.description
-      ? p.description.replace(/<[^>]+>/g, '').slice(0, 100)
-      : null,
+    shortDescription: p.description ? p.description.replace(/<[^>]+>/g, '').slice(0, 100) : null,
     imageUrl: p.imageUrl,
     categoryId: p.categoryId,
     category: cat ?? { id: '', name: '', slug: '' },
@@ -301,8 +306,7 @@ export async function getCatalogProducts(
     },
   });
 
-  const byName = (a: { name: string }, b: { name: string }) =>
-    a.name.localeCompare(b.name, 'th');
+  const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name, 'th');
   const byId = (a: { id: string }, b: { id: string }) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
   const minPriceOf = (p: (typeof keys)[number]) =>
     p.variants.length ? Math.min(...p.variants.map((v) => Number(v.price))) : null;
@@ -322,11 +326,9 @@ export async function getCatalogProducts(
       : sort === 'name-asc'
         ? (a, b) => byName(a, b) || byId(a, b)
         : sort === 'newest'
-          ? (a, b) =>
-              b.createdAt.getTime() - a.createdAt.getTime() || byId(a, b)
+          ? (a, b) => b.createdAt.getTime() - a.createdAt.getTime() || byId(a, b)
           : // featured: featured first, then name, then id — deterministic
-            (a, b) =>
-              Number(b.isFeatured) - Number(a.isFeatured) || byName(a, b) || byId(a, b);
+            (a, b) => Number(b.isFeatured) - Number(a.isFeatured) || byName(a, b) || byId(a, b);
 
   keys.sort(cmp);
 
@@ -413,4 +415,37 @@ export async function getSearchSuggestions(
     slug: p.slug,
     categoryName: p.category.name,
   }));
+}
+
+// ─── Site Settings (announcement bar etc.) ──────────────
+
+export interface AnnouncementContent {
+  message: string;
+  href: string | null;
+  enabled: boolean;
+}
+
+/**
+ * Read the storefront announcement bar from the DB (SiteSetting key
+ * 'announcement'). Falls back to the built-in default when unset or
+ * malformed, so the bar never breaks the page render.
+ */
+export async function getAnnouncement(): Promise<AnnouncementContent> {
+  const fallback: AnnouncementContent = {
+    message: '🎉 โปรโมชั่นพิเศษ! HBO Max 7 วัน ลดเหลือ ฿25',
+    href: '/product/hbo-max-7-4k-4',
+    enabled: true,
+  };
+  try {
+    const row = await prisma.siteSetting.findUnique({ where: { key: 'announcement' } });
+    if (!row) return fallback;
+    const parsed = JSON.parse(row.value) as Partial<AnnouncementContent>;
+    return {
+      message: typeof parsed.message === 'string' ? parsed.message : fallback.message,
+      href: typeof parsed.href === 'string' ? parsed.href : null,
+      enabled: parsed.enabled !== false,
+    };
+  } catch {
+    return fallback;
+  }
 }

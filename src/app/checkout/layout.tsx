@@ -1,34 +1,20 @@
-import { getTopLevelCategories } from '@/lib/data';
-import { Navbar } from '@/components/layout/Navbar';
+import { FacebookLayout } from '@/components/layout/FacebookLayout';
 import { Footer } from '@/components/layout/Footer';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * Checkout Layout — Server component that fetches categories
- * and renders Navbar + Footer around the checkout page.
+ * Checkout Layout — same FacebookNavbar + sidebar chrome as the rest of the
+ * storefront, so checkout never feels like a different site.
  */
-export default async function CheckoutLayout({
+export default function CheckoutLayout({
   children,
 }: {
   children: React.ReactNode;
-}): Promise<React.JSX.Element> {
-  let categories: Awaited<ReturnType<typeof getTopLevelCategories>> = [];
-  try {
-    categories = await getTopLevelCategories();
-  } catch {
-    // DB unavailable — render with empty categories
-  }
-
+}): React.JSX.Element {
   return (
     <>
-      <Navbar
-        categories={categories.map((c) => ({
-          ...c,
-          children: c.children.map((ch) => ({ id: ch.id, name: ch.name, slug: ch.slug })),
-        }))}
-      />
-      <main>{children}</main>
+      <FacebookLayout>{children}</FacebookLayout>
       <Footer />
     </>
   );

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { MascotImage } from '@/components/ui/MascotImage';
+import { HamsterMascot } from '@/components/ui/ClayIcons';
 import { cn } from '@/utils/cn';
 
 /**
@@ -198,7 +198,7 @@ export function HamsterGrassScene({ className }: { className?: string }): React.
               : undefined
           }
         >
-          <MascotImage
+          <HamsterMascot
             size={64}
             className={cn(
               'drop-shadow-[0_4px_6px_rgba(147,107,73,0.3)] transition-all duration-500',

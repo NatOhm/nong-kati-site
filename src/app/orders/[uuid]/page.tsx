@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Search } from 'lucide-react';
 
-import { Navbar } from '@/components/layout/Navbar';
+import { FacebookLayout } from '@/components/layout/FacebookLayout';
 
 export const dynamic = 'force-dynamic';
 import { Footer } from '@/components/layout/Footer';
@@ -10,7 +10,6 @@ import { PageShell } from '@/components/layout/PageShell';
 import { Breadcrumb } from '@/components/data-display/Breadcrumb';
 import { OrderDetailCard } from '@/components/order/OrderDetailCard';
 import { TrustBadgeRow } from '@/components/checkout/TrustBadgeRow';
-import { getTopLevelCategories } from '@/lib/data';
 import { getOrderByConfirmationUuid } from '@/api/orders';
 
 interface OrderDetailPageProps {
@@ -30,8 +29,6 @@ export default async function OrderDetailPage({
   const order = getOrderByConfirmationUuid(uuid);
   if (!order) notFound();
 
-  const categories = await getTopLevelCategories();
-
   // Map order status to OrderStatus type
   const orderStatus = order.status as
     | 'pending_payment'
@@ -45,14 +42,7 @@ export default async function OrderDetailPage({
 
   return (
     <>
-      <Navbar
-        categories={categories.map((c) => ({
-          ...c,
-          children: c.children.map((ch) => ({ id: ch.id, name: ch.name, slug: ch.slug })),
-        }))}
-      />
-
-      <main>
+      <FacebookLayout>
         <PageShell maxWidth="prose">
           <div className="py-8">
             {/* Breadcrumb */}
@@ -109,7 +99,7 @@ export default async function OrderDetailPage({
             </div>
           </div>
         </PageShell>
-      </main>
+      </FacebookLayout>
 
       <Footer />
     </>

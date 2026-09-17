@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Clock, Mail, FileText, CheckCircle } from 'lucide-react';
 
-import { Navbar } from '@/components/layout/Navbar';
+import { FacebookLayout } from '@/components/layout/FacebookLayout';
 
 export const dynamic = 'force-dynamic';
 import { Footer } from '@/components/layout/Footer';
@@ -10,7 +10,6 @@ import { PageShell } from '@/components/layout/PageShell';
 import { Breadcrumb } from '@/components/data-display/Breadcrumb';
 import { TrustBadgeRow } from '@/components/checkout/TrustBadgeRow';
 import { OrderStatusBadge } from '@/components/order/OrderStatusBadge';
-import { getTopLevelCategories } from '@/lib/data';
 import { getOrderByConfirmationUuid } from '@/api/orders';
 import { getAvailableCodeCount } from '@/lib/delivery/reservation';
 import { formatThb } from '@/lib/pricing';
@@ -31,21 +30,13 @@ export default async function ConfirmationPage({
   const order = getOrderByConfirmationUuid(uuid);
   if (!order) notFound();
 
-  const categories = await getTopLevelCategories();
   const isCompleted = order.status === 'completed';
   const isPendingPayment = order.status === 'pending_payment';
   const isPendingManual = order.status === 'pending_manual_fulfilment';
 
   return (
     <>
-      <Navbar
-        categories={categories.map((c) => ({
-          ...c,
-          children: c.children.map((ch) => ({ id: ch.id, name: ch.name, slug: ch.slug })),
-        }))}
-      />
-
-      <main>
+      <FacebookLayout>
         <PageShell>
           {/* Breadcrumb */}
           <Breadcrumb
@@ -204,7 +195,7 @@ export default async function ConfirmationPage({
             </div>
           </div>
         </PageShell>
-      </main>
+      </FacebookLayout>
 
       <Footer />
     </>

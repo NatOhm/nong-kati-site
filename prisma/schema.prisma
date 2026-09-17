@@ -369,6 +369,18 @@ model Refund {
   @@index([initiatedBy])
 }
 
+// ─── Site Settings (key/value store for storefront chrome) ──
+
+model SiteSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+
+  @@index([key])
+}
+
 // ─── Audit Logs (06-database.md §14, 11-admin.md §14.1) ────
 
 model AuditLog {

@@ -2,7 +2,7 @@ import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 
-import { Navbar } from '@/components/layout/Navbar';
+import { FacebookLayout } from '@/components/layout/FacebookLayout';
 
 export const dynamic = 'force-dynamic';
 import { Footer } from '@/components/layout/Footer';
@@ -13,7 +13,7 @@ import { CategoryCard } from '@/components/product/CategoryCard';
 import { Breadcrumb } from '@/components/data-display/Breadcrumb';
 import { StructuredData } from '@/components/data-display/StructuredData';
 
-import { getCategoryBySlug, getTopLevelCategories, getProductsByCategory } from '@/lib/data';
+import { getCategoryBySlug, getProductsByCategory } from '@/lib/data';
 
 interface CategoryPageProps {
   params: Promise<{ slug: string[] }>;
@@ -57,7 +57,6 @@ export default async function CategoryPage({
   let result: Awaited<ReturnType<typeof getCategoryBySlug>> = null;
   let products: Awaited<ReturnType<typeof getProductsByCategory>>['products'] = [];
   let total = 0;
-  let categories: Awaited<ReturnType<typeof getTopLevelCategories>> = [];
   try {
     result = await getCategoryBySlug(slugPath);
     if (!result) notFound();
@@ -65,13 +64,11 @@ export default async function CategoryPage({
     const catResult = await getProductsByCategory(slugPath);
     products = catResult.products;
     total = catResult.total;
-    categories = await getTopLevelCategories();
   } catch {
     // DB unavailable — render empty state
     return (
       <>
-        <Navbar />
-        <main>
+        <FacebookLayout>
           <PageShell>
             <section className="py-16 text-center">
               <h1 className="text-2xl font-bold text-fg">หมวดหมู่สินค้า</h1>
@@ -81,7 +78,7 @@ export default async function CategoryPage({
               </Link>
             </section>
           </PageShell>
-        </main>
+        </FacebookLayout>
         <Footer />
       </>
     );
@@ -102,14 +99,7 @@ export default async function CategoryPage({
         }}
       />
 
-      <Navbar
-        categories={categories.map((c) => ({
-          ...c,
-          children: c.children.map((ch) => ({ id: ch.id, name: ch.name, slug: ch.slug })),
-        }))}
-      />
-
-      <main>
+      <FacebookLayout>
         <PageShell>
           {/* Breadcrumb */}
           <Breadcrumb
@@ -185,7 +175,7 @@ export default async function CategoryPage({
             </section>
           )}
         </PageShell>
-      </main>
+      </FacebookLayout>
 
       <Footer />
     </>

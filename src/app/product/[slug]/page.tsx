@@ -2,7 +2,7 @@ import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 
-import { Navbar } from '@/components/layout/Navbar';
+import { FacebookLayout } from '@/components/layout/FacebookLayout';
 
 export const dynamic = 'force-dynamic';
 import { Footer } from '@/components/layout/Footer';
@@ -13,7 +13,7 @@ import { StockBadge } from '@/components/product/StockBadge';
 import { ProductDetailClient } from '@/components/product/ProductDetailClient';
 import { formatThb } from '@/utils/format';
 
-import { getProductBySlug, getTopLevelCategories } from '@/lib/data';
+import { getProductBySlug } from '@/lib/data';
 
 interface ProductPageProps {
   params: Promise<{ slug: string }>;
@@ -53,17 +53,14 @@ export default async function ProductPage({
 }: ProductPageProps): Promise<React.JSX.Element> {
   const { slug } = await params;
   let product: Awaited<ReturnType<typeof getProductBySlug>> = null;
-  let categories: Awaited<ReturnType<typeof getTopLevelCategories>> = [];
   try {
     product = await getProductBySlug(slug);
     if (!product) notFound();
-    categories = await getTopLevelCategories();
   } catch {
     // DB unavailable — render error state
     return (
       <>
-        <Navbar />
-        <main>
+        <FacebookLayout>
           <PageShell>
             <section className="py-16 text-center">
               <h1 className="text-2xl font-bold text-fg">ไม่พบสินค้า</h1>
@@ -73,7 +70,7 @@ export default async function ProductPage({
               </Link>
             </section>
           </PageShell>
-        </main>
+        </FacebookLayout>
         <Footer />
       </>
     );
@@ -111,14 +108,7 @@ export default async function ProductPage({
         }}
       />
 
-      <Navbar
-        categories={categories.map((c) => ({
-          ...c,
-          children: c.children.map((ch) => ({ id: ch.id, name: ch.name, slug: ch.slug })),
-        }))}
-      />
-
-      <main>
+      <FacebookLayout>
         <PageShell>
           {/* Breadcrumb */}
           <Breadcrumb
@@ -188,7 +178,7 @@ export default async function ProductPage({
             </div>
           </div>
         </PageShell>
-      </main>
+      </FacebookLayout>
 
       <Footer />
     </>

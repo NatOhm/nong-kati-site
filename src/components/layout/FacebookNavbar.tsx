@@ -20,8 +20,7 @@ import { CartDrawer } from '@/components/cart/CartDrawer';
 import { NotificationsDropdown } from './NotificationsDropdown';
 import { ThemeToggle } from './ThemeToggle';
 import { useCustomerSession } from './useCustomerSession';
-import { AcornIcon } from '@/components/ui/ClayIcons';
-import { MascotImage } from '@/components/ui/MascotImage';
+import { AcornIcon, HamsterFace } from '@/components/ui/ClayIcons';
 import { useCart } from '@/hooks/useCart';
 
 interface FacebookNavbarProps {
@@ -69,16 +68,15 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
               <Menu size={22} />
             </button>
 
-            {/* Logo — the Nong-Kati hamster mascot */}
+            {/* Logo — the Nong-Kati clay hamster */}
             <Link
               href="/"
               aria-label="Nong-Kati หน้าหลัก"
               className="group flex items-center gap-2"
             >
-              <MascotImage
-                size={40}
-                className="shadow-clay-sm transition-transform duration-interactive ease-spring group-hover:scale-110 group-active:scale-95"
-              />
+              <span className="block rounded-full shadow-clay-sm transition-transform duration-interactive ease-spring group-hover:scale-110 group-active:scale-95">
+                <HamsterFace size={40} />
+              </span>
             </Link>
 
             {/* Search bar — mascot peeks over the edge while you type */}
@@ -101,7 +99,7 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
                       : 'translate-y-4 scale-75 opacity-0',
                   )}
                 >
-                  <MascotImage size={36} className="drop-shadow-[0_3px_4px_rgba(147,107,73,0.3)]" />
+                  <HamsterFace size={36} className="drop-shadow-[0_3px_4px_rgba(147,107,73,0.3)]" />
                 </div>
                 <Search size={16} className="text-fg-placeholder" />
                 <input

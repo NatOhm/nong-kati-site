@@ -1,22 +1,60 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X, Sparkles } from 'lucide-react';
 
-export function AnnouncementBar() {
+interface AnnouncementContent {
+  message: string;
+  href: string | null;
+  enabled: boolean;
+}
+
+const FALLBACK: AnnouncementContent = {
+  message: '🎉 โปรโมชั่นพิเศษ! HBO Max 7 วัน ลดเหลือ ฿25',
+  href: '/product/hbo-max-7-4k-4',
+  enabled: true,
+};
+
+/**
+ * The announcement strip above the page — content is admin-editable via
+ * /management/settings (stored in the SiteSetting table, key 'announcement').
+ * Renders the default immediately (no layout shift) and swaps in the live
+ * value from the API on mount; hides itself when disabled.
+ */
+export function AnnouncementBar(): React.JSX.Element | null {
+  const [content, setContent] = useState<AnnouncementContent>(FALLBACK);
   const [isVisible, setIsVisible] = useState(true);
 
-  if (!isVisible) return null;
+  // Pick up admin edits without a full page reload.
+  useEffect(() => {
+    fetch('/api/v1/announcement')
+      .then((r) => (r.ok ? (r.json() as Promise<AnnouncementContent>) : null))
+      .then((data) => {
+        if (data) setContent(data);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!content.enabled) setIsVisible(false);
+  }, [content.enabled]);
+
+  if (!content.enabled || !isVisible) return null;
 
   return (
     <div className="relative bg-gradient-to-r from-peach-400 via-peach-300 to-peach-400 px-4 py-2">
       <div className="mx-auto flex max-w-[1440px] items-center justify-center gap-2 text-center">
-        <Sparkles size={16} className="shrink-0 text-peach-900" />
+        <Sparkles size={16} className="shrink-0 text-peach-900" aria-hidden="true" />
         <p className="text-sm font-medium text-fg">
-          🎉 <span className="font-bold">โปรโมชั่นพิเศษ!</span> HBO Max 7 วัน ลดเหลือ ฿25 —{' '}
-          <a href="/product/hbo-max-7-4k-4" className="font-bold underline hover:text-peach-800">
-            กดซื้อเลย!
-          </a>
+          <span className="font-bold">{content.message}</span>
+          {content.href && (
+            <>
+              {' — '}
+              <a href={content.href} className="font-bold underline hover:text-peach-800">
+                กดซื้อเลย!
+              </a>
+            </>
+          )}
         </p>
         <button
           onClick={() => setIsVisible(false)}

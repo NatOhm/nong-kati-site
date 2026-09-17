@@ -19,8 +19,8 @@ import {
   X,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
-import { MascotImage } from '@/components/ui/MascotImage';
-import { useState, useEffect, useRef, type MouseEventHandler } from 'react';
+import { HamsterFace } from '@/components/ui/ClayIcons';
+import { useState, useEffect, useRef, useCallback, type MouseEventHandler } from 'react';
 
 const NAV_ITEMS = [
   { icon: Home, href: '/', label: 'หน้าหลัก', color: 'text-fg-brand' },
@@ -77,10 +77,9 @@ function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
       {onClose && (
         <div className="flex items-center justify-between border-b border-line-subtle px-4 py-3 lg:hidden">
           <div className="flex items-center gap-3">
-            <MascotImage
-              size={40}
-              className="bg-peach-200 shadow-[2px_3px_8px_rgba(124,45,18,0.25)]"
-            />
+            <span className="block rounded-full shadow-[2px_3px_8px_rgba(124,45,18,0.25)]">
+              <HamsterFace size={40} />
+            </span>
             <span className="text-lg font-bold text-fg">Nong-Kati</span>
           </div>
           <button
@@ -188,10 +187,46 @@ function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
   );
 }
 
+/**
+ * Sidebar — desktop rail always visible, mobile drawer that slides in AND out
+ * (550ms matching the site motion language). The drawer stays mounted while
+ * closing so the exit animation can play, then unmounts on animationend.
+ */
 export function FacebookSidebar({
   isOpen = false,
   onClose,
 }: FacebookSidebarProps): React.JSX.Element {
+  // 'closing' keeps the drawer in the DOM through the slide-out animation.
+  const [closing, setClosing] = useState(false);
+  const prevOpenRef = useRef(isOpen);
+  const shown = isOpen || closing;
+
+  // Start the exit animation when isOpen flips true→false.
+  useEffect(() => {
+    const wasOpen = prevOpenRef.current;
+    prevOpenRef.current = isOpen;
+    if (!wasOpen || isOpen) return;
+    setClosing(true);
+    // Fallback: some embedded webviews suspend the CSS-animation clock, so
+    // animationend never fires — unmount anyway after the animation budget.
+    const t = setTimeout(() => setClosing(false), 650);
+    return () => clearTimeout(t);
+  }, [isOpen]);
+
+  // Re-opening during an exit cancels it.
+  useEffect(() => {
+    if (isOpen) setClosing(false);
+  }, [isOpen]);
+
+  const handleAnimationEnd = (e: React.AnimationEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget) return;
+    if (e.animationName === 'drawer-slide-out') {
+      setClosing(false);
+    }
+  };
+
+  const close = () => onClose?.();
+
   return (
     <>
       {/* Desktop sidebar - scrollable within page flow */}
@@ -201,20 +236,27 @@ export function FacebookSidebar({
         </div>
       </aside>
 
-      {/* Mobile drawer - slide from left */}
-      {isOpen && (
+      {/* Mobile drawer - slide from left with matching slide-out */}
+      {shown && (
         <>
           {/* Backdrop: warm clay-tinted scrim instead of harsh black */}
           <div
-            className="drawer-backdrop fixed inset-0 z-50 bg-clay-900/55 lg:hidden"
-            onClick={onClose}
+            className={cn(
+              'fixed inset-0 z-50 bg-clay-900/55 lg:hidden',
+              closing ? 'drawer-backdrop-out' : 'drawer-backdrop',
+            )}
+            onClick={close}
             aria-hidden="true"
           />
-          {/* Drawer: squishy slide-in, rounded clay edge, themed scrollbar */}
+          {/* Drawer: squishy slide-in / slide-out, rounded clay edge, themed scrollbar */}
           <div
             role="dialog"
             aria-label="เมนูนำทาง"
-            className="drawer-panel drawer-scroll fixed left-0 top-0 z-50 h-full w-[300px] overflow-y-auto rounded-r-[28px] bg-surface-base shadow-[6px_0_24px_rgba(78,56,32,0.35)] lg:hidden"
+            onAnimationEnd={handleAnimationEnd}
+            className={cn(
+              'drawer-scroll fixed left-0 top-0 z-50 h-full w-[300px] overflow-y-auto rounded-r-[28px] bg-surface-base shadow-[6px_0_24px_rgba(78,56,32,0.35)] lg:hidden',
+              closing ? 'drawer-panel-out' : 'drawer-panel',
+            )}
           >
             <SidebarContent onClose={onClose} />
           </div>
