@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { MascotImage } from '@/components/ui/MascotImage';
+import { HamsterSleeping } from '@/components/ui/ClayIcons';
 
 /**
  * Global error boundary — same sleepy mascot as the 404, with a retry.
@@ -21,10 +21,7 @@ export default function GlobalError({
   return (
     <div className="flex min-h-[70vh] flex-col items-center justify-center px-4 py-16 text-center">
       <div className="relative mb-6">
-        <MascotImage
-          size={120}
-          className="rotate-90 drop-shadow-[0_8px_14px_rgba(147,107,73,0.3)]"
-        />
+        <HamsterSleeping size={150} className="drop-shadow-[0_8px_14px_rgba(147,107,73,0.3)]" />
         <div
           aria-hidden="true"
           className="zzz absolute -right-2 -top-2 font-display text-lg font-bold text-fg-placeholder"

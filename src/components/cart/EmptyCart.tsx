@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { ShoppingCart } from 'lucide-react';
 import { cn } from '@/utils/cn';
-import { MascotImage } from '@/components/ui/MascotImage';
+import { HamsterMascot } from '@/components/ui/ClayIcons';
 
 export interface EmptyCartProps {
   className?: string;
@@ -16,7 +16,7 @@ export function EmptyCart({ className }: EmptyCartProps): React.JSX.Element {
     <div className={cn('flex flex-col items-center justify-center py-12 text-center', className)}>
       <div className="relative mb-4">
         <div className="mascot-wave">
-          <MascotImage size={80} className="drop-shadow-[0_6px_10px_rgba(147,107,73,0.3)]" />
+          <HamsterMascot size={90} className="drop-shadow-[0_6px_10px_rgba(147,107,73,0.3)]" />
         </div>
         <span
           aria-hidden="true"

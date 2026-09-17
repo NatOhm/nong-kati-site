@@ -1,12 +1,11 @@
 'use client';
 
 import { Check } from 'lucide-react';
-import { MascotImage } from '@/components/ui/MascotImage';
+import { HamsterMascot } from '@/components/ui/ClayIcons';
 
 /**
- * Compact clay success toast with the Nong-Kati hamster mascot — used for
- * cart adds. Mascot seed-pops in alongside the jade check; auto-dismisses
- * via the toast store.
+ * Compact clay success toast with the clay hamster — used for cart adds.
+ * Seed-pops in alongside the jade check; auto-dismisses via the toast store.
  */
 export function SuccessToast({
   title,
@@ -17,12 +16,12 @@ export function SuccessToast({
 }): React.JSX.Element {
   return (
     <div className="flex items-center gap-3">
-      {/* The real mascot face, seed-popping in */}
+      {/* Clay hamster face, seed-popping in */}
       <span
         className="inline-flex shrink-0 animate-seed-pop"
         style={{ animationDuration: '400ms' }}
       >
-        <MascotImage size={40} />
+        <HamsterMascot size={40} />
       </span>
       <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-jade-500 shadow-clay-xs">
         <Check size={14} strokeWidth={3} className="text-white" />

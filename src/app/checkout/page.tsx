@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { ArrowLeft, Clock, Construction } from 'lucide-react';
 
 import { PageShell } from '@/components/layout/PageShell';
-import { MascotImage } from '@/components/ui/MascotImage';
+import { HamsterMascot } from '@/components/ui/ClayIcons';
 import { CheckoutStepper } from '@/components/checkout/CheckoutStepper';
 import { ContactForm, type ContactFormData } from '@/components/checkout/ContactForm';
 import { PaymentMethodSelector } from '@/components/checkout/PaymentMethodSelector';
@@ -178,10 +178,9 @@ export default function CheckoutPage(): React.JSX.Element {
     return (
       <PageShell>
         <div className="flex flex-col items-center justify-center py-24 text-center">
-          <MascotImage
-            size={96}
+          <HamsterMascot
+            size={120}
             className="mascot-beg mb-6 drop-shadow-[0_8px_16px_rgba(124,45,18,0.25)]"
-            alt=""
           />
           <h1 className="mb-4 text-2xl font-bold text-fg">ตะกร้าว่างเปล่า</h1>
           <p className="mb-6 text-fg-placeholder">

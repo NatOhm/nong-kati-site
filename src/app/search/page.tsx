@@ -7,7 +7,7 @@ import { PageShell } from '@/components/layout/PageShell';
 import { ProductCard } from '@/components/product/ProductCard';
 import { ProductGrid } from '@/components/product/ProductGrid';
 import { Breadcrumb } from '@/components/data-display/Breadcrumb';
-import { MascotImage } from '@/components/ui/MascotImage';
+import { HamsterMascot } from '@/components/ui/ClayIcons';
 
 import { getCatalogProducts, getCategoriesWithProductCounts, type CatalogSort } from '@/lib/data';
 
@@ -221,11 +221,7 @@ export default async function SearchPage({
               </section>
             ) : query || category ? (
               <section className="py-16 text-center">
-                <MascotImage
-                  size={72}
-                  className="mascot-sniff mx-auto mb-4 shadow-clay-sm"
-                  alt=""
-                />
+                <HamsterMascot size={96} className="mascot-sniff mx-auto mb-4" />
                 <h2 className="mb-2 text-lg font-semibold text-fg">
                   {query ? <>ไม่พบสินค้า &ldquo;{query}&rdquo;</> : 'ไม่พบสินค้าในหมวดหมู่นี้'}
                 </h2>
@@ -235,11 +231,7 @@ export default async function SearchPage({
               </section>
             ) : (
               <section className="py-16 text-center">
-                <MascotImage
-                  size={72}
-                  className="mascot-sniff mx-auto mb-4 shadow-clay-sm"
-                  alt=""
-                />
+                <HamsterMascot size={96} className="mascot-sniff mx-auto mb-4" />
                 <h2 className="mb-2 text-lg font-semibold text-fg">ยังไม่มีสินค้าในร้าน</h2>
                 <p className="text-sm text-fg-placeholder">
                   น้องแฮมสเตอร์กำลังเก็บสินค้ามาวาง — กลับมาใหม่ภายหลังนะ

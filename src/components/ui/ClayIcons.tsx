@@ -291,3 +291,40 @@ export function HamsterWheelSpinner({ size = 72, className }: ClayIconProps): Re
     </div>
   );
 }
+
+/** Sleeping hamster — lying on its side, eyes closed, for 404/error pages. */
+export function HamsterSleeping({ size = 120, className }: ClayIconProps): React.JSX.Element {
+  return (
+    <svg
+      width={size}
+      height={size * 0.62}
+      viewBox="0 0 120 74"
+      fill="none"
+      className={className}
+      aria-hidden="true"
+    >
+      {/* body lying down */}
+      <ellipse cx="62" cy="48" rx="44" ry="24" fill="#FDBA74" />
+      <ellipse cx="62" cy="48" rx="44" ry="24" fill="url(#hamsterSleep)" />
+      {/* ear */}
+      <circle cx="30" cy="30" r="9" fill="#FDBA74" />
+      <circle cx="30" cy="30" r="4.5" fill="#FFEDD5" />
+      {/* closed eye: gentle arc */}
+      <path d="M52 42 q5 4 10 0" stroke="#4E3820" strokeWidth="2.4" strokeLinecap="round" />
+      {/* nose */}
+      <ellipse cx="30" cy="50" rx="3" ry="2.2" fill="#FB7185" />
+      {/* belly patch */}
+      <ellipse cx="70" cy="56" rx="22" ry="12" fill="#FFF7ED" />
+      {/* paw tucked out */}
+      <ellipse cx="44" cy="64" rx="7" ry="4.5" fill="#FED7AA" />
+      {/* blush */}
+      <ellipse cx="24" cy="55" rx="4.5" ry="2.6" fill="#FECDD3" opacity="0.8" />
+      <defs>
+        <radialGradient id="hamsterSleep" cx="0.35" cy="0.25" r="1.1">
+          <stop offset="0" stopColor="#FED7AA" />
+          <stop offset="1" stopColor="#FB923C" />
+        </radialGradient>
+      </defs>
+    </svg>
+  );
+}
