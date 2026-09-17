@@ -18,6 +18,9 @@ export function MobileBottomNav() {
   const pathname = usePathname();
   const { itemCount } = useCart();
 
+  // Sitewide taskbar except the admin panel (which has its own chrome).
+  if (pathname?.startsWith('/management')) return null;
+
   return (
     <nav className="bg-surface-base/95 fixed bottom-0 left-0 right-0 z-50 border-t border-line-subtle backdrop-blur-md lg:hidden">
       <div className="flex items-center justify-around px-2 py-1">

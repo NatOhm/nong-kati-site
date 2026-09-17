@@ -17,7 +17,6 @@ import { StatsCounter } from '@/components/home/StatsCounter';
 import { TrustBadges } from '@/components/home/TrustBadges';
 import { FAQAccordion } from '@/components/home/FAQAccordion';
 import { LiveSalesPopup } from '@/components/home/LiveSalesPopup';
-import { MobileBottomNav } from '@/components/home/MobileBottomNav';
 import { LINEChatButton } from '@/components/home/LINEChatButton';
 import { ScrollToTop } from '@/components/home/ScrollToTop';
 import { ScrollReveal } from '@/components/home/ScrollReveal';
@@ -220,7 +219,6 @@ export default async function HomePage(): Promise<React.JSX.Element> {
 
       {/* Client-side overlays */}
       <LiveSalesPopup />
-      <MobileBottomNav />
       <LINEChatButton />
       <ScrollToTop />
     </>

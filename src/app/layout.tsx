@@ -4,6 +4,7 @@ import { JetBrains_Mono, Mitr, Noto_Sans_Thai_Looped } from 'next/font/google';
 import { ThemeProvider } from '@/providers/ThemeProvider';
 import { CartProvider } from '@/providers/CartProvider';
 import { CookieConsentBanner } from '@/components/pdpa/CookieConsentBanner';
+import { MobileBottomNav } from '@/components/home/MobileBottomNav';
 import { ToastMount } from './ToastMount';
 
 import './globals.css';
@@ -58,7 +59,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }):
       </head>
       <body className="text-thai font-ui">
         <ThemeProvider defaultTheme="light">
-          <CartProvider>{children}</CartProvider>
+          <CartProvider>
+            {children}
+            {/* Sitewide mobile taskbar (hidden on /management by the component itself) */}
+            <MobileBottomNav />
+          </CartProvider>
           <ToastMount />
           <CookieConsentBanner />
         </ThemeProvider>
