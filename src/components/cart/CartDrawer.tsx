@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { X, ShoppingCart } from 'lucide-react';
 import { cn } from '@/utils/cn';
@@ -32,10 +32,22 @@ export function CartDrawer({
   // Focus trap — returns ref to attach to the drawer
   const drawerRef = useFocusTrap(isOpen);
 
+  // Fade-out: keep mounted through the 250ms exit, then unmount for real.
+  const [closing, setClosing] = useState(false);
+  useEffect(() => {
+    if (isOpen) setClosing(false);
+  }, [isOpen]);
+
+  const requestClose = () => {
+    if (closing) return;
+    setClosing(true);
+    setTimeout(onClose, 250);
+  };
+
   // Close on Escape + lock body scroll
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') requestClose();
     };
     if (isOpen) {
       document.addEventListener('keydown', handleEsc);
@@ -45,7 +57,8 @@ export function CartDrawer({
       document.removeEventListener('keydown', handleEsc);
       document.body.style.overflow = '';
     };
-  }, [isOpen, onClose]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, requestClose]);
 
   if (!isOpen) return <></>;
 
@@ -55,8 +68,11 @@ export function CartDrawer({
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-[80] bg-clay-950/50 backdrop-blur-sm"
-        onClick={onClose}
+        className={cn(
+          'fixed inset-0 z-[80] bg-clay-950/50 backdrop-blur-sm',
+          closing ? 'animate-toast-exit' : 'drawer-fade-in-once',
+        )}
+        onClick={requestClose}
         aria-hidden="true"
       />
 
@@ -66,7 +82,10 @@ export function CartDrawer({
         role="dialog"
         aria-modal="true"
         aria-label="ตะกร้าสินค้า"
-        className="fixed right-0 top-0 z-[90] flex h-full w-full max-w-[400px] flex-col border-l border-line-subtle bg-surface-base shadow-xl"
+        className={cn(
+          'fixed right-0 top-0 z-[90] flex h-full w-full max-w-[400px] flex-col border-l border-line-subtle bg-surface-base shadow-xl',
+          closing ? 'animate-cart-exit' : 'animate-cart-enter',
+        )}
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-line-subtle px-4 py-3">
@@ -75,7 +94,7 @@ export function CartDrawer({
             ตะกร้าสินค้า ({items.length})
           </h2>
           <button
-            onClick={onClose}
+            onClick={requestClose}
             className="rounded p-1 text-fg-placeholder transition-colors hover:bg-surface hover:text-fg-secondary"
             aria-label="ปิดตะกร้า"
           >
@@ -141,7 +160,7 @@ export function CartDrawer({
             <div className="mt-4 space-y-2">
               <Link
                 href="/checkout"
-                onClick={onClose}
+                onClick={requestClose}
                 className={cn(
                   'flex w-full items-center justify-center rounded-md px-5 py-2.5 text-sm font-semibold transition-colors',
                   hasOutOfStock

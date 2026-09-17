@@ -272,7 +272,9 @@ const config: Config = {
         shimmer: 'shimmer 1.5s linear infinite',
         'page-enter': 'page-enter 300ms cubic-bezier(0.25,1,0.5,1)',
         'modal-enter': 'modal-enter 300ms cubic-bezier(0.25,1,0.5,1)',
+        'modal-exit': 'modal-exit 250ms cubic-bezier(0.4, 0, 1, 1) both',
         'toast-enter': 'toast-enter 300ms cubic-bezier(0.25,1,0.5,1)',
+        'toast-exit': 'toast-exit 250ms cubic-bezier(0.4, 0, 1, 1) both',
         'copy-bounce': 'copy-bounce 300ms cubic-bezier(0.34,1.56,0.64,1)',
         'squish-press': 'squish-press 450ms cubic-bezier(0.34,1.56,0.64,1)',
         'reveal-up': 'reveal-up 550ms cubic-bezier(0, 0, 0.2, 1) both',
@@ -308,9 +310,17 @@ const config: Config = {
           from: { opacity: '0', transform: 'scale(0.95) translateY(8px)' },
           to: { opacity: '1', transform: 'scale(1) translateY(0)' },
         },
+        'modal-exit': {
+          from: { opacity: '1', transform: 'scale(1) translateY(0)' },
+          to: { opacity: '0', transform: 'scale(0.95) translateY(8px)' },
+        },
         'toast-enter': {
           from: { opacity: '0', transform: 'translateY(100%) scale(0.95)' },
           to: { opacity: '1', transform: 'translateY(0) scale(1)' },
+        },
+        'toast-exit': {
+          from: { opacity: '1', transform: 'translateY(0) scale(1)' },
+          to: { opacity: '0', transform: 'translateY(100%) scale(0.95)' },
         },
         'copy-bounce': {
           '0%': { transform: 'scale(1)' },

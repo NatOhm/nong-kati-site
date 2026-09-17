@@ -17,6 +17,8 @@ export interface ToastData {
   duration?: number;
   /** 'cart' renders the hamster-mascot success layout. */
   variant?: 'cart' | undefined;
+  /** True during the 250ms fade-out before removal. */
+  exiting?: boolean;
 }
 
 export interface ToastProps extends ToastData {
@@ -38,6 +40,7 @@ export function Toast({
   message,
   duration = 4000,
   variant,
+  exiting,
   onDismiss,
 }: ToastProps): React.JSX.Element {
   useEffect(() => {
@@ -46,11 +49,13 @@ export function Toast({
     return () => clearTimeout(timer);
   }, [id, duration, onDismiss]);
 
+  const fade = exiting ? 'animate-toast-exit' : 'animate-toast-enter';
+
   if (variant === 'cart') {
     return (
       <div
         role="status"
-        className="clay-card flex w-full max-w-sm animate-toast-enter items-start gap-3 rounded-xl p-4"
+        className={cn('clay-card flex w-full max-w-sm items-start gap-3 rounded-xl p-4', fade)}
       >
         <SuccessToast title={title} message={message} />
         <button
@@ -68,7 +73,7 @@ export function Toast({
   return (
     <div
       role={type === 'error' ? 'alert' : 'status'}
-      className="clay-card flex w-full max-w-sm animate-toast-enter items-start gap-3 rounded-xl p-4"
+      className={cn('clay-card flex w-full max-w-sm items-start gap-3 rounded-xl p-4', fade)}
     >
       {iconByType[type]}
       <div className="flex-1">

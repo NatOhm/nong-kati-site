@@ -60,11 +60,24 @@ export function QuickViewModal({
     }
   }, [isOpen, product.slug, product.variants]);
 
-  // Escape closes + body scroll lock
+  // Escape closes + body scroll lock (through the 250ms fade-out)
+  const [closing, setClosing] = useState(false);
+  useEffect(() => {
+    if (isOpen) setClosing(false);
+  }, [isOpen]);
+
+  const requestClose = useCallback((): void => {
+    setClosing((was) => {
+      if (was) return was;
+      setTimeout(onClose, 250);
+      return true;
+    });
+  }, [onClose]);
+
   useEffect(() => {
     if (!isOpen) return;
     const handleEsc = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') requestClose();
     };
     document.addEventListener('keydown', handleEsc);
     document.body.style.overflow = 'hidden';
@@ -72,7 +85,7 @@ export function QuickViewModal({
       document.removeEventListener('keydown', handleEsc);
       document.body.style.overflow = '';
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, requestClose]);
 
   // Clear pending timers on unmount
   useEffect(
@@ -114,10 +127,10 @@ export function QuickViewModal({
           duration: 2600,
           variant: 'cart',
         });
-        timers.current.push(setTimeout(onClose, 900));
+        timers.current.push(setTimeout(requestClose, 900));
       }, 450),
     );
-  }, [selected, addState, addItem, product, quantity, onClose, toast]);
+  }, [selected, addState, addItem, product, quantity, requestClose, toast]);
 
   if (!isOpen) return <></>;
 
@@ -125,8 +138,11 @@ export function QuickViewModal({
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-[80] bg-clay-950/50 backdrop-blur-sm"
-        onClick={onClose}
+        className={cn(
+          'fixed inset-0 z-[80] bg-clay-950/50 backdrop-blur-sm',
+          closing ? 'animate-toast-exit' : 'drawer-fade-in-once',
+        )}
+        onClick={requestClose}
         aria-hidden="true"
       />
 
@@ -138,7 +154,12 @@ export function QuickViewModal({
         aria-label={`เลือกราคา ${product.name}`}
         className="fixed left-1/2 top-1/2 z-[90] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2"
       >
-        <div className="clay-card animate-modal-enter rounded-2xl p-5">
+        <div
+          className={cn(
+            'clay-card rounded-2xl p-5',
+            closing ? 'animate-modal-exit' : 'animate-modal-enter',
+          )}
+        >
           {/* Header */}
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -155,7 +176,7 @@ export function QuickViewModal({
               </div>
             </div>
             <button
-              onClick={onClose}
+              onClick={requestClose}
               className="clay-btn rounded-full p-1.5 text-fg-muted transition-all duration-fast hover:bg-surface-sunken hover:text-fg-secondary active:scale-95"
               aria-label="ปิดหน้าต่างเลือกราคา"
             >
@@ -263,7 +284,7 @@ export function QuickViewModal({
           {/* Detail-page link */}
           <Link
             href={`/product/${product.slug}`}
-            onClick={onClose}
+            onClick={requestClose}
             className="mt-3 block text-center text-xs font-medium text-fg-muted underline-offset-2 hover:text-fg-brand hover:underline"
           >
             ดูรายละเอียดสินค้าเต็ม →

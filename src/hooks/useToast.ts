@@ -37,9 +37,16 @@ function push(type: ToastType, title: string, options?: ToastOptions): void {
   emit();
 }
 
-function dismiss(id: string): void {
-  toastState = toastState.filter((t) => t.id !== id);
+function dismiss(id: string, immediate = false): void {
+  if (immediate) {
+    toastState = toastState.filter((t) => t.id !== id);
+    emit();
+    return;
+  }
+  // Play the 250ms toast-exit fade first, then actually remove.
+  toastState = toastState.map((t) => (t.id === id ? { ...t, exiting: true } : t));
   emit();
+  setTimeout(() => dismiss(id, true), 250);
 }
 
 export function useToast(): UseToastResult {
