@@ -7,6 +7,7 @@ import { PageShell } from '@/components/layout/PageShell';
 import { ProductCard } from '@/components/product/ProductCard';
 import { ProductGrid } from '@/components/product/ProductGrid';
 import { Breadcrumb } from '@/components/data-display/Breadcrumb';
+import { MascotImage } from '@/components/ui/MascotImage';
 
 import { getCatalogProducts, getCategoriesWithProductCounts, type CatalogSort } from '@/lib/data';
 
@@ -220,24 +221,28 @@ export default async function SearchPage({
               </section>
             ) : query || category ? (
               <section className="py-16 text-center">
-                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-surface">
-                  <span className="text-2xl">🔍</span>
-                </div>
+                <MascotImage
+                  size={72}
+                  className="mascot-sniff mx-auto mb-4 shadow-clay-sm"
+                  alt=""
+                />
                 <h2 className="mb-2 text-lg font-semibold text-fg">
                   {query ? <>ไม่พบสินค้า &ldquo;{query}&rdquo;</> : 'ไม่พบสินค้าในหมวดหมู่นี้'}
                 </h2>
                 <p className="text-sm text-fg-placeholder">
-                  ลองค้นหาด้วยคำอื่น หรือเลือกหมวดหมู่อื่น
+                  น้องแฮมสเตอร์หาไม่เจอ — ลองค้นหาด้วยคำอื่น หรือเลือกหมวดหมู่อื่น
                 </p>
               </section>
             ) : (
               <section className="py-16 text-center">
-                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-surface">
-                  <span className="text-2xl">🛒</span>
-                </div>
+                <MascotImage
+                  size={72}
+                  className="mascot-sniff mx-auto mb-4 shadow-clay-sm"
+                  alt=""
+                />
                 <h2 className="mb-2 text-lg font-semibold text-fg">ยังไม่มีสินค้าในร้าน</h2>
                 <p className="text-sm text-fg-placeholder">
-                  กลับมาใหม่ภายหลัง หรือติดต่อทีมงานเพื่อสอบถาม
+                  น้องแฮมสเตอร์กำลังเก็บสินค้ามาวาง — กลับมาใหม่ภายหลังนะ
                 </p>
               </section>
             )}

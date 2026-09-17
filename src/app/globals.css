@@ -240,6 +240,59 @@ body {
   animation-delay: 1.6s;
 }
 
+/* Search empty state: hamster sniffing the ground for the missing product. */
+@keyframes mascot-sniff {
+  0%,
+  100% {
+    transform: rotate(0deg) translateY(0);
+  }
+  25% {
+    transform: rotate(-8deg) translateY(2px);
+  }
+  50% {
+    transform: rotate(0deg) translateY(0);
+  }
+  75% {
+    transform: rotate(8deg) translateY(2px);
+  }
+}
+.mascot-sniff {
+  animation: mascot-sniff 1.8s ease-in-out infinite;
+  transform-origin: 50% 90%;
+}
+
+/* Checkout empty cart: hamster standing up begging for items. */
+@keyframes mascot-beg {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  40% {
+    transform: translateY(-6px) scale(1.04);
+  }
+  60% {
+    transform: translateY(-4px) scale(1.02);
+  }
+}
+.mascot-beg {
+  animation: mascot-beg 2.4s ease-in-out infinite;
+  transform-origin: 50% 100%;
+}
+
+/* Footer: tiny hamster peeking over the copyright line. */
+@keyframes mascot-peek {
+  0%,
+  100% {
+    transform: translateY(4px);
+  }
+  50% {
+    transform: translateY(0);
+  }
+}
+.mascot-peek {
+  animation: mascot-peek 3.2s ease-in-out infinite;
+}
+
 /* Sidebar drawer: warm scrim fade + squishy slide-in (550ms ease-out
    motion language; reduced-motion clamps via the global rule). */
 @keyframes drawer-fade-in {

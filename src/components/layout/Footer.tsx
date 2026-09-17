@@ -1,4 +1,5 @@
 import { Logo } from './Logo';
+import { MascotImage } from '@/components/ui/MascotImage';
 
 const FOOTER_COLUMNS: Array<{ title: string; links: Array<{ label: string; href: string }> }> = [
   {
@@ -60,7 +61,10 @@ export function Footer(): React.JSX.Element {
         </div>
 
         <div className="mt-12 flex flex-col items-center gap-3 border-t border-line-subtle pt-6 text-xs text-fg-placeholder md:flex-row md:justify-between">
-          <p>© {new Date().getFullYear()} Nong-Kati</p>
+          <p className="flex items-center gap-2">
+            <MascotImage size={28} className="mascot-peek rounded-full" alt="" />©{' '}
+            {new Date().getFullYear()} Nong-Kati
+          </p>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
             {LEGAL_LINKS.map((link) => (
               <a key={link.href} href={link.href} className="hover:text-fg-secondary">
