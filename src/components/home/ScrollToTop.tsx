@@ -25,8 +25,8 @@ export function ScrollToTop() {
     <button
       onClick={scrollToTop}
       className={cn(
-        'clay-btn fixed bottom-20 right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-surface-elevated shadow-clay transition-all duration-interactive ease-spring hover:scale-110 hover:shadow-clay-lg active:scale-90 active:shadow-clay-press',
-        'lg:bottom-6 lg:right-6',
+        'clay-btn fixed bottom-[9.5rem] right-5 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-surface-elevated shadow-clay transition-all duration-interactive ease-spring hover:scale-110 hover:shadow-clay-lg active:scale-90 active:shadow-clay-press',
+        'lg:bottom-6 lg:right-20',
         isVisible
           ? 'translate-y-0 animate-seed-pop opacity-100'
           : 'pointer-events-none translate-y-4 opacity-0',

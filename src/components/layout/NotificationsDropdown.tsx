@@ -20,14 +20,8 @@ interface NotificationItem {
 }
 
 const SAMPLE_NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: 'n1',
-    icon: 'order',
-    title: 'คำสั่งซื้อ #NK-1024 สำเร็จ',
-    body: 'รหัสสินค้าของคุณถูกส่งไปที่อีเมลแล้ว',
-    time: '5 นาทีที่แล้ว',
-    read: false,
-  },
+  // Promo-only placeholders — NEVER fake order statuses. Users must not see
+  // invented "order succeeded" rows before the real notification backend lands.
   {
     id: 'n2',
     icon: 'promo',
@@ -35,14 +29,6 @@ const SAMPLE_NOTIFICATIONS: NotificationItem[] = [
     body: 'ลด 20% สำหรับ Spotify Premium ทุกแพ็กเกจ',
     time: '2 ชั่วโมงที่แล้ว',
     read: false,
-  },
-  {
-    id: 'n3',
-    icon: 'order',
-    title: 'คำสั่งซื้อ #NK-1019 กำลังดำเนินการ',
-    body: 'ได้รับชำระเงินเรียบร้อย กำลังจัดส่งรหัสสินค้า',
-    time: 'เมื่อวาน',
-    read: true,
   },
 ];
 

@@ -31,9 +31,9 @@ interface FacebookNavbarProps {
 const NAV_ITEMS = [
   { icon: AcornIcon, href: '/', label: 'หน้าหลัก' },
   { icon: Grid3X3, href: '/search', label: 'สินค้าทั้งหมด' },
-  { icon: Gamepad2, href: '/category/streaming', label: 'สตรีมมิ่ง' },
-  { icon: Tv, href: '/category/asian-streaming', label: 'เอเชีย' },
-  { icon: Music, href: '/category/music', label: 'เพลง' },
+  { icon: Gamepad2, href: '/category/hbo-max', label: 'HBO Max' },
+  { icon: Tv, href: '/category/netflix', label: 'Netflix' },
+  { icon: Music, href: '/category/spotify', label: 'Spotify' },
 ];
 
 export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {

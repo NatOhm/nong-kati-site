@@ -5,26 +5,36 @@ import { usePathname } from 'next/navigation';
 import { Search, ShoppingCart } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { useCart } from '@/hooks/useCart';
+import { useCustomerSession } from '@/components/layout/useCustomerSession';
 import { AcornIcon, SeedIcon, WheelIcon, PawIcon } from '@/components/ui/ClayIcons';
 
 const NAV_ITEMS = [
   { icon: AcornIcon, href: '/', label: 'หน้าหลัก', clay: true },
   { icon: Search, href: '/search', label: 'ค้นหา', clay: false },
   { icon: ShoppingCart, href: '/checkout', label: 'ตะกร้า', clay: false },
-  { icon: PawIcon, href: '/account/login', label: 'บัญชี', clay: true },
 ];
 
 export function MobileBottomNav() {
   const pathname = usePathname();
   const { itemCount } = useCart();
+  const sessionState = useCustomerSession();
+  const isAuthenticated = sessionState === 'authed';
 
   // Sitewide taskbar except the admin panel (which has its own chrome).
   if (pathname?.startsWith('/management')) return null;
 
+  const accountItem = {
+    icon: PawIcon,
+    href: isAuthenticated ? '/account/dashboard' : '/account/login',
+    label: isAuthenticated ? 'บัญชี' : 'เข้าสู่ระบบ',
+    clay: true as const,
+  };
+  const allItems = [...NAV_ITEMS, accountItem];
+
   return (
     <nav className="bg-surface-base/95 fixed bottom-0 left-0 right-0 z-50 border-t border-line-subtle backdrop-blur-md lg:hidden">
       <div className="flex items-center justify-around px-2 py-1">
-        {NAV_ITEMS.map((item) => {
+        {allItems.map((item) => {
           const isActive =
             pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href));
           const Icon = item.icon;

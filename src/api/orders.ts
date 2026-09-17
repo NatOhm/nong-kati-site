@@ -9,7 +9,6 @@
  *   completed → refunded
  */
 
-import { seedProducts } from '@/seed-data/products';
 import { type CartState } from '@/lib/cart';
 import { calculateVat, calculateTotal, generateOrderNumber } from '@/lib/pricing';
 
@@ -66,29 +65,17 @@ const orderStore = new Map<string, Order>();
 let orderSequence = 1;
 
 /**
- * Find a variant by ID for price/stock re-validation.
- */
-function findVariantForValidation(
-  variantId: string,
-): { salePriceThb: string; faceValueThb: string; inStock: boolean; skuCode: string } | null {
-  for (const product of seedProducts) {
-    for (const variant of product.variants) {
-      if (variant.id === variantId) {
-        return variant;
-      }
-    }
-  }
-  return null;
-}
-
-/**
  * Create an order from the current cart.
  * 07-api.md §10 — POST /api/v1/orders
+ *
+ * Price/stock come from the cart item itself (captured from the live DB
+ * product catalog when the item was added). The old seed-data lookup broke
+ * every real purchase with VARIANT_NOT_FOUND because the store sells DB
+ * products whose variant IDs never exist in the static seed file.
+ * When M4 lands, this must re-validate variantId + price against the real
+ * database server-side before charging.
  */
-export function createOrder(
-  input: CreateOrderInput,
-  cart: CartState,
-): Order {
+export function createOrder(input: CreateOrderInput, cart: CartState): Order {
   if (!input.tosAccepted) {
     throw new Error('TOS_NOT_ACCEPTED');
   }
@@ -103,12 +90,10 @@ export function createOrder(
   let subtotal = 0;
 
   for (const cartItem of cart.items) {
-    const variant = findVariantForValidation(cartItem.variantId);
-    if (!variant) throw new Error('VARIANT_NOT_FOUND');
-    if (!variant.inStock) throw new Error('OUT_OF_STOCK');
+    if (!cartItem.inStock) throw new Error('OUT_OF_STOCK');
 
-    const serverPrice = parseFloat(variant.salePriceThb);
-    const denomination = parseFloat(variant.faceValueThb);
+    const serverPrice = cartItem.unitPriceThb;
+    const denomination = cartItem.denominationThb;
     const exVat = Math.round((serverPrice / 1.07) * 100) / 100;
     const vatAmount = Math.round((serverPrice - exVat) * 100) / 100;
     const lineTotal = Math.round(serverPrice * cartItem.quantity * 100) / 100;
@@ -180,11 +165,7 @@ export function getOrderById(orderId: string): Order | null {
 /**
  * Update order status — 09-payment.md §10 state machine.
  */
-export function updateOrderStatus(
-  orderId: string,
-  newStatus: string,
-  reason?: string,
-): void {
+export function updateOrderStatus(orderId: string, newStatus: string, reason?: string): void {
   const order = orderStore.get(orderId);
   if (!order) return;
 

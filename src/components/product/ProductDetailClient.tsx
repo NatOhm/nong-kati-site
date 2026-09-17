@@ -113,7 +113,10 @@ export function ProductDetailClient({
                       {getQuantity(variant.id)}
                     </span>
                   )}
-                  <span className="font-medium text-fg">{variant.label}</span>
+                  {/* 'default' is an internal single-variant label — show only the price */}
+                  {variant.label !== 'default' && (
+                    <span className="font-medium text-fg">{variant.label}</span>
+                  )}
                   <span className="text-xs text-fg-placeholder">{formatThb(variant.price)}</span>
                   {variant.stock <= 10 && variant.stock > 0 && (
                     <span className="text-xs text-fg-brand">เหลือ {variant.stock}</span>

@@ -25,15 +25,15 @@ import { useState, useEffect, useRef, type MouseEventHandler } from 'react';
 const NAV_ITEMS = [
   { icon: Home, href: '/', label: 'หน้าหลัก', color: 'text-fg-brand' },
   { icon: Grid3X3, href: '/search', label: 'สินค้าทั้งหมด', color: 'text-sapphire-400' },
-  { icon: Tv, href: '/category/streaming', label: 'สตรีมมิ่ง', color: 'text-coral-500' },
-  { icon: Gamepad2, href: '/category/games', label: 'เกม', color: 'text-jade-500' },
-  { icon: Music, href: '/category/music', label: 'เพลง', color: 'text-pink-400' },
-  { icon: Tag, href: '/search?q=promo', label: 'โปรโมชั่น', color: 'text-red-400' },
+  { icon: Tv, href: '/category/netflix', label: 'Netflix', color: 'text-coral-500' },
+  { icon: Gamepad2, href: '/category/hbo-max', label: 'HBO Max', color: 'text-jade-500' },
+  { icon: Music, href: '/category/spotify', label: 'Spotify', color: 'text-pink-400' },
+  { icon: Tag, href: '/search', label: 'โปรโมชั่น', color: 'text-red-400' },
   { icon: ShoppingBag, href: '/orders/lookup', label: 'คำสั่งซื้อ', color: 'text-orange-400' },
   {
     icon: MessageCircle,
-    href: '/legal/privacy-policy',
-    label: 'ติดต่อเรา',
+    href: '/orders/lookup',
+    label: 'ติดตามคำสั่งซื้อ',
     color: 'text-teal-400',
   },
 ];
@@ -42,8 +42,8 @@ const SHORTCUTS = [
   { icon: MonitorPlay, label: 'HBO MAX', href: '/category/hbo-max', color: 'bg-purple-600' },
   { icon: Tv, label: 'Netflix', href: '/category/netflix', color: 'bg-red-600' },
   { icon: Headphones, label: 'Spotify', href: '/category/spotify', color: 'bg-green-600' },
-  { icon: Zap, label: 'YouTube Premium', href: '/category/youtube', color: 'bg-red-500' },
-  { icon: Gamepad2, label: 'Steam', href: '/category/games', color: 'bg-blue-600' },
+  { icon: Zap, label: 'YouTube Premium', href: '/category/youtube-premium', color: 'bg-red-500' },
+  { icon: Gamepad2, label: 'iQIYI', href: '/category/iqiyi', color: 'bg-blue-600' },
 ];
 
 interface FacebookSidebarProps {

@@ -5,9 +5,9 @@ const FOOTER_COLUMNS: Array<{ title: string; links: Array<{ label: string; href:
   {
     title: 'สินค้า',
     links: [
-      { label: 'เกม', href: '/category/gaming' },
-      { label: 'สตรีมมิ่ง', href: '/category/streaming' },
-      { label: 'อีคอมเมิร์ซ', href: '/category/ecommerce' },
+      { label: 'ดูสินค้าทั้งหมด', href: '/search' },
+      { label: 'Netflix', href: '/category/netflix' },
+      { label: 'Spotify', href: '/category/spotify' },
     ],
   },
   {
@@ -22,8 +22,7 @@ const FOOTER_COLUMNS: Array<{ title: string; links: Array<{ label: string; href:
     title: 'ช่วยเหลือ',
     links: [
       { label: 'ติดตามคำสั่งซื้อ', href: '/orders/lookup' },
-      { label: 'ติดต่อเรา', href: '/contact' },
-      { label: 'เกี่ยวกับ Nong-Kati', href: '/about' },
+      { label: 'ติดต่อเรา', href: '/account/support' },
     ],
   },
 ];

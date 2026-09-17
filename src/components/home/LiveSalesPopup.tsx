@@ -6,15 +6,15 @@ import { cn } from '@/utils/cn';
 
 const SALES_DATA = [
   { name: 'คุณ N***', product: 'HBO Max 7 4K', price: 25, time: '2 นาทีที่แล้ว' },
-  { name: 'คุณ P***', product: 'Netflix 30DAY', price: 120, time: '5 นาทีที่แล้ว' },
+  { name: 'คุณ P***', product: 'Netflix 30 วัน', price: 120, time: '5 นาทีที่แล้ว' },
   { name: 'คุณ K***', product: 'Spotify Premium', price: 45, time: '8 นาทีที่แล้ว' },
   { name: 'คุณ S***', product: 'YouTube Premium', price: 7, time: '12 นาทีที่แล้ว' },
-  { name: 'คุณ A***', product: 'WeTV 30 (÷)2', price: 45, time: '15 นาทีที่แล้ว' },
+  { name: 'คุณ A***', product: 'WeTV 30 แชร์ 2', price: 45, time: '15 นาทีที่แล้ว' },
   { name: 'คุณ T***', product: 'iQIYI 30 ส่วนตัว', price: 62, time: '18 นาทีที่แล้ว' },
   { name: 'คุณ M***', product: 'Prime Video 30', price: 40, time: '22 นาทีที่แล้ว' },
   { name: 'คุณ W***', product: 'CapCut 7 ส่วนตัว', price: 59, time: '25 นาทีที่แล้ว' },
   { name: 'คุณ J***', product: 'Youku 30 ยกแอค', price: 60, time: '30 นาทีที่แล้ว' },
-  { name: 'คุณ R***', product: 'Bilibili 30 (÷)4', price: 20, time: '35 นาทีที่แล้ว' },
+  { name: 'คุณ R***', product: 'Bilibili 30 แชร์ 4', price: 20, time: '35 นาทีที่แล้ว' },
 ];
 
 export function LiveSalesPopup() {
@@ -50,7 +50,7 @@ export function LiveSalesPopup() {
   return (
     <div
       className={cn(
-        'fixed bottom-4 left-4 z-50 max-w-[320px] transition-all duration-500',
+        'fixed bottom-[5.5rem] left-4 z-50 max-w-[320px] transition-all duration-500',
         'sm:bottom-6 sm:left-6',
         isVisible ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-4 opacity-0',
       )}

@@ -18,6 +18,25 @@ import { createOrder, type Order } from '@/api/orders';
 import { initiatePayment, getPaymentStatus } from '@/api/payments';
 import { formatThb } from '@/lib/pricing';
 
+/** Map internal error codes to Thai copy users can act on — never raw codes. */
+function friendlyOrderError(err: unknown): string {
+  const code = err instanceof Error ? err.message : '';
+  switch (code) {
+    case 'OUT_OF_STOCK':
+      return 'สินค้าบางรายการหมดสต๊อกพอดี — กรุณาลบรายการนั้นออกแล้วลองอีกครั้ง';
+    case 'CART_EMPTY':
+      return 'ตะกร้าว่างเปล่า กรุณาเพิ่มสินค้าก่อนดำเนินการชำระเงิน';
+    case 'INVALID_EMAIL':
+      return 'รูปแบบอีเมลไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง';
+    case 'TOS_NOT_ACCEPTED':
+      return 'กรุณายอมรับเงื่อนไขการใช้งานก่อนดำเนินการต่อ';
+    case 'PAYMENT_INIT_FAILED':
+      return 'สร้างรายการชำระเงินไม่สำเร็จ กรุณาลองอีกครั้ง';
+    default:
+      return 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง หากยังมีปัญหาติดต่อฝ่ายสนับสนุน';
+  }
+}
+
 /**
  * Checkout page — 2-step flow with real payment initiation.
  * Step 1: Contact Info → creates order (pending_payment)
@@ -79,8 +98,7 @@ export default function CheckoutPage(): React.JSX.Element {
         // Auto-initiate payment
         await handleInitiatePayment(newOrder);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'เกิดข้อผิดพลาด';
-        setError(message);
+        setError(friendlyOrderError(err));
       } finally {
         setLoading(false);
       }
@@ -114,8 +132,7 @@ export default function CheckoutPage(): React.JSX.Element {
           startPaymentPolling(result.paymentAttemptId);
         }
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการชำระเงิน';
-        setError(message);
+        setError(friendlyOrderError(err));
       } finally {
         setLoading(false);
       }
