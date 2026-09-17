@@ -7,8 +7,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
-import { LogIn, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { ArrowLeft, LogIn, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
 /** Only allow same-site relative paths in ?next= (no open redirect). */
@@ -18,6 +18,7 @@ function safeNext(raw: string | null): string {
 }
 
 export default function LoginPage(): React.JSX.Element {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -61,6 +62,16 @@ export default function LoginPage(): React.JSX.Element {
   return (
     <div className="flex min-h-[80vh] items-center justify-center px-4">
       <div className="w-full max-w-md">
+        {/* Back to previous page (home fallback when opened directly) */}
+        <button
+          type="button"
+          onClick={() => (window.history.length > 1 ? router.back() : router.push('/'))}
+          className="mb-4 inline-flex items-center gap-2 text-sm text-fg-placeholder transition-colors duration-200 hover:text-fg-brand"
+        >
+          <ArrowLeft size={16} />
+          กลับ
+        </button>
+
         <div className="mb-8 text-center">
           <h1 className="mb-2 text-2xl font-bold text-fg">เข้าสู่ระบบ</h1>
           <p className="text-sm text-fg-placeholder">
