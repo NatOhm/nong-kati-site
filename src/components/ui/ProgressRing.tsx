@@ -40,16 +40,31 @@ export function ProgressRing({
   const hasAnimated = useRef(false);
 
   useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const start = () => {
+      if (hasAnimated.current) return;
+      hasAnimated.current = true;
+      setVisible(true);
+    };
+
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry?.isIntersecting && !hasAnimated.current) {
-          hasAnimated.current = true;
-          setVisible(true);
+        if (entry?.isIntersecting) {
+          start();
+          observer.disconnect();
         }
       },
       { threshold: 0.4 },
     );
-    if (ref.current) observer.observe(ref.current);
+    observer.observe(el);
+
+    // Fallback for webviews whose IntersectionObserver never fires.
+    const rect = el.getBoundingClientRect();
+    if (rect.top < window.innerHeight && rect.bottom > 0) {
+      start();
+    }
     return () => observer.disconnect();
   }, []);
 

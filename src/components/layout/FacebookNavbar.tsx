@@ -147,16 +147,20 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
             })}
           </div>
 
-          {/* Right: Actions */}
+          {/* Right: Actions — on phones only the cart stays here; account,
+              notifications and support live in the sidebar + bottom taskbar,
+              so the bar doesn't crowd. From md up everything fits. */}
           <div className="flex items-center gap-1">
             {/* Cart — opens cart drawer */}
             <CartIcon count={itemCount} onClick={() => setCartOpen(true)} />
 
-            {/* Notifications — popover */}
-            <NotificationsDropdown />
+            {/* Notifications — popover (md+) */}
+            <div className="hidden md:block">
+              <NotificationsDropdown />
+            </div>
 
-            {/* Messenger — support contact. The support desk lives inside the
-                logged-in area; guests are sent to login first and land back
+            {/* Messenger — support contact (md+). The support desk lives inside
+                the logged-in area; guests are sent to login first and land back
                 on the support form after signing in. */}
             <Link
               href={
@@ -164,23 +168,25 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
               }
               aria-label="ฝ่ายสนับสนุน"
               title="ฝ่ายสนับสนุน"
-              className="clay-btn flex h-10 w-10 items-center justify-center rounded-full text-fg-muted transition-all duration-interactive ease-ease-out hover:-translate-y-0.5 hover:text-fg-brand active:translate-y-0 active:scale-95 active:shadow-clay-press"
+              className="clay-btn hidden h-10 w-10 items-center justify-center rounded-full text-fg-muted transition-all duration-interactive ease-ease-out hover:-translate-y-0.5 hover:text-fg-brand active:translate-y-0 active:scale-95 active:shadow-clay-press md:flex"
             >
               <MessageCircle size={20} strokeWidth={1.5} />
             </Link>
 
-            {/* Profile */}
+            {/* Profile (md+) — phones use the taskbar บัญชี button */}
             <Link
               href={isAuthenticated ? '/account/dashboard' : '/account/login'}
               aria-label={isAuthenticated ? 'บัญชีของฉัน' : 'เข้าสู่ระบบ'}
               title={isAuthenticated ? 'บัญชีของฉัน' : 'เข้าสู่ระบบ'}
-              className="clay-btn flex h-10 w-10 items-center justify-center rounded-full text-fg-muted transition-all duration-interactive ease-ease-out hover:-translate-y-0.5 hover:text-fg-brand active:translate-y-0 active:scale-95 active:shadow-clay-press"
+              className="clay-btn hidden h-10 w-10 items-center justify-center rounded-full text-fg-muted transition-all duration-interactive ease-ease-out hover:-translate-y-0.5 hover:text-fg-brand active:translate-y-0 active:scale-95 active:shadow-clay-press md:flex"
             >
               <User size={20} />
             </Link>
 
-            {/* Light/dark */}
-            <ThemeToggle />
+            {/* Light/dark (md+) — phone users switch via device/system theme */}
+            <div className="hidden md:block">
+              <ThemeToggle />
+            </div>
           </div>
         </div>
       </nav>

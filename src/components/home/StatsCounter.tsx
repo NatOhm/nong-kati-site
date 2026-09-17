@@ -23,31 +23,45 @@ function SeedTube({ value, label, icon, seedColor }: SeedTubeProps) {
   const hasAnimated = useRef(false);
 
   useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const start = () => {
+      if (hasAnimated.current) return;
+      hasAnimated.current = true;
+      const duration = 2000;
+      const steps = 60;
+      const increment = value / steps;
+      let current = 0;
+      const timer = setInterval(() => {
+        current += increment;
+        if (current >= value) {
+          setCount(value);
+          setFilled(100);
+          clearInterval(timer);
+        } else {
+          setCount(Math.floor(current));
+          setFilled(Math.round((current / value) * 100));
+        }
+      }, duration / steps);
+    };
+
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry?.isIntersecting && !hasAnimated.current) {
-          hasAnimated.current = true;
-          const duration = 2000;
-          const steps = 60;
-          const increment = value / steps;
-          let current = 0;
-          const timer = setInterval(() => {
-            current += increment;
-            if (current >= value) {
-              setCount(value);
-              setFilled(100);
-              clearInterval(timer);
-            } else {
-              setCount(Math.floor(current));
-              setFilled(Math.round((current / value) * 100));
-            }
-          }, duration / steps);
+        if (entry?.isIntersecting) {
+          start();
+          observer.disconnect();
         }
       },
       { threshold: 0.5 },
     );
+    observer.observe(el);
 
-    if (ref.current) observer.observe(ref.current);
+    // Fallback for webviews whose IntersectionObserver never fires.
+    const rect = el.getBoundingClientRect();
+    if (rect.top < window.innerHeight && rect.bottom > 0) {
+      start();
+    }
     return () => observer.disconnect();
   }, [value]);
 

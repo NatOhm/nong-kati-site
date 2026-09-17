@@ -239,22 +239,24 @@ export function FacebookSidebar({
       {/* Mobile drawer - slide from left with matching slide-out */}
       {shown && (
         <>
-          {/* Backdrop: warm clay-tinted scrim instead of harsh black */}
+          {/* Backdrop: warm clay-tinted scrim instead of harsh black.
+              z-[60] keeps it above the sticky navbar (z-50). */}
           <div
             className={cn(
-              'fixed inset-0 z-50 bg-clay-900/55 lg:hidden',
+              'fixed inset-0 z-[60] bg-clay-900/55 lg:hidden',
               closing ? 'drawer-backdrop-out' : 'drawer-backdrop',
             )}
             onClick={close}
             aria-hidden="true"
           />
-          {/* Drawer: squishy slide-in / slide-out, rounded clay edge, themed scrollbar */}
+          {/* Drawer: squishy slide-in / slide-out, rounded clay edge, themed scrollbar.
+              z-[70] paints the panel over the navbar icons, not beside them. */}
           <div
             role="dialog"
             aria-label="เมนูนำทาง"
             onAnimationEnd={handleAnimationEnd}
             className={cn(
-              'drawer-scroll fixed left-0 top-0 z-50 h-full w-[300px] overflow-y-auto rounded-r-[28px] bg-surface-base shadow-[6px_0_24px_rgba(78,56,32,0.35)] lg:hidden',
+              'drawer-scroll fixed left-0 top-0 z-[70] h-full w-[300px] overflow-y-auto rounded-r-[28px] bg-surface-base shadow-[6px_0_24px_rgba(78,56,32,0.35)] lg:hidden',
               closing ? 'drawer-panel-out' : 'drawer-panel',
             )}
           >
