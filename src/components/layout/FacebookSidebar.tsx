@@ -19,7 +19,8 @@ import {
   X,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
-import { useState, useEffect, type MouseEventHandler } from 'react';
+import { MascotImage } from '@/components/ui/MascotImage';
+import { useState, useEffect, useRef, type MouseEventHandler } from 'react';
 
 const NAV_ITEMS = [
   { icon: Home, href: '/', label: 'หน้าหลัก', color: 'text-fg-brand' },
@@ -55,10 +56,16 @@ function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
   const [showMore, setShowMore] = useState(false);
   const visibleItems = showMore ? NAV_ITEMS : NAV_ITEMS.slice(0, 6);
 
-  // Close drawer on navigation (mobile)
+  // Close drawer on navigation (mobile). Track the previous path so the
+  // effect's mount-run is a no-op — otherwise the drawer closes itself the
+  // instant it opens, because effects fire on mount too.
+  const prevPath = useRef(pathname);
   useEffect(() => {
-    if (onClose) onClose();
-  }, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (onClose && prevPath.current !== pathname) {
+      prevPath.current = pathname;
+      onClose();
+    }
+  }, [pathname, onClose]);
 
   const linkClickHandler: MouseEventHandler<HTMLAnchorElement> = () => {
     if (onClose) onClose();
@@ -70,21 +77,23 @@ function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
       {onClose && (
         <div className="flex items-center justify-between border-b border-line-subtle px-4 py-3 lg:hidden">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-peach-400">
-              <span className="text-lg font-bold text-peach-900">NK</span>
-            </div>
+            <MascotImage
+              size={40}
+              className="bg-peach-200 shadow-[2px_3px_8px_rgba(124,45,18,0.25)]"
+            />
             <span className="text-lg font-bold text-fg">Nong-Kati</span>
           </div>
           <button
             onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-full text-fg-muted hover:bg-surface-sunken"
+            aria-label="ปิดเมนู"
+            className="flex h-10 w-10 items-center justify-center rounded-full text-fg-muted transition-transform duration-150 hover:bg-surface-sunken active:scale-90"
           >
             <X size={22} />
           </button>
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto px-4 py-4">
+      <div className="drawer-scroll flex-1 overflow-y-auto px-4 py-4">
         {/* Navigation Items */}
         <nav className="space-y-1">
           {visibleItems.map((item) => {
@@ -195,10 +204,18 @@ export function FacebookSidebar({
       {/* Mobile drawer - slide from left */}
       {isOpen && (
         <>
-          {/* Backdrop */}
-          <div className="fixed inset-0 z-50 bg-black/60 lg:hidden" onClick={onClose} />
-          {/* Drawer */}
-          <div className="fixed left-0 top-0 z-50 h-full w-[300px] overflow-y-auto bg-surface-base shadow-2xl lg:hidden">
+          {/* Backdrop: warm clay-tinted scrim instead of harsh black */}
+          <div
+            className="drawer-backdrop fixed inset-0 z-50 bg-clay-900/55 lg:hidden"
+            onClick={onClose}
+            aria-hidden="true"
+          />
+          {/* Drawer: squishy slide-in, rounded clay edge, themed scrollbar */}
+          <div
+            role="dialog"
+            aria-label="เมนูนำทาง"
+            className="drawer-panel drawer-scroll fixed left-0 top-0 z-50 h-full w-[300px] overflow-y-auto rounded-r-[28px] bg-surface-base shadow-[6px_0_24px_rgba(78,56,32,0.35)] lg:hidden"
+          >
             <SidebarContent onClose={onClose} />
           </div>
         </>
