@@ -13,6 +13,7 @@ import {
   searchProducts,
 } from '@/lib/data';
 import type { CategoryItem, ProductItem } from '@/lib/data';
+import { adminFetch, adminFetchJson } from '@/lib/adminSession';
 
 // ─── Types ──────────────────────────────────────────────
 
@@ -86,10 +87,7 @@ function mapToAdminProduct(product: ProductItem): AdminProduct {
   };
 }
 
-function mapToAdminCategory(
-  cat: CategoryItem,
-  productCounts: Map<string, number>
-): AdminCategory {
+function mapToAdminCategory(cat: CategoryItem, productCounts: Map<string, number>): AdminCategory {
   return {
     id: cat.id,
     slug: cat.slug,
@@ -99,9 +97,7 @@ function mapToAdminCategory(
     sortOrder: cat.sortOrder,
     isActive: cat.isActive,
     productCount: productCounts.get(cat.id) ?? 0,
-    children: cat.children.map((child) =>
-      mapToAdminCategory(child, productCounts)
-    ),
+    children: cat.children.map((child) => mapToAdminCategory(child, productCounts)),
   };
 }
 
@@ -125,9 +121,9 @@ export async function adminListProducts(params: {
   } else {
     // Get all products
     const allSlugs = await getAllProductSlugs();
-    products = (
-      await Promise.all(allSlugs.map((slug) => getProductBySlug(slug)))
-    ).filter((p): p is ProductItem => p !== null);
+    products = (await Promise.all(allSlugs.map((slug) => getProductBySlug(slug)))).filter(
+      (p): p is ProductItem => p !== null,
+    );
   }
 
   // Filter by active status
@@ -148,9 +144,7 @@ export async function adminListProducts(params: {
   };
 }
 
-export async function adminGetProduct(
-  slug: string
-): Promise<AdminProduct | null> {
+export async function adminGetProduct(slug: string): Promise<AdminProduct | null> {
   const product = await getProductBySlug(slug);
   if (!product) return null;
   return mapToAdminProduct(product);
@@ -189,7 +183,7 @@ export async function adminUpdateProduct(
     categorySlug: string;
     isActive: boolean;
     isFeatured: boolean;
-  }>
+  }>,
 ): Promise<AdminProduct | null> {
   const existing = await adminGetProduct(slug);
   if (!existing) return null;
@@ -200,9 +194,7 @@ export async function adminUpdateProduct(
   };
 }
 
-export async function adminDeleteProduct(
-  slug: string
-): Promise<{ success: boolean }> {
+export async function adminDeleteProduct(slug: string): Promise<{ success: boolean }> {
   const existing = await adminGetProduct(slug);
   if (!existing) return { success: false };
   return { success: true };
@@ -210,9 +202,7 @@ export async function adminDeleteProduct(
 
 // ─── Category CRUD ──────────────────────────────────────
 
-async function countProductsByCategory(
-  tree: CategoryItem[]
-): Promise<Map<string, number>> {
+async function countProductsByCategory(tree: CategoryItem[]): Promise<Map<string, number>> {
   const counts = new Map<string, number>();
 
   async function walk(nodes: CategoryItem[]) {
@@ -236,9 +226,7 @@ export async function adminListCategories(): Promise<AdminCategory[]> {
   return tree.map((cat) => mapToAdminCategory(cat, productCounts));
 }
 
-export async function adminGetCategory(
-  slug: string
-): Promise<AdminCategory | null> {
+export async function adminGetCategory(slug: string): Promise<AdminCategory | null> {
   const result = await getCategoryBySlug(slug);
   if (!result) return null;
 
@@ -250,51 +238,54 @@ export async function adminGetCategory(
 
 export async function adminCreateCategory(input: {
   name: string;
-  slug: string;
+  slug?: string;
   parentId?: string;
   sortOrder?: number;
-}): Promise<AdminCategory> {
-  const now = new Date().toISOString();
-  return {
-    id: `cat_${Date.now()}`,
-    slug: input.slug,
-    name: input.name,
-    icon: null,
-    parentId: input.parentId ?? null,
-    sortOrder: input.sortOrder ?? 0,
-    isActive: true,
-    productCount: 0,
-    children: [],
-  };
+}): Promise<{ success: boolean; slug?: string; error?: string }> {
+  const res = await adminFetchJson('/api/v1/admin/categories', 'POST', input);
+  if (res.ok) {
+    const data = (await res.json()) as { category?: { slug?: string } };
+    const slug = data.category?.slug;
+    return slug ? { success: true, slug } : { success: true };
+  }
+  const err = (await res.json().catch(() => ({}))) as { error?: string };
+  return { success: false, error: err.error ?? `HTTP_${res.status}` };
 }
 
 export async function adminUpdateCategory(
-  slug: string,
+  id: string,
   input: Partial<{
     name: string;
+    slug: string;
+    parentId: string | null;
     sortOrder: number;
     isActive: boolean;
-  }>
-): Promise<AdminCategory | null> {
-  const existing = await adminGetCategory(slug);
-  if (!existing) return null;
-
-  return {
-    ...existing,
-    ...input,
-  };
+  }>,
+): Promise<{ success: boolean; slug?: string; error?: string }> {
+  const res = await adminFetchJson(`/api/v1/admin/categories/${id}`, 'PUT', input);
+  if (res.ok) {
+    const data = (await res.json()) as { category?: { slug?: string } };
+    const slug = data.category?.slug;
+    return slug ? { success: true, slug } : { success: true };
+  }
+  const err = (await res.json().catch(() => ({}))) as { error?: string };
+  return { success: false, error: err.error ?? `HTTP_${res.status}` };
 }
 
 export async function adminDeleteCategory(
-  slug: string
+  id: string,
 ): Promise<{ success: boolean; reason?: string }> {
-  const result = await getProductsByCategory(slug, 1, 1);
-  if (result.total > 0) {
+  const res = await adminFetch(`/api/v1/admin/categories/${id}`, { method: 'DELETE' });
+  if (res.ok) return { success: true };
+  const err = (await res.json().catch(() => ({}))) as { error?: string; products?: number };
+  if (err.error === 'HAS_PRODUCTS') {
     return {
       success: false,
-      reason: 'Cannot delete category with associated products',
+      reason: `มีสินค้า ${err.products ?? 0} รายการอยู่ในหมวดนี้ ย้ายหรือลบสินค้าก่อน`,
     };
   }
-
-  return { success: true };
+  if (err.error === 'HAS_CHILDREN') {
+    return { success: false, reason: 'มีหมวดหมู่ย่อยอยู่ ย้ายหรือลบหมวดย่อยก่อน' };
+  }
+  return { success: false, reason: err.error ?? `HTTP_${res.status}` };
 }
