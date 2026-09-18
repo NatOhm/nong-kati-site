@@ -163,7 +163,7 @@ export default function AdminStaffPage(): React.JSX.Element {
 
         {/* Create Staff Form */}
         {showCreateForm && (
-          <div className="rounded-md border border-line-subtle bg-white p-6">
+          <div className="rounded-md border border-line-subtle bg-surface p-6">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-fg">เพิ่มพนักงานใหม่</h2>
               <button
@@ -252,7 +252,7 @@ export default function AdminStaffPage(): React.JSX.Element {
                 </tr>
               ) : (
                 staff.map((member) => (
-                  <tr key={member.id} className="border-b border-line-subtle hover:bg-white">
+                  <tr key={member.id} className="border-b border-line-subtle hover:bg-surface">
                     <td className="px-4 py-3 text-fg-secondary">{member.email}</td>
                     <td className="px-4 py-3 text-fg-secondary">{member.fullName}</td>
                     <td className="px-4 py-3 text-center">

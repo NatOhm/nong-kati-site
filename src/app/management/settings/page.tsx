@@ -485,7 +485,7 @@ function AppearanceSettings({
               >
                 ปุ่มซื้อสินค้า
               </button>
-              <div className="h-4 w-32 overflow-hidden rounded-full bg-white">
+              <div className="h-4 w-32 overflow-hidden rounded-full bg-surface">
                 <div
                   className="h-full rounded-full transition-all duration-700"
                   style={{ width: '72%', backgroundColor: accent }}
@@ -738,7 +738,7 @@ function PaymentSettings(): React.JSX.Element {
                 className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 font-mono text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
               />
             </Field>
-            <div className="rounded-md bg-white p-3 text-xs text-fg-placeholder">
+            <div className="rounded-md bg-surface p-3 text-xs text-fg-placeholder">
               <p>ใช้ PromptPay ID ของร้านค้าในการสร้าง QR Code</p>
               <p className="mt-1">
                 ทดสอบ: ใช้ <code className="text-fg-brand">0123456789012</code>
@@ -792,7 +792,7 @@ function PaymentSettings(): React.JSX.Element {
                 </button>
               </div>
             </Field>
-            <div className="rounded-md bg-white p-3 text-xs text-fg-placeholder">
+            <div className="rounded-md bg-surface p-3 text-xs text-fg-placeholder">
               <p>
                 🧪 <strong className="text-fg-secondary">โหมดทดสอบ:</strong> ใช้ keys ที่ขึ้นต้นด้วย{' '}
                 <code className="text-fg-brand">pkey_test_</code> /{' '}
@@ -887,7 +887,7 @@ function EmailSettings(): React.JSX.Element {
           ].map((tpl) => (
             <div
               key={tpl.name}
-              className="flex items-center justify-between rounded-md bg-white px-3 py-2"
+              className="flex items-center justify-between rounded-md bg-surface px-3 py-2"
             >
               <div>
                 <p className="text-xs font-medium text-fg-secondary">{tpl.name}</p>
@@ -986,7 +986,7 @@ function SecuritySettings(): React.JSX.Element {
           ].map((session) => (
             <div
               key={session.ip}
-              className="flex items-center justify-between rounded-md bg-white px-3 py-2.5"
+              className="flex items-center justify-between rounded-md bg-surface px-3 py-2.5"
             >
               <div className="flex items-center gap-3">
                 <div
@@ -1311,7 +1311,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-line-subtle bg-white p-6">
+    <div className="rounded-xl border border-line-subtle bg-surface p-6">
       <div className="mb-6">
         <h2 className="text-lg font-semibold text-fg">{title}</h2>
         <p className="mt-1 text-sm text-fg-placeholder">{subtitle}</p>
@@ -1343,7 +1343,7 @@ function ToggleSwitch({ enabled, onChange }: { enabled: boolean; onChange: (v: b
     >
       <span
         className={cn(
-          'absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform',
+          'absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-surface shadow transition-transform',
           enabled ? 'translate-x-5' : 'translate-x-0',
         )}
       />

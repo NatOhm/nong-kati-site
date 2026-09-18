@@ -23,24 +23,39 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: check.error ?? 'FORBIDDEN' }, { status: 403 });
   }
 
-  const variants = await prisma.productVariant.findMany({
-    orderBy: { updatedAt: 'desc' },
+  const products = await prisma.product.findMany({
+    orderBy: [{ isActive: 'desc' }, { name: 'asc' }],
     include: {
-      product: { select: { name: true } },
-      _count: { select: { giftCodes: { where: { status: 'available' } } } },
+      category: { select: { name: true } },
+      variants: {
+        orderBy: { sortOrder: 'asc' },
+        include: { _count: { select: { giftCodes: { where: { status: 'available' } } } } },
+      },
     },
   });
 
-  const items = variants.map((v) => ({
-    id: v.id,
-    skuCode: v.label,
-    productName: v.product.name,
-    price: Number(v.price),
-    cost: v.costThb === null ? null : Number(v.costThb),
-    stock: v.stock,
-    codesAvailable: v._count.giftCodes,
-    isActive: v.isActive,
-  }));
+  // Product-level rows (each product currently has one variant; multi-variant
+  // products expose the primary variant for stock ops and a variantCount).
+  const items = products.map((p) => {
+    const v = p.variants[0] ?? null;
+    const codesAvailable = p.variants.reduce((sum, vv) => sum + vv._count.giftCodes, 0);
+    return {
+      id: p.id,
+      variantId: v?.id ?? null,
+      variantCount: p.variants.length,
+      sku: p.sku,
+      name: p.name,
+      categoryName: p.category.name,
+      imageUrl: p.imageUrl,
+      description: p.description,
+      price: v ? Number(v.price) : null,
+      cost: v && v.costThb !== null ? Number(v.costThb) : null,
+      stock: v ? v.stock : 0,
+      codesAvailable,
+      isActive: p.isActive,
+      isFeatured: p.isFeatured,
+    };
+  });
 
   // Recent stock moves (last 50) for the ประวัติการจัดสต๊อก table.
   const moves = await prisma.stockMove.findMany({

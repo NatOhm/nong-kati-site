@@ -174,7 +174,7 @@ export default function AdminCouponsPage(): React.JSX.Element {
 
         {/* Create form */}
         {creating && (
-          <div className="rounded-md border border-line-subtle bg-white p-5">
+          <div className="rounded-md border border-line-subtle bg-surface p-5">
             <h2 className="mb-4 text-base font-semibold text-fg">สร้างคูปองใหม่</h2>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <div>
@@ -293,7 +293,7 @@ export default function AdminCouponsPage(): React.JSX.Element {
                 coupons.map((c) => {
                   const expired = c.expiresAt !== null && new Date(c.expiresAt) < new Date();
                   return (
-                    <tr key={c.id} className="border-b border-line-subtle hover:bg-white">
+                    <tr key={c.id} className="border-b border-line-subtle hover:bg-surface">
                       <td className="px-4 py-3">
                         <p className="font-mono font-semibold text-fg">{c.code}</p>
                         {c.description && <p className="text-xs text-fg-muted">{c.description}</p>}

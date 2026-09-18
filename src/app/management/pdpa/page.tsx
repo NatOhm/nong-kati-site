@@ -111,7 +111,7 @@ export default function AdminPdpaPage(): React.JSX.Element {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as DataRequestStatus | '')}
-            className="rounded-md border border-line-subtle bg-white px-3 py-2 text-sm text-fg-secondary focus:border-line-brand focus:outline-none"
+            className="rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg-secondary focus:border-line-brand focus:outline-none"
           >
             <option value="">ทุกสถานะ</option>
             <option value="pending">รอดำเนินการ</option>
@@ -153,7 +153,7 @@ export default function AdminPdpaPage(): React.JSX.Element {
                 </tr>
               ) : (
                 requests.map((req) => (
-                  <tr key={req.id} className="border-b border-line-subtle hover:bg-white">
+                  <tr key={req.id} className="border-b border-line-subtle hover:bg-surface">
                     <td className="px-4 py-3 font-mono text-xs text-fg-placeholder">
                       {req.id.slice(0, 12)}...
                     </td>

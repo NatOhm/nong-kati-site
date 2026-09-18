@@ -149,7 +149,7 @@ export default function AdminLoginPage(): React.JSX.Element {
   );
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surface-base p-4">
+    <div className="nk-admin-theme flex min-h-screen items-center justify-center bg-surface-base p-4">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="mb-8 text-center">
@@ -164,7 +164,7 @@ export default function AdminLoginPage(): React.JSX.Element {
         {step === 'credentials' && (
           <form
             onSubmit={handleCredentialsSubmit}
-            className="space-y-4 rounded-md border border-line-subtle bg-white p-6"
+            className="space-y-4 rounded-md border border-line-subtle bg-surface p-6"
           >
             <h2 className="text-lg font-semibold text-fg">เข้าสู่ระบบ</h2>
 
@@ -219,14 +219,14 @@ export default function AdminLoginPage(): React.JSX.Element {
 
         {/* Step 2: 2FA Setup */}
         {step === '2fa-setup' && setupData && (
-          <div className="space-y-4 rounded-md border border-line-subtle bg-white p-6">
+          <div className="space-y-4 rounded-md border border-line-subtle bg-surface p-6">
             <h2 className="text-lg font-semibold text-fg">ตั้งค่า 2FA</h2>
             <p className="text-sm text-fg-placeholder">
               สแกน QR Code ด้วย Google Authenticator หรือ Authy
             </p>
 
             <div className="flex justify-center">
-              <div className="rounded-md bg-white p-4">
+              <div className="rounded-md bg-surface p-4">
                 <img
                   src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(setupData.totpUri)}`}
                   alt="QR Code"
@@ -277,7 +277,7 @@ export default function AdminLoginPage(): React.JSX.Element {
         {step === '2fa' && (
           <form
             onSubmit={handleTotpSubmit}
-            className="space-y-4 rounded-md border border-line-subtle bg-white p-6"
+            className="space-y-4 rounded-md border border-line-subtle bg-surface p-6"
           >
             <h2 className="text-lg font-semibold text-fg">ยืนยันตัวตน</h2>
             <p className="text-sm text-fg-placeholder">กรอกรหัส 6 หลักจาก Authenticator App</p>

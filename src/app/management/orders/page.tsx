@@ -224,7 +224,7 @@ export default function AdminOrdersPage(): React.JSX.Element {
                 </tr>
               ) : (
                 orders.map((order) => (
-                  <tr key={order.id} className="border-b border-line-subtle hover:bg-white">
+                  <tr key={order.id} className="border-b border-line-subtle hover:bg-surface">
                     <td className="px-4 py-3 font-mono text-xs text-fg-secondary">
                       {order.orderNumber}
                     </td>

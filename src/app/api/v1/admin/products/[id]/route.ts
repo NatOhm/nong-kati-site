@@ -43,6 +43,7 @@ export async function PUT(
 
   const data: {
     name?: string;
+    sku?: string | null;
     description?: string | null;
     imageUrl?: string | null;
     categoryId?: string;
@@ -51,6 +52,21 @@ export async function PUT(
   } = {};
 
   if (typeof b['name'] === 'string' && b['name'].trim() !== '') data.name = b['name'].trim();
+  // SKU: string เปลี่ยนรหัส (ต้องไม่ซ้ำ), null เคลียร์, ไม่ส่งมา = ไม่แก้
+  if (b['sku'] === null) {
+    data.sku = null;
+  } else if (typeof b['sku'] === 'string') {
+    const sku = b['sku'].trim().toUpperCase();
+    if (sku === '') {
+      data.sku = null;
+    } else {
+      const clash = await prisma.product.findUnique({ where: { sku } });
+      if (clash && clash.id !== id) {
+        return NextResponse.json({ error: 'SKU_TAKEN' }, { status: 409 });
+      }
+      data.sku = sku;
+    }
+  }
   if (typeof b['description'] === 'string' || b['description'] === null) {
     data.description = b['description'] as string | null;
   }

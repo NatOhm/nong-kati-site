@@ -92,7 +92,7 @@ export default function AdminAuditPage(): React.JSX.Element {
         </div>
 
         {/* Filters */}
-        <div className="rounded-md border border-line-subtle bg-white p-4">
+        <div className="rounded-md border border-line-subtle bg-surface p-4">
           <div className="mb-3 flex items-center gap-2 text-sm text-fg-muted">
             <Filter size={14} /> ตัวกรอง
           </div>
@@ -191,7 +191,7 @@ export default function AdminAuditPage(): React.JSX.Element {
                 </tr>
               ) : (
                 entries.map((entry) => (
-                  <tr key={entry.id} className="border-b border-line-subtle hover:bg-white">
+                  <tr key={entry.id} className="border-b border-line-subtle hover:bg-surface">
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-fg-placeholder">
                       {entry.createdAt.toLocaleString('th-TH')}
                     </td>

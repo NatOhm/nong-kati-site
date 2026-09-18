@@ -36,6 +36,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       id: p.id,
       name: p.name,
       slug: p.slug,
+      sku: p.sku,
       description: p.description,
       imageUrl: p.imageUrl,
       categoryId: p.categoryId,
@@ -137,6 +138,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     data: {
       name,
       slug,
+      sku: typeof b['sku'] === 'string' && b['sku'].trim() !== '' ? b['sku'].trim() : null,
       description,
       imageUrl,
       categoryId,

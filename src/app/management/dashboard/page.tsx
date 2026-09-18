@@ -289,7 +289,7 @@ export default function AdminDashboardPage(): React.JSX.Element {
               ภาพรวมระบบ Nong-Kati · อัปเดตล่าสุด เมื่อสักครู่
             </p>
           </div>
-          <div className="flex items-center gap-1 rounded-lg border border-line-subtle bg-white p-1">
+          <div className="flex items-center gap-1 rounded-lg border border-line-subtle bg-surface p-1">
             {(['today', 'week', 'month'] as const).map((tab) => (
               <button
                 key={tab}
@@ -348,7 +348,7 @@ export default function AdminDashboardPage(): React.JSX.Element {
         </div>
 
         {/* ── Revenue Breakdown Bar ── */}
-        <div className="rounded-xl border border-line-subtle bg-white p-5">
+        <div className="rounded-xl border border-line-subtle bg-surface p-5">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-fg-secondary">รายได้เดือนนี้</h2>
             <span className="text-xs text-fg-placeholder">กรกฎาคม 2026</span>
@@ -390,7 +390,7 @@ export default function AdminDashboardPage(): React.JSX.Element {
         {/* ── Charts Row ── */}
         <div className="grid gap-4 lg:grid-cols-3">
           {/* Revenue Chart */}
-          <div className="rounded-xl border border-line-subtle bg-white p-5 lg:col-span-2">
+          <div className="rounded-xl border border-line-subtle bg-surface p-5 lg:col-span-2">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-fg-secondary">รายได้ 7 วันล่าสุด</h2>
               <Link
@@ -409,7 +409,7 @@ export default function AdminDashboardPage(): React.JSX.Element {
           </div>
 
           {/* Payment Methods */}
-          <div className="rounded-xl border border-line-subtle bg-white p-5">
+          <div className="rounded-xl border border-line-subtle bg-surface p-5">
             <h2 className="mb-4 text-sm font-semibold text-fg-secondary">วิธีชำระเงิน</h2>
             <div className="space-y-4">
               {revenue.revenueByPaymentMethod.map((pm) => {
@@ -451,7 +451,7 @@ export default function AdminDashboardPage(): React.JSX.Element {
         {/* ── Orders Table + Activity Feed ── */}
         <div className="grid gap-4 lg:grid-cols-3">
           {/* Recent Orders */}
-          <div className="rounded-xl border border-line-subtle bg-white lg:col-span-2">
+          <div className="rounded-xl border border-line-subtle bg-surface lg:col-span-2">
             <div className="flex items-center justify-between border-b border-line-subtle px-5 py-4">
               <h2 className="text-sm font-semibold text-fg-secondary">ออเดอร์ล่าสุด</h2>
               <Link
@@ -533,7 +533,7 @@ export default function AdminDashboardPage(): React.JSX.Element {
           </div>
 
           {/* Activity Feed */}
-          <div className="rounded-xl border border-line-subtle bg-white">
+          <div className="rounded-xl border border-line-subtle bg-surface">
             <div className="flex items-center justify-between border-b border-line-subtle px-5 py-4">
               <h2 className="flex items-center gap-2 text-sm font-semibold text-fg-secondary">
                 <Activity size={14} className="text-fg-brand" />
@@ -576,7 +576,7 @@ export default function AdminDashboardPage(): React.JSX.Element {
         {/* ── Bottom Row: Top Products + Customer Metrics + Low Stock ── */}
         <div className="grid gap-4 lg:grid-cols-3">
           {/* Top Products */}
-          <div className="rounded-xl border border-line-subtle bg-white p-5">
+          <div className="rounded-xl border border-line-subtle bg-surface p-5">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-fg-secondary">สินค้าขายดี</h2>
               <Link
@@ -624,7 +624,7 @@ export default function AdminDashboardPage(): React.JSX.Element {
           </div>
 
           {/* Customer Metrics */}
-          <div className="rounded-xl border border-line-subtle bg-white p-5">
+          <div className="rounded-xl border border-line-subtle bg-surface p-5">
             <h2 className="mb-4 text-sm font-semibold text-fg-secondary">เมตริกลูกค้า</h2>
             <div className="space-y-4">
               <MetricRow
@@ -662,7 +662,7 @@ export default function AdminDashboardPage(): React.JSX.Element {
           </div>
 
           {/* Low Stock Alerts */}
-          <div className="rounded-xl border border-line-subtle bg-white">
+          <div className="rounded-xl border border-line-subtle bg-surface">
             <div className="flex items-center justify-between border-b border-line-subtle px-5 py-4">
               <h2 className="flex items-center gap-2 text-sm font-semibold text-fg-secondary">
                 <AlertTriangle size={14} className="text-fg-brand" />
@@ -712,7 +712,7 @@ export default function AdminDashboardPage(): React.JSX.Element {
         </div>
 
         {/* ── Quick Actions ── */}
-        <div className="rounded-xl border border-line-subtle bg-white p-5">
+        <div className="rounded-xl border border-line-subtle bg-surface p-5">
           <h2 className="mb-4 text-sm font-semibold text-fg-secondary">ดำเนินการด่วน</h2>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <QuickAction
@@ -763,7 +763,7 @@ function KPICard({
   return (
     <div
       className={cn(
-        'group rounded-xl border bg-white p-4 transition-all duration-200 hover:border-line',
+        'group rounded-xl border bg-surface p-4 transition-all duration-200 hover:border-line',
         alert ? 'border-line-brand shadow-brand-glow' : 'border-line-subtle',
       )}
     >

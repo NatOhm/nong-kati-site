@@ -28,7 +28,7 @@ export default function AdminAnalyticsPage(): React.JSX.Element {
 
         {/* Sales Overview */}
         <div className="grid gap-4 md:grid-cols-4">
-          <div className="rounded-md border border-line-subtle bg-white p-4">
+          <div className="rounded-md border border-line-subtle bg-surface p-4">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-md bg-peach-100 text-fg-brand">
                 <ShoppingBag size={20} />
@@ -39,7 +39,7 @@ export default function AdminAnalyticsPage(): React.JSX.Element {
               </div>
             </div>
           </div>
-          <div className="rounded-md border border-line-subtle bg-white p-4">
+          <div className="rounded-md border border-line-subtle bg-surface p-4">
             <div className="flex items-center gap-3">
               <div className="text-jade-600 flex h-10 w-10 items-center justify-center rounded-md bg-jade-500/15">
                 <DollarSign size={20} />
@@ -50,7 +50,7 @@ export default function AdminAnalyticsPage(): React.JSX.Element {
               </div>
             </div>
           </div>
-          <div className="rounded-md border border-line-subtle bg-white p-4">
+          <div className="rounded-md border border-line-subtle bg-surface p-4">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-md bg-sky-900/30 text-sky-400">
                 <TrendingUp size={20} />
@@ -61,7 +61,7 @@ export default function AdminAnalyticsPage(): React.JSX.Element {
               </div>
             </div>
           </div>
-          <div className="rounded-md border border-line-subtle bg-white p-4">
+          <div className="rounded-md border border-line-subtle bg-surface p-4">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-md bg-violet-900/30 text-violet-400">
                 <Users size={20} />
@@ -76,7 +76,7 @@ export default function AdminAnalyticsPage(): React.JSX.Element {
 
         {/* Revenue Breakdown */}
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-md border border-line-subtle bg-white p-6">
+          <div className="rounded-md border border-line-subtle bg-surface p-6">
             <h2 className="mb-4 text-lg font-semibold text-fg">รายได้</h2>
             <div className="space-y-3">
               <div className="flex justify-between text-sm">
@@ -104,7 +104,7 @@ export default function AdminAnalyticsPage(): React.JSX.Element {
             </div>
           </div>
 
-          <div className="rounded-md border border-line-subtle bg-white p-6">
+          <div className="rounded-md border border-line-subtle bg-surface p-6">
             <h2 className="mb-4 text-lg font-semibold text-fg">ชำระเงินผ่าน</h2>
             <div className="space-y-3">
               {revenue.revenueByPaymentMethod.map((method) => (
@@ -122,7 +122,7 @@ export default function AdminAnalyticsPage(): React.JSX.Element {
         </div>
 
         {/* Customer Analytics */}
-        <div className="rounded-md border border-line-subtle bg-white p-6">
+        <div className="rounded-md border border-line-subtle bg-surface p-6">
           <h2 className="mb-4 text-lg font-semibold text-fg">ลูกค้า</h2>
           <div className="grid gap-4 md:grid-cols-4">
             <div>
@@ -147,7 +147,7 @@ export default function AdminAnalyticsPage(): React.JSX.Element {
         </div>
 
         {/* Top Products */}
-        <div className="rounded-md border border-line-subtle bg-white p-6">
+        <div className="rounded-md border border-line-subtle bg-surface p-6">
           <h2 className="mb-4 text-lg font-semibold text-fg">สินค้ายอดนิยม</h2>
           <div className="space-y-3">
             {products.topProducts.map((product, idx) => (

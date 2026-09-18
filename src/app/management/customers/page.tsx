@@ -80,13 +80,13 @@ export default function AdminCustomersPage(): React.JSX.Element {
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               placeholder="ค้นหาอีเมล หรือชื่อ..."
-              className="w-full rounded-md border border-line-subtle bg-white py-2 pl-9 pr-3 text-sm text-fg placeholder:text-clay-400 focus:border-line-brand focus:outline-none"
+              className="w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-3 text-sm text-fg placeholder:text-clay-400 focus:border-line-brand focus:outline-none"
             />
           </div>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="rounded-md border border-line-subtle bg-white px-3 py-2 text-sm text-fg-secondary focus:border-line-brand focus:outline-none"
+            className="rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg-secondary focus:border-line-brand focus:outline-none"
           >
             <option value="">ทุกสถานะ</option>
             <option value="active">ใช้งาน</option>
@@ -223,7 +223,7 @@ export default function AdminCustomersPage(): React.JSX.Element {
                 </tr>
               ) : (
                 customers.map((customer) => (
-                  <tr key={customer.id} className="border-b border-line-subtle hover:bg-white">
+                  <tr key={customer.id} className="border-b border-line-subtle hover:bg-surface">
                     <td className="px-4 py-3 text-fg-secondary">{customer.email}</td>
                     <td className="px-4 py-3 text-fg-secondary">{customer.fullName}</td>
                     <td className="px-4 py-3 text-center">

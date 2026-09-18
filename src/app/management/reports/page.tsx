@@ -62,7 +62,7 @@ export default function AdminReportsPage(): React.JSX.Element {
           {REPORTS.map((report) => (
             <div
               key={report.id}
-              className="rounded-md border border-line-subtle bg-white p-6 transition-colors hover:border-line-brand"
+              className="rounded-md border border-line-subtle bg-surface p-6 transition-colors hover:border-line-brand"
             >
               <div className="mb-3 text-2xl">{report.icon}</div>
               <h3 className="mb-1 text-sm font-semibold text-fg">{report.name}</h3>

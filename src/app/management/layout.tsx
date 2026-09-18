@@ -79,7 +79,7 @@ export default function ManagementLayout({
   // Loading state while checking auth
   if (isAuthenticated === null) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-surface-base">
+      <div className="nk-admin-theme flex min-h-screen items-center justify-center bg-surface-base">
         <div className="text-center">
           <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-peach-500 border-t-transparent" />
           <p className="text-sm text-fg-placeholder">กำลังตรวจสอบ...</p>
@@ -90,7 +90,7 @@ export default function ManagementLayout({
 
   if (!isAuthenticated && !isPublic) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-surface-base">
+      <div className="nk-admin-theme flex min-h-screen items-center justify-center bg-surface-base">
         <p className="text-sm text-fg-placeholder">กำลังพาไปหน้าเข้าสู่ระบบ...</p>
       </div>
     );

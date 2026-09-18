@@ -164,7 +164,7 @@ export default function AdminProductsPage(): React.JSX.Element {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center gap-2 rounded-xl border border-line-subtle bg-white py-16 text-sm text-fg-placeholder">
+          <div className="flex items-center justify-center gap-2 rounded-xl border border-line-subtle bg-surface py-16 text-sm text-fg-placeholder">
             <Loader2 size={16} className="animate-spin" /> กำลังโหลดสินค้า…
           </div>
         ) : loadError ? (
@@ -175,7 +175,7 @@ export default function AdminProductsPage(): React.JSX.Element {
             </button>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-line-subtle bg-white">
+          <div className="overflow-x-auto rounded-xl border border-line-subtle bg-surface">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-line-subtle bg-surface">
@@ -433,7 +433,7 @@ function ProductEditor({
           <div>
             <label className="mb-1.5 block text-sm font-medium text-fg-muted">รูปสินค้า</label>
             <div className="flex items-center gap-4">
-              <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-line bg-white">
+              <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-line bg-surface">
                 {imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={imageUrl} alt="รูปสินค้า" className="h-full w-full object-cover" />
@@ -478,7 +478,7 @@ function ProductEditor({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="เช่น HBO Max 7 วัน 4K แชร์"
-              className="w-full rounded-lg border border-line bg-white px-3 py-2.5 text-sm text-fg placeholder:text-fg-placeholder focus:outline-none focus:ring-2 focus:ring-peach-500"
+              className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-fg-placeholder focus:outline-none focus:ring-2 focus:ring-peach-500"
             />
           </div>
 
@@ -489,7 +489,7 @@ function ProductEditor({
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
               placeholder="รายละเอียดที่ลูกค้าจะเห็นในหน้าสินค้า"
-              className="w-full resize-none rounded-lg border border-line bg-white px-3 py-2.5 text-sm text-fg placeholder:text-fg-placeholder focus:outline-none focus:ring-2 focus:ring-peach-500"
+              className="w-full resize-none rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-fg-placeholder focus:outline-none focus:ring-2 focus:ring-peach-500"
             />
           </div>
 
@@ -499,7 +499,7 @@ function ProductEditor({
               <select
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
-                className="w-full rounded-lg border border-line bg-white px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-peach-500"
+                className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-peach-500"
               >
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -545,7 +545,7 @@ function ProductEditor({
                       )
                     }
                     placeholder="ชื่อ เช่น 7 วัน 4K"
-                    className="min-w-0 flex-1 rounded-lg border border-line bg-white px-3 py-2 text-sm text-fg placeholder:text-fg-placeholder focus:outline-none focus:ring-2 focus:ring-peach-500"
+                    className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-placeholder focus:outline-none focus:ring-2 focus:ring-peach-500"
                   />
                   <input
                     value={v.price}
@@ -560,7 +560,7 @@ function ProductEditor({
                     }
                     inputMode="decimal"
                     placeholder="ราคา ฿"
-                    className="w-20 rounded-lg border border-line bg-white px-2 py-2 text-right text-sm text-fg focus:outline-none focus:ring-2 focus:ring-peach-500"
+                    className="w-20 rounded-lg border border-line bg-surface px-2 py-2 text-right text-sm text-fg focus:outline-none focus:ring-2 focus:ring-peach-500"
                   />
                   <input
                     value={v.stock}
@@ -576,7 +576,7 @@ function ProductEditor({
                     inputMode="numeric"
                     placeholder="สต็อก"
                     title="สต็อก"
-                    className="w-16 rounded-lg border border-line bg-white px-2 py-2 text-right text-sm text-fg focus:outline-none focus:ring-2 focus:ring-peach-500"
+                    className="w-16 rounded-lg border border-line bg-surface px-2 py-2 text-right text-sm text-fg focus:outline-none focus:ring-2 focus:ring-peach-500"
                   />
                   <button
                     onClick={() =>
