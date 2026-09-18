@@ -565,7 +565,7 @@ export default function AdminInventoryPage(): React.JSX.Element {
               {draft.variantCount > 1 && (
                 <p className="rounded-lg border border-oat-200 bg-oat px-3 py-2 text-xs text-fg-warning">
                   สินค้านี้มี {draft.variantCount} ตัวเลือก — แก้ราคา/สต๊อกรายตัวเลือกในหน้า
-                  "สินค้า"
+                  สินค้า
                 </p>
               )}
               <div>
