@@ -4,21 +4,16 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  Home,
   Search,
-  Grid3X3,
-  User,
   MessageCircle,
   Menu,
-  Gamepad2,
-  Tv,
-  Music,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { CartIcon } from '@/components/cart/CartIcon';
 import { CartDrawer } from '@/components/cart/CartDrawer';
 import { NotificationsDropdown } from './NotificationsDropdown';
 import { ThemeToggle } from './ThemeToggle';
+import { ProfileMenu } from './ProfileMenu';
 import { useCustomerSession } from './useCustomerSession';
 import { AcornIcon, HamsterFace } from '@/components/ui/ClayIcons';
 import { useCart } from '@/hooks/useCart';
@@ -33,12 +28,12 @@ interface SearchSuggestion {
   categoryName: string;
 }
 
+// Client ask: ข้อความแทนไอคอน — 4 ลิงก์หลัก (หน้าแรกอยู่ที่โลโก้)
 const NAV_ITEMS = [
-  { icon: AcornIcon, href: '/', label: 'หน้าหลัก' },
-  { icon: Grid3X3, href: '/search', label: 'สินค้าทั้งหมด' },
-  { icon: Tv, href: '/category/movie-series', label: 'ดูหนัง/ซีรีส์' },
-  { icon: Music, href: '/category/music', label: 'ดนตรี' },
-  { icon: Gamepad2, href: '/category/chinese-apps', label: 'แอปจีน' },
+  { href: '/search', label: 'สินค้าทั้งหมด' },
+  { href: '/search?sort=featured', label: 'แนะนำ' },
+  { href: '/account/wishlist', label: 'รายการโปรด' },
+  { href: '/account/orders', label: 'คำสั่งซื้อ' },
 ];
 
 export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
@@ -175,36 +170,30 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
             </form>
           </div>
 
-          {/* Center: Navigation icons - desktop only */}
-          <div className="hidden items-center gap-1 md:flex">
+          {/* Center: Navigation text links — client ask (ข้อความแทนไอคอน) */}
+          <nav className="hidden items-center gap-1 md:flex" aria-label="เมนูหลัก">
             {NAV_ITEMS.map((item) => {
-              const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
-              const Icon = item.icon;
-
+              const isActive =
+                item.href === '/search'
+                  ? pathname === '/search' || pathname?.startsWith('/category/')
+                  : pathname === item.href || pathname?.startsWith(item.href + '/');
               return (
                 <Link
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    'group relative flex h-12 w-24 items-center justify-center rounded-xl transition-all duration-interactive ease-ease-out',
+                    'relative rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-interactive ease-ease-out',
                     isActive
-                      ? 'text-fg-brand'
-                      : 'text-fg-placeholder hover:-translate-y-0.5 hover:bg-surface-sunken hover:text-fg-secondary active:translate-y-0 active:scale-95',
+                      ? 'bg-peach-100 text-fg-brand'
+                      : 'text-fg-secondary hover:-translate-y-0.5 hover:bg-surface-sunken hover:text-fg active:translate-y-0 active:scale-95',
                   )}
-                  title={item.label}
-                  aria-label={item.label}
+                  aria-current={isActive ? 'page' : undefined}
                 >
-                  <Icon
-                    size={item.icon === AcornIcon ? 24 : 22}
-                    strokeWidth={isActive ? 2.5 : 1.5}
-                  />
-                  {isActive && (
-                    <div className="absolute bottom-0 left-1/2 h-[3px] w-12 -translate-x-1/2 rounded-full bg-peach-500" />
-                  )}
+                  {item.label}
                 </Link>
               );
             })}
-          </div>
+          </nav>
 
           {/* Right: Actions — on phones only the cart stays here; account,
               notifications and support live in the sidebar + bottom taskbar,
@@ -232,15 +221,9 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
               <MessageCircle size={20} strokeWidth={1.5} />
             </Link>
 
-            {/* Profile (md+) — phones use the taskbar บัญชี button */}
-            <Link
-              href={isAuthenticated ? '/account/dashboard' : '/account/login'}
-              aria-label={isAuthenticated ? 'บัญชีของฉัน' : 'เข้าสู่ระบบ'}
-              title={isAuthenticated ? 'บัญชีของฉัน' : 'เข้าสู่ระบบ'}
-              className="clay-btn hidden h-10 w-10 items-center justify-center rounded-full text-fg-muted transition-all duration-interactive ease-ease-out hover:-translate-y-0.5 hover:text-fg-brand active:translate-y-0 active:scale-95 active:shadow-clay-press md:flex"
-            >
-              <User size={20} />
-            </Link>
+            {/* Profile popover — identity, credit, top-up, settings, history,
+                logout (client ask). Phones use the taskbar บัญชี button. */}
+            <ProfileMenu />
 
             {/* Light/dark (md+) — phone users switch via device/system theme */}
             <div className="hidden md:block">

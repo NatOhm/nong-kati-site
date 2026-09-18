@@ -19,6 +19,7 @@ import {
   Headphones,
   Settings,
   LogOut,
+  Wallet,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import {
@@ -28,6 +29,7 @@ import {
 
 const NAV_ITEMS = [
   { label: 'ภาพรวม', href: '/account/dashboard', icon: LayoutDashboard },
+  { label: 'กระเป๋าเงิน', href: '/account/wallet', icon: Wallet },
   { label: 'สินค้าทั้งหมด', href: '/search', icon: ShoppingBag },
   { label: 'แนะนำ', href: '/search?sort=featured', icon: Star },
   { label: 'รายการโปรด', href: '/account/wishlist', icon: Heart },

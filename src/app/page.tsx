@@ -65,50 +65,25 @@ export default async function HomePage(): Promise<React.JSX.Element> {
       <MarqueeTicker />
 
       <FacebookLayout>
-        {/* Hero — asymmetric: oversized serif headline left, delivered-code card right */}
-        <section className="border-b border-line-subtle">
-          <div className="grid items-center gap-10 px-4 py-12 md:grid-cols-[1.2fr_1fr] md:px-8 md:py-20 lg:gap-16">
-            <div>
-              <ScrollReveal>
-                <h1 className="font-display text-4xl font-bold leading-[1.15] text-fg-brand-strong sm:text-5xl lg:text-6xl">
-                  โค้ดเกม สตรีมมิ่ง
-                  <br />
-                  และอีคอมเมิร์ซ
-                  <br />
-                  <span className="text-fg-brand">ส่งถึงอีเมลใน 60 วินาที</span>
-                </h1>
-                <p className="mt-5 max-w-md text-base leading-relaxed text-fg-muted">
-                  จ่ายผ่าน PromptPay หรือบัตรเครดิต รหัสสินค้าถูกส่งอัตโนมัติ ไม่ต้องรอแอดมิน
-                </p>
-                <div className="mt-8">
-                  <Link
-                    href="/search"
-                    className="inline-flex items-center justify-center rounded-full bg-peach-500 px-8 py-3 text-sm font-semibold text-white shadow-clay-brand transition-all hover:bg-peach-400 hover:shadow-clay-lg active:scale-95 active:shadow-clay-press"
-                  >
-                    เลือกซื้อสินค้า
-                  </Link>
-                </div>
-              </ScrollReveal>
-            </div>
-            {/* Clay hamster peeking over the CTA card — leans hello on card hover */}
-            <div className="group relative">
-              <div className="pointer-events-none absolute -top-16 right-2 z-10 animate-float md:-top-20">
-                <div className="mascot-hello">
-                  <HamsterMascot
-                    size={120}
-                    className="drop-shadow-[0_10px_18px_rgba(147,107,73,0.35)]"
-                  />
-                </div>
-              </div>
-              <DeliveredCodeCard />
-            </div>
+        {/* Announcement board — the headline framed as a notice board (client ask) */}
+        <section className="px-4 pt-8 md:px-8">
+          <div className="mx-auto max-w-3xl rounded-2xl border-2 border-dashed border-peach-300 bg-peach-50 px-6 py-5 text-center shadow-clay-sm dark:border-peach-700/60 dark:bg-peach-900/20">
+            <p className="font-display text-xl font-bold leading-snug text-fg-brand-strong sm:text-2xl">
+              📢 โค้ดเกม สตรีมมิ่ง และอีคอมเมิร์ซ ส่งถึงอีเมลใน 60 วินาที
+            </p>
+            <p className="mt-1.5 text-sm text-fg-muted">
+              จ่ายผ่าน PromptPay หรือบัตรเครดิต รหัสสินค้าถูกส่งอัตโนมัติ ไม่ต้องรอแอดมิน
+            </p>
+            <Link
+              href="/search"
+              className="mt-4 inline-flex items-center justify-center rounded-full bg-peach-500 px-8 py-2.5 text-sm font-semibold text-white shadow-clay-brand transition-all hover:bg-peach-400 hover:shadow-clay-lg active:scale-95 active:shadow-clay-press"
+            >
+              เลือกซื้อสินค้า
+            </Link>
           </div>
         </section>
 
-        {/* Stats Counter */}
-        <StatsCounter />
-
-        {/* How It Works — วิธีการซื้อ above the fold per client feedback deck (แก้เว็บ.pdf p.1) */}
+        {/* How It Works — วิธีการซื้อ moved to the very top (client ask) */}
         <ScrollReveal>
           <section className="px-4 py-8 md:px-8">
             <h2 className="mb-6 text-center text-lg font-bold text-fg">วิธีการซื้อ</h2>
@@ -132,6 +107,11 @@ export default async function HomePage(): Promise<React.JSX.Element> {
             </div>
           </section>
         </ScrollReveal>
+
+        {/* Categories Section */}
+
+        {/* Promotion banner — directly under วิธีการซื้อ (client ask) */}
+        <MarqueeTicker />
 
         <PawDivider className="py-4" />
 
@@ -214,6 +194,9 @@ export default async function HomePage(): Promise<React.JSX.Element> {
         <ScrollReveal>
           <FAQAccordion />
         </ScrollReveal>
+
+        {/* Stats — plain numbers, horizontal, at the bottom (client ask) */}
+        <StatsCounter />
       </FacebookLayout>
 
       <Footer />
