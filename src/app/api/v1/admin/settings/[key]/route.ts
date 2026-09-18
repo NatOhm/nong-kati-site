@@ -1,0 +1,118 @@
+import { NextRequest, NextResponse } from 'next/server';
+
+import { prisma } from '@/lib/db';
+import { checkPermission } from '@/lib/rbac';
+
+export const dynamic = 'force-dynamic';
+
+const VALID_KEYS = new Set(['appearance', 'store-info']);
+
+function bearer(req: NextRequest): string | null {
+  const header = req.headers.get('authorization');
+  if (!header?.startsWith('Bearer ')) return null;
+  return header.slice(7) || null;
+}
+
+/**
+ * GET /api/v1/admin/settings/[key] — read a settings group (settings:read).
+ * Groups: appearance (accent color + animation speed), store-info.
+ */
+export async function GET(
+  req: NextRequest,
+  ctx: { params: Promise<{ key: string }> },
+): Promise<NextResponse> {
+  const token = bearer(req);
+  if (!token) return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 });
+  const check = await checkPermission(token, 'settings:read');
+  if (!check.allowed) {
+    return NextResponse.json({ error: check.error ?? 'FORBIDDEN' }, { status: 403 });
+  }
+  const { key } = await ctx.params;
+  if (!VALID_KEYS.has(key)) return NextResponse.json({ error: 'UNKNOWN_KEY' }, { status: 404 });
+
+  const row = await prisma.siteSetting.findUnique({ where: { key } });
+  if (!row) return NextResponse.json({}, { status: 200 });
+  try {
+    return NextResponse.json(JSON.parse(row.value), { status: 200 });
+  } catch {
+    return NextResponse.json({}, { status: 200 });
+  }
+}
+
+/**
+ * PUT /api/v1/admin/settings/[key] — save a settings group (settings:write).
+ * Body is a JSON object; unknown fields are dropped per group schema.
+ */
+export async function PUT(
+  req: NextRequest,
+  ctx: { params: Promise<{ key: string }> },
+): Promise<NextResponse> {
+  const token = bearer(req);
+  if (!token) return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 });
+  const check = await checkPermission(token, 'settings:write');
+  if (!check.allowed) {
+    return NextResponse.json({ error: check.error ?? 'FORBIDDEN' }, { status: 403 });
+  }
+  const { key } = await ctx.params;
+  if (!VALID_KEYS.has(key)) return NextResponse.json({ error: 'UNKNOWN_KEY' }, { status: 404 });
+
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'INVALID_JSON' }, { status: 400 });
+  }
+  if (typeof body !== 'object' || body === null) {
+    return NextResponse.json({ error: 'INVALID_BODY' }, { status: 400 });
+  }
+  const b = body as Record<string, unknown>;
+
+  // Merge with the current value so partial saves don't wipe other fields.
+  const current = await prisma.siteSetting.findUnique({ where: { key } });
+  let currentObj: Record<string, unknown> = {};
+  if (current) {
+    try {
+      const parsed: unknown = JSON.parse(current.value);
+      if (typeof parsed === 'object' && parsed !== null)
+        currentObj = parsed as Record<string, unknown>;
+    } catch {
+      // stale/corrupt row — start fresh
+    }
+  }
+
+  let next: Record<string, unknown>;
+  if (key === 'appearance') {
+    // Explicit null clears the accent (back to default peach); omitted keeps it.
+    const accent =
+      b['accent'] === null
+        ? null
+        : typeof b['accent'] === 'string'
+          ? b['accent']
+          : currentObj['accent'];
+    if (typeof accent === 'string' && !/^#[0-9a-fA-F]{6}$/.test(accent)) {
+      return NextResponse.json({ error: 'INVALID_ACCENT' }, { status: 400 });
+    }
+    const speed = typeof b['speed'] === 'string' ? b['speed'] : currentObj['speed'];
+    if (typeof speed === 'string' && !['slow', 'normal', 'fast', 'off'].includes(speed)) {
+      return NextResponse.json({ error: 'INVALID_SPEED' }, { status: 400 });
+    }
+    next = {};
+    if (accent !== undefined) next['accent'] = accent ?? null;
+    if (speed !== undefined) next['speed'] = speed;
+  } else {
+    // store-info: whitelist string fields.
+    next = {};
+    for (const field of ['name', 'description', 'email', 'phone', 'line', 'facebook'] as const) {
+      if (typeof b[field] === 'string') next[field] = (b[field] as string).trim();
+    }
+  }
+
+  const value = JSON.stringify({ ...currentObj, ...next });
+  await prisma.siteSetting.upsert({
+    where: { key },
+    update: { value, updatedBy: check.payload?.sub ?? null },
+    create: { key, value, updatedBy: check.payload?.sub ?? null },
+  });
+
+  return NextResponse.json(JSON.parse(value), { status: 200 });
+}

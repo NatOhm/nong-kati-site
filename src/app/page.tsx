@@ -108,6 +108,31 @@ export default async function HomePage(): Promise<React.JSX.Element> {
         {/* Stats Counter */}
         <StatsCounter />
 
+        {/* How It Works — วิธีการซื้อ above the fold per client feedback deck (แก้เว็บ.pdf p.1) */}
+        <ScrollReveal>
+          <section className="px-4 py-8 md:px-8">
+            <h2 className="mb-6 text-center text-lg font-bold text-fg">วิธีการซื้อ</h2>
+            <div className="grid gap-4 md:grid-cols-3">
+              {[
+                { step: '01', title: 'เลือกสินค้า', desc: 'เลือกประเภทบัตรและราคาที่ต้องการ' },
+                { step: '02', title: 'ชำระเงิน', desc: 'จ่ายผ่าน PromptPay หรือบัตรเครดิต' },
+                { step: '03', title: 'รับโค้ด', desc: 'รับโค้ดทันทีภายใน 60 วินาที' },
+              ].map((item) => (
+                <div
+                  key={item.step}
+                  className="clay-card flex items-center gap-4 rounded-xl p-4 transition-transform duration-fast ease-out-quart hover:-translate-y-0.5"
+                >
+                  <span className="shrink-0 text-2xl font-bold text-peach-500">{item.step}</span>
+                  <div>
+                    <h3 className="text-sm font-semibold text-fg">{item.title}</h3>
+                    <p className="text-xs text-fg-muted">{item.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        </ScrollReveal>
+
         <PawDivider className="py-4" />
 
         {/* Categories Section */}
@@ -179,31 +204,6 @@ export default async function HomePage(): Promise<React.JSX.Element> {
         )}
 
         <PawDivider className="py-6" />
-
-        {/* How It Works Section */}
-        <ScrollReveal>
-          <section className="px-4 py-8 md:px-8">
-            <h2 className="mb-6 text-center text-lg font-bold text-fg">วิธีการซื้อ</h2>
-            <div className="grid gap-4 md:grid-cols-3">
-              {[
-                { step: '01', title: 'เลือกสินค้า', desc: 'เลือกประเภทบัตรและราคาที่ต้องการ' },
-                { step: '02', title: 'ชำระเงิน', desc: 'จ่ายผ่าน PromptPay หรือบัตรเครดิต' },
-                { step: '03', title: 'รับโค้ด', desc: 'รับโค้ดทันทีภายใน 60 วินาที' },
-              ].map((item) => (
-                <div
-                  key={item.step}
-                  className="clay-card flex items-center gap-4 rounded-xl p-4 transition-transform duration-fast ease-out-quart hover:-translate-y-0.5"
-                >
-                  <span className="shrink-0 text-2xl font-bold text-peach-500">{item.step}</span>
-                  <div>
-                    <h3 className="text-sm font-semibold text-fg">{item.title}</h3>
-                    <p className="text-xs text-fg-muted">{item.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        </ScrollReveal>
 
         {/* Trust Badges */}
         <ScrollReveal>

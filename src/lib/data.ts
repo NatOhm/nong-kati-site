@@ -449,3 +449,80 @@ export async function getAnnouncement(): Promise<AnnouncementContent> {
     return fallback;
   }
 }
+
+// ─── Appearance (runtime theme) ─────────────────────────
+
+export interface AppearanceContent {
+  /** Accent color as "#rrggbb"; null = built-in peach. */
+  accent: string | null;
+  /** Global animation speed: slow | normal | fast | off. */
+  speed: 'slow' | 'normal' | 'fast' | 'off';
+}
+
+const SPEEDS = ['slow', 'normal', 'fast', 'off'] as const;
+
+/**
+ * Read the runtime theme settings (SiteSetting key 'appearance'). Admin sets
+ * accent color + animation speed; the layout turns this into CSS vars.
+ */
+export async function getAppearance(): Promise<AppearanceContent> {
+  const fallback: AppearanceContent = { accent: null, speed: 'normal' };
+  try {
+    const row = await prisma.siteSetting.findUnique({ where: { key: 'appearance' } });
+    if (!row) return fallback;
+    const parsed = JSON.parse(row.value) as Partial<AppearanceContent>;
+    return {
+      accent:
+        typeof parsed.accent === 'string' && /^#[0-9a-fA-F]{6}$/.test(parsed.accent)
+          ? parsed.accent
+          : null,
+      speed: SPEEDS.includes(parsed.speed as (typeof SPEEDS)[number])
+        ? (parsed.speed as AppearanceContent['speed'])
+        : 'normal',
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+// ─── Store info (footer/contact) ─────────────────────────
+
+export interface StoreInfoContent {
+  name: string | null;
+  description: string | null;
+  email: string | null;
+  phone: string | null;
+  line: string | null;
+  facebook: string | null;
+}
+
+/**
+ * Read editable store info (SiteSetting key 'store-info') used by the
+ * footer and contact surfaces. Nulls mean "use the built-in default".
+ */
+export async function getStoreInfo(): Promise<StoreInfoContent> {
+  const empty: StoreInfoContent = {
+    name: null,
+    description: null,
+    email: null,
+    phone: null,
+    line: null,
+    facebook: null,
+  };
+  try {
+    const row = await prisma.siteSetting.findUnique({ where: { key: 'store-info' } });
+    if (!row) return empty;
+    const parsed = JSON.parse(row.value) as Partial<StoreInfoContent>;
+    const str = (v: unknown) => (typeof v === 'string' && v.trim() !== '' ? v : null);
+    return {
+      name: str(parsed.name),
+      description: str(parsed.description),
+      email: str(parsed.email),
+      phone: str(parsed.phone),
+      line: str(parsed.line),
+      facebook: str(parsed.facebook),
+    };
+  } catch {
+    return empty;
+  }
+}

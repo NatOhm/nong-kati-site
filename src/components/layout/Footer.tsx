@@ -1,5 +1,6 @@
 import { Logo } from './Logo';
 import { PawIcon } from '@/components/ui/ClayIcons';
+import { getStoreInfo } from '@/lib/data';
 
 const FOOTER_COLUMNS: Array<{ title: string; links: Array<{ label: string; href: string }> }> = [
   {
@@ -34,14 +35,40 @@ const LEGAL_LINKS = [
 ];
 
 /** 05-components.md §1.4 — 4-col desktop, accordion-shaped stack on mobile (accordion interaction deferred to M2 content pass). */
-export function Footer(): React.JSX.Element {
+export async function Footer(): Promise<React.JSX.Element> {
+  const store = await getStoreInfo();
   return (
     <footer className="relative z-50 border-t border-line-subtle bg-surface-base py-16">
       <div className="mx-auto max-w-content px-4 md:px-8">
         <div className="grid grid-cols-1 gap-10 md:grid-cols-4">
           <div>
             <Logo />
-            <p className="mt-3 text-sm text-fg-muted">ซื้อง่าย จ่ายเร็ว ได้โค้ดทันที</p>
+            <p className="mt-3 text-sm text-fg-muted">
+              {store.description ?? 'ซื้อง่าย จ่ายเร็ว ได้โค้ดทันที'}
+            </p>
+            {(store.phone || store.email || store.line) && (
+              <ul className="mt-3 space-y-1 text-sm text-fg-muted">
+                {store.phone && (
+                  <li>
+                    โทร{' '}
+                    <a
+                      href={`tel:${store.phone.replace(/\s/g, '')}`}
+                      className="hover:text-fg-brand"
+                    >
+                      {store.phone}
+                    </a>
+                  </li>
+                )}
+                {store.email && (
+                  <li>
+                    <a href={`mailto:${store.email}`} className="hover:text-fg-brand">
+                      {store.email}
+                    </a>
+                  </li>
+                )}
+                {store.line && <li>LINE: {store.line}</li>}
+              </ul>
+            )}
           </div>
           {FOOTER_COLUMNS.map((col) => (
             <div key={col.title}>
@@ -61,7 +88,8 @@ export function Footer(): React.JSX.Element {
 
         <div className="mt-12 flex flex-col items-center gap-3 border-t border-line-subtle pt-6 text-xs text-fg-placeholder md:flex-row md:justify-between">
           <p className="flex items-center gap-2">
-            <PawIcon size={20} className="mascot-peek" />© {new Date().getFullYear()} Nong-Kati
+            <PawIcon size={20} className="mascot-peek" />© {new Date().getFullYear()}{' '}
+            {store.name ?? 'Nong-Kati'}
           </p>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
             {LEGAL_LINKS.map((link) => (

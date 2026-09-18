@@ -8,6 +8,7 @@ import {
   Shield,
   Bell,
   Megaphone,
+  Palette,
   Save,
   Eye,
   EyeOff,
@@ -26,10 +27,18 @@ import {
 import { AdminShell } from '@/components/layout/AdminShell';
 import { cn } from '@/utils/cn';
 
-type SettingsTab = 'announcement' | 'store' | 'payment' | 'email' | 'security' | 'notifications';
+type SettingsTab =
+  | 'announcement'
+  | 'appearance'
+  | 'store'
+  | 'payment'
+  | 'email'
+  | 'security'
+  | 'notifications';
 
 const TABS: { id: SettingsTab; label: string; icon: typeof Store }[] = [
   { id: 'announcement', label: 'แถบประกาศ', icon: Megaphone },
+  { id: 'appearance', label: 'ธีมและแอนิเมชัน', icon: Palette },
   { id: 'store', label: 'ร้านค้า', icon: Store },
   { id: 'payment', label: 'การชำระเงิน', icon: CreditCard },
   { id: 'email', label: 'อีเมล', icon: Mail },
@@ -93,6 +102,7 @@ export default function AdminSettingsPage(): React.JSX.Element {
           {/* Tab Content */}
           <div className="flex-1">
             {activeTab === 'announcement' && <AnnouncementSettings />}
+            {activeTab === 'appearance' && <AppearanceSettings />}
             {activeTab === 'store' && <StoreSettings onSave={handleSave} />}
             {activeTab === 'payment' && <PaymentSettings onSave={handleSave} />}
             {activeTab === 'email' && <EmailSettings onSave={handleSave} />}
@@ -243,75 +253,353 @@ function AnnouncementSettings(): React.JSX.Element {
   );
 }
 
-// ─── Store Settings ───────────────────────────────────────
-function StoreSettings({ onSave }: { onSave: () => void }) {
-  const [storeName, setStoreName] = useState('Nong-Kati');
-  const [storeDesc, setStoreDesc] = useState(
-    'ซื้อบัตรเกม Netflix Steam และอื่นๆ ได้ที่ Nong-Kati ส่งโค้ดทันที',
-  );
-  const [contactEmail, setContactEmail] = useState('support@nong-kati.co.th');
-  const [contactPhone, setContactPhone] = useState('02-123-4567');
-  const [currency, setCurrency] = useState('THB');
-  const [timezone, setTimezone] = useState('Asia/Bangkok');
+// ─── Appearance (theme + animation speed) ────────────────
+
+const ACCENT_PRESETS: { name: string; hex: string }[] = [
+  { name: 'บัตเตอร์สก็อต (เดิม)', hex: '#F97316' },
+  { name: 'แฮมสเตอร์ทอง', hex: '#D97706' },
+  { name: 'กุหลาบน้ำนม', hex: '#F43F5E' },
+  { name: 'เจดแก้ว', hex: '#10B981' },
+  { name: 'ฟ้าน้ำนม', hex: '#0EA5E9' },
+  { name: 'ม่วงมินต์', hex: '#8B5CF6' },
+];
+
+const SPEED_OPTIONS: { value: string; label: string; desc: string }[] = [
+  { value: 'slow', label: 'ช้า', desc: 'ขยับนุ่มนวล ชมได้เพลิน ๆ' },
+  { value: 'normal', label: 'ปกติ', desc: '550ms — ค่าที่ออกแบบไว้' },
+  { value: 'fast', label: 'เร็ว', desc: 'สั้นกระชับ ตอบสนองไว' },
+  { value: 'off', label: 'ปิดแอนิเมชัน', desc: 'ทุกอย่างปรากฏทันที' },
+];
+
+function AppearanceSettings(): React.JSX.Element {
+  const [accent, setAccent] = useState('#F97316');
+  const [speed, setSpeed] = useState('normal');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const token = getAdminToken();
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    fetch('/api/v1/admin/settings/appearance', { headers })
+      .then(async (r) => {
+        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? `HTTP ${r.status}`);
+        return r.json() as Promise<{ accent?: string | null; speed?: string }>;
+      })
+      .then((data) => {
+        if (data.accent) setAccent(data.accent);
+        if (data.speed) setSpeed(data.speed);
+      })
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function handleSave() {
+    setSaving(true);
+    setError(null);
+    try {
+      const token = getAdminToken();
+      const res = await fetch('/api/v1/admin/settings/appearance', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ accent, speed }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error ?? `HTTP ${res.status}`);
+      }
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
-    <Section title="การตั้งค่าร้านค้า" subtitle="ตั้งค่าข้อมูลร้านค้าที่แสดงต่อลูกค้า">
-      <Field label="ชื่อร้านค้า">
-        <input
-          value={storeName}
-          onChange={(e) => setStoreName(e.target.value)}
-          className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
-        />
-      </Field>
-      <Field label="คำอธิบายร้านค้า">
-        <textarea
-          value={storeDesc}
-          onChange={(e) => setStoreDesc(e.target.value)}
-          rows={3}
-          className="w-full resize-none rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
-        />
-      </Field>
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="อีเมลติดต่อ">
-          <input
-            value={contactEmail}
-            onChange={(e) => setContactEmail(e.target.value)}
-            className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
-          />
-        </Field>
-        <Field label="เบอร์โทรศัพท์">
-          <input
-            value={contactPhone}
-            onChange={(e) => setContactPhone(e.target.value)}
-            className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
-          />
-        </Field>
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="สกุลเงิน">
-          <select
-            value={currency}
-            onChange={(e) => setCurrency(e.target.value)}
-            className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
-          >
-            <option value="THB">THB — ฿ บาทยอด</option>
-            <option value="USD">USD — $ ดอลลาร์</option>
-          </select>
-        </Field>
-        <Field label="Timezone">
-          <select
-            value={timezone}
-            onChange={(e) => setTimezone(e.target.value)}
-            className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
-          >
-            <option value="Asia/Bangkok">Asia/Bangkok (ICT, UTC+7)</option>
-            <option value="UTC">UTC</option>
-          </select>
-        </Field>
-      </div>
-      <div className="flex justify-end">
-        <SaveButton onClick={onSave} />
-      </div>
+    <Section
+      title="ธีมและแอนิเมชัน"
+      subtitle="เปลี่ยนสีหลักของเว็บและความเร็วแอนิเมชัน — บันทึกแล้วมีผลทันทีกับทุกหน้า"
+    >
+      {loading ? (
+        <p className="py-6 text-center text-sm text-fg-placeholder">กำลังโหลด…</p>
+      ) : (
+        <>
+          <Field label="สีหลัก (Accent)">
+            <div className="flex flex-wrap gap-2">
+              {ACCENT_PRESETS.map((p) => (
+                <button
+                  key={p.hex}
+                  onClick={() => setAccent(p.hex)}
+                  title={p.name}
+                  className={cn(
+                    'h-10 w-10 rounded-full border-2 transition-transform hover:scale-110',
+                    accent.toLowerCase() === p.hex.toLowerCase()
+                      ? 'border-fg shadow-md ring-2 ring-peach-300 ring-offset-2'
+                      : 'border-line-subtle',
+                  )}
+                  style={{ backgroundColor: p.hex }}
+                  aria-label={p.name}
+                  aria-pressed={accent.toLowerCase() === p.hex.toLowerCase()}
+                />
+              ))}
+              <label
+                className={cn(
+                  'flex h-10 cursor-pointer items-center gap-2 rounded-full border px-3 text-xs text-fg-secondary hover:bg-surface',
+                  !ACCENT_PRESETS.some((p) => p.hex.toLowerCase() === accent.toLowerCase())
+                    ? 'border-fg ring-2 ring-peach-300 ring-offset-2'
+                    : 'border-line-subtle',
+                )}
+              >
+                <span
+                  className="h-5 w-5 rounded-full border border-line-subtle"
+                  style={{ backgroundColor: accent }}
+                />
+                กำหนดเอง
+                <input
+                  type="color"
+                  value={accent}
+                  onChange={(e) => setAccent(e.target.value)}
+                  className="sr-only"
+                />
+              </label>
+            </div>
+          </Field>
+
+          <Field label="ความเร็วแอนิเมชัน">
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+              {SPEED_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setSpeed(opt.value)}
+                  className={cn(
+                    'rounded-lg border px-3 py-3 text-left transition-all',
+                    speed === opt.value
+                      ? 'border-peach-500 bg-peach-50 ring-1 ring-peach-500'
+                      : 'border-line-subtle hover:bg-surface',
+                  )}
+                  aria-pressed={speed === opt.value}
+                >
+                  <p className="text-sm font-semibold text-fg">{opt.label}</p>
+                  <p className="text-[10px] text-fg-placeholder">{opt.desc}</p>
+                </button>
+              ))}
+            </div>
+          </Field>
+
+          {/* Live preview */}
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-fg-placeholder">
+              ตัวอย่าง
+            </p>
+            <div className="flex flex-wrap items-center gap-4 rounded-xl border border-line-subtle bg-surface p-4">
+              <button
+                className="rounded-full px-5 py-2 text-sm font-semibold text-white shadow-clay-brand transition-transform hover:scale-[1.03] active:scale-95"
+                style={{ backgroundColor: accent }}
+              >
+                ปุ่มซื้อสินค้า
+              </button>
+              <div className="h-4 w-32 overflow-hidden rounded-full bg-white">
+                <div
+                  className="h-full rounded-full transition-all duration-700"
+                  style={{ width: '72%', backgroundColor: accent }}
+                />
+              </div>
+              <span className="text-sm font-bold" style={{ color: accent }}>
+                ฿25 ลดเหลือ ฿19
+              </span>
+            </div>
+          </div>
+
+          {error && (
+            <div className="flex items-center gap-2 rounded-lg border border-coral-300 bg-coral-50 px-4 py-3 text-sm text-coral-700">
+              <AlertTriangle size={16} /> {error}
+            </div>
+          )}
+
+          <div className="flex justify-end">
+            <button
+              onClick={handleSave}
+              disabled={saving || loading}
+              className="flex items-center gap-2 rounded-lg bg-peach-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-peach-400 disabled:opacity-50"
+            >
+              {saved ? <CheckCircle2 size={14} /> : <Save size={14} />}
+              {saving ? 'กำลังบันทึก…' : saved ? 'บันทึกแล้ว!' : 'บันทึกธีม'}
+            </button>
+          </div>
+        </>
+      )}
+    </Section>
+  );
+}
+
+// ─── Store Settings ───────────────────────────────────────
+
+interface StoreInfoForm {
+  name: string;
+  description: string;
+  email: string;
+  phone: string;
+  line: string;
+  facebook: string;
+}
+
+function StoreSettings({ onSave }: { onSave: () => void }) {
+  const [form, setForm] = useState<StoreInfoForm>({
+    name: '',
+    description: '',
+    email: '',
+    phone: '',
+    line: '',
+    facebook: '',
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const token = getAdminToken();
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    fetch('/api/v1/admin/settings/store-info', { headers })
+      .then(async (r) => {
+        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? `HTTP ${r.status}`);
+        return r.json() as Promise<Partial<StoreInfoForm>>;
+      })
+      .then((data) => {
+        setForm((f) => ({
+          ...f,
+          name: data.name ?? f.name,
+          description: data.description ?? f.description,
+          email: data.email ?? f.email,
+          phone: data.phone ?? f.phone,
+          line: data.line ?? f.line,
+          facebook: data.facebook ?? f.facebook,
+        }));
+      })
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  function set(field: keyof StoreInfoForm, value: string) {
+    setForm((f) => ({ ...f, [field]: value }));
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    setError(null);
+    try {
+      const token = getAdminToken();
+      const res = await fetch('/api/v1/admin/settings/store-info', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error ?? `HTTP ${res.status}`);
+      }
+      setSaved(true);
+      onSave();
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Section
+      title="การตั้งค่าร้านค้า"
+      subtitle="ข้อมูลที่แสดงในฟุตเตอร์และหน้าติดต่อ — เว้นว่างเพื่อใช้ค่าเริ่มต้น"
+    >
+      {loading ? (
+        <p className="py-6 text-center text-sm text-fg-placeholder">กำลังโหลด…</p>
+      ) : (
+        <>
+          <Field label="ชื่อร้านค้า">
+            <input
+              value={form.name}
+              onChange={(e) => set('name', e.target.value)}
+              placeholder="Nong-Kati"
+              className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+            />
+          </Field>
+          <Field label="คำอธิบายร้านค้า">
+            <textarea
+              value={form.description}
+              onChange={(e) => set('description', e.target.value)}
+              rows={3}
+              placeholder="ซื้อบัตรเกม Netflix Steam และอื่นๆ ได้ที่ Nong-Kati ส่งโค้ดทันที"
+              className="w-full resize-none rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+            />
+          </Field>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="อีเมลติดต่อ">
+              <input
+                value={form.email}
+                onChange={(e) => set('email', e.target.value)}
+                placeholder="support@nong-kati.co.th"
+                className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+              />
+            </Field>
+            <Field label="เบอร์โทรศัพท์">
+              <input
+                value={form.phone}
+                onChange={(e) => set('phone', e.target.value)}
+                placeholder="02-123-4567"
+                className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+              />
+            </Field>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="LINE ID">
+              <input
+                value={form.line}
+                onChange={(e) => set('line', e.target.value)}
+                placeholder="@nongkati"
+                className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+              />
+            </Field>
+            <Field label="Facebook Page">
+              <input
+                value={form.facebook}
+                onChange={(e) => set('facebook', e.target.value)}
+                placeholder="https://facebook.com/..."
+                className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+              />
+            </Field>
+          </div>
+
+          {error && (
+            <div className="flex items-center gap-2 rounded-lg border border-coral-300 bg-coral-50 px-4 py-3 text-sm text-coral-700">
+              <AlertTriangle size={16} /> {error}
+            </div>
+          )}
+
+          <div className="flex justify-end">
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex items-center gap-2 rounded-lg bg-peach-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-peach-400 disabled:opacity-50"
+            >
+              {saved ? <CheckCircle2 size={14} /> : <Save size={14} />}
+              {saving ? 'กำลังบันทึก…' : saved ? 'บันทึกแล้ว!' : 'บันทึกข้อมูลร้าน'}
+            </button>
+          </div>
+        </>
+      )}
     </Section>
   );
 }
