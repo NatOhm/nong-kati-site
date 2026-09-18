@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AdminSidebar } from './AdminSidebar';
 import { AdminTopBar } from './AdminTopBar';
+import { adminFetch } from '@/lib/adminSession';
 import type { AdminRole } from '@/types/auth';
 
 export interface AdminShellProps {
@@ -20,13 +21,35 @@ export interface AdminShellProps {
  */
 export function AdminShell({
   children,
-  staffName,
-  staffRole,
+  staffName: staffNameProp,
+  staffRole: staffRoleProp,
   notificationCount = 0,
   breadcrumbs,
   className,
 }: AdminShellProps): React.JSX.Element {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // Pages may pass static props; the signed-in admin's real identity (from
+  // the DB via /me) wins once loaded. Keeps role-gated sidebar/nav accurate
+  // for limited accounts without every page fetching its own profile.
+  const [profile, setProfile] = useState<{ fullName: string; role: AdminRole } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    adminFetch('/api/v1/auth/admin/me')
+      .then(async (r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!cancelled && data?.role) {
+          setProfile({ fullName: data.fullName ?? data.email, role: data.role as AdminRole });
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const staffName = profile?.fullName ?? staffNameProp;
+  const staffRole = profile?.role ?? staffRoleProp;
 
   return (
     <div className="flex h-screen overflow-hidden bg-surface-base">

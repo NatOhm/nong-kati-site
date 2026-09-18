@@ -76,29 +76,71 @@ function hashToken(token: string): string {
 }
 
 /**
- * Ensure the default super-admin exists. Called lazily on first login so a
- * fresh database bootstraps itself. The bootstrap password comes from
- * ADMIN_SEED_PASSWORD (defaults to 'admin123' for dev) and is hashed with
- * scrypt before storage — the plaintext is never persisted.
+ * Ensure the default accounts exist. Called lazily on first login so a fresh
+ * database bootstraps itself. Passwords come from env overrides (or the dev
+ * defaults below) and are hashed with scrypt before storage — plaintext is
+ * never persisted. The super-admin gets a real random TOTP secret; limited
+ * accounts share the seeded TOTP secret so they can be test-logged-into
+ * without enrolling each one.
+ *
+ * Limited roles exist so RBAC can be exercised end-to-end: their JWTs carry
+ * only their role's permissions (src/types/auth.ts ROLE_PERMISSIONS).
  */
+interface SeedAdminSpec {
+  email: string;
+  fullName: string;
+  role: AdminRole;
+  envVar: string;
+  fallbackPassword: string;
+}
+
+export const SEED_ADMINS: SeedAdminSpec[] = [
+  {
+    email: 'admin@nong-kati.co.th',
+    fullName: 'Founder',
+    role: 'super_admin',
+    envVar: 'ADMIN_SEED_PASSWORD',
+    fallbackPassword: 'admin123',
+  },
+  {
+    email: 'catalogue@nong-kati.co.th',
+    fullName: 'Catalogue Manager',
+    role: 'catalogue_manager',
+    envVar: 'ADMIN_SEED_CATALOGUE_PASSWORD',
+    fallbackPassword: 'catalogue123',
+  },
+  {
+    email: 'orders@nong-kati.co.th',
+    fullName: 'Order Manager',
+    role: 'order_manager',
+    envVar: 'ADMIN_SEED_ORDERS_PASSWORD',
+    fallbackPassword: 'orders123',
+  },
+];
+
+/** Test 2FA secret shared by seeded accounts (standard RFC 6238 vector). */
+const SEED_TOTP_SECRET = 'JBSWY3DPEHPK3PXP';
+
 export async function ensureSeedAdmin(): Promise<void> {
-  const email = 'admin@nong-kati.co.th';
-  const existing = await prisma.adminUser.findUnique({ where: { email } });
-  if (existing) return;
-  const password = process.env['ADMIN_SEED_PASSWORD'] ?? 'admin123';
-  await prisma.adminUser.create({
-    data: {
-      email,
-      fullName: 'Founder',
-      role: 'super_admin',
-      status: 'active',
-      passwordHash: await hashPassword(password),
-      // Seeded account gets a real random TOTP secret; the owner scans it on
-      // first login via the 2FA-setup flow (totpConfirmed=false forces setup).
-      totpSecret: generateTotpSecret(),
-      totpConfirmed: false,
-    },
-  });
+  for (const spec of SEED_ADMINS) {
+    const existing = await prisma.adminUser.findUnique({ where: { email: spec.email } });
+    if (existing) continue;
+    const password = process.env[spec.envVar] ?? spec.fallbackPassword;
+    await prisma.adminUser.create({
+      data: {
+        email: spec.email,
+        fullName: spec.fullName,
+        role: spec.role,
+        status: 'active',
+        passwordHash: await hashPassword(password),
+        totpSecret: SEED_TOTP_SECRET,
+        // super_admin enrolls via the 2FA-setup flow on first login; the
+        // limited test accounts are pre-confirmed so RBAC tests skip setup.
+        totpConfirmed: spec.role !== 'super_admin',
+        mustChangePassword: true,
+      },
+    });
+  }
 }
 
 /**
@@ -297,6 +339,11 @@ export async function refreshAdminSession(refreshToken: string): Promise<{
 
   const user = session.adminUser;
   if (user.status !== 'active') return { success: false, error: 'ACCOUNT_DEACTIVATED' };
+  // A global invalidation (password change) kills every session minted
+  // before it — including ones created by a refresh racing the change.
+  if (user.sessionsInvalidBefore && session.createdAt < user.sessionsInvalidBefore) {
+    return { success: false, error: 'TOKEN_INVALID' };
+  }
 
   await prisma.adminSession.update({
     where: { id: session.id },
@@ -328,7 +375,14 @@ export async function changeAdminPassword(
   await prisma.$transaction([
     prisma.adminUser.update({
       where: { id: adminId },
-      data: { passwordHash: await hashPassword(newPassword), mustChangePassword: false },
+      data: {
+        passwordHash: await hashPassword(newPassword),
+        mustChangePassword: false,
+        // +5s margin: any session a concurrent refresh manages to mint during
+        // this change is still dated before the threshold and dies on first
+        // use. Only sessions from genuine post-change logins survive.
+        sessionsInvalidBefore: new Date(Date.now() + 5_000),
+      },
     }),
     prisma.adminSession.updateMany({
       where: { adminUserId: adminId, revokedAt: null },

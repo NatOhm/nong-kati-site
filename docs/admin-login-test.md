@@ -18,10 +18,20 @@ case it is designed to handle.
 
 ## 1. Credentials
 
-| Field | Value | Note |
-| -------- | ----------------------- | -------------------------------------------------------------------------- || Email | `admin@nong-kati.co.th` | Only seeded account, role `super_admin` |
-| Password | `admin123` | scrypt-hashed in DB; **change it** in ตั้งค่า → ความปลอดภัย → เปลี่ยนรหัสผ่าน (new password needs ≥12 chars) |
-| 2FA | **Real TOTP** | 6-digit rotating code from any authenticator app |
+| Email                       | Role                | Password       | Note                                                                      |
+| --------------------------- | ------------------- | -------------- | ------------------------------------------------------------------------- |
+| `admin@nong-kati.co.th`     | `super_admin`       | `admin123`     | Full permissions. **Change it** in ตั้งค่า → ความปลอดภัย (≥12 chars)      |
+| `catalogue@nong-kati.co.th` | `catalogue_manager` | `catalogue123` | Products/categories/inventory only; forced password change on first login |
+| `orders@nong-kati.co.th`    | `order_manager`     | `orders123`    | Orders/customers/reviews only; forced password change on first login      |
+
+All three are seeded lazily on first login attempt against the DB
+(`ensureSeedAdmin`; password overrides `ADMIN_SEED_PASSWORD`,
+`ADMIN_SEED_CATALOGUE_PASSWORD`, `ADMIN_SEED_ORDERS_PASSWORD`). Limited
+accounts ship pre-confirmed TOTP with the shared seed secret and
+`mustChangePassword=true` — their first login lands on the change-password
+form and the sidebar shows only their role's items.
+
+**2FA: real TOTP** — 6-digit rotating code from any authenticator app.
 
 **2FA enrollment:** on first login the seeded account shows the 2FA-setup
 step with a QR code (secret `JBSWY3DPEHPK3PXP` in the current seed row). Scan
@@ -93,6 +103,21 @@ Unlock a locked account (or reset counters) directly:
 UPDATE "AdminUser" SET status='active', "lockedUntil"=NULL, "failedLoginAttempts"=0
 WHERE email='admin@nong-kati.co.th';
 ```
+
+## 4b. RBAC spot checks (limited accounts)
+
+Log in as each seeded limited account and verify both sides of the matrix:
+
+| Caller            | `GET /api/v1/admin/products` | `GET /api/v1/admin/categories` | `GET /api/v1/admin/announcement` | `POST change-password` (self) |
+| ----------------- | ---------------------------- | ------------------------------ | -------------------------------- | ----------------------------- |
+| catalogue_manager | **200**                      | **200**                        | 403                              | 200/400                       |
+| order_manager     | 403                          | 403                            | 403                              | 200/400                       |
+
+(change-password returns 400 for a wrong current password — that's the
+allowed self-service path reaching validation.)
+
+Also check the sidebar: catalogue_manager sees สินค้า/หมวดหมู่/คลังสินค้า,
+order_manager sees คำสั่งซื้อ/ลูกค้า — never each other's items.
 
 ## 5. What login unlocks (smoke test)
 
