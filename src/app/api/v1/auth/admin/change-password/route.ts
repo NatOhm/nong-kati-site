@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { changeAdminPassword } from '@/api/adminAuth';
-import { checkPermission } from '@/lib/rbac';
+import { verifyAdminJwt } from '@/lib/jwt';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,21 +12,19 @@ function bearer(req: NextRequest): string | null {
 }
 
 /**
- * POST /api/v1/auth/admin/change-password — self-service password change
- * for the authenticated admin (settings:write). Verifies the current
- * password, enforces the 12-character minimum, and revokes ALL sessions
- * (including the caller's) so every device re-authenticates with the new
- * password. The client must redirect to the login page after success.
+ * POST /api/v1/auth/admin/change-password — self-service password change.
+ * Requires only authentication, NOT settings:write: every admin must be able
+ * to rotate their own password (including limited roles that are forced to
+ * change it on first login), and the target is always the caller — the id
+ * comes from the verified JWT, never from the request body. Changing other
+ * accounts' passwords remains a staff:write operation handled elsewhere.
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const token = bearer(req);
   if (!token) return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 });
-  const check = await checkPermission(token, 'settings:write');
-  if (!check.allowed) {
-    return NextResponse.json({ error: check.error ?? 'FORBIDDEN' }, { status: 403 });
-  }
-  const adminId = check.payload?.sub;
-  if (!adminId) return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 });
+  const payload = await verifyAdminJwt(token);
+  if (!payload?.sub) return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 });
+  const adminId = payload.sub;
 
   let body: unknown;
   try {
