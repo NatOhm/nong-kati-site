@@ -381,6 +381,45 @@ model SiteSetting {
   @@index([key])
 }
 
+// ─── Admin Users & Sessions (08-auth.md §4) ────────────────
+// DB-backed admin auth: scrypt password hashes, per-user lockout,
+// TOTP secrets and server-side refresh-token sessions.
+
+model AdminUser {
+  id                  String    @id @default(cuid())
+  email               String    @unique
+  fullName            String
+  role                String    @default("super_admin")
+  status              String    @default("active") // active | deactivated | locked
+  passwordHash        String // scrypt$N$r$p$salt$hash (lib/password.ts)
+  totpSecret          String? // base32, set during 2FA setup
+  totpConfirmed       Boolean   @default(false)
+  mustChangePassword  Boolean   @default(false)
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+  lastLoginAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  sessions AdminSession[]
+
+  @@index([email])
+}
+
+model AdminSession {
+  id           String    @id @default(cuid())
+  adminUserId  String
+  tokenHash    String    @unique // SHA-256 of the opaque refresh token
+  expiresAt    DateTime
+  createdAt    DateTime  @default(now())
+  revokedAt    DateTime?
+
+  adminUser AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  @@index([adminUserId])
+  @@index([tokenHash])
+}
+
 // ─── Audit Logs (06-database.md §14, 11-admin.md §14.1) ────
 
 model AuditLog {

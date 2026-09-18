@@ -5,26 +5,32 @@ case it is designed to handle.
 
 - **Login page (local dev):** `http://localhost:4200/management/login` (or whichever port `npm run dev` prints)
 - **Login page (production):** `https://nong-kati.vercel.app/management/login`
-- **Implementation under test:** `src/api/adminAuth.ts` (login logic) and
-  `src/lib/jwt.ts` (TOTP verify + JWT signing)
+- **Implementation:** `src/api/adminAuth.ts` (DB-backed login logic),
+  `src/lib/password.ts` (scrypt hashing), `src/lib/jwt.ts` (RFC 6238 TOTP + JWT signing),
+  API routes `src/app/api/v1/auth/admin/{login,2fa}/route.ts`
 
-> **Status: MOCK AUTH.** Accounts, sessions and lockouts live in server memory
-> (`adminAuth.ts` maps), not the database. A server restart resets everything —
-> failed-attempt counters, lockouts, and sessions. Real DB-backed auth with
-> hashed passwords is planned for M6.
+> **Status: DB-BACKED AUTH.** Admin accounts, password hashes (scrypt), TOTP
+> secrets and refresh-token sessions live in PostgreSQL (`AdminUser`,
+> `AdminSession` tables). Failed-attempt counters and lockouts persist across
+> restarts. The JWT signing secret comes from `NK_JWT_SECRET`.
 
 ---
 
 ## 1. Credentials
 
-| Field | Value | Note |
-|---|---|---|
-| Email | `admin@nong-kati.co.th` | Only seeded account, role `super_admin` |
-| Password | `admin123` | Plaintext compare (mock) |
-| 2FA code | `123456` | Fixed test code — the login page displays it as a hint |
+| Field    | Value                   | Note                                                                       |
+| -------- | ----------------------- | -------------------------------------------------------------------------- |
+| Email    | `admin@nong-kati.co.th` | Only seeded account, role `super_admin`                                    |
+| Password | `admin123`              | scrypt-hashed in DB; override via `ADMIN_SEED_PASSWORD` before first login |
+| 2FA      | **Real TOTP**           | 6-digit rotating code from any authenticator app                           |
 
-If the login page shows the "รหัสสำหรับทดสอบ: 123456" hint, you are on the
-mock TOTP path. Any other 6-digit code is rejected with `TOTP_INVALID`.
+**2FA enrollment:** on first login the seeded account shows the 2FA-setup
+step with a QR code (secret `JBSWY3DPEHPK3PXP` in the current seed row). Scan
+it, then enter the rotating 6-digit code. Codes refresh every 30 seconds;
+±1 time-window of clock drift is accepted.
+
+> The old fixed test code `123456` is **gone** — real RFC 6238 verification
+> runs in `verifyTotpCode` (`src/lib/jwt.ts`).
 
 ---
 
@@ -32,20 +38,26 @@ mock TOTP path. Any other 6-digit code is rejected with `TOTP_INVALID`.
 
 1. Go to `/management/login`.
 2. Enter the email + password above → **เข้าสู่ระบบ**.
-3. The page switches to the **ยืนยันตัวตน** step (6-digit code).
-4. Enter `123456` → **ยืนยัน**.
-5. Expected: redirect to `/management/dashboard`, and
+3. First login: the **ตั้งค่า 2FA** step shows QR + secret + backup codes.
+   Scan with an authenticator app, enter the 6-digit code → **ยืนยัน**.
+   Later logins go straight to the **ยืนยันตัวตน** code step.
+4. Expected: redirect to `/management/dashboard`, and
    `localStorage.nk_admin_access_token` + `nk_admin_refresh_token` are set.
 
 **Pass criteria:** dashboard renders with the sidebar (แดชบอร์ด, สินค้า, …)
-and the header shows "Founder / Super Admin".
+and the header shows "Founder / Super Admin". `GET /api/v1/admin/products`
+with the stored token returns the full catalog.
 
 ## 3. Session behavior after login
 
 - **Access token TTL: 15 minutes.** After that, admin API calls return
   `401 UNAUTHENTICATED` and admin pages' data loads start failing until you
   log in again. This is by design; the UI does not auto-refresh yet.
-- **Refresh token TTL: 30 days** (stored, but no auto-refresh flow wired).
+- **Refresh token: 30 days**, stored as a SHA-256 hash in `AdminSession`.
+  Logout (`adminLogout`) revokes it server-side.
+- **Challenge token (between step 1 and 2): single-use, 5-minute TTL.**
+  Letting the TOTP step expire shows "หมดเวลายืนยัน กรุณาเข้าสู่ระบบใหม่" and
+  returns you to the credentials step.
 - Tokens live in `localStorage` — clearing site data logs you out.
 
 To check expiry manually, paste in the browser console:
@@ -60,31 +72,35 @@ console.log('expired:', p.exp * 1000 < Date.now(), 'role:', p.role);
 
 ## 4. Failure cases to exercise
 
-| # | Scenario | Steps | Expected result |
-|---|---|---|---|
-| 1 | Wrong password | valid email + wrong password | Error "อีเมลหรือรหัสผ่านไม่ถูกต้อง"; counter increments |
-| 2 | Unknown email | any password | Same invalid-credentials error (no account enumeration) |
-| 3 | Account lockout | 5 consecutive wrong passwords | 6th attempt returns lock message with retry minutes; status `locked` for 30 min |
-| 4 | Wrong TOTP | correct email+password, then `000000` | "รหัสยืนยันไม่ถูกต้อง"; remains on 2FA step |
-| 5 | Expired challenge | wait > 5 min after step 1, then enter TOTP | `TOKEN_INVALID`; must start over |
-| 6 | Deactivated account | (set `status: 'deactivated'` in code) | `ACCOUNT_DEACTIVATED` error |
-| 7 | Empty inputs | submit blank form | HTML5 required validation blocks submit |
+| #   | Scenario                   | Steps                                             | Expected result                                                                                     |
+| --- | -------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| 1   | Wrong password             | valid email + wrong password                      | Error "อีเมลหรือรหัสผ่านไม่ถูกต้อง"; counter increments (persisted in DB)                           |
+| 2   | Unknown email              | any password                                      | Same invalid-credentials error (no account enumeration; latency masked)                             |
+| 3   | Account lockout            | 5 consecutive wrong passwords                     | Account `locked` in DB for **15 minutes**; message shows minutes remaining; survives server restart |
+| 4   | Wrong TOTP                 | correct email+password, then a wrong 6-digit code | "รหัสไม่ถูกต้อง กรุณาลองใหม่"; remains on 2FA step                                                  |
+| 5   | Expired/consumed challenge | wait > 5 min, or reuse an old challenge           | "หมดเวลายืนยัน" and return to credentials step                                                      |
+| 6   | Deactivated account        | (set `status: 'deactivated'` in DB)               | "บัญชีนี้ถูกปิดใช้งาน"                                                                              |
+| 7   | Empty inputs               | submit blank form                                 | HTML5 required validation blocks submit                                                             |
 
-Reset between runs: restart the dev server (in-memory state clears), or wait
-out the 30-minute lockout.
+Unlock a locked account (or reset counters) directly:
+
+```sql
+UPDATE "AdminUser" SET status='active', "lockedUntil"=NULL, "failedLoginAttempts"=0
+WHERE email='admin@nong-kati.co.th';
+```
 
 ## 5. What login unlocks (smoke test)
 
 After logging in, confirm each admin page loads its real data:
 
-| Page | Should show |
-|---|---|
-| `/management/dashboard` | Stat cards, sales summary |
-| `/management/products` | All 37 real DB products with images, edit + archive buttons |
-| `/management/settings` → แถบประกาศ | Current announcement from DB, editable |
-| `/management/settings` → ธีมและแอนิเมชัน | 6 accent swatches + 4 speed presets + live preview |
-| `/management/settings` → ร้านค้า | Store-info form (name, phone, email, LINE, Facebook) |
-| `/management/orders` | Orders list |
+| Page                                     | Should show                                                 |
+| ---------------------------------------- | ----------------------------------------------------------- |
+| `/management/dashboard`                  | Stat cards, sales summary                                   |
+| `/management/products`                   | All 37 real DB products with images, edit + archive buttons |
+| `/management/settings` → แถบประกาศ       | Current announcement from DB, editable                      |
+| `/management/settings` → ธีมและแอนิเมชัน | 6 accent swatches + 4 speed presets + live preview          |
+| `/management/settings` → ร้านค้า         | Store-info form (name, phone, email, LINE, Facebook)        |
+| `/management/orders`                     | Orders list                                                 |
 
 Quick authorization check (logged out, e.g. incognito):
 
@@ -103,39 +119,48 @@ curl -s -o /dev/null -w "%{http_code}\n" \
 
 ## 6. API-level login (scripting the whole flow)
 
-The login is currently a client-side flow (`adminLogin` runs in the browser
-bundle, not an HTTP endpoint), so scripted UI testing should drive the page.
-With Playwright, for example:
+Login is now two HTTP endpoints — scriptable with curl:
 
-```ts
-await page.goto('http://localhost:4200/management/login');
-await page.fill('input[type="email"], input:not([type])', 'admin@nong-kati.co.th');
-await page.fill('input[type="password"]', 'admin123');
-await page.click('button:has-text("เข้าสู่ระบบ")');
-await page.fill('input[placeholder*="6 หลัก"]', '123456');
-await page.click('button:has-text("ยืนยัน")');
-await page.waitForURL('**/management/dashboard');
+```bash
+# Step 1: credentials → challenge token
+TOKEN_JSON=$(curl -s -X POST https://nong-kati.vercel.app/api/v1/auth/admin/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@nong-kati.co.th","password":"admin123"}')
+CHALLENGE=$(echo "$TOKEN_JSON" | jq -r .challengeToken)
+
+# Step 2: TOTP code from your authenticator → access + refresh tokens
+curl -s -X POST https://nong-kati.vercel.app/api/v1/auth/admin/2fa \
+  -H "Content-Type: application/json" \
+  -d "{\"challengeToken\":\"$CHALLENGE\",\"code\":\"123456-from-authenticator\"}"
 ```
 
-## 7. Known limitations (mock phase)
+Wrong-password returns `401 {success:false, error:"INVALID_CREDENTIALS"}`;
+a consumed/expired challenge returns `401 {error:"TOKEN_INVALID"}`.
 
-- No real TOTP — the code is always `123456`; the page prints it as a hint.
-- Password stored/compared in plaintext; no hashing yet.
-- Lockout state is per-server-process and resets on redeploy/restart.
-- No "forgot password" flow; no email verification.
-- Admin APIs are guarded by JWT permission checks (`settings:write`,
-  `products:write`, …) — role `super_admin` has all permissions. Other roles
-  (`catalogue_manager`, `order_manager`, …) exist in the RBAC matrix but have
-  no seeded accounts.
+## 7. Security properties (now real)
+
+- **scrypt password hashing** (N=16384, r=8, p=1, 64-byte key, random salt,
+  timing-safe compare) — `src/lib/password.ts`. Plaintext never stored.
+- **Real RFC 6238 TOTP** — HMAC-SHA1 over a big-endian 64-bit counter,
+  30s step, 6 digits, ±1 window drift. Verified against a reference
+  implementation. Verified against the DB-stored base32 secret.
+- **No account enumeration** — unknown email and wrong password return the
+  same error; unknown-email path burns a scrypt round to equalize latency.
+- **Persistent lockout** — 5 failures → 15-minute lock, stored in the DB row.
+- **Server-side sessions** — refresh tokens stored only as SHA-256 hashes;
+  logout and password change revoke them.
+- **JWT secret from env** (`NK_JWT_SECRET`) — set in Vercel for production.
+- **Change password** (`changeAdminPassword`) verifies the current password,
+  enforces ≥12 chars, and revokes all existing sessions.
 
 ## 8. Checklist (print-friendly)
 
 - [ ] Happy path: login → 2FA → dashboard
-- [ ] Token appears in localStorage
+- [ ] Tokens appear in localStorage; admin API accepts the access token
 - [ ] Wrong password shows Thai error, no lock on 1st try
-- [ ] 5 wrong passwords lock the account for 30 min
-- [ ] Wrong TOTP code rejected
+- [ ] 5 wrong passwords lock the account for 15 min (persists across restart)
+- [ ] Wrong TOTP code rejected, stays on 2FA step
+- [ ] Expired challenge returns user to credentials step with notice
 - [ ] Logged-out admin API returns 401; forged token 403
 - [ ] Products page lists 37 DB products
-- [ ] Settings tabs save and persist (announcement, theme, store info)
 - [ ] After 15 min, admin APIs return 401 → re-login works

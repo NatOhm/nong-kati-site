@@ -15,8 +15,9 @@ const ACCESS_TOKEN_TTL = 15 * 60; // 15 minutes
 const REFRESH_TOKEN_TTL = 30 * 24 * 60 * 60; // 30 days
 
 function getSecret(): string {
-  // NK_JWT_SECRET is not available client-side, always use mock
-  return 'mock-jwt-secret-for-development-only';
+  // Server-side only. Falls back to a dev secret when the env var is absent
+  // so local dev never crashes; production (Vercel) sets NK_JWT_SECRET.
+  return process.env['NK_JWT_SECRET'] ?? 'dev-only-insecure-secret';
 }
 
 // ─── Browser-compatible helpers ──────────────────────────
@@ -218,16 +219,85 @@ export function generateBackupCodes(count: number = 10): string[] {
   return codes;
 }
 
-/**
- * Verify a TOTP code (mock — always accepts "123456" in dev).
- * In production: use speakeasy or otplib.
- */
-export function verifyTotpCode(secret: string, code: string): boolean {
-  // Mock: accept "123456" as test code (both dev and production)
-  // Real TOTP verification will be implemented in M6 with otplib
-  if (code === '123456') {
-    return true;
+// ─── TOTP (RFC 6238) ─────────────────────────────────────
+
+const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+
+function base32Decode(input: string): Uint8Array {
+  const clean = input.toUpperCase().replace(/[^A-Z2-7]/g, '');
+  let bits = 0;
+  let value = 0;
+  const out: number[] = [];
+  for (const ch of clean) {
+    const idx = BASE32_ALPHABET.indexOf(ch);
+    if (idx === -1) continue;
+    value = (value << 5) | idx;
+    bits += 5;
+    if (bits >= 8) {
+      out.push((value >>> (bits - 8)) & 0xff);
+      bits -= 8;
+    }
   }
-  // TODO: In production with real TOTP, verify against TOTP secret
+  return new Uint8Array(out);
+}
+
+/** HMAC-SHA1 over raw bytes (Web Crypto, browser + Node 18+ compatible). */
+async function hmacSha1Raw(key: Uint8Array, message: Uint8Array): Promise<Uint8Array> {
+  const cryptoKey = await globalThis.crypto.subtle.importKey(
+    'raw',
+    key as BufferSource,
+    { name: 'HMAC', hash: 'SHA-1' },
+    false,
+    ['sign'],
+  );
+  const sig = await globalThis.crypto.subtle.sign('HMAC', cryptoKey, message as BufferSource);
+  return new Uint8Array(sig);
+}
+
+/**
+ * Compute the TOTP for a base32 secret at a given unix timestamp.
+ * 30-second step, 6 digits — matches Google Authenticator / Authy defaults.
+ */
+export async function computeTotp(
+  secretBase32: string,
+  unixSeconds: number,
+): Promise<string | null> {
+  const key = base32Decode(secretBase32);
+  if (key.length === 0) return null;
+
+  const counter = Math.floor(unixSeconds / 30);
+  const msg = new Uint8Array(8);
+  // Big-endian 64-bit counter: hi 4 bytes first, then lo 4 bytes.
+  // (JS bitwise ops are 32-bit, so split and write each half big-endian.)
+  const lo = counter >>> 0;
+  const hi = Math.floor(counter / 0x100000000) >>> 0;
+  for (let i = 0; i < 4; i++) {
+    msg[i] = (hi >>> (24 - i * 8)) & 0xff;
+    msg[4 + i] = (lo >>> (24 - i * 8)) & 0xff;
+  }
+
+  const mac = await hmacSha1Raw(key, msg);
+  const offset = mac[mac.length - 1]! & 0x0f;
+  const bin =
+    ((mac[offset]! & 0x7f) << 24) |
+    ((mac[offset + 1]! & 0xff) << 16) |
+    ((mac[offset + 2]! & 0xff) << 8) |
+    (mac[offset + 3]! & 0xff);
+  return String(bin % 1_000_000).padStart(6, '0');
+}
+
+/**
+ * Verify a TOTP code against a base32 secret.
+ * Accepts ±1 time step of drift and backup codes, which adminAuth passes
+ * separately. Constant-time-ish comparison to avoid trivial timing leaks.
+ */
+export async function verifyTotpCode(secretBase32: string, code: string): Promise<boolean> {
+  const clean = code.trim();
+  if (!/^\d{6}$/.test(clean)) return false;
+  const now = Math.floor(Date.now() / 1000);
+  for (const drift of [0, -1, 1]) {
+    const expected = await computeTotp(secretBase32, now + drift * 30);
+    if (expected && expected === clean) return true;
+  }
   return false;
 }

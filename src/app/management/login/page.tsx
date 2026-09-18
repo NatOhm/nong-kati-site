@@ -4,7 +4,6 @@ import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Shield } from 'lucide-react';
 
-import { adminLogin, confirm2fa, setup2fa } from '@/api/adminAuth';
 import { cn } from '@/utils/cn';
 
 /**
@@ -34,15 +33,28 @@ export default function AdminLoginPage(): React.JSX.Element {
       setError(null);
 
       try {
-        const result = adminLogin(email, password);
+        const res = await fetch('/api/v1/auth/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        const result = (await res.json()) as {
+          success: boolean;
+          requires2faSetup?: boolean;
+          challengeToken?: string;
+          error?: string;
+          retryAfter?: number;
+        };
 
         if (!result.success) {
           setError(
             result.error === 'INVALID_CREDENTIALS'
               ? 'อีเมลหรือรหัสผ่านไม่ถูกต้อง'
               : result.error === 'ACCOUNT_LOCKED'
-                ? `บัญชีถูกล็อค กรุณาลองใหม่ใน ${Math.ceil((result.retryAfter ?? 1800) / 60)} นาที`
-                : 'เกิดข้อผิดพลาด',
+                ? `บัญชีถูกล็อค กรุณาลองใหม่ใน ${Math.ceil((result.retryAfter ?? 900) / 60)} นาที`
+                : result.error === 'ACCOUNT_DEACTIVATED'
+                  ? 'บัญชีนี้ถูกปิดใช้งาน'
+                  : 'เกิดข้อผิดพลาด',
           );
           return;
         }
@@ -51,7 +63,17 @@ export default function AdminLoginPage(): React.JSX.Element {
 
         if (result.requires2faSetup) {
           // First login — setup 2FA
-          const setup = setup2fa(result.challengeToken ?? '');
+          const setupRes = await fetch('/api/v1/auth/admin/2fa', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ challengeToken: result.challengeToken ?? '', action: 'setup' }),
+          });
+          const setup = (await setupRes.json()) as {
+            success: boolean;
+            totpUri?: string;
+            secretBase32?: string;
+            backupCodes?: string[];
+          };
           if (setup.success) {
             setSetupData({
               totpUri: setup.totpUri ?? '',
@@ -80,7 +102,17 @@ export default function AdminLoginPage(): React.JSX.Element {
       setError(null);
 
       try {
-        const result = await confirm2fa(challengeToken, totpCode);
+        const res = await fetch('/api/v1/auth/admin/2fa', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ challengeToken, code: totpCode }),
+        });
+        const result = (await res.json()) as {
+          success: boolean;
+          accessToken?: string;
+          refreshToken?: string;
+          error?: string;
+        };
         if (result.success) {
           // Store tokens in localStorage
           if (result.accessToken) {
@@ -92,6 +124,12 @@ export default function AdminLoginPage(): React.JSX.Element {
           localStorage.setItem('nk_admin_email', email);
           // Redirect to dashboard
           router.push('/management/dashboard');
+        } else if (result.error === 'TOKEN_INVALID') {
+          // Challenge expired/consumed (5-min TTL, single use) — restart cleanly
+          setStep('credentials');
+          setChallengeToken('');
+          setTotpCode('');
+          setError('หมดเวลายืนยัน กรุณาเข้าสู่ระบบใหม่');
         } else {
           setError(
             result.error === 'TOTP_INVALID' ? 'รหัสไม่ถูกต้อง กรุณาลองใหม่' : 'เกิดข้อผิดพลาด',
@@ -268,10 +306,6 @@ export default function AdminLoginPage(): React.JSX.Element {
             >
               {loading ? 'กำลังยืนยัน...' : 'ยืนยัน'}
             </button>
-
-            <p className="text-center text-xs text-fg-placeholder">
-              รหัสสำหรับทดสอบ: <span className="font-mono text-fg-brand">123456</span>
-            </p>
           </form>
         )}
       </div>
