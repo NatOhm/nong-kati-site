@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 
 import { AdminShell } from '@/components/layout/AdminShell';
+import { adminFetch } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
 /**
  * Admin Products Management — real CRUD over the Prisma catalog.
@@ -59,19 +60,6 @@ interface DraftVariant {
 
 const MAX_UPLOAD_BYTES = 512 * 1024;
 
-function getAdminToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('nk_admin_access_token');
-}
-
-function authHeaders(json: boolean): HeadersInit {
-  const token = getAdminToken();
-  const headers: Record<string, string> = {};
-  if (json) headers['Content-Type'] = 'application/json';
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  return headers;
-}
-
 let draftKey = 1;
 function newDraftVariant(): DraftVariant {
   draftKey += 1;
@@ -93,8 +81,8 @@ export default function AdminProductsPage(): React.JSX.Element {
     setLoadError(null);
     try {
       const [productsRes, catsRes] = await Promise.all([
-        fetch('/api/v1/admin/products', { headers: authHeaders(false), cache: 'no-store' }),
-        fetch('/api/v1/admin/categories', { headers: authHeaders(false), cache: 'no-store' }),
+        adminFetch('/api/v1/admin/products', { cache: 'no-store' }),
+        adminFetch('/api/v1/admin/categories', { cache: 'no-store' }),
       ]);
       if (!productsRes.ok) {
         const data = (await productsRes.json().catch(() => ({}))) as { error?: string };
@@ -263,9 +251,8 @@ export default function AdminProductsPage(): React.JSX.Element {
                                 )
                               )
                                 return;
-                              await fetch(`/api/v1/admin/products/${product.id}`, {
+                              await adminFetch(`/api/v1/admin/products/${product.id}`, {
                                 method: 'DELETE',
-                                headers: authHeaders(false),
                               });
                               void load();
                             }}
@@ -364,9 +351,9 @@ function ProductEditor({
         reader.onerror = () => reject(new Error('อ่านไฟล์ไม่สำเร็จ'));
         reader.readAsDataURL(file);
       });
-      const res = await fetch('/api/v1/admin/upload', {
+      const res = await adminFetch('/api/v1/admin/upload', {
         method: 'POST',
-        headers: authHeaders(true),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dataUrl }),
       });
       if (!res.ok) {
@@ -399,11 +386,11 @@ function ProductEditor({
           isActive: v.isActive,
         })),
       };
-      const res = await fetch(
+      const res = await adminFetch(
         product ? `/api/v1/admin/products/${product.id}` : '/api/v1/admin/products',
         {
           method: product ? 'PUT' : 'POST',
-          headers: authHeaders(true),
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         },
       );

@@ -50,11 +50,17 @@ with the stored token returns the full catalog.
 
 ## 3. Session behavior after login
 
-- **Access token TTL: 15 minutes.** After that, admin API calls return
-  `401 UNAUTHENTICATED` and admin pages' data loads start failing until you
-  log in again. This is by design; the UI does not auto-refresh yet.
-- **Refresh token: 30 days**, stored as a SHA-256 hash in `AdminSession`.
-  Logout (`adminLogout`) revokes it server-side.
+- **Access token TTL: 15 minutes — but it self-renews.** Admin pages fetch
+  through `adminFetch` (`src/lib/adminSession.ts`): a 401 triggers one silent
+  refresh-and-retry, and the layout refreshes proactively while the tab is
+  open. You should almost never see an expiry error.
+- **Refresh token: 30 days**, stored only as a SHA-256 hash in `AdminSession`.
+  Every refresh **rotates** it — the old token is revoked server-side and a
+  new one is returned. Re-login is only needed after 30 days of inactivity,
+  or if the session was revoked (logout, password change).
+- **Refresh failure = silent logout.** An invalid/expired/already-rotated
+  refresh token clears storage and redirects to the login page — no dead
+  admin screens.
 - **Challenge token (between step 1 and 2): single-use, 5-minute TTL.**
   Letting the TOTP step expire shows "หมดเวลายืนยัน กรุณาเข้าสู่ระบบใหม่" and
   returns you to the credentials step.
@@ -119,7 +125,7 @@ curl -s -o /dev/null -w "%{http_code}\n" \
 
 ## 6. API-level login (scripting the whole flow)
 
-Login is now two HTTP endpoints — scriptable with curl:
+Login is two HTTP endpoints, plus refresh and logout — fully scriptable:
 
 ```bash
 # Step 1: credentials → challenge token
@@ -129,13 +135,25 @@ TOKEN_JSON=$(curl -s -X POST https://nong-kati.vercel.app/api/v1/auth/admin/logi
 CHALLENGE=$(echo "$TOKEN_JSON" | jq -r .challengeToken)
 
 # Step 2: TOTP code from your authenticator → access + refresh tokens
-curl -s -X POST https://nong-kati.vercel.app/api/v1/auth/admin/2fa \
+SESSION=$(curl -s -X POST https://nong-kati.vercel.app/api/v1/auth/admin/2fa \
   -H "Content-Type: application/json" \
-  -d "{\"challengeToken\":\"$CHALLENGE\",\"code\":\"123456-from-authenticator\"}"
+  -d "{\"challengeToken\":\"$CHALLENGE\",\"code\":\"123456-from-authenticator\"}")
+REFRESH=$(echo "$SESSION" | jq -r .refreshToken)
+
+# Renew the session any time (rotates the refresh token):
+curl -s -X POST https://nong-kati.vercel.app/api/v1/auth/admin/refresh \
+  -H "Content-Type: application/json" \
+  -d "{\"refreshToken\":\"$REFRESH\"}"
+
+# Revoke the session (what the logout button does):
+curl -s -X POST https://nong-kati.vercel.app/api/v1/auth/admin/logout \
+  -H "Content-Type: application/json" \
+  -d "{\"refreshToken\":\"$REFRESH\"}"
 ```
 
-Wrong-password returns `401 {success:false, error:"INVALID_CREDENTIALS"}`;
-a consumed/expired challenge returns `401 {error:"TOKEN_INVALID"}`.
+Wrong-password returns `401 {error:"INVALID_CREDENTIALS"}`; a consumed or
+expired challenge returns `401 {error:"TOKEN_INVALID"}`; a reused (rotated)
+refresh token also returns `TOKEN_INVALID`.
 
 ## 7. Security properties (now real)
 
@@ -157,6 +175,9 @@ a consumed/expired challenge returns `401 {error:"TOKEN_INVALID"}`.
 
 - [ ] Happy path: login → 2FA → dashboard
 - [ ] Tokens appear in localStorage; admin API accepts the access token
+- [ ] Corrupt the access token, reload /management/products — page still loads (silent refresh)
+- [ ] Garbage refresh token → redirected to login, storage cleared
+- [ ] Logout button → AdminSession row revoked in DB
 - [ ] Wrong password shows Thai error, no lock on 1st try
 - [ ] 5 wrong passwords lock the account for 15 min (persists across restart)
 - [ ] Wrong TOTP code rejected, stays on 2FA step

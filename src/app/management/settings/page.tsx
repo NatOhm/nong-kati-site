@@ -25,6 +25,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { AdminShell } from '@/components/layout/AdminShell';
+import { adminFetch } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
 
 type SettingsTab =
@@ -122,11 +123,6 @@ interface AnnouncementContent {
   enabled: boolean;
 }
 
-function getAdminToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('nk_admin_access_token');
-}
-
 function AnnouncementSettings(): React.JSX.Element {
   const [message, setMessage] = useState('');
   const [href, setHref] = useState('');
@@ -137,34 +133,36 @@ function AnnouncementSettings(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = getAdminToken();
-    const headers: Record<string, string> = {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    fetch('/api/v1/admin/announcement', { headers })
+    let cancelled = false;
+    adminFetch('/api/v1/admin/announcement')
       .then(async (r) => {
         if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? `HTTP ${r.status}`);
         return r.json() as Promise<AnnouncementContent>;
       })
       .then((data) => {
+        if (cancelled) return;
         setMessage(data.message);
         setHref(data.href ?? '');
         setEnabled(data.enabled);
       })
-      .catch((e: Error) => setError(e.message))
-      .finally(() => setLoading(false));
+      .catch((e: Error) => {
+        if (!cancelled) setError(e.message);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function handleSave() {
     setSaving(true);
     setError(null);
     try {
-      const token = getAdminToken();
-      const res = await fetch('/api/v1/admin/announcement', {
+      const res = await adminFetch('/api/v1/admin/announcement', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: message.trim(), href: href.trim() || null, enabled }),
       });
       if (!res.ok) {
@@ -280,33 +278,35 @@ function AppearanceSettings(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = getAdminToken();
-    const headers: Record<string, string> = {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    fetch('/api/v1/admin/settings/appearance', { headers })
+    let cancelled = false;
+    adminFetch('/api/v1/admin/settings/appearance')
       .then(async (r) => {
         if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? `HTTP ${r.status}`);
         return r.json() as Promise<{ accent?: string | null; speed?: string }>;
       })
       .then((data) => {
+        if (cancelled) return;
         if (data.accent) setAccent(data.accent);
         if (data.speed) setSpeed(data.speed);
       })
-      .catch((e: Error) => setError(e.message))
-      .finally(() => setLoading(false));
+      .catch((e: Error) => {
+        if (!cancelled) setError(e.message);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function handleSave() {
     setSaving(true);
     setError(null);
     try {
-      const token = getAdminToken();
-      const res = await fetch('/api/v1/admin/settings/appearance', {
+      const res = await adminFetch('/api/v1/admin/settings/appearance', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ accent, speed }),
       });
       if (!res.ok) {
@@ -465,15 +465,14 @@ function StoreSettings({ onSave }: { onSave: () => void }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = getAdminToken();
-    const headers: Record<string, string> = {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    fetch('/api/v1/admin/settings/store-info', { headers })
+    let cancelled = false;
+    adminFetch('/api/v1/admin/settings/store-info')
       .then(async (r) => {
         if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? `HTTP ${r.status}`);
         return r.json() as Promise<Partial<StoreInfoForm>>;
       })
       .then((data) => {
+        if (cancelled) return;
         setForm((f) => ({
           ...f,
           name: data.name ?? f.name,
@@ -484,8 +483,15 @@ function StoreSettings({ onSave }: { onSave: () => void }) {
           facebook: data.facebook ?? f.facebook,
         }));
       })
-      .catch((e: Error) => setError(e.message))
-      .finally(() => setLoading(false));
+      .catch((e: Error) => {
+        if (!cancelled) setError(e.message);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   function set(field: keyof StoreInfoForm, value: string) {
@@ -496,13 +502,9 @@ function StoreSettings({ onSave }: { onSave: () => void }) {
     setSaving(true);
     setError(null);
     try {
-      const token = getAdminToken();
-      const res = await fetch('/api/v1/admin/settings/store-info', {
+      const res = await adminFetch('/api/v1/admin/settings/store-info', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       });
       if (!res.ok) {

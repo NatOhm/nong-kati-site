@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Shield } from 'lucide-react';
 
+import { setAdminSession } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
 
 /**
@@ -114,12 +115,9 @@ export default function AdminLoginPage(): React.JSX.Element {
           error?: string;
         };
         if (result.success) {
-          // Store tokens in localStorage
-          if (result.accessToken) {
-            localStorage.setItem('nk_admin_access_token', result.accessToken);
-          }
-          if (result.refreshToken) {
-            localStorage.setItem('nk_admin_refresh_token', result.refreshToken);
+          // Store the token pair via the shared session helper
+          if (result.accessToken && result.refreshToken) {
+            setAdminSession(result.accessToken, result.refreshToken);
           }
           localStorage.setItem('nk_admin_email', email);
           // Redirect to dashboard

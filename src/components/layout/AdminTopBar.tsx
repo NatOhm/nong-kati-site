@@ -3,6 +3,7 @@
 import { useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bell, LogOut, Menu } from 'lucide-react';
+import { clearAdminSession } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
 import { type AdminRole } from '@/types/auth';
 
@@ -99,8 +100,16 @@ export function AdminTopBar({
         {/* Logout */}
         <button
           onClick={() => {
-            localStorage.removeItem('nk_admin_access_token');
-            localStorage.removeItem('nk_admin_refresh_token');
+            // Fire-and-forget: revoke the refresh session server-side.
+            const refreshToken = localStorage.getItem('nk_admin_refresh_token');
+            if (refreshToken) {
+              void fetch('/api/v1/auth/admin/logout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refreshToken }),
+              }).catch(() => undefined);
+            }
+            clearAdminSession();
             localStorage.removeItem('nk_admin_email');
             window.location.href = '/management/login';
           }}

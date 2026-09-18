@@ -264,6 +264,42 @@ export async function adminLogout(refreshToken: string): Promise<{ success: bool
 }
 
 /**
+ * Refresh an admin session: validate the opaque refresh token against the
+ * stored hash, then rotate it (new random token, old row revoked) and issue a
+ * fresh 15-minute access JWT. Rotation bounds the blast radius of a leaked
+ * refresh token to a single use; reuse of a rotated token fails with
+ * TOKEN_INVALID and the client re-logs in.
+ */
+export async function refreshAdminSession(refreshToken: string): Promise<{
+  success: boolean;
+  accessToken?: string;
+  refreshToken?: string;
+  expiresIn?: number;
+  error?: string;
+}> {
+  const trimmed = refreshToken.trim();
+  if (!trimmed) return { success: false, error: 'REFRESH_TOKEN_REQUIRED' };
+
+  const session = await prisma.adminSession.findUnique({
+    where: { tokenHash: hashToken(trimmed) },
+    include: { adminUser: true },
+  });
+  if (!session || session.revokedAt || session.expiresAt < new Date()) {
+    return { success: false, error: 'TOKEN_INVALID' };
+  }
+
+  const user = session.adminUser;
+  if (user.status !== 'active') return { success: false, error: 'ACCOUNT_DEACTIVATED' };
+
+  await prisma.adminSession.update({
+    where: { id: session.id },
+    data: { revokedAt: new Date() },
+  });
+
+  return issueAdminSession(user);
+}
+
+/**
  * Change admin password (08-auth.md §5.1). Requires the current password;
  * revokes every other session.
  */
