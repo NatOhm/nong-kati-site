@@ -112,6 +112,7 @@ export default function AdminLoginPage(): React.JSX.Element {
           success: boolean;
           accessToken?: string;
           refreshToken?: string;
+          mustChangePassword?: boolean;
           error?: string;
         };
         if (result.success) {
@@ -120,6 +121,11 @@ export default function AdminLoginPage(): React.JSX.Element {
             setAdminSession(result.accessToken, result.refreshToken);
           }
           localStorage.setItem('nk_admin_email', email);
+          if (result.mustChangePassword) {
+            // First login / forced rotation — land on the change form.
+            router.push('/management/settings?tab=security&changePassword=1');
+            return;
+          }
           // Redirect to dashboard
           router.push('/management/dashboard');
         } else if (result.error === 'TOKEN_INVALID') {

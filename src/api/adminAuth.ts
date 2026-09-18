@@ -209,6 +209,7 @@ export async function confirm2fa(
   accessToken?: string;
   refreshToken?: string;
   expiresIn?: number;
+  mustChangePassword?: boolean;
   error?: string;
 }> {
   const challenge = await readChallengeToken(challengeToken);
@@ -228,7 +229,9 @@ export async function confirm2fa(
     data: { totpConfirmed: true, lastLoginAt: new Date() },
   });
 
-  return issueAdminSession(user);
+  const session = await issueAdminSession(user);
+  // Fresh/flagged accounts land on the change-password form first.
+  return user.mustChangePassword ? { ...session, mustChangePassword: true } : session;
 }
 
 /**

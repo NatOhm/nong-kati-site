@@ -18,11 +18,10 @@ case it is designed to handle.
 
 ## 1. Credentials
 
-| Field    | Value                   | Note                                                                       |
-| -------- | ----------------------- | -------------------------------------------------------------------------- |
-| Email    | `admin@nong-kati.co.th` | Only seeded account, role `super_admin`                                    |
-| Password | `admin123`              | scrypt-hashed in DB; override via `ADMIN_SEED_PASSWORD` before first login |
-| 2FA      | **Real TOTP**           | 6-digit rotating code from any authenticator app                           |
+| Field | Value | Note |
+| -------- | ----------------------- | -------------------------------------------------------------------------- || Email | `admin@nong-kati.co.th` | Only seeded account, role `super_admin` |
+| Password | `admin123` | scrypt-hashed in DB; **change it** in ตั้งค่า → ความปลอดภัย → เปลี่ยนรหัสผ่าน (new password needs ≥12 chars) |
+| 2FA | **Real TOTP** | 6-digit rotating code from any authenticator app |
 
 **2FA enrollment:** on first login the seeded account shows the 2FA-setup
 step with a QR code (secret `JBSWY3DPEHPK3PXP` in the current seed row). Scan
@@ -169,7 +168,12 @@ refresh token also returns `TOKEN_INVALID`.
   logout and password change revoke them.
 - **JWT secret from env** (`NK_JWT_SECRET`) — set in Vercel for production.
 - **Change password** (`changeAdminPassword`) verifies the current password,
-  enforces ≥12 chars, and revokes all existing sessions.
+  enforces ≥12 chars, and revokes all existing sessions. UI: ตั้งค่า →
+  ความปลอดภัย → เปลี่ยนรหัสผ่าน (or after login you're sent there
+  automatically when the account has `mustChangePassword` set). API:
+  `POST /api/v1/auth/admin/change-password` (settings:write) — success
+  response means you were logged out on purpose; sign in with the new
+  password.
 
 ## 8. Checklist (print-friendly)
 
@@ -185,3 +189,4 @@ refresh token also returns `TOKEN_INVALID`.
 - [ ] Logged-out admin API returns 401; forged token 403
 - [ ] Products page lists 37 DB products
 - [ ] After 15 min, admin APIs return 401 → re-login works
+- [ ] Change password: wrong current pw rejected; mismatch/short rejected; success logs you out → new password works, old one doesn't
