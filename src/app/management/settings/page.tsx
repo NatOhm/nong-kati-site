@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Store,
   CreditCard,
@@ -28,6 +28,10 @@ import { AdminShell } from '@/components/layout/AdminShell';
 import { adminFetch } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
 
+/** A tab's save implementation, registered with the page so the header
+ *  button can trigger the active tab's real save. */
+type SettingsSaver = () => Promise<void>;
+
 type SettingsTab =
   | 'announcement'
   | 'appearance'
@@ -49,11 +53,29 @@ const TABS: { id: SettingsTab; label: string; icon: typeof Store }[] = [
 
 export default function AdminSettingsPage(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<SettingsTab>('store');
-  const [saved, setSaved] = useState(false);
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  // The active tab registers its real save here; null when the tab has no
+  // backend (payment/email/security/notifications are placeholders).
+  const saverRef = useRef<SettingsSaver | null>(null);
+  const [canSave, setCanSave] = useState(false);
 
-  function handleSave() {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const registerSaver = useCallback((fn: SettingsSaver | null) => {
+    saverRef.current = fn;
+    setCanSave(fn !== null);
+  }, []);
+
+  async function handleSave() {
+    const save = saverRef.current;
+    if (!save || saveState === 'saving') return;
+    setSaveState('saving');
+    try {
+      await save();
+      setSaveState('saved');
+      setTimeout(() => setSaveState('idle'), 2000);
+    } catch {
+      setSaveState('error');
+      setTimeout(() => setSaveState('idle'), 2500);
+    }
   }
 
   return (
@@ -67,11 +89,21 @@ export default function AdminSettingsPage(): React.JSX.Element {
             </p>
           </div>
           <button
-            onClick={handleSave}
-            className="flex items-center gap-2 rounded-lg bg-peach-500 px-4 py-2 text-sm font-semibold text-fg transition-colors hover:bg-peach-400"
+            onClick={() => void handleSave()}
+            disabled={!canSave || saveState === 'saving'}
+            title={canSave ? undefined : 'ส่วนนี้ยังไม่รองรับการบันทึก'}
+            className={cn(
+              'flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-fg transition-colors',
+              canSave
+                ? 'bg-peach-500 hover:bg-peach-400'
+                : 'cursor-not-allowed bg-surface text-fg-placeholder',
+            )}
           >
-            {saved ? <CheckCircle2 size={16} /> : <Save size={16} />}
-            {saved ? 'บันทึกแล้ว!' : 'บันทึกการตั้งค่า'}
+            {saveState === 'saved' ? <CheckCircle2 size={16} /> : <Save size={16} />}
+            {saveState === 'saving' && 'กำลังบันทึก…'}
+            {saveState === 'saved' && 'บันทึกแล้ว!'}
+            {saveState === 'error' && 'บันทึกไม่สำเร็จ'}
+            {saveState === 'idle' && 'บันทึกการตั้งค่า'}
           </button>
         </div>
 
@@ -102,13 +134,13 @@ export default function AdminSettingsPage(): React.JSX.Element {
 
           {/* Tab Content */}
           <div className="flex-1">
-            {activeTab === 'announcement' && <AnnouncementSettings />}
-            {activeTab === 'appearance' && <AppearanceSettings />}
-            {activeTab === 'store' && <StoreSettings onSave={handleSave} />}
-            {activeTab === 'payment' && <PaymentSettings onSave={handleSave} />}
-            {activeTab === 'email' && <EmailSettings onSave={handleSave} />}
-            {activeTab === 'security' && <SecuritySettings onSave={handleSave} />}
-            {activeTab === 'notifications' && <NotificationSettings onSave={handleSave} />}
+            {activeTab === 'announcement' && <AnnouncementSettings registerSaver={registerSaver} />}
+            {activeTab === 'appearance' && <AppearanceSettings registerSaver={registerSaver} />}
+            {activeTab === 'store' && <StoreSettings registerSaver={registerSaver} />}
+            {activeTab === 'payment' && <PaymentSettings />}
+            {activeTab === 'email' && <EmailSettings />}
+            {activeTab === 'security' && <SecuritySettings />}
+            {activeTab === 'notifications' && <NotificationSettings />}
           </div>
         </div>
       </div>
@@ -123,7 +155,11 @@ interface AnnouncementContent {
   enabled: boolean;
 }
 
-function AnnouncementSettings(): React.JSX.Element {
+function AnnouncementSettings({
+  registerSaver,
+}: {
+  registerSaver: (fn: SettingsSaver | null) => void;
+}): React.JSX.Element {
   const [message, setMessage] = useState('');
   const [href, setHref] = useState('');
   const [enabled, setEnabled] = useState(true);
@@ -156,19 +192,35 @@ function AnnouncementSettings(): React.JSX.Element {
     };
   }, []);
 
+  // Latest values for the header-registered saver (stable closure, fresh data).
+  const valuesRef = useRef({ message, href, enabled });
+  valuesRef.current = { message, href, enabled };
+
+  async function saveToApi(): Promise<void> {
+    const { message: m, href: h, enabled: en } = valuesRef.current;
+    const res = await adminFetch('/api/v1/admin/announcement', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: m.trim(), href: h.trim() || null, enabled: en }),
+    });
+    if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(data.error ?? `HTTP ${res.status}`);
+    }
+  }
+
+  // Header save button drives this tab's real save.
+  useEffect(() => {
+    registerSaver(saveToApi);
+    return () => registerSaver(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [registerSaver]);
+
   async function handleSave() {
     setSaving(true);
     setError(null);
     try {
-      const res = await adminFetch('/api/v1/admin/announcement', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: message.trim(), href: href.trim() || null, enabled }),
-      });
-      if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(data.error ?? `HTTP ${res.status}`);
-      }
+      await saveToApi();
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (e) {
@@ -269,7 +321,11 @@ const SPEED_OPTIONS: { value: string; label: string; desc: string }[] = [
   { value: 'off', label: 'ปิดแอนิเมชัน', desc: 'ทุกอย่างปรากฏทันที' },
 ];
 
-function AppearanceSettings(): React.JSX.Element {
+function AppearanceSettings({
+  registerSaver,
+}: {
+  registerSaver: (fn: SettingsSaver | null) => void;
+}): React.JSX.Element {
   const [accent, setAccent] = useState('#F97316');
   const [speed, setSpeed] = useState('normal');
   const [loading, setLoading] = useState(true);
@@ -300,19 +356,35 @@ function AppearanceSettings(): React.JSX.Element {
     };
   }, []);
 
+  // Latest values for the header-registered saver.
+  const valuesRef = useRef({ accent, speed });
+  valuesRef.current = { accent, speed };
+
+  async function saveToApi(): Promise<void> {
+    const { accent: a, speed: s } = valuesRef.current;
+    const res = await adminFetch('/api/v1/admin/settings/appearance', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accent: a, speed: s }),
+    });
+    if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(data.error ?? `HTTP ${res.status}`);
+    }
+  }
+
+  // Header save button drives this tab's real save.
+  useEffect(() => {
+    registerSaver(saveToApi);
+    return () => registerSaver(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [registerSaver]);
+
   async function handleSave() {
     setSaving(true);
     setError(null);
     try {
-      const res = await adminFetch('/api/v1/admin/settings/appearance', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accent, speed }),
-      });
-      if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(data.error ?? `HTTP ${res.status}`);
-      }
+      await saveToApi();
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (e) {
@@ -450,7 +522,11 @@ interface StoreInfoForm {
   facebook: string;
 }
 
-function StoreSettings({ onSave }: { onSave: () => void }) {
+function StoreSettings({
+  registerSaver,
+}: {
+  registerSaver: (fn: SettingsSaver | null) => void;
+}): React.JSX.Element {
   const [form, setForm] = useState<StoreInfoForm>({
     name: '',
     description: '',
@@ -498,21 +574,35 @@ function StoreSettings({ onSave }: { onSave: () => void }) {
     setForm((f) => ({ ...f, [field]: value }));
   }
 
+  // Latest values for the header-registered saver.
+  const formRef = useRef(form);
+  formRef.current = form;
+
+  async function saveToApi(): Promise<void> {
+    const res = await adminFetch('/api/v1/admin/settings/store-info', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(formRef.current),
+    });
+    if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(data.error ?? `HTTP ${res.status}`);
+    }
+  }
+
+  // Header save button drives this tab's real save.
+  useEffect(() => {
+    registerSaver(saveToApi);
+    return () => registerSaver(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [registerSaver]);
+
   async function handleSave() {
     setSaving(true);
     setError(null);
     try {
-      const res = await adminFetch('/api/v1/admin/settings/store-info', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      });
-      if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(data.error ?? `HTTP ${res.status}`);
-      }
+      await saveToApi();
       setSaved(true);
-      onSave();
       setTimeout(() => setSaved(false), 2000);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
@@ -607,7 +697,7 @@ function StoreSettings({ onSave }: { onSave: () => void }) {
 }
 
 // ─── Payment Settings ─────────────────────────────────────
-function PaymentSettings({ onSave }: { onSave: () => void }) {
+function PaymentSettings(): React.JSX.Element {
   const [promptpayEnabled, setPromptpayEnabled] = useState(true);
   const [promptpayId, setPromptpayId] = useState('0123456789012');
   const [cardEnabled, setCardEnabled] = useState(true);
@@ -722,14 +812,14 @@ function PaymentSettings({ onSave }: { onSave: () => void }) {
       </div>
 
       <div className="flex justify-end">
-        <SaveButton onClick={onSave} />
+        <SaveButton />
       </div>
     </Section>
   );
 }
 
 // ─── Email Settings ───────────────────────────────────────
-function EmailSettings({ onSave }: { onSave: () => void }) {
+function EmailSettings(): React.JSX.Element {
   const [smtpHost, setSmtpHost] = useState('smtp.resend.com');
   const [smtpPort, setSmtpPort] = useState('587');
   const [smtpUser, setSmtpUser] = useState('resend');
@@ -809,14 +899,14 @@ function EmailSettings({ onSave }: { onSave: () => void }) {
       </div>
 
       <div className="flex justify-end">
-        <SaveButton onClick={onSave} />
+        <SaveButton />
       </div>
     </Section>
   );
 }
 
 // ─── Security Settings ────────────────────────────────────
-function SecuritySettings({ onSave }: { onSave: () => void }) {
+function SecuritySettings(): React.JSX.Element {
   return (
     <Section title="ความปลอดภัย" subtitle="จัดการ 2FA, Sessions, และ Password Policy">
       {/* 2FA */}
@@ -940,14 +1030,14 @@ function SecuritySettings({ onSave }: { onSave: () => void }) {
       </div>
 
       <div className="flex justify-end">
-        <SaveButton onClick={onSave} />
+        <SaveButton />
       </div>
     </Section>
   );
 }
 
 // ─── Notification Settings ────────────────────────────────
-function NotificationSettings({ onSave }: { onSave: () => void }) {
+function NotificationSettings(): React.JSX.Element {
   const notifications = [
     {
       category: 'ออเดอร์',
@@ -1010,7 +1100,7 @@ function NotificationSettings({ onSave }: { onSave: () => void }) {
         ))}
       </div>
       <div className="flex justify-end">
-        <SaveButton onClick={onSave} />
+        <SaveButton />
       </div>
     </Section>
   );
@@ -1068,14 +1158,16 @@ function ToggleSwitch({ enabled, onChange }: { enabled: boolean; onChange: (v: b
   );
 }
 
-function SaveButton({ onClick }: { onClick: () => void }) {
+/** Placeholder sections have no backend yet — the button says so honestly. */
+function SaveButton(): React.JSX.Element {
   return (
     <button
-      onClick={onClick}
-      className="flex items-center gap-2 rounded-lg bg-peach-500 px-4 py-2 text-sm font-semibold text-fg transition-colors hover:bg-peach-400"
+      disabled
+      title="ส่วนนี้ยังไม่รองรับการบันทึก"
+      className="flex cursor-not-allowed items-center gap-2 rounded-lg bg-surface px-4 py-2 text-sm font-semibold text-fg-placeholder"
     >
       <Save size={14} />
-      บันทึก
+      ยังไม่รองรับการบันทึก
     </button>
   );
 }

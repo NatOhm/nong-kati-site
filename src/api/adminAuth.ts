@@ -13,7 +13,7 @@
  * - Refresh tokens are stored as SHA-256 hashes; logout revokes server-side.
  */
 
-import { createHash, randomBytes } from 'crypto';
+import { createHash } from 'crypto';
 
 import { prisma } from '@/lib/db';
 import { hashPassword, verifyPassword } from '@/lib/password';
@@ -21,8 +21,9 @@ import {
   generateBackupCodes,
   generateRefreshToken,
   generateTotpSecret,
-  hashRefreshToken,
   issueAdminJwt,
+  signJwt,
+  verifyJwt,
   verifyTotpCode,
 } from '@/lib/jwt';
 import { ROLE_PERMISSIONS, type AdminRole, type Permission } from '@/types/auth';
@@ -47,18 +48,27 @@ export interface AdminSession {
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_MINUTES = 15;
-const CHALLENGE_TTL_MS = 5 * 60 * 1000;
+const CHALLENGE_TTL_SECONDS = 5 * 60;
 
-// Step-1 challenge tokens (email+password OK, TOTP pending). In-memory is
-// correct here: they live 5 minutes and a server restart logging everyone
-// out of the *middle* of a login is acceptable. Sessions are the durable part.
-const challengeTokens = new Map<string, { adminUserId: string; expiresAt: Date }>();
+interface ChallengePayload {
+  typ: 'admin-challenge';
+  sub: string;
+}
 
-function pruneChallenges(): void {
-  const now = Date.now();
-  for (const [token, c] of challengeTokens) {
-    if (c.expiresAt.getTime() < now) challengeTokens.delete(token);
-  }
+/**
+ * Issue a step-1 challenge: a short-lived signed JWT naming the admin user.
+ * Stateless on purpose — login and 2FA can be served by different processes
+ * (dev recompiles, serverless lambdas) and the challenge must survive that.
+ * The challenge alone grants nothing: step 2 still requires a valid TOTP.
+ */
+async function issueChallengeToken(adminUserId: string): Promise<string> {
+  return signJwt({ typ: 'admin-challenge', sub: adminUserId }, CHALLENGE_TTL_SECONDS);
+}
+
+async function readChallengeToken(token: string): Promise<ChallengePayload | null> {
+  const payload = await verifyJwt<ChallengePayload>(token);
+  if (!payload || payload.typ !== 'admin-challenge' || !payload.sub) return null;
+  return payload;
 }
 
 function hashToken(token: string): string {
@@ -106,7 +116,6 @@ export async function adminLogin(
   error?: string;
   retryAfter?: number;
 }> {
-  pruneChallenges();
   await ensureSeedAdmin();
 
   const user = await prisma.adminUser.findUnique({ where: { email: email.trim().toLowerCase() } });
@@ -149,11 +158,7 @@ export async function adminLogin(
     data: { failedLoginAttempts: 0, lockedUntil: null },
   });
 
-  const challengeToken = randomBytes(24).toString('hex');
-  challengeTokens.set(challengeToken, {
-    adminUserId: user.id,
-    expiresAt: new Date(Date.now() + CHALLENGE_TTL_MS),
-  });
+  const challengeToken = await issueChallengeToken(user.id);
 
   if (!user.totpConfirmed || !user.totpSecret) {
     return { success: true, requires2faSetup: true, challengeToken };
@@ -172,12 +177,12 @@ export async function setup2fa(challengeToken: string): Promise<{
   backupCodes?: string[];
   error?: string;
 }> {
-  const challenge = challengeTokens.get(challengeToken);
-  if (!challenge || challenge.expiresAt < new Date()) {
+  const challenge = await readChallengeToken(challengeToken);
+  if (!challenge) {
     return { success: false, error: 'TOKEN_INVALID' };
   }
 
-  const user = await prisma.adminUser.findUnique({ where: { id: challenge.adminUserId } });
+  const user = await prisma.adminUser.findUnique({ where: { id: challenge.sub } });
   if (!user) return { success: false, error: 'USER_NOT_FOUND' };
 
   // The seeded row already holds a secret — reuse it so the QR the user
@@ -206,13 +211,12 @@ export async function confirm2fa(
   expiresIn?: number;
   error?: string;
 }> {
-  const challenge = challengeTokens.get(challengeToken);
-  if (!challenge || challenge.expiresAt < new Date()) {
+  const challenge = await readChallengeToken(challengeToken);
+  if (!challenge) {
     return { success: false, error: 'TOKEN_INVALID' };
   }
-  challengeTokens.delete(challengeToken);
 
-  const user = await prisma.adminUser.findUnique({ where: { id: challenge.adminUserId } });
+  const user = await prisma.adminUser.findUnique({ where: { id: challenge.sub } });
   if (!user) return { success: false, error: 'USER_NOT_FOUND' };
   if (!user.totpSecret) return { success: false, error: 'TOTP_NOT_SETUP' };
 
