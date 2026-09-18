@@ -285,10 +285,9 @@ export default function AdminCouponsPage(): React.JSX.Element {
                   </td>
                 </tr>
               ) : coupons.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-fg-muted">
-                    ยังไม่มีคูปอง — กด "สร้างคูปอง" เพื่อเริ่ม
-                  </td>
+                <tr>                    <td colSpan={7} className="px-4 py-8 text-center text-fg-muted">
+                      ยังไม่มีคูปอง — กด สร้างคูปอง ด้านบนเพื่อเริ่ม
+                    </td>
                 </tr>
               ) : (
                 coupons.map((c) => {
