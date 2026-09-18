@@ -27,7 +27,7 @@ export default async function ConfirmationPage({
 }: ConfirmationPageProps): Promise<React.JSX.Element> {
   const { uuid } = await params;
 
-  const order = getOrderByConfirmationUuid(uuid);
+  const order = await getOrderByConfirmationUuid(uuid);
   if (!order) notFound();
 
   const isCompleted = order.status === 'completed';

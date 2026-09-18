@@ -146,7 +146,9 @@ export default function AdminSettingsPage(): React.JSX.Element {
             {activeTab === 'payment' && <PaymentSettings />}
             {activeTab === 'email' && <EmailSettings />}
             {activeTab === 'security' && <SecuritySettings />}
-            {activeTab === 'notifications' && <NotificationSettings />}
+            {activeTab === 'notifications' && (
+              <NotificationSettings registerSaver={registerSaver} />
+            )}
           </div>
         </div>
       </div>
@@ -1046,71 +1048,122 @@ function SecuritySettings(): React.JSX.Element {
 }
 
 // ─── Notification Settings ────────────────────────────────
-function NotificationSettings(): React.JSX.Element {
-  const notifications = [
-    {
-      category: 'ออเดอร์',
-      items: [
-        { label: 'ออเดอร์ใหม่', desc: 'แจ้งเตือนเมื่อมีออเดอร์ชำระเงินสำเร็จ', enabled: true },
-        { label: 'รอส่งโค้ด', desc: 'แจ้งเตือนเมื่อมีออเดอร์รอ manual fulfilment', enabled: true },
-        { label: 'คืนเงิน', desc: 'แจ้งเตือนเมื่อทำรายการคืนเงิน', enabled: true },
-      ],
-    },
-    {
-      category: 'สินค้า',
-      items: [
-        { label: 'สต็อกต่ำ', desc: 'แจ้งเตือนเมื่อสินค้าใกล้หมด', enabled: true },
-        { label: 'สินค้าหมด', desc: 'แจ้งเตือนเมื่อสินค้าหมดสต็อก', enabled: true },
-      ],
-    },
-    {
-      category: 'ลูกค้า',
-      items: [
-        { label: 'ลูกค้าใหม่', desc: 'แจ้งเตือนเมื่อมีลูกค้าสมัครสมาชิก', enabled: false },
-        { label: 'ร้องเรียน', desc: 'แจ้งเตือนเมื่อลูกค้าส่งแบบฟอร์มติดต่อ', enabled: true },
-      ],
-    },
-    {
-      category: 'ระบบ',
-      items: [
-        { label: 'Webhook ล้มเหลว', desc: 'แจ้งเตือนเมื่อ payment webhook ผิดพลาด', enabled: true },
-        {
-          label: ' Circuit Breaker เปิด',
-          desc: 'แจ้งเตือนเมื่อ payment gateway ขัดข้อง',
-          enabled: true,
-        },
-      ],
-    },
-  ];
+function NotificationSettings({
+  registerSaver,
+}: {
+  registerSaver: (fn: SettingsSaver | null) => void;
+}): React.JSX.Element {
+  const [webhookUrl, setWebhookUrl] = useState('');
+  const [threshold, setThreshold] = useState('5');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    adminFetch('/api/v1/admin/settings/notifications')
+      .then(async (r) => (r.ok ? r.json() : {}))
+      .then((data: { discordWebhookUrl?: string | null; lowStockThreshold?: number }) => {
+        if (cancelled) return;
+        setWebhookUrl(data.discordWebhookUrl ?? '');
+        setThreshold(String(data.lowStockThreshold ?? 5));
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const save = useCallback(async () => {
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+    try {
+      const res = await adminFetch('/api/v1/admin/settings/notifications', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          discordWebhookUrl: webhookUrl.trim() === '' ? null : webhookUrl.trim(),
+          lowStockThreshold: Number(threshold) || 0,
+        }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(
+          data.error === 'INVALID_WEBHOOK_URL'
+            ? 'ลิงก์ Discord Webhook ไม่ถูกต้อง'
+            : data.error === 'INVALID_THRESHOLD'
+              ? 'ค่าเตือนสต๊อกต้องเป็นตัวเลข 0-1000'
+              : 'บันทึกไม่สำเร็จ',
+        );
+      }
+      setSaved(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
+    } finally {
+      setSaving(false);
+    }
+  }, [webhookUrl, threshold]);
+
+  useEffect(() => {
+    registerSaver(save);
+    return () => registerSaver(null);
+  }, [save, registerSaver]);
 
   return (
-    <Section title="การแจ้งเตือน" subtitle="ตั้งค่าการแจ้งเตือนสำหรับทีมงาน">
-      <div className="space-y-6">
-        {notifications.map((group) => (
-          <div key={group.category}>
-            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-fg-placeholder">
-              {group.category}
-            </h3>
-            <div className="space-y-2">
-              {group.items.map((item) => (
-                <div
-                  key={item.label}
-                  className="flex items-center justify-between rounded-lg border border-line-subtle bg-surface px-4 py-3"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-fg-secondary">{item.label}</p>
-                    <p className="text-xs text-clay-400">{item.desc}</p>
-                  </div>
-                  <ToggleSwitch enabled={item.enabled} onChange={() => {}} />
-                </div>
-              ))}
-            </div>
+    <Section
+      title="การแจ้งเตือน"
+      subtitle="แจ้งเตือนออเดอร์ใหม่ การชำระเงิน และสต๊อกใกล้หมด ผ่าน Discord (ตามเวลาจริง)"
+    >
+      {loading ? (
+        <p className="py-6 text-center text-sm text-fg-muted">กำลังโหลด...</p>
+      ) : (
+        <div className="space-y-5">
+          <div>
+            <label className={cn('mb-1 block text-sm font-medium text-fg')}>
+              Discord Webhook URL
+            </label>
+            <input
+              type="url"
+              value={webhookUrl}
+              onChange={(e) => setWebhookUrl(e.target.value)}
+              placeholder="https://discord.com/api/webhooks/..."
+              className={INPUT_CLASS}
+            />
+            <p className="mt-1 text-xs text-clay-400">
+              สร้างได้จาก Discord → เซิร์ฟเวอร์ของคุณ → ช่องแชท → แก้ไขช่อง → Integration → Webhooks
+              → New Webhook → Copy Webhook URL เว้นว่างไว้ = ปิดการแจ้งเตือน
+            </p>
           </div>
-        ))}
-      </div>
-      <div className="flex justify-end">
-        <SaveButton />
-      </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-fg">
+              เตือนเมื่อสต๊อกเหลือไม่เกิน (ชิ้น)
+            </label>
+            <input
+              type="number"
+              min="0"
+              max="1000"
+              value={threshold}
+              onChange={(e) => setThreshold(e.target.value.replace(/[^0-9]/g, ''))}
+              className={cn(INPUT_CLASS, 'max-w-32')}
+            />
+          </div>
+          {error && (
+            <div className="rounded-md border border-coral-300 bg-coral-50 px-4 py-3 text-sm text-coral-700">
+              {error}
+            </div>
+          )}
+          {saved && (
+            <div className="rounded-md border border-jade-500/40 bg-jade-500/10 px-4 py-3 text-sm text-jade-700">
+              บันทึกเรียบร้อย — การแจ้งเตือนจะส่งเข้า Discord ทันทีที่มีออเดอร์/สต๊อกต่ำ
+            </div>
+          )}
+        </div>
+      )}
     </Section>
   );
 }

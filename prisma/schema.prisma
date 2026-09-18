@@ -65,6 +65,7 @@ model ProductVariant {
   productId String
   label     String
   price     Decimal  @db.Decimal(10, 2)
+  costThb   Decimal? @db.Decimal(10, 2)
   stock     Int      @default(0)
   isActive  Boolean  @default(true)
   sortOrder Int      @default(0)
@@ -73,6 +74,7 @@ model ProductVariant {
 
   product       Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
   inventory     InventorySnapshot[]
+  stockMoves    StockMove[]
   cartItems     CartItem[]
   orderItems    OrderItem[]
   giftCodes     GiftCode[]
@@ -111,6 +113,27 @@ model InventorySnapshot {
 
   @@index([productId])
   @@index([productVariantId])
+}
+
+// ─── Stock Moves (ประวัติการจัดสต๊อกแบบละเอียด — ตัด/เติม/ขาย/คืน) ───
+
+model StockMove {
+  id             String   @id @default(cuid())
+  variantId      String
+  delta          Int // +เติม / −ตัด / −ขาย / +คืน
+  reason         String // restock, adjust, sale, refund, import
+  refType        String? // order, upload, manual, csv
+  refId          String?
+  note           String?
+  stockAfter     Int
+  actorType      String   @default("admin") // admin, system
+  actorId        String?
+  createdAt      DateTime @default(now())
+
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@index([variantId, createdAt])
+  @@index([reason])
 }
 
 // ─── Carts (§9) ──────────────────────────────────────────
@@ -163,11 +186,13 @@ model Customer {
   failedLoginAttempts Int       @default(0)
   lockedUntil         DateTime?
   lastLoginAt         DateTime?
+  walletBalanceThb    Decimal   @default(0) @db.Decimal(10, 2)
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
   orders   Order[]
   wishlist WishlistItem[]
+  topups   TopUpLog[]
 
   @@index([email])
 }
@@ -188,6 +213,47 @@ model WishlistItem {
   @@index([productId])
 }
 
+// ─── Wallet top-ups (client ask: ประวัติการเดินเงิน / เครดิตคงเหลือ) ──
+
+model TopUpLog {
+  id         String   @id @default(cuid())
+  customerId String
+  amountThb  Decimal  @db.Decimal(10, 2)
+  method     String   @default("promptpay") // promptpay | credit_card | admin_credit
+  reference  String? // payment provider reference / slip id
+  status     String   @default("pending") // pending | completed | failed
+  createdAt  DateTime @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([createdAt])
+}
+
+// ─── Coupons (คูปองส่วนลด — บาท/%, ยอดขั้นต่ำ, วันหมดอายุ) ──
+
+model Coupon {
+  id               String    @id @default(cuid())
+  code             String    @unique
+  description      String?
+  discountType     String    @default("percent") // percent | amount
+  discountValue    Decimal   @db.Decimal(10, 2)
+  minSpendThb      Decimal?  @db.Decimal(10, 2)
+  usageLimit       Int? // null = ไม่จำกัด
+  perCustomerLimit Int?      @default(1)
+  usageCount       Int       @default(0)
+  isActive         Boolean   @default(true)
+  startsAt         DateTime?
+  expiresAt        DateTime?
+  createdBy        String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  orders Order[]
+
+  @@index([isActive])
+}
+
 // ─── Orders (§10) ────────────────────────────────────────
 
 model Order {
@@ -200,7 +266,9 @@ model Order {
   paymentMethod          String?
   subtotalThb            Decimal   @db.Decimal(10, 2)
   vatAmountThb           Decimal   @db.Decimal(10, 2)
+  discountThb            Decimal   @default(0) @db.Decimal(10, 2)
   totalAmountThb         Decimal   @db.Decimal(10, 2)
+  couponId               String?
   lineOptIn              Boolean   @default(false)
   marketingOptIn         Boolean   @default(false)
   tosAcceptedAt          DateTime
@@ -219,6 +287,7 @@ model Order {
   updatedAt              DateTime  @updatedAt
 
   customer        Customer?        @relation(fields: [customerId], references: [id])
+  coupon          Coupon?          @relation(fields: [couponId], references: [id])
   items           OrderItem[]
   paymentAttempts PaymentAttempt[]
   giftCodes       GiftCode[]

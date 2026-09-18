@@ -26,7 +26,7 @@ export default async function OrderDetailPage({
 }: OrderDetailPageProps): Promise<React.JSX.Element> {
   const { uuid } = await params;
 
-  const order = getOrderByConfirmationUuid(uuid);
+  const order = await getOrderByConfirmationUuid(uuid);
   if (!order) notFound();
 
   // Map order status to OrderStatus type

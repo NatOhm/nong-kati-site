@@ -7,7 +7,7 @@
  * AC-005: resend-to-original-email-only, mismatched email returns 404 (no enumeration).
  */
 
-import { getOrderById, type Order } from './orders';
+import { getOrderByNumber, getOrderById, type Order } from './orders';
 import { sendEmailWithRetry } from '@/lib/email/resend';
 import { orderConfirmationTemplate } from '@/lib/email/templates';
 
@@ -24,13 +24,8 @@ export interface OrderLookupResult {
  * Rate limited: 20 req/IP/hour (enforced at middleware level).
  * No enumeration: same error for "not found" and "wrong email".
  */
-export function lookupOrder(
-  email: string,
-  orderNumber: string,
-): OrderLookupResult {
-  // Find order by order number — scan all orders (mock)
-  // In production: SELECT * FROM orders WHERE order_number = $1
-  const order = findOrderByNumber(orderNumber);
+export async function lookupOrder(email: string, orderNumber: string): Promise<OrderLookupResult> {
+  const order = await getOrderByNumber(orderNumber);
 
   if (!order) {
     return { success: false, error: 'NOT_FOUND' };
@@ -55,7 +50,7 @@ export async function resendOrderEmail(
   orderId: string,
   email: string,
 ): Promise<{ success: boolean; error?: string }> {
-  const order = getOrderById(orderId);
+  const order = await getOrderById(orderId);
   if (!order) {
     return { success: false, error: 'NOT_FOUND' };
   }
@@ -96,14 +91,4 @@ export async function resendOrderEmail(
   }
 
   return { success: true };
-}
-
-/**
- * Find order by order number (mock — scans in-memory store).
- */
-function findOrderByNumber(orderNumber: string): Order | null {
-  // Use the same store as getOrderById
-  // In production: SELECT * FROM orders WHERE order_number = $1
-  const order = getOrderById(`order-${orderNumber}`);
-  return order;
 }

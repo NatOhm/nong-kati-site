@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   ShoppingCart,
@@ -25,12 +25,7 @@ import {
 } from 'lucide-react';
 import { AdminShell } from '@/components/layout/AdminShell';
 import { formatThb } from '@/lib/pricing';
-import {
-  getSalesDashboard,
-  getRevenueDashboard,
-  getProductAnalytics,
-  getCustomerAnalytics,
-} from '@/api/analytics';
+import { adminJson } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
 
 // ─── Status Badge ─────────────────────────────────────────
@@ -137,107 +132,137 @@ function Sparkline({ values, color = '#F0A020' }: { values: number[]; color?: st
 }
 
 // ─── Main Dashboard ───────────────────────────────────────
+interface DashboardData {
+  sales: {
+    todayOrders: number;
+    todayRevenue: number;
+    todayCompleted: number;
+    todayFailed: number;
+    pendingManualFulfilment: number;
+    lowStockAlerts: number;
+    weekOrders: number;
+    weekRevenue: number;
+    monthOrders: number;
+    monthRevenue: number;
+    completedOrders: number;
+    itemsSold: number;
+  };
+  revenue: {
+    grossRevenue: number;
+    netRevenue: number;
+    vatCollected: number;
+    refundAmount: number;
+    discountAmount: number;
+    averageOrderValue: number;
+    revenueByDay: { date: string; revenue: number }[];
+    revenueByPaymentMethod: { method: string; count: number; total: number }[];
+  };
+  profitReport: {
+    revenueThb: number;
+    discountsThb: number;
+    costThb: number;
+    grossProfitThb: number;
+  };
+  products: {
+    topProducts: { productId: string; name: string; totalSold: number; totalRevenue: number }[];
+    categoryPerformance: {
+      categoryId: string;
+      name: string;
+      orderCount: number;
+      revenue: number;
+    }[];
+  };
+  customers: {
+    totalCustomers: number;
+    activeCustomers: number;
+    newCustomersThisMonth: number;
+    averageOrdersPerCustomer: number;
+    averageCustomerLifetimeValue: number;
+    returningCustomerRate: number;
+  };
+  stock: {
+    totalUnits: number;
+    variantCount: number;
+    lowStock: { id: string; sku: string; name: string; stock: number; threshold: number }[];
+  };
+  recentOrders: {
+    id: string;
+    customer: string;
+    product: string;
+    amount: number;
+    status: string;
+    time: string;
+    payment: string;
+  }[];
+}
+
+/** Zero-filled shape so the first render never crashes while loading. */
+const EMPTY: DashboardData = {
+  sales: {
+    todayOrders: 0,
+    todayRevenue: 0,
+    todayCompleted: 0,
+    todayFailed: 0,
+    pendingManualFulfilment: 0,
+    lowStockAlerts: 0,
+    weekOrders: 0,
+    weekRevenue: 0,
+    monthOrders: 0,
+    monthRevenue: 0,
+    completedOrders: 0,
+    itemsSold: 0,
+  },
+  revenue: {
+    grossRevenue: 0,
+    netRevenue: 0,
+    vatCollected: 0,
+    refundAmount: 0,
+    discountAmount: 0,
+    averageOrderValue: 0,
+    revenueByDay: Array.from({ length: 7 }, (_, i) => ({ date: '', revenue: 0 })),
+    revenueByPaymentMethod: [],
+  },
+  profitReport: { revenueThb: 0, discountsThb: 0, costThb: 0, grossProfitThb: 0 },
+  products: { topProducts: [], categoryPerformance: [] },
+  customers: {
+    totalCustomers: 0,
+    activeCustomers: 0,
+    newCustomersThisMonth: 0,
+    averageOrdersPerCustomer: 0,
+    averageCustomerLifetimeValue: 0,
+    returningCustomerRate: 0,
+  },
+  stock: { totalUnits: 0, variantCount: 0, lowStock: [] },
+  recentOrders: [],
+};
+
 export default function AdminDashboardPage(): React.JSX.Element {
-  const sales = getSalesDashboard();
-  const revenue = getRevenueDashboard();
-  const products = getProductAnalytics();
-  const customers = getCustomerAnalytics();
+  const [data, setData] = useState<DashboardData>(EMPTY);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'today' | 'week' | 'month'>('today');
 
-  // Mock recent orders
-  const recentOrders = [
-    {
-      id: 'NK-2026-000024',
-      customer: 'kaem@ex...',
-      product: 'Steam Wallet ฿100',
-      amount: 107,
-      status: 'completed',
-      time: '14:22',
-      payment: 'promptpay',
-    },
-    {
-      id: 'NK-2026-000023',
-      customer: 'pim@ex...',
-      product: 'Netflix ฿350',
-      amount: 374.5,
-      status: 'completed',
-      time: '14:18',
-      payment: 'card',
-    },
-    {
-      id: 'NK-2026-000022',
-      customer: 'som@ex...',
-      product: 'Steam Wallet ฿500',
-      amount: 535,
-      status: 'pending_manual_fulfilment',
-      time: '14:05',
-      payment: 'promptpay',
-    },
-    {
-      id: 'NK-2026-000021',
-      customer: 'nisa@ex...',
-      product: 'Google Play ฿200',
-      amount: 214,
-      status: 'completed',
-      time: '13:58',
-      payment: 'promptpay',
-    },
-    {
-      id: 'NK-2026-000020',
-      customer: 'art@ex...',
-      product: 'Apple Gift ฿500',
-      amount: 535,
-      status: 'pending_payment',
-      time: '13:42',
-      payment: 'card',
-    },
-  ];
+  const load = useCallback(async () => {
+    try {
+      const d = await adminJson<DashboardData>('/api/v1/admin/dashboard');
+      setData(d);
+    } catch {
+      // keep zeros on failure — page still renders
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  // Low stock alerts
-  const lowStockItems = [
-    { name: 'Steam Wallet ฿100', sku: 'STEAM-100', stock: 3, threshold: 10 },
-    { name: 'Netflix ฿350', sku: 'NETFLIX-350', stock: 5, threshold: 10 },
-    { name: 'Google Play ฿200', sku: 'GP-200', stock: 4, threshold: 8 },
-  ];
+  useEffect(() => {
+    void load();
+  }, [load]);
 
-  // Customer activity (live feed)
-  const activityFeed = [
-    {
-      type: 'order',
-      text: 'kaem@example.com สั่งซื้อ Steam Wallet ฿100',
-      time: '2 นาทีที่แล้ว',
-      icon: ShoppingCart,
-      color: 'text-jade-600',
-    },
-    {
-      type: 'payment',
-      text: 'pim@example.com ชำระเงิน Netflix ฿350 สำเร็จ',
-      time: '5 นาทีที่แล้ว',
-      icon: CheckCircle2,
-      color: 'text-jade-600',
-    },
-    {
-      type: 'alert',
-      text: 'Stock STEAM-100 ต่ำกว่าเกณฑ์ (3 เหลือ)',
-      time: '12 นาทีที่แล้ว',
-      icon: AlertTriangle,
-      color: 'text-fg-brand',
-    },
-    {
-      type: 'refund',
-      text: 'คืนเงิน NK-000019 จำนวน ฿214',
-      time: '28 นาทีที่แล้ว',
-      icon: RotateCcw,
-      color: 'text-coral-600',
-    },
-    {
-      type: 'signup',
-      text: 'somchai@example.com สมัครสมาชิกใหม่',
-      time: '35 นาทีที่แล้ว',
-      icon: Users,
-      color: 'text-sapphire-700',
-    },
-  ];
+  const sales = data.sales;
+  const revenue = data.revenue;
+  const products = data.products;
+  const customers = data.customers;
+
+  const recentOrders = data.recentOrders;
+  const lowStockItems = data.stock.lowStock;
 
   const tabData = {
     today: { orders: sales.todayOrders, revenue: sales.todayRevenue, label: 'วันนี้' },
@@ -517,23 +542,33 @@ export default function AdminDashboardPage(): React.JSX.Element {
               <span className="flex h-2 w-2 animate-pulse rounded-full bg-jade-500" />
             </div>
             <div className="divide-y divide-clay-200">
-              {activityFeed.map((item, i) => {
-                const Icon = item.icon;
-                return (
+              {recentOrders.length === 0 ? (
+                <p className="px-5 py-6 text-center text-xs text-fg-muted">ยังไม่มีกิจกรรม</p>
+              ) : (
+                recentOrders.map((order) => (
                   <div
-                    key={i}
+                    key={order.id}
                     className="hover:bg-surface/30 flex gap-3 px-5 py-3 transition-colors"
                   >
-                    <div className={cn('mt-0.5 flex-shrink-0', item.color)}>
-                      <Icon size={14} />
+                    <div className="text-jade-600 mt-0.5 flex-shrink-0">
+                      <ShoppingCart size={14} />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs leading-relaxed text-fg-secondary">{item.text}</p>
-                      <p className="mt-0.5 text-[10px] text-clay-400">{item.time}</p>
+                      <p className="text-xs leading-relaxed text-fg-secondary">
+                        {order.customer} สั่งซื้อ {order.product}
+                      </p>
+                      <p className="mt-0.5 text-[10px] text-clay-400">
+                        {new Date(order.time).toLocaleString('th-TH', {
+                          day: 'numeric',
+                          month: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </p>
                     </div>
                   </div>
-                );
-              })}
+                ))
+              )}
             </div>
           </div>
         </div>

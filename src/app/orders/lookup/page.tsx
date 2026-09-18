@@ -23,7 +23,7 @@ export default function OrderLookupPage(): React.JSX.Element {
     setResult(null);
 
     try {
-      const lookupResult = lookupOrder(email, orderNumber);
+      const lookupResult = await lookupOrder(email, orderNumber);
       if (lookupResult.success && lookupResult.order) {
         // Redirect to order detail
         window.location.href = `/orders/${lookupResult.order.confirmationUuid}`;

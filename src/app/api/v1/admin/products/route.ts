@@ -59,19 +59,26 @@ interface VariantInput {
   label?: unknown;
   price?: unknown;
   stock?: unknown;
+  cost?: unknown;
   isActive?: unknown;
 }
 
 /** Validate a variant payload; returns null when the shape is wrong. */
 function parseVariant(
   v: VariantInput,
-): { label: string; price: number; stock: number; isActive: boolean } | null {
+): { label: string; price: number; stock: number; cost: number | null; isActive: boolean } | null {
   if (typeof v.label !== 'string' || v.label.trim() === '') return null;
   const price = typeof v.price === 'number' ? v.price : NaN;
   const stock = typeof v.stock === 'number' ? v.stock : NaN;
   if (!Number.isFinite(price) || price < 0) return null;
   if (!Number.isFinite(stock) || stock < 0 || !Number.isInteger(stock)) return null;
-  return { label: v.label.trim(), price, stock, isActive: v.isActive !== false };
+  // ต้นทุนต่อชิ้น (รายงานกำไร) — ไม่กรอกได้ (null)
+  let cost: number | null = null;
+  if (v.cost !== null && v.cost !== undefined && v.cost !== '') {
+    cost = Number(v.cost);
+    if (!Number.isFinite(cost) || cost < 0) return null;
+  }
+  return { label: v.label.trim(), price, stock, cost, isActive: v.isActive !== false };
 }
 
 /**
@@ -139,6 +146,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           label: v!.label,
           price: v!.price,
           stock: v!.stock,
+          costThb: v!.cost,
           isActive: v!.isActive,
           sortOrder: i,
         })),

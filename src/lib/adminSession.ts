@@ -180,3 +180,16 @@ export async function adminFetchJson(
     body: JSON.stringify(body),
   });
 }
+
+/**
+ * Generic JSON helper: fetches with admin auth, parses the body, and throws
+ * an Error carrying the server's `error` code when the response is not OK.
+ */
+export async function adminJson<T>(url: string, init: RequestInit = {}): Promise<T> {
+  const res = await adminFetch(url, init);
+  const data = (await res.json().catch(() => ({}))) as T & { error?: string };
+  if (!res.ok) {
+    throw new Error(typeof data.error === 'string' ? data.error : `HTTP ${res.status}`);
+  }
+  return data;
+}

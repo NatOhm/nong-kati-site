@@ -81,11 +81,25 @@ export async function PUT(
       if (!label || !Number.isFinite(price) || price < 0 || !Number.isFinite(stock) || stock < 0) {
         return null;
       }
-      return { label, price, stock, isActive };
+      // ต้นทุนต่อชิ้น (รายงานกำไร) — null ได้
+      let cost: number | null = null;
+      if (v['cost'] !== null && v['cost'] !== undefined && v['cost'] !== '') {
+        cost = Number(v['cost']);
+        if (!Number.isFinite(cost) || cost < 0) return null;
+      }
+      return { label, price, stock, isActive, cost };
     });
     if (parsed.some((v) => v === null)) {
       return NextResponse.json({ error: 'INVALID_VARIANT' }, { status: 400 });
     }
+    // Snapshot existing stock so editor-driven changes land in the
+    // ประวัติการจัดสต๊อก (StockMove) audit trail.
+    const beforeVariants = await prisma.productVariant.findMany({
+      where: { productId: id },
+      select: { id: true, label: true, stock: true },
+    });
+    const beforeByLabel = new Map(beforeVariants.map((v) => [v.label, v.stock]));
+
     // OrderItem.variant has onDelete: Restrict, so variants referenced by past
     // orders cannot be replaced wholesale — deactivate them instead, which
     // preserves order history while hiding the old denominations from sale.
@@ -104,6 +118,7 @@ export async function PUT(
           label: v!.label,
           price: v!.price,
           stock: v!.stock,
+          costThb: v!.cost,
           isActive: v!.isActive,
           sortOrder: i,
         })),
@@ -121,6 +136,7 @@ export async function PUT(
                 label: v!.label,
                 price: v!.price,
                 stock: v!.stock,
+                costThb: v!.cost,
                 isActive: v!.isActive,
                 sortOrder: i,
               })),
@@ -128,6 +144,32 @@ export async function PUT(
           },
         }),
       ]);
+    }
+    // Record stock deltas for labels whose stock changed (new labels count
+    // as a restock from zero).
+    const afterVariants = await prisma.productVariant.findMany({
+      where: { productId: id, isActive: true },
+      select: { id: true, label: true, stock: true },
+    });
+    const moves = afterVariants
+      .map((v) => {
+        const beforeStock = beforeByLabel.get(v.label) ?? 0;
+        return { variantId: v.id, delta: v.stock - beforeStock, stockAfter: v.stock };
+      })
+      .filter((m) => m.delta !== 0);
+    if (moves.length > 0) {
+      await prisma.stockMove.createMany({
+        data: moves.map((m) => ({
+          variantId: m.variantId,
+          delta: m.delta,
+          reason: m.delta > 0 ? 'restock' : 'adjust',
+          refType: 'product_edit',
+          note: 'ปรับสต๊อกจากหน้าแก้ไขสินค้า',
+          stockAfter: m.stockAfter,
+          actorType: 'admin',
+          actorId: check.payload?.sub ?? null,
+        })),
+      });
     }
   } else if (Object.keys(data).length > 0) {
     await prisma.product.update({ where: { id }, data });
@@ -150,6 +192,7 @@ export async function PUT(
       label: v.label,
       price: Number(v.price),
       stock: v.stock,
+      cost: v.costThb === null ? null : Number(v.costThb),
       isActive: v.isActive,
       sortOrder: v.sortOrder,
     })),

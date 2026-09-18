@@ -5,7 +5,7 @@ import { checkPermission } from '@/lib/rbac';
 
 export const dynamic = 'force-dynamic';
 
-const VALID_KEYS = new Set(['appearance', 'store-info']);
+const VALID_KEYS = new Set(['appearance', 'store-info', 'notifications']);
 
 function bearer(req: NextRequest): string | null {
   const header = req.headers.get('authorization');
@@ -99,6 +99,29 @@ export async function PUT(
     next = {};
     if (accent !== undefined) next['accent'] = accent ?? null;
     if (speed !== undefined) next['speed'] = speed;
+  } else if (key === 'notifications') {
+    // Discord webhook + low-stock threshold (แจ้งเตือน Discord / สต๊อกใกล้หมด).
+    next = {};
+    if (b['discordWebhookUrl'] === null || typeof b['discordWebhookUrl'] === 'string') {
+      const url = b['discordWebhookUrl'];
+      if (url === null || url === '') {
+        next['discordWebhookUrl'] = null;
+      } else if (
+        typeof url === 'string' &&
+        /^https:\/\/(canary\.|ptb\.)?discord(app)?\.com\/api\/webhooks\//.test(url)
+      ) {
+        next['discordWebhookUrl'] = url.trim();
+      } else {
+        return NextResponse.json({ error: 'INVALID_WEBHOOK_URL' }, { status: 400 });
+      }
+    }
+    if (b['lowStockThreshold'] !== undefined) {
+      const t = Number(b['lowStockThreshold']);
+      if (!Number.isInteger(t) || t < 0 || t > 1000) {
+        return NextResponse.json({ error: 'INVALID_THRESHOLD' }, { status: 400 });
+      }
+      next['lowStockThreshold'] = t;
+    }
   } else {
     // store-info: whitelist string fields.
     next = {};

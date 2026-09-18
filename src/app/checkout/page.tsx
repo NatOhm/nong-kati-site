@@ -14,9 +14,9 @@ import { OrderSummaryPanel } from '@/components/checkout/OrderSummaryPanel';
 import { TrustBadgeRow } from '@/components/checkout/TrustBadgeRow';
 import { CartIcon } from '@/components/cart/CartIcon';
 import { useCart } from '@/hooks/useCart';
-import { createOrder, type Order } from '@/api/orders';
-import { initiatePayment, getPaymentStatus } from '@/api/payments';
+import { apiCreateOrder, apiInitiatePayment, apiPollPayment, type Order } from '@/api/orderClient';
 import { formatThb } from '@/lib/pricing';
+import { cn } from '@/utils/cn';
 
 /** Map internal error codes to Thai copy users can act on — never raw codes. */
 function friendlyOrderError(err: unknown): string {
@@ -30,12 +30,24 @@ function friendlyOrderError(err: unknown): string {
       return 'รูปแบบอีเมลไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง';
     case 'TOS_NOT_ACCEPTED':
       return 'กรุณายอมรับเงื่อนไขการใช้งานก่อนดำเนินการต่อ';
+    case 'VARIANT_NOT_FOUND':
+      return 'สินค้าบางรายการไม่พร้อมขายแล้ว — กรุณาลบออกจากตะกร้าแล้วเพิ่มใหม่';
     case 'PAYMENT_INIT_FAILED':
       return 'สร้างรายการชำระเงินไม่สำเร็จ กรุณาลองอีกครั้ง';
     default:
       return 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง หากยังมีปัญหาติดต่อฝ่ายสนับสนุน';
   }
 }
+
+/** Coupon error codes → Thai copy. */
+const COUPON_ERRORS: Record<string, string> = {
+  INACTIVE: 'โค้ดส่วนลดไม่ถูกต้องหรือถูกปิดใช้งาน',
+  NOT_STARTED: 'โค้ดนี้ยังไม่เริ่มใช้ได้',
+  EXPIRED: 'โค้ดนี้หมดอายุแล้ว',
+  MIN_SPEND: 'ยอดซื้อไม่ถึงขั้นต่ำของโค้ดนี้',
+  USAGE_LIMIT: 'โค้ดนี้ถูกใช้ครบจำนวนแล้ว',
+  INVALID: 'กรุณากรอกโค้ดส่วนลด',
+};
 
 /**
  * Checkout page — 2-step flow with real payment initiation.
@@ -58,6 +70,35 @@ export default function CheckoutPage(): React.JSX.Element {
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [couponInput, setCouponInput] = useState('');
+  const [couponApplied, setCouponApplied] = useState<{ code: string; discountThb: number } | null>(
+    null,
+  );
+  const [couponMsg, setCouponMsg] = useState<string | null>(null);
+
+  // Validate + stage a coupon code (server check; applied on order create).
+  const handleApplyCoupon = useCallback(async () => {
+    const code = couponInput.trim().toUpperCase();
+    if (!code || !cart) return;
+    setCouponMsg(null);
+    try {
+      const res = await fetch('/api/v1/coupons/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, subtotalThb: cart.summary.subtotalThb }),
+      });
+      const data = await res.json();
+      if (data?.ok) {
+        setCouponApplied({ code, discountThb: data.discountThb });
+        setCouponMsg(`ใช้โค้ด ${code} แล้ว — ลด ${formatThb(data.discountThb)}`);
+      } else {
+        setCouponApplied(null);
+        setCouponMsg(COUPON_ERRORS[data?.error as string] ?? 'โค้ดส่วนลดไม่ถูกต้อง');
+      }
+    } catch {
+      setCouponMsg('ตรวจสอบโค้ดไม่สำเร็จ กรุณาลองใหม่');
+    }
+  }, [couponInput, cart]);
 
   // Step 1: Submit contact info → create order → advance to Step 2
   const handleContactSubmit = useCallback(
@@ -71,95 +112,85 @@ export default function CheckoutPage(): React.JSX.Element {
       setError(null);
 
       try {
-        const newOrder = createOrder(
+        const result = await apiCreateOrder(
           {
-            sessionKey: cart.sessionKey,
-            customerEmail: data.email,
-            paymentMethod:
-              paymentMethod === 'card' ? ('credit_card' as const) : ('promptpay' as const),
-            lineOptIn: false,
+            email: data.email,
+            ...(data.phone ? { phone: data.phone } : {}),
             marketingOptIn: data.marketingOptIn,
             tosAccepted: data.tosAccepted,
-            tosVersion: '1.0',
             requiresTaxInvoice: data.requiresTaxInvoice,
-            ...(data.phone ? { customerPhone: data.phone } : {}),
             ...(data.requiresTaxInvoice
               ? { taxInvoiceName: data.taxInvoiceName, taxInvoiceTaxId: data.taxInvoiceTaxId }
               : {}),
           },
           cart,
+          couponApplied?.code,
         );
 
         setContactData(data);
-        setOrder(newOrder);
+        setOrder(result.order);
         setCompletedSteps([1]);
         setStep(2);
 
         // Auto-initiate payment
-        await handleInitiatePayment(newOrder);
+        await handleInitiatePayment(result.order.id);
       } catch (err) {
         setError(friendlyOrderError(err));
       } finally {
         setLoading(false);
       }
     },
-    [cart, paymentMethod],
+    [cart, paymentMethod, couponApplied],
   );
 
   // Initiate payment
-  const handleInitiatePayment = useCallback(
-    async (targetOrder: Order) => {
-      setLoading(true);
-      setError(null);
+  const handleInitiatePayment = useCallback(async (orderId: string) => {
+    setLoading(true);
+    setError(null);
 
-      try {
-        const result = await initiatePayment(
-          targetOrder.id,
-          paymentMethod === 'card' ? 'credit_card' : 'promptpay',
-          targetOrder,
-        );
+    try {
+      const result = await apiInitiatePayment(orderId);
 
-        setPaymentState({
-          attemptId: result.paymentAttemptId,
-          qrImageUrl: result.qrImageUrl as string | undefined,
-          qrExpiresAt: result.qrExpiresAt ? new Date(result.qrExpiresAt) : undefined,
-          gatewayRef: result.gatewayRef as string | undefined,
-          status: 'pending',
-        } as any);
+      setPaymentState({
+        attemptId: result.paymentAttemptId,
+        qrImageUrl: result.qrImageUrl as string | undefined,
+        qrExpiresAt: result.qrExpiresAt ? new Date(result.qrExpiresAt) : undefined,
+        gatewayRef: result.gatewayRef as string | undefined,
+        status: 'pending',
+      } as any);
 
-        // Start polling for PromptPay
-        if (paymentMethod === 'promptpay' && result.qrExpiresAt) {
-          startPaymentPolling(result.paymentAttemptId);
-        }
-      } catch (err) {
-        setError(friendlyOrderError(err));
-      } finally {
-        setLoading(false);
+      // Start polling for PromptPay
+      if (result.qrExpiresAt) {
+        startPaymentPolling(result.paymentAttemptId);
       }
-    },
-    [paymentMethod],
-  );
+    } catch (err) {
+      setError(friendlyOrderError(err));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   // Poll payment status (every 3 seconds for PromptPay)
-  const startPaymentPolling = useCallback(
-    (attemptId: string) => {
-      const interval = setInterval(() => {
-        const status = getPaymentStatus(attemptId);
-        if (status && status.status === 'succeeded') {
+  const startPaymentPolling = useCallback((attemptId: string) => {
+    const interval = setInterval(async () => {
+      try {
+        const status = await apiPollPayment(attemptId);
+        if (status.status === 'succeeded') {
           clearInterval(interval);
           setPaymentState((prev) => (prev ? { ...prev, status: 'succeeded' } : null));
           // Redirect to confirmation
-          if (order) {
-            window.location.href = `/checkout/confirmation/${order.confirmationUuid}`;
+          if (status.confirmationUuid) {
+            window.location.href = `/checkout/confirmation/${status.confirmationUuid}`;
           }
         }
-      }, 3000);
+      } catch {
+        // transient poll failure — retry on next tick
+      }
+    }, 3000);
 
-      // Stop polling after 15 minutes (QR expiry)
-      setTimeout(() => clearInterval(interval), 15 * 60 * 1000);
-    },
-    [order],
-  );
+    // Stop polling after 15 minutes (QR expiry)
+    setTimeout(() => clearInterval(interval), 15 * 60 * 1000);
+  }, []);
 
   // Handle QR expiry
   const handleQrExpire = useCallback(() => {
@@ -237,6 +268,41 @@ export default function CheckoutPage(): React.JSX.Element {
             <div className="rounded-md border border-line-subtle bg-white p-6">
               <h2 className="mb-4 text-lg font-semibold text-fg">ข้อมูลการติดต่อ</h2>
               <ContactForm onSubmit={handleContactSubmit} loading={loading} />
+
+              {/* Coupon code (คูปองส่วนลด) */}
+              <div className="mt-6 border-t border-line-subtle pt-4">
+                <label htmlFor="coupon-code" className="mb-1.5 block text-sm font-medium text-fg">
+                  โค้ดส่วนลด (ถ้ามี)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    id="coupon-code"
+                    type="text"
+                    value={couponInput}
+                    onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                    placeholder="เช่น SUMMER10"
+                    className="h-10 flex-1 rounded-md border border-line bg-surface px-3 text-sm text-fg placeholder:text-fg-placeholder focus:border-clay-400 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleApplyCoupon}
+                    disabled={!couponInput.trim()}
+                    className="h-10 shrink-0 rounded-md bg-surface-brand px-4 text-sm font-semibold text-fg-inverse shadow-clay-brand transition-all duration-interactive ease-ease-out hover:scale-[1.02] active:scale-[0.96] disabled:opacity-50"
+                  >
+                    ใช้โค้ด
+                  </button>
+                </div>
+                {couponMsg && (
+                  <p
+                    className={cn(
+                      'mt-1.5 text-xs',
+                      couponApplied ? 'text-jade-600' : 'text-coral-600',
+                    )}
+                  >
+                    {couponMsg}
+                  </p>
+                )}
+              </div>
             </div>
           )}
 
@@ -273,7 +339,7 @@ export default function CheckoutPage(): React.JSX.Element {
                           QR หมดอายุ — กรุณาสร้าง QR ใหม่
                         </div>
                         <button
-                          onClick={() => order && handleInitiatePayment(order)}
+                          onClick={() => order && handleInitiatePayment(order.id)}
                           className="w-full rounded-md bg-peach-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-peach-400"
                         >
                           สร้าง QR ใหม่
