@@ -15,6 +15,7 @@ import {
   Download,
   FileText,
   Star,
+  Heart,
   Headphones,
   Settings,
   LogOut,
@@ -27,6 +28,9 @@ import {
 
 const NAV_ITEMS = [
   { label: 'ภาพรวม', href: '/account/dashboard', icon: LayoutDashboard },
+  { label: 'สินค้าทั้งหมด', href: '/search', icon: ShoppingBag },
+  { label: 'แนะนำ', href: '/search?sort=featured', icon: Star },
+  { label: 'รายการโปรด', href: '/account/wishlist', icon: Heart },
   { label: 'คำสั่งซื้อ', href: '/account/orders', icon: ShoppingBag },
   { label: 'โค้ดที่ซื้อ', href: '/account/codes', icon: Key },
   { label: 'ใบเสร็จ', href: '/account/downloads', icon: Download },

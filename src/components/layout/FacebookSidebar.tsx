@@ -5,7 +5,6 @@ import { usePathname } from 'next/navigation';
 import {
   Home,
   Grid3X3,
-  Tag,
   ShoppingBag,
   MessageCircle,
   ChevronDown,
@@ -13,9 +12,7 @@ import {
   Tv,
   Gamepad2,
   Music,
-  Headphones,
-  MonitorPlay,
-  Zap,
+  Scissors,
   X,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
@@ -25,10 +22,10 @@ import { useState, useEffect, useRef, useCallback, type MouseEventHandler } from
 const NAV_ITEMS = [
   { icon: Home, href: '/', label: 'หน้าหลัก', color: 'text-fg-brand' },
   { icon: Grid3X3, href: '/search', label: 'สินค้าทั้งหมด', color: 'text-sapphire-400' },
-  { icon: Tv, href: '/category/netflix', label: 'Netflix', color: 'text-coral-500' },
-  { icon: Gamepad2, href: '/category/hbo-max', label: 'HBO Max', color: 'text-jade-500' },
-  { icon: Music, href: '/category/spotify', label: 'Spotify', color: 'text-pink-400' },
-  { icon: Tag, href: '/search', label: 'โปรโมชั่น', color: 'text-red-400' },
+  { icon: Tv, href: '/category/movie-series', label: 'ดูหนัง/ซีรีส์', color: 'text-coral-500' },
+  { icon: Music, href: '/category/music', label: 'ดนตรี', color: 'text-pink-400' },
+  { icon: Gamepad2, href: '/category/chinese-apps', label: 'แอปจีน', color: 'text-jade-500' },
+  { icon: Scissors, href: '/category/editing', label: 'แอปตัดต่อ', color: 'text-purple-400' },
   { icon: ShoppingBag, href: '/orders/lookup', label: 'คำสั่งซื้อ', color: 'text-orange-400' },
   {
     icon: MessageCircle,
@@ -36,14 +33,6 @@ const NAV_ITEMS = [
     label: 'ติดตามคำสั่งซื้อ',
     color: 'text-teal-400',
   },
-];
-
-const SHORTCUTS = [
-  { icon: MonitorPlay, label: 'HBO MAX', href: '/category/hbo-max', color: 'bg-purple-600' },
-  { icon: Tv, label: 'Netflix', href: '/category/netflix', color: 'bg-red-600' },
-  { icon: Headphones, label: 'Spotify', href: '/category/spotify', color: 'bg-green-600' },
-  { icon: Zap, label: 'YouTube Premium', href: '/category/youtube-premium', color: 'bg-red-500' },
-  { icon: Gamepad2, label: 'iQIYI', href: '/category/iqiyi', color: 'bg-blue-600' },
 ];
 
 interface FacebookSidebarProps {
@@ -144,39 +133,6 @@ function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
             <span>{showMore ? 'แสดงน้อยลง' : 'ดูเพิ่มเติม'}</span>
           </button>
         </nav>
-
-        {/* Divider */}
-        <div className="my-4 h-px bg-line" />
-
-        {/* Shortcuts */}
-        <div>
-          <h3 className="mb-3 px-3 text-xs font-semibold uppercase tracking-wider text-fg-placeholder">
-            ทางลัดของคุณ
-          </h3>
-          <div className="space-y-1">
-            {SHORTCUTS.map((shortcut) => {
-              const Icon = shortcut.icon;
-              return (
-                <Link
-                  key={shortcut.href}
-                  href={shortcut.href}
-                  onClick={linkClickHandler}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-fg-secondary transition-all duration-150 hover:bg-surface-sunken hover:text-fg"
-                >
-                  <div
-                    className={cn(
-                      'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg',
-                      shortcut.color,
-                    )}
-                  >
-                    <Icon size={18} className="text-white" strokeWidth={1.5} />
-                  </div>
-                  <span className="truncate">{shortcut.label}</span>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
       </div>
 
       {/* Footer copyright */}
@@ -229,13 +185,9 @@ export function FacebookSidebar({
 
   return (
     <>
-      {/* Desktop sidebar - scrollable within page flow */}
-      <aside className="hidden w-[280px] shrink-0 lg:block">
-        <div className="sticky top-16 z-40 h-[calc(100vh-64px)] w-[280px] overflow-y-auto border-r border-line-subtle bg-surface-base">
-          <SidebarContent />
-        </div>
-      </aside>
-
+      {/* Client ask: "เอาด้านข้างออก เหลือไว้แค่ด้านบน" — the always-visible
+          desktop rail is gone; the top navbar is the only nav on desktop.
+          The mobile drawer stays (it IS the hamburger menu). */}
       {/* Mobile drawer - slide from left with matching slide-out */}
       {shown && (
         <>

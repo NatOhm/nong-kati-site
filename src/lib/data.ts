@@ -101,6 +101,8 @@ export async function getTopLevelCategories(): Promise<CategoryItem[]> {
 
 /**
  * Get categories with product counts (for homepage cards).
+ * Parent categories show the SUBTREE total (own + all descendants), so a
+ * type-level group like แอปดูหนัง/ซีรีส์ counts every app nested under it.
  */
 export async function getCategoriesWithProductCounts(): Promise<
   (CategoryItem & { productCount: number })[]
@@ -109,17 +111,48 @@ export async function getCategoriesWithProductCounts(): Promise<
     orderBy: { sortOrder: 'asc' },
     include: { _count: { select: { products: true } } },
   });
-  // Build flat list with product counts (no tree nesting needed for homepage)
+  const ownCount = new Map(cats.map((c) => [c.id, c._count.products]));
   const countMap = new Map(cats.map((c) => [c.id, c._count.products]));
+  // Aggregate up the tree: children first (flat list is sorted, but do a
+  // proper reverse pass so depth > 2 also lands correctly).
+  const byId = new Map(cats.map((c) => [c.id, c]));
+  for (const c of [...cats].reverse()) {
+    if (c.parentId) {
+      countMap.set(c.parentId, (countMap.get(c.parentId) ?? 0) + (countMap.get(c.id) ?? 0));
+    }
+  }
+  void byId;
   const tree = buildCategoryTree(cats);
   function enrich(nodes: CategoryItem[]): (CategoryItem & { productCount: number })[] {
     return nodes.map((n) => ({
       ...n,
-      productCount: countMap.get(n.id) ?? 0,
+      productCount: countMap.get(n.id) ?? ownCount.get(n.id) ?? 0,
       children: enrich(n.children),
     }));
   }
   return enrich(tree);
+}
+
+/** All descendant category ids of a category (excluding itself). */
+async function getDescendantIds(categoryId: string): Promise<string[]> {
+  const cats = await prisma.category.findMany({ select: { id: true, parentId: true } });
+  const childrenOf = new Map<string, string[]>();
+  for (const c of cats) {
+    if (c.parentId) {
+      const list = childrenOf.get(c.parentId) ?? [];
+      list.push(c.id);
+      childrenOf.set(c.parentId, list);
+    }
+  }
+  const out: string[] = [];
+  const walk = (id: string) => {
+    for (const child of childrenOf.get(id) ?? []) {
+      out.push(child);
+      walk(child);
+    }
+  };
+  walk(categoryId);
+  return out;
 }
 
 export async function getCategoryTree(): Promise<CategoryItem[]> {
@@ -208,9 +241,14 @@ export async function getProductsByCategory(
   const cat = await prisma.category.findUnique({ where: { slug } });
   if (!cat) return { products: [], total: 0 };
 
+  // Type-level parent categories show every product in their subtree.
+  const descendantIds = await getDescendantIds(cat.id);
+  const categoryIds = [cat.id, ...descendantIds];
+  const where = { categoryId: { in: categoryIds }, isActive: true };
+
   const [products, total] = await Promise.all([
     prisma.product.findMany({
-      where: { categoryId: cat.id, isActive: true },
+      where,
       include: {
         category: { select: { id: true, name: true, slug: true } },
         variants: { orderBy: { sortOrder: 'asc' } },
@@ -220,7 +258,7 @@ export async function getProductsByCategory(
       take: limit,
       orderBy: { createdAt: 'desc' },
     }),
-    prisma.product.count({ where: { categoryId: cat.id, isActive: true } }),
+    prisma.product.count({ where }),
   ]);
 
   return {
@@ -404,7 +442,10 @@ export async function getSearchSuggestions(
   const products = await prisma.product.findMany({
     where: {
       isActive: true,
-      name: { contains: trimmed, mode: 'insensitive' },
+      OR: [
+        { name: { contains: trimmed, mode: 'insensitive' } },
+        { aliases: { some: { alias: { contains: trimmed, mode: 'insensitive' } } } },
+      ],
     },
     include: { category: { select: { name: true } } },
     take: limit,
@@ -415,6 +456,37 @@ export async function getSearchSuggestions(
     slug: p.slug,
     categoryName: p.category.name,
   }));
+}
+
+/**
+ * Wishlist products for the profile รายการโปรด tab — newest wish first.
+ */
+export async function getWishlistProducts(customerId: string): Promise<ProductItem[]> {
+  const wishes = await prisma.wishlistItem.findMany({
+    where: { customerId },
+    orderBy: { createdAt: 'desc' },
+    include: {
+      product: {
+        include: {
+          category: { select: { id: true, name: true, slug: true } },
+          variants: { where: { isActive: true }, orderBy: { sortOrder: 'asc' } },
+          aliases: true,
+        },
+      },
+    },
+  });
+  return wishes
+    .filter((w) => w.product.isActive)
+    .map((w) => mapProduct(w.product, w.product.category));
+}
+
+/** Ids the customer has wished — for heart states on cards. */
+export async function getWishlistIds(customerId: string): Promise<string[]> {
+  const rows = await prisma.wishlistItem.findMany({
+    where: { customerId },
+    select: { productId: true },
+  });
+  return rows.map((r) => r.productId);
 }
 
 // ─── Site Settings (announcement bar etc.) ──────────────

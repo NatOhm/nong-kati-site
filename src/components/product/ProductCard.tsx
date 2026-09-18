@@ -9,6 +9,7 @@ import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/useToast';
 import { QuickViewModal, type QuickViewVariant } from './QuickViewModal';
 import { StockBadge } from './StockBadge';
+import { WishlistButton } from './WishlistButton';
 
 export interface ProductCardProps {
   id: string;
@@ -39,6 +40,7 @@ type BuyState = 'idle' | 'pending' | 'added';
  * pick a denomination. Stock urgency line shows when stock runs low.
  */
 export function ProductCard({
+  id,
   name,
   slug,
   shortDescription,
@@ -128,6 +130,11 @@ export function ProductCard({
             {/* Stock badge overlay */}
             <div className="absolute right-2 top-2">
               <StockBadge stock={stock} />
+            </div>
+            {/* Wishlist heart (รายการโปรด) — outside the link so taps
+                never navigate */}
+            <div className="absolute left-2 top-2">
+              <WishlistButton productId={id} />
             </div>
           </div>
 

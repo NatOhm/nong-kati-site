@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -27,12 +27,18 @@ interface FacebookNavbarProps {
   onMenuToggle?: () => void;
 }
 
+interface SearchSuggestion {
+  name: string;
+  slug: string;
+  categoryName: string;
+}
+
 const NAV_ITEMS = [
   { icon: AcornIcon, href: '/', label: 'หน้าหลัก' },
   { icon: Grid3X3, href: '/search', label: 'สินค้าทั้งหมด' },
-  { icon: Gamepad2, href: '/category/hbo-max', label: 'HBO Max' },
-  { icon: Tv, href: '/category/netflix', label: 'Netflix' },
-  { icon: Music, href: '/category/spotify', label: 'Spotify' },
+  { icon: Tv, href: '/category/movie-series', label: 'ดูหนัง/ซีรีส์' },
+  { icon: Music, href: '/category/music', label: 'ดนตรี' },
+  { icon: Gamepad2, href: '/category/chinese-apps', label: 'แอปจีน' },
 ];
 
 export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
@@ -43,6 +49,7 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
   const { cart, updateQuantity, removeItem, itemCount } = useCart();
   const [searchFocused, setSearchFocused] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
 
   const handleSearch = (e: React.FormEvent) => {
@@ -51,6 +58,22 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
       window.location.href = `/search?q=${encodeURIComponent(searchQuery.trim())}`;
     }
   };
+
+  // Google-style suggestions: debounced live lookups as you type.
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (q.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    const t = setTimeout(() => {
+      fetch(`/api/v1/search/suggest?q=${encodeURIComponent(q)}`)
+        .then((r) => (r.ok ? r.json() : { suggestions: [] }))
+        .then((d: { suggestions?: SearchSuggestion[] }) => setSuggestions(d.suggestions ?? []))
+        .catch(() => setSuggestions([]));
+    }, 250);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
 
   return (
     <>
@@ -79,9 +102,8 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
               </span>
             </Link>
 
-            {/* Search bar — mascot peeks over the edge while you type */}
-            <form onSubmit={handleSearch} className="hidden md:block">
-              {' '}
+            {/* Search bar — suggestions slide down Google-style as you type */}
+            <form onSubmit={handleSearch} className="relative hidden md:block">
               <div
                 className={cn(
                   'shadow-inset-sm group/search relative flex items-center gap-2 rounded-full border bg-surface-elevated px-3 py-2 transition-all duration-interactive ease-ease-out',
@@ -104,15 +126,52 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
                 <Search size={16} className="text-fg-placeholder" />
                 <input
                   type="text"
+                  role="combobox"
+                  aria-expanded={searchFocused && suggestions.length > 0}
+                  aria-controls="nav-search-suggest"
                   aria-label="ค้นหาสินค้า"
                   placeholder="ค้นหาสินค้า…"
+                  autoComplete="off"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onFocus={() => setSearchFocused(true)}
                   onBlur={() => setSearchFocused(false)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') setSuggestions([]);
+                  }}
                   className="placeholder:text-clay-9000 w-48 bg-transparent text-sm text-fg focus:outline-none lg:w-64"
                 />
               </div>
+
+              {/* Suggestion dropdown — mousedown navigates before the input's
+                  blur can hide the list */}
+              {searchFocused && suggestions.length > 0 && (
+                <div
+                  id="nav-search-suggest"
+                  role="listbox"
+                  aria-label="คำค้นแนะนำ"
+                  className="clay-card suggest-drop absolute left-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-2xl p-1.5"
+                >
+                  {suggestions.map((s) => (
+                    <button
+                      key={s.slug}
+                      type="button"
+                      role="option"
+                      aria-selected={false}
+                      onMouseDown={() => {
+                        window.location.href = `/product/${s.slug}`;
+                      }}
+                      className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2.5 text-left transition-colors duration-fast hover:bg-surface-sunken"
+                    >
+                      <Search size={14} className="shrink-0 text-fg-placeholder" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium text-fg">{s.name}</span>
+                        <span className="block text-xs text-fg-muted">{s.categoryName}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </form>
           </div>
 

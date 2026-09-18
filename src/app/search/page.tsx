@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
+import { Suspense } from 'react';
 
 import { FacebookLayout } from '@/components/layout/FacebookLayout';
 import { Footer } from '@/components/layout/Footer';
@@ -7,6 +8,7 @@ import { PageShell } from '@/components/layout/PageShell';
 import { ProductCard } from '@/components/product/ProductCard';
 import { ProductGrid } from '@/components/product/ProductGrid';
 import { Breadcrumb } from '@/components/data-display/Breadcrumb';
+import { CatalogSearchBox } from '@/components/search/CatalogSearchBox';
 import { HamsterMascot } from '@/components/ui/ClayIcons';
 
 import { getCatalogProducts, getCategoriesWithProductCounts, type CatalogSort } from '@/lib/data';
@@ -95,6 +97,14 @@ export default async function SearchPage({
                   : { label: query ? 'ค้นหาสินค้า' : 'สินค้าทั้งหมด' },
               ]}
             />
+
+            {/* Live search with Google-style suggestions — client ask;
+                the navbar box is md+ only, phones search here */}
+            <section className="pb-6">
+              <Suspense fallback={<div className="h-11" />}>
+                <CatalogSearchBox className="max-w-xl" />
+              </Suspense>
+            </section>
 
             {/* Header */}
             <section className="pb-6">
