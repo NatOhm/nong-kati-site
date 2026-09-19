@@ -35,7 +35,8 @@ const jetbrainsMono = JetBrains_Mono({
 // 14-seo.md §2.1 — root metadata defaults. <NK_DOMAIN> resolved at M10 per that
 // document's placeholder convention; a safe local fallback is used until then.
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env['NEXT_PUBLIC_SITE_URL'] ?? 'http://localhost:3000'),
+  // Canonical production origin — localhost fallback only affects local dev.
+  metadataBase: new URL(process.env['NEXT_PUBLIC_SITE_URL'] ?? 'https://nong-kati.vercel.app'),
   title: {
     template: '%s — Nong-Kati',
     default: 'ซื้อบัตรเกม Netflix Steam และอื่นๆ — Nong-Kati',

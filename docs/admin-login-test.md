@@ -106,31 +106,55 @@ WHERE email='admin@nong-kati.co.th';
 
 ## 4b. RBAC spot checks (limited accounts)
 
-Log in as each seeded limited account and verify both sides of the matrix:
+Log in as each seeded limited account and verify both sides of the matrix.
+Permissions come from `ROLE_PERMISSIONS` in `src/types/auth.ts` and are
+embedded in the JWT at issuance.
 
-| Caller            | `GET /api/v1/admin/products` | `GET /api/v1/admin/categories` | `GET /api/v1/admin/announcement` | `POST change-password` (self) |
-| ----------------- | ---------------------------- | ------------------------------ | -------------------------------- | ----------------------------- |
-| catalogue_manager | **200**                      | **200**                        | 403                              | 200/400                       |
-| order_manager     | 403                          | 403                            | 403                              | 200/400                       |
+| Caller            | products | categories | inventory | coupons | orders  | announcement | change-password (self) |
+| ----------------- | -------- | ---------- | --------- | ------- | ------- | ------------ | ---------------------- |
+| catalogue_manager | **200**  | **200**    | **200**   | **200** | 403     | 403          | 200/400                |
+| order_manager     | 403      | 403        | 403       | 403     | **200** | 403          | 200/400                |
 
 (change-password returns 400 for a wrong current password — that's the
 allowed self-service path reaching validation.)
 
-Also check the sidebar: catalogue_manager sees สินค้า/หมวดหมู่/คลังสินค้า,
-order_manager sees คำสั่งซื้อ/ลูกค้า — never each other's items.
+Also check the sidebar (it filters by the same permissions):
+
+catalogue_manager sees แดชบอร์ด / สินค้า / หมวดหมู่ / คลังสินค้า;
+order_manager sees คำสั่งซื้อ / ลูกค้า (the dashboard item requires
+`products:read`, so they don't get it either) — never each other's items.
+Note the sidebar has no คูปอง entry yet even for roles that hold
+`coupons:read` — reach it directly at `/management/coupons`.
 
 ## 5. What login unlocks (smoke test)
 
-After logging in, confirm each admin page loads its real data:
+After logging in, confirm each admin page loads. Data sources differ —
+real Prisma-backed pages and M7 placeholders are marked so you know what
+a bug vs a stub looks like:
 
-| Page                                     | Should show                                                 |
-| ---------------------------------------- | ----------------------------------------------------------- |
-| `/management/dashboard`                  | Stat cards, sales summary                                   |
-| `/management/products`                   | All 37 real DB products with images, edit + archive buttons |
-| `/management/settings` → แถบประกาศ       | Current announcement from DB, editable                      |
-| `/management/settings` → ธีมและแอนิเมชัน | 6 accent swatches + 4 speed presets + live preview          |
-| `/management/settings` → ร้านค้า         | Store-info form (name, phone, email, LINE, Facebook)        |
-| `/management/orders`                     | Orders list                                                 |
+| Page                     | Data             | Should show                                                                                         |
+| ------------------------ | ---------------- | --------------------------------------------------------------------------------------------------- |
+| `/management/dashboard`  | **real DB**      | Sales stats from `/api/v1/admin/dashboard` (Prisma aggregates)                                      |
+| `/management/products`   | **real DB**      | All 37 products; edit SKU/name/price/cost/stock/description/image; archive; show/hide               |
+| `/management/categories` | **real DB**      | Type-level category tree — add/rename/reorder groups, move app categories between groups            |
+| `/management/inventory`  | **real DB**      | All 37 products with SKU; edit price/stock; hide/show (instantly off the storefront); stock history |
+| `/management/orders`     | **real DB**      | Orders from `/api/v1/admin/orders`; detail + **ยืนยันการชำระเงิน** (verify-payment)                 |
+| `/management/coupons`    | **real DB**      | Coupon CRUD (bath/percent, min spend, expiry). No sidebar link yet — open the URL directly          |
+| `/management/customers`  | M7 mock          | Customer list UI on placeholder data (Prisma migration pending)                                     |
+| `/management/staff`      | M7 mock          | Staff CRUD UI on placeholder data (the real accounts come from the seed table above)                |
+| `/management/reports`    | static catalogue | Report cards with export buttons (no live metrics yet)                                              |
+| `/management/audit`      | in-memory        | Audit log filter/search (resets on server restart)                                                  |
+| `/management/settings`   | **real DB**      | 7 tabs: แถบประกาศ · ธีมและแอนิเมชัน · ร้านค้า · การชำระเงิน · อีเมล · ความปลอดภัย · การแจ้งเตือน    |
+
+Settings specifics worth exercising:
+
+- **แถบประกาศ** — the striped banner above the storefront; edits go live
+  on the site after save.
+- **ธีมและแอนิเมชัน** — 6 accent swatches + 4 speed presets (550ms is the
+  designed default) with live preview; the accent regenerates the whole
+  peach ramp.
+- **การแจ้งเตือน** — Discord webhook for new orders and low-stock alerts.
+- **ความปลอดภัย** — change password (see §7).
 
 Quick authorization check (logged out, e.g. incognito):
 
@@ -202,16 +226,30 @@ refresh token also returns `TOKEN_INVALID`.
 
 ## 8. Checklist (print-friendly)
 
-- [ ] Happy path: login → 2FA → dashboard
-- [ ] Tokens appear in localStorage; admin API accepts the access token
-- [ ] Corrupt the access token, reload /management/products — page still loads (silent refresh)
-- [ ] Garbage refresh token → redirected to login, storage cleared
-- [ ] Logout button → AdminSession row revoked in DB
-- [ ] Wrong password shows Thai error, no lock on 1st try
-- [ ] 5 wrong passwords lock the account for 15 min (persists across restart)
-- [ ] Wrong TOTP code rejected, stays on 2FA step
-- [ ] Expired challenge returns user to credentials step with notice
-- [ ] Logged-out admin API returns 401; forged token 403
-- [ ] Products page lists 37 DB products
-- [ ] After 15 min, admin APIs return 401 → re-login works
-- [ ] Change password: wrong current pw rejected; mismatch/short rejected; success logs you out → new password works, old one doesn't
+> **2026-09-19: 28/28 items below verified passing** via an automated E2E
+> run against the real API surface (throwaway admin account, real TOTP
+> codes, real DB; all test rows cleaned up afterward). Evidence lines
+> showed exact status codes and payloads. Rerun anytime with the script
+> pattern in §6 plus the TOTP helper described in §7.
+
+- [x] Happy path: login → 2FA → dashboard
+- [x] Tokens appear in localStorage; admin API accepts the access token
+- [x] Corrupt the access token, reload /management/products — page still loads (silent refresh)
+- [x] Garbage refresh token → redirected to login, storage cleared
+- [x] Logout button → AdminSession row revoked in DB
+- [x] Wrong password shows Thai error, no lock on 1st try
+- [x] 5 wrong passwords lock the account for 15 min (persists across restart)
+- [x] Wrong TOTP code rejected, stays on 2FA step
+- [x] Expired challenge returns user to credentials step with notice
+- [x] **Challenge is single-use** — a consumed challenge replayed against
+      the 2FA endpoint returns `TOKEN_INVALID` (enforced by the
+      `AdminChallengeConsumed` table; fixed & verified 2026-09-19 — it was
+      previously reusable)
+- [x] Setup step stays usable until confirm consumes the challenge
+- [x] Logged-out admin API returns 401; forged token 403 (products, orders, coupons, announcement)
+- [x] Products page lists 37 DB products; editing SKU to a duplicate is rejected with 409 (`SKU_TAKEN`)
+- [x] Inventory: hide a product → its card disappears from the storefront search (2 hrefs → 1; the announcement banner link correctly remains); unhide restores it
+- [x] Coupons page loads (open `/management/coupons` directly — no sidebar link yet)
+- [x] Limited roles see only their sidebar items and get 403 on the other role's APIs
+- [x] After 15 min, admin APIs return 401 → re-login works
+- [x] Change password: wrong current pw rejected (400); short pw rejected (400); success returns `sessionsRevoked: true`, old refresh token then 401 on refresh, old password rejected, new password works

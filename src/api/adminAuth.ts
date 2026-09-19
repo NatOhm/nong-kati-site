@@ -57,9 +57,10 @@ interface ChallengePayload {
 
 /**
  * Issue a step-1 challenge: a short-lived signed JWT naming the admin user.
- * Stateless on purpose — login and 2FA can be served by different processes
- * (dev recompiles, serverless lambdas) and the challenge must survive that.
- * The challenge alone grants nothing: step 2 still requires a valid TOTP.
+ * Carries a unique `jti`; consumption is recorded in `AdminChallengeConsumed`
+ * (see consumeChallengeToken) so a replayed challenge can never mint a second
+ * session. The challenge alone grants nothing: step 2 still requires a valid
+ * TOTP.
  */
 async function issueChallengeToken(adminUserId: string): Promise<string> {
   return signJwt({ typ: 'admin-challenge', sub: adminUserId }, CHALLENGE_TTL_SECONDS);
@@ -69,6 +70,34 @@ async function readChallengeToken(token: string): Promise<ChallengePayload | nul
   const payload = await verifyJwt<ChallengePayload>(token);
   if (!payload || payload.typ !== 'admin-challenge' || !payload.sub) return null;
   return payload;
+}
+
+/**
+ * Consume a challenge at the moment it is finally used (2FA confirm — the
+ * step that mints a session). First writer wins via the unique tokenHash
+ * index; a replay loses the race and gets TOKEN_INVALID.
+ */
+async function consumeChallengeToken(token: string): Promise<ChallengePayload | null> {
+  const payload = await readChallengeToken(token);
+  if (!payload) return null;
+  const tokenHash = hashToken(token);
+  try {
+    await prisma.adminChallengeConsumed.create({ data: { tokenHash } });
+  } catch {
+    return null; // unique-violation → already consumed
+  }
+  return payload;
+}
+
+/** Housekeeping: drop consumption rows older than the challenge TTL. */
+async function pruneConsumedChallenges(): Promise<void> {
+  try {
+    await prisma.adminChallengeConsumed.deleteMany({
+      where: { consumedAt: { lt: new Date(Date.now() - 2 * CHALLENGE_TTL_SECONDS * 1000) } },
+    });
+  } catch {
+    // housekeeping must never break login
+  }
 }
 
 function hashToken(token: string): string {
@@ -201,6 +230,7 @@ export async function adminLogin(
   });
 
   const challengeToken = await issueChallengeToken(user.id);
+  void pruneConsumedChallenges();
 
   if (!user.totpConfirmed || !user.totpSecret) {
     return { success: true, requires2faSetup: true, challengeToken };
@@ -254,7 +284,10 @@ export async function confirm2fa(
   mustChangePassword?: boolean;
   error?: string;
 }> {
-  const challenge = await readChallengeToken(challengeToken);
+  // Single-use: the challenge is consumed here, at the only step that mints
+  // a session. (setup2fa stays read-only because the login UI legitimately
+  // reuses the same challenge for the setup + confirm pair on first login.)
+  const challenge = await consumeChallengeToken(challengeToken);
   if (!challenge) {
     return { success: false, error: 'TOKEN_INVALID' };
   }

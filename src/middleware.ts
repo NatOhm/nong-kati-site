@@ -7,6 +7,7 @@
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { applyRateLimit } from '@/lib/rateLimit';
 
 // ─── CSP Policy ─────────────────────────────────────────
 // 13-security.md §8 — locked values
@@ -21,12 +22,12 @@ const CSP_DIRECTIVES = [
   "font-src 'self' https://fonts.gstatic.com",
   "img-src 'self' https://cdn.nong-kati.co.th data: https://www.google.com https://api.qrserver.com",
   "connect-src 'self' https://api.omise.co https://*.2c2p.com https://www.google-analytics.com",
-  "frame-src https://js.omise.co https://pay.omise.co https://*.2c2p.com https://www.google.com",
+  'frame-src https://js.omise.co https://pay.omise.co https://*.2c2p.com https://www.google.com',
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
   "frame-ancestors 'none'",
-  "upgrade-insecure-requests",
+  'upgrade-insecure-requests',
 ].join('; ');
 
 const CSP_REPORT_DIRECTIVES = [
@@ -36,12 +37,12 @@ const CSP_REPORT_DIRECTIVES = [
   "font-src 'self' https://fonts.gstatic.com",
   "img-src 'self' https://cdn.nong-kati.co.th data: https://www.google.com https://api.qrserver.com",
   "connect-src 'self' https://api.omise.co https://*.2c2p.com https://www.google-analytics.com",
-  "frame-src https://js.omise.co https://pay.omise.co https://*.2c2p.com https://www.google.com",
+  'frame-src https://js.omise.co https://pay.omise.co https://*.2c2p.com https://www.google.com',
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
   "frame-ancestors 'none'",
-  "report-uri /api/v1/csp-report",
+  'report-uri /api/v1/csp-report',
 ].join('; ');
 
 // ─── Route Groups ───────────────────────────────────────
@@ -55,7 +56,12 @@ function isAuthRoute(pathname: string): boolean {
 }
 
 function isSensitiveRoute(pathname: string): boolean {
-  return SENSITIVE_ROUTES.some((r) => pathname.startsWith(r));
+  // Match both "/checkout" and "/checkout/..." — the trailing-slash entries
+  // must not let the bare path escape the noindex header.
+  return SENSITIVE_ROUTES.some((r) => {
+    const bare = r.replace(/\/$/, '');
+    return pathname === bare || pathname.startsWith(r);
+  });
 }
 
 function isWebhookRoute(pathname: string): boolean {
@@ -66,7 +72,23 @@ function isWebhookRoute(pathname: string): boolean {
 
 export function middleware(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl;
-  const response = NextResponse.next();
+
+  // ─── Rate limiting (API routes) ───────────────────
+  // Sliding-window limiter from 13-security.md §5 — in-memory store (per
+  // serverless instance; per-account brute force is additionally covered by
+  // the DB lockout in adminLogin). Only API routes are limited.
+  let limited: NextResponse | null = null;
+  if (pathname.startsWith('/api/')) {
+    const ip =
+      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+      request.headers.get('x-real-ip') ??
+      'unknown';
+    limited = applyRateLimit(pathname, ip);
+    limited.headers.set('X-RateLimit-Scoped-By', 'ip');
+    if (limited.status === 429) return limited;
+  }
+
+  const response = limited ?? NextResponse.next();
 
   // Use report-only CSP in staging
   const reportOnly = process.env['NK_CSP_REPORT_ONLY'] === 'true';
@@ -82,7 +104,7 @@ export function middleware(request: NextRequest): NextResponse {
   response.headers.set('X-DNS-Prefetch-Control', 'off');
   response.headers.set(
     'Permissions-Policy',
-    'camera=(), microphone=(), geolocation=(), payment=(self "https://js.omise.co")'
+    'camera=(), microphone=(), geolocation=(), payment=(self "https://js.omise.co")',
   );
 
   // ─── Auth Routes — no-cache ───────────────────────

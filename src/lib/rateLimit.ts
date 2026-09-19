@@ -30,14 +30,17 @@ export const RATE_LIMIT_RULES: RateLimitRule[] = [
   // Checkout / Orders
   { route: '/api/v1/orders', maxRequests: 10, windowMs: 60_000, keyBy: 'ip' },
 
-  // Auth
-  { route: '/api/v1/auth/login', maxRequests: 5, windowMs: 900_000, keyBy: 'email' },      // 5 fails / 15 min
-  { route: '/api/v1/admin/auth/login', maxRequests: 5, windowMs: 1_800_000, keyBy: 'email' }, // 5 fails / 30 min
-  { route: '/api/v1/admin/auth/totp', maxRequests: 5, windowMs: 1_800_000, keyBy: 'email' },
+  // Auth (per-IP; per-account brute force is additionally covered by the
+  // DB lockout in adminLogin — 5 wrong passwords → 15-minute account lock).
+  // NOTE: paths must match the real endpoints under /api/v1/auth/admin/*.
+  { route: '/api/v1/auth/login', maxRequests: 20, windowMs: 900_000, keyBy: 'ip' }, // customer login
+  { route: '/api/v1/auth/register', maxRequests: 20, windowMs: 900_000, keyBy: 'ip' },
+  { route: '/api/v1/auth/admin/login', maxRequests: 30, windowMs: 1_800_000, keyBy: 'ip' }, // admin step 1
+  { route: '/api/v1/auth/admin/2fa', maxRequests: 30, windowMs: 1_800_000, keyBy: 'ip' }, // admin step 2
 
   // Order velocity (per 01-prd.md FR-144, FR-145)
   { route: '_order_velocity_email', maxRequests: 20, windowMs: 86_400_000, keyBy: 'email' }, // 20 / 24h
-  { route: '_order_velocity_ip', maxRequests: 30, windowMs: 86_400_000, keyBy: 'ip' },       // 30 / 24h
+  { route: '_order_velocity_ip', maxRequests: 30, windowMs: 86_400_000, keyBy: 'ip' }, // 30 / 24h
 
   // Payment
   { route: '/api/v1/payments', maxRequests: 20, windowMs: 60_000, keyBy: 'ip' },
@@ -79,7 +82,7 @@ if (typeof setInterval !== 'undefined') {
 export function checkRateLimit(
   route: string,
   identifier: string,
-  rule?: RateLimitRule
+  rule?: RateLimitRule,
 ): { allowed: boolean; remaining: number; resetAt: number } {
   const matchedRule = rule ?? findMatchingRule(route);
   if (!matchedRule) {
@@ -116,7 +119,7 @@ export function checkRateLimit(
  */
 export function getRateLimitHeaders(
   result: { allowed: boolean; remaining: number; resetAt: number },
-  rule: RateLimitRule
+  rule: RateLimitRule,
 ): Record<string, string> {
   return {
     'X-RateLimit-Limit': String(rule.maxRequests),
@@ -133,7 +136,7 @@ export function getRateLimitHeaders(
 export function applyRateLimit(
   route: string,
   identifier: string,
-  response?: NextResponse
+  response?: NextResponse,
 ): NextResponse {
   const result = checkRateLimit(route, identifier);
   const fallbackRule: RateLimitRule = RATE_LIMIT_RULES[0]!;
@@ -160,7 +163,7 @@ export function applyRateLimit(
           ...headers,
           'Content-Type': 'application/json',
         },
-      }
+      },
     );
   }
 
@@ -171,8 +174,10 @@ export function applyRateLimit(
 
 function findMatchingRule(route: string): RateLimitRule | undefined {
   // Exact match first, then prefix match
-  return RATE_LIMIT_RULES.find((r) => r.route === route)
-    ?? RATE_LIMIT_RULES.find((r) => r.route !== '_' && route.startsWith(r.route));
+  return (
+    RATE_LIMIT_RULES.find((r) => r.route === route) ??
+    RATE_LIMIT_RULES.find((r) => r.route !== '_' && route.startsWith(r.route))
+  );
 }
 
 /**

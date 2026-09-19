@@ -6,7 +6,12 @@ import { ArrowLeft } from 'lucide-react';
 
 import { PageShell } from '@/components/layout/PageShell';
 import { OrderLookupForm } from '@/components/order/OrderLookupForm';
-import { lookupOrder, type OrderLookupResult } from '@/api/orderLookup';
+
+interface LookupResponse {
+  success?: boolean;
+  order?: { confirmationUuid: string };
+  error?: { code: string };
+}
 
 /**
  * Order Lookup page — per UF-03.
@@ -15,7 +20,7 @@ import { lookupOrder, type OrderLookupResult } from '@/api/orderLookup';
 export default function OrderLookupPage(): React.JSX.Element {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<OrderLookupResult | null>(null);
+  const [result, setResult] = useState<LookupResponse | null>(null);
 
   const handleSubmit = useCallback(async (email: string, orderNumber: string) => {
     setLoading(true);
@@ -23,12 +28,21 @@ export default function OrderLookupPage(): React.JSX.Element {
     setResult(null);
 
     try {
-      const lookupResult = await lookupOrder(email, orderNumber);
-      if (lookupResult.success && lookupResult.order) {
+      // Server route wraps the Prisma-backed lookupOrder — the lookup logic
+      // must never run in the browser (it pulls in db + email deps).
+      const res = await fetch('/api/v1/orders/lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, orderNumber }),
+      });
+      const data: LookupResponse = await res.json().catch(() => ({}));
+      if (res.ok && data.success && data.order) {
         // Redirect to order detail
-        window.location.href = `/orders/${lookupResult.order.confirmationUuid}`;
-      } else {
+        window.location.href = `/orders/${data.order.confirmationUuid}`;
+      } else if (res.status === 404) {
         setError('ไม่พบคำสั่งซื้อ — กรุณาตรวจสอบอีเมลและรหัสคำสั่งซื้อ');
+      } else {
+        setError('เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
       }
     } catch {
       setError('เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');

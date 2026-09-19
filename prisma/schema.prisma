@@ -497,6 +497,18 @@ model AdminUser {
   @@index([email])
 }
 
+/// One row per consumed login-challenge JWT (sha256 of the token). Step-1
+/// challenges are short-lived JWTs; this table is what makes them single-use
+/// — confirm2fa records the token here before minting a session, so a
+/// replayed challenge can never mint a second session.
+model AdminChallengeConsumed {
+  id         String   @id @default(cuid())
+  tokenHash  String   @unique
+  consumedAt DateTime @default(now())
+
+  @@index([consumedAt])
+}
+
 model AdminSession {
   id          String    @id @default(cuid())
   adminUserId String
