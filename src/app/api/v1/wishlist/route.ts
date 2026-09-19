@@ -25,12 +25,25 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: { code: 'UNAUTHENTICATED' } }, { status: 401 });
   }
   const idsOnly = req.nextUrl.searchParams.get('idsOnly') === '1';
+  const counts = req.nextUrl.searchParams.get('counts') === '1';
   const rows = await prisma.wishlistItem.findMany({
     where: { customerId: session.id },
     select: { productId: true },
   });
   const productIds = rows.map((r) => r.productId);
   if (idsOnly) return NextResponse.json({ productIds, products: [] });
+  if (counts) {
+    const grouped = await prisma.wishlistItem.groupBy({
+      by: ['productId'],
+      where: { productId: { in: productIds } },
+      _count: { productId: true },
+    });
+    return NextResponse.json({
+      productIds,
+      products: [],
+      counts: Object.fromEntries(grouped.map((g) => [g.productId, g._count.productId])),
+    });
+  }
   const products = await getWishlistProducts(session.id);
   return NextResponse.json({ productIds, products });
 }
@@ -70,8 +83,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   if (existing) {
     await prisma.wishlistItem.delete({ where: { id: existing.id } });
-    return NextResponse.json({ wished: false });
+    const wishCount = await prisma.wishlistItem.count({ where: { productId } });
+    return NextResponse.json({ wished: false, wishCount });
   }
   await prisma.wishlistItem.create({ data: { customerId: session.id, productId } });
-  return NextResponse.json({ wished: true });
+  const wishCount = await prisma.wishlistItem.count({ where: { productId } });
+  return NextResponse.json({ wished: true, wishCount });
 }
