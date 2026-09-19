@@ -9,7 +9,7 @@ import { Footer } from '@/components/layout/Footer';
 import { PageShell } from '@/components/layout/PageShell';
 import { ProductCard } from '@/components/product/ProductCard';
 import { ProductGrid } from '@/components/product/ProductGrid';
-import { CategoryCard } from '@/components/product/CategoryCard';
+import { AppTile } from '@/components/product/AppTile';
 import { Breadcrumb } from '@/components/data-display/Breadcrumb';
 import { StructuredData } from '@/components/data-display/StructuredData';
 
@@ -122,26 +122,30 @@ export default async function CategoryPage({
             <p className="mt-2 text-fg-placeholder">{total} สินค้า</p>
           </section>
 
-          {/* Sub-categories (if L1) */}
+          {/* Sub-apps as dark app tiles (client mockup: artwork + จำนวน pill) */}
           {category.children.length > 0 && (
             <section className="pb-8">
-              <h2 className="mb-4 text-lg font-semibold text-fg-secondary">หมวดหมู่ย่อย</h2>
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-                {category.children.map((child) => (
-                  <CategoryCard
-                    key={child.id}
-                    id={child.id}
-                    name={child.name}
-                    slug={child.slug}
-                    icon={child.icon}
-                  />
-                ))}
+              <div className="shadow-clay-md mb-3 rounded-2xl bg-clay-950 p-4">
+                <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
+                  {category.children.map((child) => (
+                    <AppTile
+                      key={child.id}
+                      name={child.name}
+                      slug={child.slug}
+                      icon={child.icon}
+                      imageUrl={child.imageUrl}
+                      productSlug={child.productSlug}
+                      productCount={child.productCount ?? 0}
+                    />
+                  ))}
+                </div>
               </div>
             </section>
           )}
 
-          {/* Products */}
-          {products.length > 0 ? (
+          {/* Products — leaf app pages only; group pages show tiles instead of
+              the repeated-card rows the client crossed out in the mockup */}
+          {category.children.length === 0 && products.length > 0 ? (
             <section className="pb-16">
               <h2 className="mb-4 text-lg font-semibold text-fg-secondary">สินค้าทั้งหมด</h2>
               <ProductGrid>
@@ -169,6 +173,8 @@ export default async function CategoryPage({
                 ))}
               </ProductGrid>
             </section>
+          ) : category.children.length > 0 ? (
+            <></>
           ) : (
             <section className="py-16 text-center">
               <p className="text-fg-placeholder">ยังไม่มีสินค้าในหมวดหมู่นี้</p>

@@ -6,7 +6,7 @@ import { Footer } from '@/components/layout/Footer';
 
 export const dynamic = 'force-dynamic';
 import { ProductCard } from '@/components/product/ProductCard';
-import { CategoryCard } from '@/components/product/CategoryCard';
+import { AppTile } from '@/components/product/AppTile';
 import { ProductGrid } from '@/components/product/ProductGrid';
 import { StructuredData } from '@/components/data-display/StructuredData';
 
@@ -52,6 +52,11 @@ export default async function HomePage(): Promise<React.JSX.Element> {
       e instanceof Error ? e.message : e,
     );
   }
+
+  // App tiles = the leaf app categories (13 apps); type-groups wrap them.
+  const appCategories = categories.flatMap((root) =>
+    root.children.length > 0 ? root.children : [root],
+  );
 
   return (
     <>
@@ -121,11 +126,13 @@ export default async function HomePage(): Promise<React.JSX.Element> {
 
         <PawDivider className="py-4" />
 
-        {/* Categories Section */}
+        {/* App-tile grid — dark panel like the client mockup: artwork tiles
+            per app, จำนวน pill, single-product apps go straight to the
+            package page; multi-product apps open the category */}
         <ScrollReveal>
           <section className="px-4 py-6 md:px-8">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-fg">หมวดหมู่สินค้า</h2>
+              <h2 className="text-lg font-bold text-fg">หมวดเมนูแยกตามแอป</h2>
               <Link
                 href="/search"
                 className="text-sm font-medium text-fg-brand hover:text-fg-brand"
@@ -133,17 +140,20 @@ export default async function HomePage(): Promise<React.JSX.Element> {
                 ดูทั้งหมด
               </Link>
             </div>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-              {categories.map((cat) => (
-                <CategoryCard
-                  key={cat.id}
-                  id={cat.id}
-                  name={cat.name}
-                  slug={cat.slug}
-                  icon={cat.icon}
-                  productCount={cat.productCount}
-                />
-              ))}
+            <div className="shadow-clay-md rounded-2xl bg-clay-950 p-4">
+              <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
+                {appCategories.map((cat) => (
+                  <AppTile
+                    key={cat.id}
+                    name={cat.name}
+                    slug={cat.slug}
+                    icon={cat.icon}
+                    imageUrl={cat.imageUrl}
+                    productSlug={cat.productSlug}
+                    productCount={cat.productCount}
+                  />
+                ))}
+              </div>
             </div>
           </section>
         </ScrollReveal>

@@ -16,6 +16,12 @@ export interface CategoryItem {
   sortOrder: number;
   isActive: boolean;
   children: CategoryItem[];
+  /** Aggregate product count (set by getCategoriesWithProductCounts / getCategoryBySlug). */
+  productCount?: number;
+  /** Representative product image for app-tile grids (client mockup style). */
+  imageUrl?: string | null;
+  /** Slug of that representative product — enables direct package-page links. */
+  productSlug?: string | null;
 }
 
 export interface ProductVariant {
@@ -104,6 +110,27 @@ export async function getTopLevelCategories(): Promise<CategoryItem[]> {
  * Parent categories show the SUBTREE total (own + all descendants), so a
  * type-level group like แอปดูหนัง/ซีรีส์ counts every app nested under it.
  */
+/** Representative product image + slug per category id (app-tile grids). */
+async function getCategoryImageMaps(): Promise<{
+  firstImage: Map<string, string>;
+  firstSlug: Map<string, string>;
+}> {
+  const imgProducts = await prisma.product.findMany({
+    where: { isActive: true, imageUrl: { not: null } },
+    select: { categoryId: true, imageUrl: true, slug: true },
+    orderBy: { createdAt: 'asc' },
+  });
+  const firstImage = new Map<string, string>();
+  const firstSlug = new Map<string, string>();
+  for (const p of imgProducts) {
+    if (p.imageUrl && !firstImage.has(p.categoryId)) {
+      firstImage.set(p.categoryId, p.imageUrl);
+      firstSlug.set(p.categoryId, p.slug);
+    }
+  }
+  return { firstImage, firstSlug };
+}
+
 export async function getCategoriesWithProductCounts(): Promise<
   (CategoryItem & { productCount: number })[]
 > {
@@ -113,6 +140,28 @@ export async function getCategoriesWithProductCounts(): Promise<
   });
   const ownCount = new Map(cats.map((c) => [c.id, c._count.products]));
   const countMap = new Map(cats.map((c) => [c.id, c._count.products]));
+
+  // Representative product image per category (client mockup: app tiles lead
+  // with the artwork). First active product image in the subtree; parents
+  // inherit their first child's image.
+  const { firstImage, firstSlug } = await getCategoryImageMaps();
+  const resolveImage = (id: string): { img: string; slug: string } | null => {
+    const own = firstImage.get(id);
+    if (own) return { img: own, slug: firstSlug.get(id) ?? '' };
+    for (const c of cats) {
+      if (c.parentId === id) {
+        const inherited = resolveImage(c.id);
+        if (inherited) {
+          firstImage.set(id, inherited.img);
+          firstSlug.set(id, inherited.slug);
+          return inherited;
+        }
+      }
+    }
+    return null;
+  };
+  for (const c of cats) resolveImage(c.id);
+
   // Aggregate up the tree: children first (flat list is sorted, but do a
   // proper reverse pass so depth > 2 also lands correctly).
   const byId = new Map(cats.map((c) => [c.id, c]));
@@ -127,6 +176,8 @@ export async function getCategoriesWithProductCounts(): Promise<
     return nodes.map((n) => ({
       ...n,
       productCount: countMap.get(n.id) ?? ownCount.get(n.id) ?? 0,
+      imageUrl: firstImage.get(n.id) ?? null,
+      productSlug: firstSlug.get(n.id) ?? null,
       children: enrich(n.children),
     }));
   }
@@ -166,6 +217,7 @@ export async function getCategoryBySlug(slug: string): Promise<{
 } | null> {
   const cats = await prisma.category.findMany({ orderBy: { sortOrder: 'asc' } });
   const tree = buildCategoryTree(cats);
+  const { firstImage, firstSlug } = await getCategoryImageMaps();
 
   function findInTree(
     nodes: CategoryItem[],
@@ -182,7 +234,22 @@ export async function getCategoryBySlug(slug: string): Promise<{
     return null;
   }
 
-  return findInTree(tree, []);
+  const result = findInTree(tree, []);
+  if (!result) return null;
+  // Enrich the found node's children with tile artwork + product counts
+  // (app-tile grid needs both for the pill and package-page deep link).
+  const childCounts = await prisma.category.findMany({
+    where: { parentId: result.category.id },
+    select: { id: true, _count: { select: { products: { where: { isActive: true } } } } },
+  });
+  const countOf = new Map(childCounts.map((c) => [c.id, c._count.products]));
+  result.category.children = result.category.children.map((c) => ({
+    ...c,
+    productCount: countOf.get(c.id) ?? 0,
+    imageUrl: firstImage.get(c.id) ?? null,
+    productSlug: firstSlug.get(c.id) ?? null,
+  }));
+  return result;
 }
 
 export async function getAllCategorySlugs(): Promise<string[]> {
