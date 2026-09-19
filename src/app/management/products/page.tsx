@@ -12,11 +12,13 @@ import {
   Star,
   CheckCircle2,
   AlertTriangle,
+  FileUp,
 } from 'lucide-react';
 
 import { AdminShell } from '@/components/layout/AdminShell';
 import { adminFetch } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
+import { ImportDialog } from './ImportDialog';
 /**
  * Admin Products Management — real CRUD over the Prisma catalog.
  * List, search, create, edit (info + image + variants), archive.
@@ -75,6 +77,7 @@ export default function AdminProductsPage(): React.JSX.Element {
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
   const [editing, setEditing] = useState<AdminProduct | 'new' | null>(null);
+  const [importing, setImporting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -128,13 +131,22 @@ export default function AdminProductsPage(): React.JSX.Element {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-fg">สินค้า</h1>
-          <button
-            onClick={() => setEditing('new')}
-            className="flex items-center gap-2 rounded-lg bg-peach-500 px-4 py-2 text-sm font-semibold text-white transition-transform hover:scale-[1.02] hover:bg-peach-400 active:scale-95"
-          >
-            <Plus size={16} />
-            เพิ่มสินค้า
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setImporting(true)}
+              className="flex items-center gap-2 rounded-lg border border-line bg-surface px-4 py-2 text-sm font-semibold text-fg transition-colors hover:border-peach-400 hover:text-fg-brand"
+            >
+              <FileUp size={16} />
+              นำเข้า CSV
+            </button>
+            <button
+              onClick={() => setEditing('new')}
+              className="flex items-center gap-2 rounded-lg bg-peach-500 px-4 py-2 text-sm font-semibold text-white transition-transform hover:scale-[1.02] hover:bg-peach-400 active:scale-95"
+            >
+              <Plus size={16} />
+              เพิ่มสินค้า
+            </button>
+          </div>
         </div>
 
         {/* Filters */}
@@ -282,6 +294,10 @@ export default function AdminProductsPage(): React.JSX.Element {
           แสดง {filteredProducts.length} จาก {products.length} สินค้า
         </p>
       </div>
+
+      {importing && (
+        <ImportDialog onClose={() => setImporting(false)} onImported={() => void load()} />
+      )}
 
       {editing !== null && (
         <ProductEditor
