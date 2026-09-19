@@ -631,6 +631,37 @@ export async function getAnnouncement(): Promise<AnnouncementContent> {
   }
 }
 
+// ─── Storefront stats (homepage StatsCounter) ───────────
+
+export interface StorefrontStats {
+  customers: number;
+  products: number;
+  itemsSold: number;
+  stock: number;
+}
+
+/** Real counts for the homepage stats band (client ask: plain numbers). */
+export async function getStorefrontStats(): Promise<StorefrontStats> {
+  const [customers, products, sold, stock] = await Promise.all([
+    prisma.customer.count(),
+    prisma.product.count({ where: { isActive: true } }),
+    prisma.orderItem.aggregate({
+      where: { order: { status: 'completed' } },
+      _sum: { quantity: true },
+    }),
+    prisma.productVariant.aggregate({
+      where: { product: { isActive: true } },
+      _sum: { stock: true },
+    }),
+  ]);
+  return {
+    customers,
+    products,
+    itemsSold: sold._sum.quantity ?? 0,
+    stock: stock._sum.stock ?? 0,
+  };
+}
+
 // ─── Hero carousel (admin-managed slides) ───────────────
 
 export interface HeroSlideContent {

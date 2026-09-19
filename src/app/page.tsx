@@ -24,7 +24,12 @@ import { DeliveredCodeCard } from '@/components/home/DeliveredCodeCard';
 import { HamsterMascot } from '@/components/ui/ClayIcons';
 import { PawDivider } from '@/components/ui/PawDivider';
 
-import { getCategoriesWithProductCounts, getFeaturedProducts, getHeroSlides } from '@/lib/data';
+import {
+  getCategoriesWithProductCounts,
+  getFeaturedProducts,
+  getHeroSlides,
+  getStorefrontStats,
+} from '@/lib/data';
 
 export const metadata: Metadata = {
   title: 'ซื้อบัตรเกม Netflix Steam และอีคอมเมิร์ซ — Nong-Kati',
@@ -42,10 +47,12 @@ export default async function HomePage(): Promise<React.JSX.Element> {
   let categories: Awaited<ReturnType<typeof getCategoriesWithProductCounts>> = [];
   let featuredProducts: Awaited<ReturnType<typeof getFeaturedProducts>> = [];
   let heroSlides: Awaited<ReturnType<typeof getHeroSlides>> = [];
+  let stats: Awaited<ReturnType<typeof getStorefrontStats>> | null = null;
   try {
     categories = await getCategoriesWithProductCounts();
     featuredProducts = await getFeaturedProducts();
     heroSlides = await getHeroSlides();
+    stats = await getStorefrontStats();
   } catch (e) {
     console.error(
       '[HomePage] Database unavailable, rendering with empty data:',
@@ -211,8 +218,19 @@ export default async function HomePage(): Promise<React.JSX.Element> {
           <FAQAccordion />
         </ScrollReveal>
 
-        {/* Stats — plain numbers, horizontal, at the bottom (client ask) */}
-        <StatsCounter />
+        {/* Stats — real counts, plain numbers, horizontal, at the bottom (client ask) */}
+        <StatsCounter
+          stats={
+            stats
+              ? [
+                  { value: stats.customers, label: 'ลูกค้า' },
+                  { value: stats.products, label: 'สินค้า' },
+                  { value: stats.itemsSold, label: 'ขายแล้ว' },
+                  { value: stats.stock, label: 'สต๊อก' },
+                ]
+              : undefined
+          }
+        />
       </FacebookLayout>
 
       <Footer />

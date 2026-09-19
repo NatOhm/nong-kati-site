@@ -72,19 +72,38 @@ function StatNumber({
   );
 }
 
-export function StatsCounter() {
-  const stats = [
-    { icon: <Users size={22} className="text-fg-brand" />, value: 1234, label: 'ลูกค้า' },
-    { icon: <Package size={22} className="text-coral-500" />, value: 37, label: 'สินค้า' },
-    { icon: <Zap size={22} className="text-fg-brand" />, value: 567, label: 'ขายแล้ว' },
-    { icon: <BarChart3 size={22} className="text-coral-500" />, value: 480, label: 'สต๊อก' },
+export function StatsCounter({
+  stats: initial,
+}: {
+  stats?: { value: number; label: string }[] | undefined;
+}) {
+  const stats = initial ?? [
+    { value: 0, label: 'ลูกค้า' },
+    { value: 0, label: 'สินค้า' },
+    { value: 0, label: 'ขายแล้ว' },
+    { value: 0, label: 'สต๊อก' },
   ];
 
   return (
     <section className="px-4 py-6 md:px-8">
       <div className="mx-auto grid max-w-4xl grid-cols-2 gap-4 md:grid-cols-4">
         {stats.map((s) => (
-          <StatNumber key={s.label} value={s.value} label={s.label} icon={s.icon} />
+          <StatNumber
+            key={s.label}
+            value={s.value}
+            label={s.label}
+            icon={
+              s.label === 'ลูกค้า' ? (
+                <Users size={22} className="text-fg-brand" />
+              ) : s.label === 'สินค้า' ? (
+                <Package size={22} className="text-coral-500" />
+              ) : s.label === 'ขายแล้ว' ? (
+                <Zap size={22} className="text-fg-brand" />
+              ) : (
+                <BarChart3 size={22} className="text-coral-500" />
+              )
+            }
+          />
         ))}
       </div>
     </section>
