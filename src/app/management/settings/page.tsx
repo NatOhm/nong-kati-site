@@ -23,6 +23,11 @@ import {
   Trash2,
   ChevronDown,
   ChevronRight,
+  Image as ImageIcon,
+  Plus,
+  ArrowUp,
+  ArrowDown,
+  Loader2,
 } from 'lucide-react';
 import { AdminShell } from '@/components/layout/AdminShell';
 import { adminFetch, clearAdminSession } from '@/lib/adminSession';
@@ -34,6 +39,7 @@ type SettingsSaver = () => Promise<void>;
 
 type SettingsTab =
   | 'announcement'
+  | 'banner'
   | 'appearance'
   | 'store'
   | 'payment'
@@ -43,6 +49,7 @@ type SettingsTab =
 
 const TABS: { id: SettingsTab; label: string; icon: typeof Store }[] = [
   { id: 'announcement', label: 'แถบประกาศ', icon: Megaphone },
+  { id: 'banner', label: 'แบนเนอร์หน้าแรก', icon: ImageIcon },
   { id: 'appearance', label: 'ธีมและแอนิเมชัน', icon: Palette },
   { id: 'store', label: 'ร้านค้า', icon: Store },
   { id: 'payment', label: 'การชำระเงิน', icon: CreditCard },
@@ -141,6 +148,7 @@ export default function AdminSettingsPage(): React.JSX.Element {
           {/* Tab Content */}
           <div className="flex-1">
             {activeTab === 'announcement' && <AnnouncementSettings registerSaver={registerSaver} />}
+            {activeTab === 'banner' && <BannerSettings />}
             {activeTab === 'appearance' && <AppearanceSettings registerSaver={registerSaver} />}
             {activeTab === 'store' && <StoreSettings registerSaver={registerSaver} />}
             {activeTab === 'payment' && <PaymentSettings />}
@@ -1382,5 +1390,338 @@ function CopyButton({ text }: { text: string }) {
     >
       {copied ? <CheckCircle2 size={14} className="text-jade-600" /> : <Copy size={14} />}
     </button>
+  );
+}
+
+// ─── Homepage Banner (hero carousel) Settings ───────────
+interface AdminHeroSlide {
+  id: string;
+  imageUrl: string;
+  href: string | null;
+  alt: string;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+function BannerSettings(): React.JSX.Element {
+  const [slides, setSlides] = useState<AdminHeroSlide[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const fileInputs = useRef<Record<string, HTMLInputElement | null>>({});
+  const newSlideInput = useRef<HTMLInputElement | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await adminFetch('/api/v1/admin/hero-slides');
+      if (!res.ok)
+        throw new Error((await res.json().catch(() => ({}))).error ?? `HTTP ${res.status}`);
+      const data = (await res.json()) as { slides: AdminHeroSlide[] };
+      setSlides(data.slides);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'โหลดไม่สำเร็จ');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function patch(id: string, data: Partial<AdminHeroSlide>): Promise<void> {
+    setBusyId(id);
+    try {
+      const res = await adminFetch(`/api/v1/admin/hero-slides/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok)
+        throw new Error((await res.json().catch(() => ({}))).error ?? `HTTP ${res.status}`);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function remove(id: string): Promise<void> {
+    if (!window.confirm('ลบสไลด์นี้ถาวร?')) return;
+    setBusyId(id);
+    try {
+      const res = await adminFetch(`/api/v1/admin/hero-slides/${id}`, { method: 'DELETE' });
+      if (!res.ok)
+        throw new Error((await res.json().catch(() => ({}))).error ?? `HTTP ${res.status}`);
+      setSlides((s) => s.filter((x) => x.id !== id));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'ลบไม่สำเร็จ');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  /** Add = pick an image first; the slide is created with the uploaded path. */
+  function startAdd(): void {
+    newSlideInput.current?.click();
+  }
+
+  async function createFromImage(file: File): Promise<void> {
+    setUploadingId('new');
+    setError(null);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error('อ่านไฟล์ไม่สำเร็จ'));
+        reader.readAsDataURL(file);
+      });
+      const up = await adminFetch('/api/v1/admin/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dataUrl }),
+      });
+      if (!up.ok) {
+        const data = (await up.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error ?? `HTTP ${up.status}`);
+      }
+      const { path } = (await up.json()) as { path: string };
+      const res = await adminFetch('/api/v1/admin/hero-slides', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageUrl: path,
+          alt: 'แบนเนอร์โปรโมชั่น',
+          sortOrder: slides.length,
+        }),
+      });
+      if (!res.ok)
+        throw new Error((await res.json().catch(() => ({}))).error ?? `HTTP ${res.status}`);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'เพิ่มสไลด์ไม่สำเร็จ');
+    } finally {
+      setUploadingId(null);
+    }
+  }
+
+  function pickImage(id: string): void {
+    fileInputs.current[id]?.click();
+  }
+
+  async function uploadImage(id: string, file: File): Promise<void> {
+    setUploadingId(id);
+    setError(null);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error('อ่านไฟล์ไม่สำเร็จ'));
+        reader.readAsDataURL(file);
+      });
+      const res = await adminFetch('/api/v1/admin/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dataUrl }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error ?? `HTTP ${res.status}`);
+      }
+      const { path } = (await res.json()) as { path: string };
+      await patch(id, { imageUrl: path });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'อัปโหลดไม่สำเร็จ');
+    } finally {
+      setUploadingId(null);
+    }
+  }
+
+  function move(slide: AdminHeroSlide, dir: -1 | 1): void {
+    const idx = slides.findIndex((s) => s.id === slide.id);
+    const swapWith = slides[idx + dir];
+    if (!swapWith) return;
+    void patch(slide.id, { sortOrder: swapWith.sortOrder });
+    void patch(swapWith.id, { sortOrder: slide.sortOrder });
+  }
+
+  if (loading) {
+    return (
+      <div className="clay-card rounded-2xl p-8 text-center text-sm text-fg-placeholder">
+        กำลังโหลด…
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="clay-card rounded-2xl p-5">
+        <h2 className="text-base font-bold text-fg">แบนเนอร์หน้าแรก (Carousel)</h2>
+        <p className="mt-1 text-sm text-fg-muted">
+          อัปโหลดภาพโปรโมชั่น ใส่ลิงก์เมื่อกดภาพ และจัดลำดับการแสดงผล — ภาพแนะนำขนาดกว้าง
+          อัตราส่วนประมาณ 21:8 (สูงสุด 512KB ต่อภาพ)
+        </p>
+        {error && (
+          <p className="mt-3 rounded-lg bg-coral-50 px-3 py-2 text-sm text-coral-700 dark:bg-coral-900/20 dark:text-coral-300">
+            {error}
+          </p>
+        )}
+      </div>
+
+      {slides.length === 0 && (
+        <div className="clay-card rounded-2xl p-8 text-center text-sm text-fg-placeholder">
+          ยังไม่มีแบนเนอร์ — กด “เพิ่มสไลด์” เพื่อเริ่ม
+        </div>
+      )}
+
+      {slides.map((slide, i) => (
+        <div key={slide.id} className="clay-card rounded-2xl p-4">
+          <div className="flex flex-col gap-4 sm:flex-row">
+            {/* Image preview / upload */}
+            <div className="relative shrink-0">
+              {slide.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={slide.imageUrl}
+                  alt={slide.alt}
+                  className="h-24 w-44 rounded-xl object-cover shadow-clay-sm"
+                />
+              ) : (
+                <div className="flex h-24 w-44 items-center justify-center rounded-xl bg-surface text-xs text-fg-placeholder shadow-clay-sm">
+                  ยังไม่มีภาพ
+                </div>
+              )}
+              <input
+                ref={(el) => {
+                  fileInputs.current[slide.id] = el;
+                }}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = '';
+                  if (f) void uploadImage(slide.id, f);
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => pickImage(slide.id)}
+                disabled={uploadingId === slide.id}
+                className="absolute -bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-peach-500 px-3 py-1 text-xs font-semibold text-white shadow-clay-sm transition-transform duration-fast ease-out-quart hover:scale-105 active:scale-90"
+              >
+                {uploadingId === slide.id ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  <ImageIcon size={12} />
+                )}
+                {uploadingId === slide.id ? 'กำลังอัปโหลด…' : 'เปลี่ยนรูป'}
+              </button>
+            </div>
+
+            {/* Fields */}
+            <div className="min-w-0 flex-1 space-y-2.5">
+              <label className="block">
+                <span className="text-xs font-medium text-fg-muted">
+                  ลิงก์เมื่อกดภาพ (เว้นว่างได้)
+                </span>
+                <input
+                  defaultValue={slide.href ?? ''}
+                  onBlur={(e) => {
+                    const v = e.target.value.trim();
+                    if (v !== (slide.href ?? '')) void patch(slide.id, { href: v });
+                  }}
+                  placeholder="/search หรือ https://…"
+                  className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-placeholder focus:border-peach-400 focus:outline-none"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-medium text-fg-muted">คำอธิบายภาพ (alt)</span>
+                <input
+                  defaultValue={slide.alt}
+                  onBlur={(e) => {
+                    const v = e.target.value.trim();
+                    if (v && v !== slide.alt) void patch(slide.id, { alt: v });
+                  }}
+                  className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg focus:border-peach-400 focus:outline-none"
+                />
+              </label>
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="flex items-center gap-2 text-sm text-fg">
+                  <input
+                    type="checkbox"
+                    checked={slide.isActive}
+                    onChange={(e) => void patch(slide.id, { isActive: e.target.checked })}
+                    className="size-4 accent-peach-500"
+                  />
+                  แสดงบนหน้าเว็บ
+                </label>
+                <span className="text-xs text-fg-placeholder">
+                  {busyId === slide.id ? 'กำลังบันทึก…' : 'แก้ไขแล้วบันทึกอัตโนมัติ'}
+                </span>
+              </div>
+            </div>
+
+            {/* Order + delete */}
+            <div className="flex shrink-0 flex-row items-center gap-1.5 sm:flex-col">
+              <button
+                type="button"
+                onClick={() => move(slide, -1)}
+                disabled={i === 0}
+                aria-label="ย้ายขึ้น"
+                className="rounded-lg p-2 text-fg-muted transition-colors hover:bg-surface hover:text-fg disabled:opacity-30"
+              >
+                <ArrowUp size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => move(slide, 1)}
+                disabled={i === slides.length - 1}
+                aria-label="ย้ายลง"
+                className="rounded-lg p-2 text-fg-muted transition-colors hover:bg-surface hover:text-fg disabled:opacity-30"
+              >
+                <ArrowDown size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => void remove(slide.id)}
+                aria-label="ลบสไลด์"
+                className="rounded-lg p-2 text-coral-600 transition-colors hover:bg-coral-50 dark:text-coral-400 dark:hover:bg-coral-900/20"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
+
+      <input
+        ref={newSlideInput}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          e.target.value = '';
+          if (f) void createFromImage(f);
+        }}
+      />
+      <button
+        type="button"
+        onClick={startAdd}
+        disabled={uploadingId === 'new'}
+        className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-peach-300 py-4 text-sm font-semibold text-fg-brand transition-colors hover:bg-peach-50 disabled:opacity-60 dark:border-peach-700/60 dark:hover:bg-peach-900/20"
+      >
+        {uploadingId === 'new' ? (
+          <Loader2 size={16} className="animate-spin" />
+        ) : (
+          <Plus size={16} />
+        )}
+        {uploadingId === 'new' ? 'กำลังอัปโหลด…' : 'เพิ่มสไลด์ (เลือกภาพ)'}
+      </button>
+    </div>
   );
 }

@@ -564,6 +564,32 @@ export async function getAnnouncement(): Promise<AnnouncementContent> {
   }
 }
 
+// ─── Hero carousel (admin-managed slides) ───────────────
+
+export interface HeroSlideContent {
+  id: string;
+  imageUrl: string;
+  href: string | null;
+  alt: string;
+}
+
+/**
+ * Active homepage carousel slides in display order. Empty list is normal
+ * (carousel not configured yet) — callers hide the section.
+ */
+export async function getHeroSlides(): Promise<HeroSlideContent[]> {
+  try {
+    const rows = await prisma.heroSlide.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+    return rows.map((r) => ({ id: r.id, imageUrl: r.imageUrl, href: r.href, alt: r.alt }));
+  } catch (e) {
+    console.error('[data] getHeroSlides failed:', e instanceof Error ? e.message : e);
+    return [];
+  }
+}
+
 // ─── Appearance (runtime theme) ─────────────────────────
 
 export interface AppearanceContent {

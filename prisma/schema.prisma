@@ -525,6 +525,20 @@ model AdminSession {
 
 // ─── Audit Logs (06-database.md §14, 11-admin.md §14.1) ────
 
+/// Homepage hero carousel slides (admin-managed; images via /api/v1/admin/upload).
+model HeroSlide {
+  id        String   @id @default(cuid())
+  imageUrl  String
+  href      String?
+  alt       String
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
+}
+
 model AuditLog {
   id         String   @id @default(cuid())
   actorType  String

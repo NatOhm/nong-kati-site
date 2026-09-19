@@ -12,6 +12,7 @@ import { StructuredData } from '@/components/data-display/StructuredData';
 
 // New components
 import { MarqueeTicker } from '@/components/home/MarqueeTicker';
+import { HeroCarousel } from '@/components/home/HeroCarousel';
 import { StatsCounter } from '@/components/home/StatsCounter';
 import { TrustBadges } from '@/components/home/TrustBadges';
 import { FAQAccordion } from '@/components/home/FAQAccordion';
@@ -23,7 +24,7 @@ import { DeliveredCodeCard } from '@/components/home/DeliveredCodeCard';
 import { HamsterMascot } from '@/components/ui/ClayIcons';
 import { PawDivider } from '@/components/ui/PawDivider';
 
-import { getCategoriesWithProductCounts, getFeaturedProducts } from '@/lib/data';
+import { getCategoriesWithProductCounts, getFeaturedProducts, getHeroSlides } from '@/lib/data';
 
 export const metadata: Metadata = {
   title: 'ซื้อบัตรเกม Netflix Steam และอีคอมเมิร์ซ — Nong-Kati',
@@ -40,9 +41,11 @@ export const metadata: Metadata = {
 export default async function HomePage(): Promise<React.JSX.Element> {
   let categories: Awaited<ReturnType<typeof getCategoriesWithProductCounts>> = [];
   let featuredProducts: Awaited<ReturnType<typeof getFeaturedProducts>> = [];
+  let heroSlides: Awaited<ReturnType<typeof getHeroSlides>> = [];
   try {
     categories = await getCategoriesWithProductCounts();
     featuredProducts = await getFeaturedProducts();
+    heroSlides = await getHeroSlides();
   } catch (e) {
     console.error(
       '[HomePage] Database unavailable, rendering with empty data:',
@@ -65,6 +68,9 @@ export default async function HomePage(): Promise<React.JSX.Element> {
       <MarqueeTicker />
 
       <FacebookLayout>
+        {/* Hero carousel — admin-managed promo banners (hidden until configured) */}
+        {heroSlides.length > 0 && <HeroCarousel slides={heroSlides} />}
+
         {/* Announcement board — the headline framed as a notice board (client ask) */}
         <section className="px-4 pt-8 md:px-8">
           <div className="mx-auto max-w-3xl rounded-2xl border-2 border-dashed border-peach-300 bg-peach-50 px-6 py-5 text-center shadow-clay-sm dark:border-peach-700/60 dark:bg-peach-900/20">
