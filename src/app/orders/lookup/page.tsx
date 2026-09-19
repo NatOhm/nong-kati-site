@@ -43,7 +43,7 @@ export default function OrderLookupPage(): React.JSX.Element {
         {/* Back link */}
         <Link
           href="/"
-          className="mb-6 inline-flex items-center gap-2 text-sm text-fg-placeholder hover:text-fg-brand"
+          className="mb-6 inline-flex min-h-[36px] items-center gap-2 text-sm text-fg-placeholder hover:text-fg-brand"
         >
           <ArrowLeft size={16} />
           กลับ

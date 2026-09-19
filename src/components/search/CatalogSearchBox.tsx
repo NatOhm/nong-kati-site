@@ -70,7 +70,7 @@ export function CatalogSearchBox({ className }: { className?: string }): React.J
         }}
         role="search"
       >
-        <div className="shadow-inset-sm flex items-center gap-2 rounded-full border border-line bg-surface-elevated px-4 py-2.5 transition-colors focus-within:border-peach-500">
+        <div className="shadow-inset-sm flex items-center gap-2 rounded-full border border-line bg-surface-elevated px-4 py-2 transition-colors focus-within:border-peach-500">
           <Search size={16} className="text-fg-placeholder" />
           <input
             type="text"
@@ -86,7 +86,7 @@ export function CatalogSearchBox({ className }: { className?: string }): React.J
             onKeyDown={(e) => {
               if (e.key === 'Escape') setOpen(false);
             }}
-            className="w-full bg-transparent text-sm text-fg focus:outline-none"
+            className="h-11 w-full bg-transparent text-base text-fg focus:outline-none"
           />
         </div>
       </form>
@@ -106,7 +106,7 @@ export function CatalogSearchBox({ className }: { className?: string }): React.J
               role="option"
               aria-selected={false}
               onMouseDown={() => go(s.name)}
-              className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2.5 text-left transition-colors duration-fast hover:bg-surface-sunken"
+              className="flex min-h-[44px] w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2.5 text-left transition-colors duration-fast hover:bg-surface-sunken"
             >
               <Search size={14} className="shrink-0 text-fg-placeholder" />
               <span className="min-w-0 flex-1">

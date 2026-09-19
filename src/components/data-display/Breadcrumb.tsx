@@ -55,7 +55,7 @@ export function Breadcrumb({ items, className }: BreadcrumbProps): React.JSX.Ele
               ) : (
                 <Link
                   href={item.href}
-                  className="text-fg-placeholder transition-colors hover:text-fg-brand"
+                  className="-my-2 inline-flex min-h-[32px] items-center px-0.5 text-fg-placeholder transition-colors hover:text-fg-brand"
                 >
                   {item.label}
                 </Link>

@@ -101,7 +101,7 @@ export function HamsterGrassScene({ className }: { className?: string }): React.
   }, []);
 
   return (
-    <div className={cn('absolute inset-x-0 bottom-0 z-0', className)} aria-hidden="true">
+    <div className={cn('absolute inset-x-0 bottom-0 z-0', className)}>
       {/* Rolling clay hills */}
       <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-28">
         {/* back hill */}

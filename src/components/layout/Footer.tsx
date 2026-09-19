@@ -47,36 +47,44 @@ export async function Footer(): Promise<React.JSX.Element> {
               {store.description ?? 'ซื้อง่าย จ่ายเร็ว ได้โค้ดทันที'}
             </p>
             {(store.phone || store.email || store.line) && (
-              <ul className="mt-3 space-y-1 text-sm text-fg-muted">
+              <ul className="mt-3 space-y-0 text-sm text-fg-muted">
                 {store.phone && (
-                  <li>
+                  <li className="flex min-h-[36px] items-center">
                     โทร{' '}
                     <a
                       href={`tel:${store.phone.replace(/\s/g, '')}`}
-                      className="hover:text-fg-brand"
+                      className="inline-flex min-h-[32px] items-center hover:text-fg-brand"
                     >
                       {store.phone}
                     </a>
                   </li>
                 )}
                 {store.email && (
-                  <li>
-                    <a href={`mailto:${store.email}`} className="hover:text-fg-brand">
+                  <li className="flex min-h-[36px] items-center">
+                    <a
+                      href={`mailto:${store.email}`}
+                      className="inline-flex min-h-[32px] items-center hover:text-fg-brand"
+                    >
                       {store.email}
                     </a>
                   </li>
                 )}
-                {store.line && <li>LINE: {store.line}</li>}
+                {store.line && (
+                  <li className="flex min-h-[36px] items-center">LINE: {store.line}</li>
+                )}
               </ul>
             )}
           </div>
           {FOOTER_COLUMNS.map((col) => (
             <div key={col.title}>
               <h3 className="mb-3 text-sm font-semibold text-fg">{col.title}</h3>
-              <ul className="flex flex-col gap-2">
+              <ul className="flex flex-col gap-0">
                 {col.links.map((link) => (
-                  <li key={link.href}>
-                    <a href={link.href} className="text-sm text-fg-muted hover:text-fg-brand">
+                  <li key={link.href} className="flex min-h-[36px] items-center">
+                    <a
+                      href={link.href}
+                      className="inline-flex min-h-[32px] items-center text-sm text-fg-muted hover:text-fg-brand"
+                    >
                       {link.label}
                     </a>
                   </li>

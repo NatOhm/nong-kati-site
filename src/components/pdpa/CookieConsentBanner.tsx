@@ -105,7 +105,9 @@ export function CookieConsentBanner(): React.JSX.Element | null {
   if (!visible) return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-line-subtle bg-surface-base p-4 shadow-lg md:p-6">
+    <div className="fixed inset-x-0 bottom-[4.25rem] z-50 border border-line-subtle bg-surface-base p-4 shadow-lg md:bottom-0 md:border-x-0 md:border-b-0 md:border-t lg:bottom-0 lg:p-6">
+      {/* Mobile: sits above the fixed bottom taskbar (bottom-[4.25rem]) so the
+          taskbar stays reachable; md/lg have no taskbar → full bottom. */}
       <div className="mx-auto max-w-4xl">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           {/* Icon + Text */}
@@ -125,20 +127,20 @@ export function CookieConsentBanner(): React.JSX.Element | null {
           <div className="flex shrink-0 flex-wrap gap-2">
             <button
               onClick={() => setShowDetails(!showDetails)}
-              className="inline-flex items-center gap-1 rounded-md border border-line-subtle px-3 py-1.5 text-xs text-fg-muted hover:bg-surface"
+              className="inline-flex min-h-[32px] items-center gap-1 rounded-md border border-line-subtle px-3 py-1.5 text-xs text-fg-muted hover:bg-surface"
             >
               <Settings size={12} />
               {showDetails ? 'ซ่อน' : 'ตั้งค่า'}
             </button>
             <button
               onClick={handleRejectAll}
-              className="rounded-md border border-line-subtle px-3 py-1.5 text-xs text-fg-muted hover:bg-surface"
+              className="inline-flex min-h-[32px] rounded-md border border-line-subtle px-3 py-1.5 text-xs text-fg-muted hover:bg-surface"
             >
               ปฏิเสธทั้งหมด
             </button>
             <button
               onClick={handleAcceptAll}
-              className="rounded-md bg-peach-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-peach-400"
+              className="inline-flex min-h-[32px] rounded-md bg-peach-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-peach-400"
             >
               ยอมรับทั้งหมด
             </button>
@@ -208,7 +210,7 @@ export function CookieConsentBanner(): React.JSX.Element | null {
             <div className="pt-2">
               <button
                 onClick={handleAcceptSelected}
-                className="rounded-md bg-peach-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-peach-400"
+                className="inline-flex min-h-[36px] rounded-md bg-peach-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-peach-400"
               >
                 บันทึกการเลือก
               </button>

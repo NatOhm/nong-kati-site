@@ -145,7 +145,7 @@ export default function RegisterPage(): React.JSX.Element {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-placeholder hover:text-fg-secondary"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 p-2.5 text-fg-placeholder hover:text-fg-secondary"
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -177,7 +177,7 @@ export default function RegisterPage(): React.JSX.Element {
                 type="checkbox"
                 checked={marketingOptIn}
                 onChange={(e) => setMarketingOptIn(e.target.checked)}
-                className="mt-0.5 rounded"
+                className="relative mt-0.5 h-5 w-5 rounded before:absolute before:-inset-2.5 before:content-['']"
               />
               <span className="text-xs text-fg-placeholder">
                 ต้องการรับข่าวสารและโปรโมชั่นจาก Nong-Kati

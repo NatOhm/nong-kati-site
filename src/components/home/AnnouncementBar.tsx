@@ -50,7 +50,10 @@ export function AnnouncementBar(): React.JSX.Element | null {
           {content.href && (
             <>
               {' — '}
-              <a href={content.href} className="font-bold underline hover:text-peach-800">
+              <a
+                href={content.href}
+                className="inline-flex min-h-[32px] items-center font-bold underline hover:text-peach-800"
+              >
                 กดซื้อเลย!
               </a>
             </>
@@ -58,7 +61,7 @@ export function AnnouncementBar(): React.JSX.Element | null {
         </p>
         <button
           onClick={() => setIsVisible(false)}
-          className="text-fg-secondary/60 absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 transition-colors hover:bg-clay-500/20 hover:text-fg"
+          className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full p-2.5 transition-colors hover:bg-clay-500/20 hover:text-fg"
           aria-label="ปิดประกาศ"
         >
           <X size={16} />

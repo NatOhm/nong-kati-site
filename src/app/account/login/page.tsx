@@ -66,7 +66,7 @@ export default function LoginPage(): React.JSX.Element {
         <button
           type="button"
           onClick={() => (window.history.length > 1 ? router.back() : router.push('/'))}
-          className="mb-4 inline-flex items-center gap-2 text-sm text-fg-placeholder transition-colors duration-200 hover:text-fg-brand"
+          className="mb-4 inline-flex min-h-[36px] items-center gap-2 text-sm text-fg-placeholder transition-colors duration-200 hover:text-fg-brand"
         >
           <ArrowLeft size={16} />
           กลับ
@@ -119,7 +119,7 @@ export default function LoginPage(): React.JSX.Element {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-placeholder hover:text-fg-secondary"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 p-2.5 text-fg-placeholder hover:text-fg-secondary"
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -132,7 +132,7 @@ export default function LoginPage(): React.JSX.Element {
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="rounded"
+                className="relative h-5 w-5 rounded before:absolute before:-inset-2.5 before:content-['']"
               />
               <span className="text-sm text-fg-placeholder">จดจำฉัน</span>
             </label>
