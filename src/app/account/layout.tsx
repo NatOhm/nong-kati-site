@@ -20,6 +20,7 @@ import {
   Settings,
   LogOut,
   Wallet,
+  type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import {
@@ -27,11 +28,28 @@ import {
   type CustomerSessionState,
 } from '@/components/layout/useCustomerSession';
 
-const NAV_ITEMS = [
-  { label: 'ภาพรวม', href: '/account/dashboard', icon: LayoutDashboard },
+const NAV_ITEMS: {
+  label: string;
+  href: string;
+  /** Path prefix tested for the active highlight (defaults to href). */
+  match?: string;
+  icon: LucideIcon;
+}[] = [
+  { label: 'โปรไฟล์', href: '/account/dashboard', icon: LayoutDashboard },
+  { label: 'ภาพรวม', href: '/account/overview', icon: LayoutDashboard },
   { label: 'กระเป๋าเงิน', href: '/account/wallet', icon: Wallet },
-  { label: 'สินค้าทั้งหมด', href: '/search', icon: ShoppingBag },
-  { label: 'แนะนำ', href: '/search?sort=featured', icon: Star },
+  {
+    label: 'สินค้าทั้งหมด',
+    href: '/account/dashboard?view=all',
+    match: '/account/dashboard',
+    icon: ShoppingBag,
+  },
+  {
+    label: 'แนะนำ',
+    href: '/account/dashboard?view=featured',
+    match: '/account/dashboard',
+    icon: Star,
+  },
   { label: 'รายการโปรด', href: '/account/wishlist', icon: Heart },
   { label: 'คำสั่งซื้อ', href: '/account/orders', icon: ShoppingBag },
   { label: 'โค้ดที่ซื้อ', href: '/account/codes', icon: Key },
@@ -107,7 +125,7 @@ export default function AccountLayout({
           <nav className="sticky top-4">
             <ul className="space-y-1">
               {NAV_ITEMS.map((item) => {
-                const isActive = pathname?.startsWith(item.href);
+                const isActive = pathname?.startsWith(item.match ?? item.href);
                 const Icon = item.icon;
 
                 return (

@@ -13,7 +13,9 @@ import { StockBadge } from '@/components/product/StockBadge';
 import { ProductDetailClient } from '@/components/product/ProductDetailClient';
 import { formatThb } from '@/utils/format';
 
-import { getProductBySlug } from '@/lib/data';
+import { getProductBySlug, getProductWishCount, getMostWishedProducts } from '@/lib/data';
+import { WishCounterBadge } from '@/components/product/WishCounterBadge';
+import { AlsoWished } from '@/components/product/AlsoWished';
 
 interface ProductPageProps {
   params: Promise<{ slug: string }>;
@@ -78,6 +80,11 @@ export default async function ProductPage({
   const siteUrl = process.env['NEXT_PUBLIC_SITE_URL'] || 'https://nong-kati.com';
   const productUrl = `${siteUrl}/product/${slug}`;
   const totalStock = product.variants.reduce((sum, v) => sum + v.stock, 0);
+  // Social proof: real wishlist table (both degrade gracefully to empty).
+  const [wishCount, alsoWished] = await Promise.all([
+    getProductWishCount(product.id).catch(() => 0),
+    getMostWishedProducts(product.id, 6).catch(() => []),
+  ]);
 
   return (
     <>
@@ -153,9 +160,10 @@ export default async function ProductPage({
                 {product.name}
               </h1>
 
-              {/* Stock badge */}
-              <div>
+              {/* Stock badge + wishlist social proof */}
+              <div className="flex flex-wrap items-center gap-2">
                 <StockBadge stock={totalStock} />
+                <WishCounterBadge productId={product.id} initialCount={wishCount} />
               </div>
 
               {/* Description */}
@@ -177,6 +185,9 @@ export default async function ProductPage({
               />
             </div>
           </div>
+
+          {/* Wishlist social proof — most-wished products (hidden when empty) */}
+          <AlsoWished items={alsoWished} />
         </PageShell>
       </FacebookLayout>
 

@@ -489,6 +489,48 @@ export async function getWishlistIds(customerId: string): Promise<string[]> {
   return rows.map((r) => r.productId);
 }
 
+/** How many customers have this product on their wishlist (social proof). */
+export async function getProductWishCount(productId: string): Promise<number> {
+  return prisma.wishlistItem.count({ where: { productId } });
+}
+
+export interface WishRankedProduct {
+  product: ProductItem;
+  wishCount: number;
+}
+
+/**
+ * Most-wished active products — the "ลูกค้าคนอื่นก็ถูกใจ" social-proof row.
+ * Wishlist ties are broken by newest wish so fresh interest bubbles up.
+ */
+export async function getMostWishedProducts(
+  excludeProductId: string,
+  limit = 6,
+): Promise<WishRankedProduct[]> {
+  const ranked = await prisma.wishlistItem.groupBy({
+    by: ['productId'],
+    where: { product: { isActive: true, id: { not: excludeProductId } } },
+    _count: { productId: true },
+    orderBy: [{ _count: { productId: 'desc' } }, { _max: { createdAt: 'desc' } }],
+    take: limit,
+  });
+  if (ranked.length === 0) return [];
+  const ids = ranked.map((r) => r.productId);
+  const products = await prisma.product.findMany({
+    where: { id: { in: ids }, isActive: true },
+    include: {
+      category: { select: { id: true, name: true, slug: true } },
+      variants: { where: { isActive: true }, orderBy: { sortOrder: 'asc' } },
+      aliases: true,
+    },
+  });
+  const byId = new Map(products.map((p) => [p.id, mapProduct(p, p.category)]));
+  return ranked.flatMap((r) => {
+    const product = byId.get(r.productId);
+    return product ? [{ product, wishCount: r._count.productId }] : [];
+  });
+}
+
 // ─── Site Settings (announcement bar etc.) ──────────────
 
 export interface AnnouncementContent {

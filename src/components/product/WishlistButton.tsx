@@ -76,9 +76,17 @@ export function WishlistButton({
         body: JSON.stringify({ productId }),
       });
       if (!res.ok) throw new Error('failed');
-      const data = (await res.json()) as { wished: boolean };
+      const data = (await res.json()) as { wished: boolean; wishCount?: number };
       setWished(data.wished);
       mutateWishlistCache(productId, data.wished);
+      // Detail page's WishCounterBadge listens for this to show the live count.
+      if (typeof data.wishCount === 'number') {
+        window.dispatchEvent(
+          new CustomEvent('nk-wish', {
+            detail: { productId, wishCount: data.wishCount },
+          }),
+        );
+      }
     } catch {
       setWished(!next); // revert
     } finally {

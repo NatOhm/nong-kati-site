@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { createOrder } from '@/api/orders';
 import { getCustomerFromToken } from '@/api/customerAuth';
+import { prisma } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,6 +20,45 @@ function statusFor(code: string): number {
     default:
       return 500;
   }
+}
+
+/**
+ * GET /api/v1/orders — the signed-in customer's order history (profile
+ * คำสั่งซื้อ tab). Newest first; trimmed item lines for the list view.
+ */
+export async function GET(req: NextRequest): Promise<NextResponse> {
+  const token = req.cookies.get(COOKIE)?.value;
+  const session = token ? await getCustomerFromToken(token) : null;
+  if (!session) {
+    return NextResponse.json({ error: { code: 'UNAUTHENTICATED' } }, { status: 401 });
+  }
+
+  const orders = await prisma.order.findMany({
+    where: { customerId: session.id },
+    orderBy: { createdAt: 'desc' },
+    take: 50,
+    include: {
+      items: { select: { productNameTh: true, productNameEn: true, quantity: true } },
+    },
+  });
+
+  return NextResponse.json({
+    orders: orders.map((o) => ({
+      id: o.id,
+      orderNumber: o.orderNumber,
+      confirmationUuid: o.confirmationUuid,
+      status: o.status,
+      totalAmountThb: Number(o.totalAmountThb),
+      itemCount: o.items.reduce((s, i) => s + i.quantity, 0),
+      /** First line name in Thai + extra-count for the list label. */
+      label:
+        o.items[0]?.productNameTh ??
+        o.items[0]?.productNameEn ??
+        (o.items.length > 0 ? `${o.items.length} รายการ` : '-'),
+      extraItems: Math.max(0, o.items.length - 1),
+      createdAt: o.createdAt.toISOString(),
+    })),
+  });
 }
 
 /**
@@ -49,10 +89,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   try {
     const result = await createOrder({
-      customerEmail: String(b['customerEmail'] ?? ''),
+      // Client sends `email`/`phone` (orderClient.ts); accept the API-internal
+      // names too so the contract is forgiving at the boundary.
+      customerEmail: String(b['customerEmail'] ?? b['email'] ?? ''),
       ...(typeof b['customerPhone'] === 'string'
         ? { customerPhone: b['customerPhone'] as string }
-        : {}),
+        : typeof b['phone'] === 'string'
+          ? { customerPhone: b['phone'] as string }
+          : {}),
       paymentMethod: 'promptpay',
       lineOptIn: false,
       marketingOptIn: b['marketingOptIn'] === true,
