@@ -3,7 +3,7 @@
 import { useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bell, LogOut, Menu } from 'lucide-react';
-import { clearAdminSession } from '@/lib/adminSession';
+import { clearAdminSession, setAdminRemembered } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
 import { type AdminRole } from '@/types/auth';
 
@@ -110,6 +110,7 @@ export function AdminTopBar({
               }).catch(() => undefined);
             }
             clearAdminSession();
+            setAdminRemembered(false);
             localStorage.removeItem('nk_admin_email');
             window.location.href = '/management/login';
           }}

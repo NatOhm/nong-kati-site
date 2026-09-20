@@ -9,6 +9,7 @@ import {
   ensureFreshAdminToken,
   getAdminRefreshToken,
   getAdminToken,
+  installSessionScopeGuard,
 } from '@/lib/adminSession';
 
 const PUBLIC_MANAGEMENT_ROUTES = ['/management/login'];
@@ -75,6 +76,12 @@ export default function ManagementLayout({
     window.addEventListener(ADMIN_SESSION_EXPIRED_EVENT, onExpired);
     return () => window.removeEventListener(ADMIN_SESSION_EXPIRED_EVENT, onExpired);
   }, [isPublic, redirectToLogin]);
+
+  // Un-remembered sessions end with the browser: the guard clears the
+  // tokens on pagehide (tab close). Remembered sessions persist.
+  useEffect(() => {
+    installSessionScopeGuard();
+  }, []);
 
   // Loading state while checking auth
   if (isAuthenticated === null) {

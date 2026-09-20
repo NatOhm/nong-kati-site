@@ -19,10 +19,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const b = (body ?? {}) as Record<string, unknown>;
   const email = typeof b['email'] === 'string' ? b['email'] : '';
   const password = typeof b['password'] === 'string' ? b['password'] : '';
+  const remember = b['remember'] === true;
   if (!email || !password) {
     return NextResponse.json({ error: 'EMAIL_AND_PASSWORD_REQUIRED' }, { status: 400 });
   }
 
-  const result = await adminLogin(email, password);
+  const result = await adminLogin(email, password, remember);
   return NextResponse.json(result, { status: result.success ? 200 : 401 });
 }

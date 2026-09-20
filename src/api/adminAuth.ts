@@ -53,6 +53,8 @@ const CHALLENGE_TTL_SECONDS = 5 * 60;
 interface ChallengePayload {
   typ: 'admin-challenge';
   sub: string;
+  /** Remember-me choice from step 1, carried to the session issuer. */
+  rem?: boolean;
 }
 
 /**
@@ -62,8 +64,11 @@ interface ChallengePayload {
  * session. The challenge alone grants nothing: step 2 still requires a valid
  * TOTP.
  */
-async function issueChallengeToken(adminUserId: string): Promise<string> {
-  return signJwt({ typ: 'admin-challenge', sub: adminUserId }, CHALLENGE_TTL_SECONDS);
+async function issueChallengeToken(adminUserId: string, remember = false): Promise<string> {
+  return signJwt(
+    { typ: 'admin-challenge', sub: adminUserId, rem: remember },
+    CHALLENGE_TTL_SECONDS,
+  );
 }
 
 async function readChallengeToken(token: string): Promise<ChallengePayload | null> {
@@ -179,6 +184,7 @@ export async function ensureSeedAdmin(): Promise<void> {
 export async function adminLogin(
   email: string,
   password: string,
+  remember = false,
 ): Promise<{
   success: boolean;
   requires2faSetup?: boolean;
@@ -229,7 +235,7 @@ export async function adminLogin(
     data: { failedLoginAttempts: 0, lockedUntil: null },
   });
 
-  const challengeToken = await issueChallengeToken(user.id);
+  const challengeToken = await issueChallengeToken(user.id, remember);
   void pruneConsumedChallenges();
 
   if (!user.totpConfirmed || !user.totpSecret) {
@@ -304,19 +310,29 @@ export async function confirm2fa(
     data: { totpConfirmed: true, lastLoginAt: new Date() },
   });
 
-  const session = await issueAdminSession(user);
+  const session = await issueAdminSession(user, challenge.rem === true);
   // Fresh/flagged accounts land on the change-password form first.
   return user.mustChangePassword ? { ...session, mustChangePassword: true } : session;
 }
 
 /**
- * Issue a session: 15-min access JWT + 30-day refresh token (hash stored).
+ * Issue a session: 15-min access JWT + refresh token.
+ * Remember me → 30-day refresh (the classic "keep me logged in" box).
+ * Not remembered → 12-hour refresh: the session still survives refreshes
+ * within the workday but is gone by tomorrow, or whenever the browser
+ * session ends (the client clears storage on unload).
  */
-async function issueAdminSession(user: {
-  id: string;
-  email: string;
-  role: string;
-}): Promise<{ success: boolean; accessToken: string; refreshToken: string; expiresIn: number }> {
+const REFRESH_TTL_REMEMBER_MS = 30 * 24 * 60 * 60 * 1000;
+const REFRESH_TTL_SESSION_MS = 12 * 60 * 60 * 1000;
+
+async function issueAdminSession(
+  user: {
+    id: string;
+    email: string;
+    role: string;
+  },
+  remember = false,
+): Promise<{ success: boolean; accessToken: string; refreshToken: string; expiresIn: number }> {
   const role = user.role as AdminRole;
   const perms: Permission[] = ROLE_PERMISSIONS[role] ?? [];
   const accessToken = await issueAdminJwt(user.id, user.email, role, perms);
@@ -327,7 +343,9 @@ async function issueAdminSession(user: {
     data: {
       adminUserId: user.id,
       tokenHash,
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      expiresAt: new Date(
+        Date.now() + (remember ? REFRESH_TTL_REMEMBER_MS : REFRESH_TTL_SESSION_MS),
+      ),
     },
   });
 
@@ -383,7 +401,12 @@ export async function refreshAdminSession(refreshToken: string): Promise<{
     data: { revokedAt: new Date() },
   });
 
-  return issueAdminSession(user);
+  // Preserve the remembered-ness of the session being rotated: the new row
+  // keeps the original's expiry class (30 days vs 12 hours).
+  return issueAdminSession(
+    user,
+    session.expiresAt.getTime() - session.createdAt.getTime() > REFRESH_TTL_SESSION_MS,
+  );
 }
 
 /**

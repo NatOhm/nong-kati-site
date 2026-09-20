@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Shield } from 'lucide-react';
 
-import { setAdminSession } from '@/lib/adminSession';
+import { setAdminSession, setAdminRemembered } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
 
 /**
@@ -16,6 +16,7 @@ export default function AdminLoginPage(): React.JSX.Element {
   const [step, setStep] = useState<'credentials' | '2fa' | '2fa-setup'>('credentials');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [remember, setRemember] = useState(false);
   const [totpCode, setTotpCode] = useState('');
   const [challengeToken, setChallengeToken] = useState('');
   const [loading, setLoading] = useState(false);
@@ -37,7 +38,7 @@ export default function AdminLoginPage(): React.JSX.Element {
         const res = await fetch('/api/v1/auth/admin/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password }),
+          body: JSON.stringify({ email, password, remember }),
         });
         const result = (await res.json()) as {
           success: boolean;
@@ -92,7 +93,7 @@ export default function AdminLoginPage(): React.JSX.Element {
         setLoading(false);
       }
     },
-    [email, password],
+    [email, password, remember],
   );
 
   // Step 2: Verify TOTP
@@ -119,6 +120,7 @@ export default function AdminLoginPage(): React.JSX.Element {
           // Store the token pair via the shared session helper
           if (result.accessToken && result.refreshToken) {
             setAdminSession(result.accessToken, result.refreshToken);
+            setAdminRemembered(remember);
           }
           localStorage.setItem('nk_admin_email', email);
           if (result.mustChangePassword) {
@@ -201,6 +203,18 @@ export default function AdminLoginPage(): React.JSX.Element {
                 className="w-full rounded-md border border-line bg-surface px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-peach-500"
               />
             </div>
+
+            {/* Remember me — unchecked: session ends with the browser tab
+                (12h server cap); checked: stays logged in for 30 days. */}
+            <label className="flex cursor-pointer select-none items-center gap-2 text-sm text-fg-muted">
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+                className="h-4 w-4 rounded border-line accent-peach-500"
+              />
+              จดจำการเข้าสู่ระบบไว้ในเครื่องนี้ (30 วัน)
+            </label>
 
             <button
               type="submit"

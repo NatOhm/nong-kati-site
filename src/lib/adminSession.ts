@@ -49,6 +49,37 @@ export function clearAdminSession(): void {
   localStorage.removeItem(REFRESH_KEY);
 }
 
+// ─── Remember me ──────────────────────────────────────────
+
+const REMEMBER_KEY = 'nk_admin_remember';
+
+/** Remember-me choice of the current login (default false). */
+export function isAdminRemembered(): boolean {
+  if (typeof window === 'undefined') return false;
+  return localStorage.getItem(REMEMBER_KEY) === '1';
+}
+
+export function setAdminRemembered(remember: boolean): void {
+  if (typeof window === 'undefined') return;
+  if (remember) localStorage.setItem(REMEMBER_KEY, '1');
+  else localStorage.setItem(REMEMBER_KEY, '0');
+}
+
+/**
+ * Un-remembered sessions must end with the browser: clear the tokens when
+ * the tab closes. beforeunload/pagehide fire on every tab close (and on
+ * refresh — harmless, tokens re-saved by the next login only). Remembered
+ * sessions deliberately persist.
+ */
+export function installSessionScopeGuard(): void {
+  if (typeof window === 'undefined') return;
+  if ((window as Window & { __nkAdminScopeGuard?: boolean })['__nkAdminScopeGuard']) return;
+  (window as Window & { __nkAdminScopeGuard?: boolean })['__nkAdminScopeGuard'] = true;
+  window.addEventListener('pagehide', () => {
+    if (!isAdminRemembered()) clearAdminSession();
+  });
+}
+
 export interface AdminJwtPayloadLike {
   exp?: number;
   sub?: string;
