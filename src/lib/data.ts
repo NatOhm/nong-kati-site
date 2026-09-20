@@ -71,6 +71,7 @@ export interface ProductItem {
   category: { id: string; name: string; slug: string };
   variants: ProductVariant[];
   aliases: string[];
+  tags: { id: string; name: string; slug: string }[];
   isActive: boolean;
   isFeatured: boolean;
   createdAt: string;
@@ -286,7 +287,11 @@ export async function getAllCategorySlugs(): Promise<string[]> {
 
 // ─── Product helpers ───────────────────────────────────
 
-function mapProduct(p: any, cat: { id: string; name: string; slug: string } | null, tier: PriceTier = 'retail'): ProductItem {
+function mapProduct(
+  p: any,
+  cat: { id: string; name: string; slug: string } | null,
+  tier: PriceTier = 'retail',
+): ProductItem {
   return {
     id: p.id,
     name: p.name,
@@ -309,6 +314,11 @@ function mapProduct(p: any, cat: { id: string; name: string; slug: string } | nu
       sortOrder: v.sortOrder,
     })),
     aliases: (p.aliases ?? []).map((a: any) => a.alias),
+    tags: (p.tags ?? []).map((pt: any) => ({
+      id: pt.tag.id,
+      name: pt.tag.name,
+      slug: pt.tag.slug,
+    })),
     isActive: p.isActive,
     isFeatured: p.isFeatured,
     createdAt: p.createdAt?.toISOString?.() ?? new Date().toISOString(),
@@ -374,6 +384,7 @@ export async function getProductBySlug(slug: string): Promise<ProductItem | null
       category: { select: { id: true, name: true, slug: true } },
       variants: { where: { isActive: true }, orderBy: { sortOrder: 'asc' } },
       aliases: true,
+      tags: { include: { tag: true } },
     },
   });
 

@@ -162,6 +162,20 @@ export default async function ProductPage({
                   <p>{product.description}</p>
                 </div>
               )}
+
+              {/* Tags — free-form labels beyond the category (client ask) */}
+              {product.tags.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {product.tags.map((tag) => (
+                    <span
+                      key={tag.id}
+                      className="rounded-full bg-peach-100 px-2.5 py-1 text-xs font-medium text-peach-800"
+                    >
+                      #{tag.name}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Buy steps */}

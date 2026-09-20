@@ -53,6 +53,7 @@ model Product {
   aliases   ProductAlias[]
   inventory InventorySnapshot[]
   wishlist  WishlistItem[]
+  tags      ProductTag[]
 
   @@index([categoryId])
   @@index([slug])
@@ -561,4 +562,23 @@ model AuditLog {
   @@index([action])
   @@index([tableName, recordId])
   @@index([createdAt(sort: Desc)])
+}
+
+/// Free-form product labels beyond categories (client ask: การจัดการแท็ก).
+model Tag {
+  id        String       @id @default(cuid())
+  name      String       @unique
+  slug      String       @unique
+  createdAt DateTime     @default(now())
+  products  ProductTag[]
+}
+
+model ProductTag {
+  productId String
+  tagId     String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([productId, tagId])
+  @@index([tagId])
 }

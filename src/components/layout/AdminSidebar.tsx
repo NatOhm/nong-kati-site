@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   Package,
   Tags,
+  Hash,
   ShoppingCart,
   Ticket,
   Users,
@@ -44,6 +45,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   { label: 'สินค้า', href: '/management/products', icon: Package, permission: 'products:read' },
   { label: 'หมวดหมู่', href: '/management/categories', icon: Tags, permission: 'categories:read' },
+  { label: 'แท็ก', href: '/management/tags', icon: Hash, permission: 'products:read' },
   {
     label: 'คลังสินค้า',
     href: '/management/inventory',

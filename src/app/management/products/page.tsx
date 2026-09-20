@@ -45,11 +45,17 @@ interface AdminProduct {
   categoryName: string;
   isActive: boolean;
   isFeatured: boolean;
+  tags: { id: string; name: string; slug: string }[];
   variants: AdminVariant[];
   createdAt: string;
 }
 
 interface CategoryOption {
+  id: string;
+  name: string;
+}
+
+interface TagOption {
   id: string;
   name: string;
 }
@@ -69,12 +75,21 @@ const MAX_UPLOAD_BYTES = 512 * 1024;
 let draftKey = 1;
 function newDraftVariant(): DraftVariant {
   draftKey += 1;
-  return { key: draftKey, label: '', price: '', memberPrice: '', dealerPrice: '', stock: '0', isActive: true };
+  return {
+    key: draftKey,
+    label: '',
+    price: '',
+    memberPrice: '',
+    dealerPrice: '',
+    stock: '0',
+    isActive: true,
+  };
 }
 
 export default function AdminProductsPage(): React.JSX.Element {
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [allTags, setAllTags] = useState<TagOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -87,9 +102,10 @@ export default function AdminProductsPage(): React.JSX.Element {
     setLoading(true);
     setLoadError(null);
     try {
-      const [productsRes, catsRes] = await Promise.all([
+      const [productsRes, catsRes, tagsRes] = await Promise.all([
         adminFetch('/api/v1/admin/products', { cache: 'no-store' }),
         adminFetch('/api/v1/admin/categories', { cache: 'no-store' }),
+        adminFetch('/api/v1/admin/tags', { cache: 'no-store' }),
       ]);
       if (!productsRes.ok) {
         const data = (await productsRes.json().catch(() => ({}))) as { error?: string };
@@ -100,6 +116,10 @@ export default function AdminProductsPage(): React.JSX.Element {
       if (catsRes.ok) {
         const cats = (await catsRes.json()) as { categories: CategoryOption[] };
         setCategories(cats.categories);
+      }
+      if (tagsRes.ok) {
+        const t = (await tagsRes.json()) as { tags: TagOption[] };
+        setAllTags(t.tags);
       }
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : 'โหลดสินค้าไม่สำเร็จ');
@@ -307,6 +327,8 @@ export default function AdminProductsPage(): React.JSX.Element {
         <ProductEditor
           product={editing === 'new' ? null : editing}
           categories={categories}
+          allTags={allTags}
+          onTagsChanged={() => void load()}
           onClose={() => setEditing(null)}
           onSaved={handleSaved}
         />
@@ -320,11 +342,15 @@ export default function AdminProductsPage(): React.JSX.Element {
 function ProductEditor({
   product,
   categories,
+  allTags,
+  onTagsChanged,
   onClose,
   onSaved,
 }: {
   product: AdminProduct | null;
   categories: CategoryOption[];
+  allTags: TagOption[];
+  onTagsChanged: () => void;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -333,6 +359,11 @@ function ProductEditor({
   const [categoryId, setCategoryId] = useState(product?.categoryId ?? categories[0]?.id ?? '');
   const [imageUrl, setImageUrl] = useState<string | null>(product?.imageUrl ?? null);
   const [isFeatured, setIsFeatured] = useState(product?.isFeatured ?? false);
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>(
+    product?.tags.map((t) => t.id) ?? [],
+  );
+  const [newTagName, setNewTagName] = useState('');
+  const [creatingTag, setCreatingTag] = useState(false);
   const [variants, setVariants] = useState<DraftVariant[]>(
     product && product.variants.length > 0
       ? product.variants.map((v) => ({
@@ -391,6 +422,30 @@ function ProductEditor({
     }
   }
 
+  async function handleCreateTag() {
+    if (newTagName.trim() === '') return;
+    setCreatingTag(true);
+    try {
+      const res = await adminFetch('/api/v1/admin/tags', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newTagName.trim() }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error ?? `HTTP ${res.status}`);
+      }
+      const tag = (await res.json()) as { id: string; name: string };
+      setSelectedTagIds((ids) => [...ids, tag.id]);
+      setNewTagName('');
+      onTagsChanged();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'สร้างแท็กไม่สำเร็จ');
+    } finally {
+      setCreatingTag(false);
+    }
+  }
+
   async function handleSave() {
     setSaving(true);
     setError(null);
@@ -401,6 +456,7 @@ function ProductEditor({
         imageUrl,
         categoryId,
         isFeatured,
+        tagIds: selectedTagIds,
         variants: variants.map((v) => ({
           label: v.label.trim(),
           price: Number(v.price),
@@ -542,6 +598,56 @@ function ProductEditor({
                 />
                 <Star size={14} className="text-peach-500" /> แสดงเป็นสินค้าแนะนำ
               </label>
+            </div>
+          </div>
+
+          {/* Tags (แท็ก) — free-form labels beyond category */}
+          <div>
+            <label className="mb-2 block text-sm font-medium text-fg-muted">แท็ก</label>
+            {allTags.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {allTags.map((tag) => {
+                  const on = selectedTagIds.includes(tag.id);
+                  return (
+                    <button
+                      key={tag.id}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() =>
+                        setSelectedTagIds((ids) =>
+                          on ? ids.filter((x) => x !== tag.id) : [...ids, tag.id],
+                        )
+                      }
+                      className={cn(
+                        'rounded-full border px-3 py-1.5 text-xs font-medium transition-all duration-fast active:scale-95',
+                        on
+                          ? 'border-peach-500 bg-peach-100 text-peach-800'
+                          : 'border-line bg-surface text-fg-secondary hover:border-peach-400',
+                      )}
+                    >
+                      {tag.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <input
+                value={newTagName}
+                onChange={(e) => setNewTagName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && void handleCreateTag()}
+                placeholder="สร้างแท็กใหม่…"
+                className="h-9 flex-1 rounded-lg border border-line bg-surface px-3 text-sm text-fg placeholder:text-fg-placeholder focus:outline-none focus:ring-2 focus:ring-peach-500"
+              />
+              <button
+                type="button"
+                onClick={() => void handleCreateTag()}
+                disabled={creatingTag || newTagName.trim() === ''}
+                className="flex h-9 items-center gap-1 rounded-lg border border-line bg-surface px-3 text-xs font-semibold text-fg-secondary transition-colors hover:border-peach-400 hover:text-fg-brand disabled:opacity-50"
+              >
+                {creatingTag ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                สร้างแท็ก
+              </button>
             </div>
           </div>
 

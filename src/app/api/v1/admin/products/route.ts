@@ -27,6 +27,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     include: {
       category: { select: { id: true, name: true, slug: true } },
       variants: { orderBy: { sortOrder: 'asc' } },
+      tags: { include: { tag: true } },
     },
     orderBy: { createdAt: 'desc' },
   });
@@ -43,6 +44,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       categoryName: p.category.name,
       isActive: p.isActive,
       isFeatured: p.isFeatured,
+      tags: p.tags.map((pt) => ({ id: pt.tag.id, name: pt.tag.name, slug: pt.tag.slug })),
       variants: p.variants.map((v) => ({
         id: v.id,
         label: v.label,
@@ -69,9 +71,7 @@ interface VariantInput {
 }
 
 /** Validate a variant payload; returns null when the shape is wrong. */
-function parseVariant(
-  v: VariantInput,
-): {
+function parseVariant(v: VariantInput): {
   label: string;
   price: number;
   stock: number;
@@ -161,6 +161,22 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'INVALID_VARIANT' }, { status: 400 });
   }
 
+  // Optional tags at create time — validate all ids exist.
+  let tagConnect: { tagId: string }[] = [];
+  if (b['tagIds'] !== undefined) {
+    if (!Array.isArray(b['tagIds'])) {
+      return NextResponse.json({ error: 'INVALID_TAGS' }, { status: 400 });
+    }
+    const ids = [
+      ...new Set((b['tagIds'] as unknown[]).filter((x): x is string => typeof x === 'string')),
+    ];
+    const valid = await prisma.tag.findMany({ where: { id: { in: ids } }, select: { id: true } });
+    if (valid.length !== ids.length) {
+      return NextResponse.json({ error: 'TAG_NOT_FOUND' }, { status: 400 });
+    }
+    tagConnect = ids.map((tagId) => ({ tagId }));
+  }
+
   const created = await prisma.product.create({
     data: {
       name,
@@ -182,6 +198,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           sortOrder: i,
         })),
       },
+      tags: { create: tagConnect },
     },
     include: { variants: true },
   });

@@ -49,6 +49,7 @@ export async function PUT(
     categoryId?: string;
     isActive?: boolean;
     isFeatured?: boolean;
+    tags?: { deleteMany: { productId: string }[]; create: { tagId: string }[] };
   } = {};
 
   if (typeof b['name'] === 'string' && b['name'].trim() !== '') data.name = b['name'].trim();
@@ -83,6 +84,20 @@ export async function PUT(
   }
   if (typeof b['isActive'] === 'boolean') data.isActive = b['isActive'];
   if (typeof b['isFeatured'] === 'boolean') data.isFeatured = b['isFeatured'];
+  // Tags: replace-all semantics when present (array of tag ids).
+  if (b['tagIds'] !== undefined) {
+    if (!Array.isArray(b['tagIds'])) {
+      return NextResponse.json({ error: 'INVALID_TAGS' }, { status: 400 });
+    }
+    const ids = [
+      ...new Set((b['tagIds'] as unknown[]).filter((x): x is string => typeof x === 'string')),
+    ];
+    const valid = await prisma.tag.findMany({ where: { id: { in: ids } }, select: { id: true } });
+    if (valid.length !== ids.length) {
+      return NextResponse.json({ error: 'TAG_NOT_FOUND' }, { status: 400 });
+    }
+    data.tags = { deleteMany: [{ productId: id }], create: ids.map((tagId) => ({ tagId })) };
+  }
 
   // Variants: replace-all semantics when present.
   if (b['variants'] !== undefined) {
@@ -205,7 +220,10 @@ export async function PUT(
 
   const updated = await prisma.product.findUnique({
     where: { id },
-    include: { variants: { orderBy: { sortOrder: 'asc' } } },
+    include: {
+      variants: { orderBy: { sortOrder: 'asc' } },
+      tags: { include: { tag: true } },
+    },
   });
   return NextResponse.json({
     id: updated!.id,
@@ -215,6 +233,7 @@ export async function PUT(
     imageUrl: updated!.imageUrl,
     isActive: updated!.isActive,
     isFeatured: updated!.isFeatured,
+    tags: updated!.tags.map((pt) => ({ id: pt.tag.id, name: pt.tag.name, slug: pt.tag.slug })),
     variants: updated!.variants.map((v) => ({
       id: v.id,
       label: v.label,
