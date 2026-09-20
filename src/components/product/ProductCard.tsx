@@ -1,12 +1,11 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { Check } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { formatThb } from '@/utils/format';
-import { useCart } from '@/hooks/useCart';
-import { useToast } from '@/hooks/useToast';
+import { useCardBuy } from '@/hooks/useCardBuy';
 import { QuickViewModal, type QuickViewVariant } from './QuickViewModal';
 import { StockBadge } from './StockBadge';
 import { WishlistButton } from './WishlistButton';
@@ -30,8 +29,6 @@ export interface ProductCardProps {
   className?: string;
 }
 
-type BuyState = 'idle' | 'pending' | 'added';
-
 /**
  * 05-components.md §3.1 — Product Grid Card (clay tile) with buy-from-card.
  * Image + title link to /product/[slug]; the buy button is a sibling (never
@@ -54,49 +51,18 @@ export function ProductCard({
   variants,
   className,
 }: ProductCardProps): React.JSX.Element {
-  const { addItem } = useCart();
-  const { toast } = useToast();
-  const [buyState, setBuyState] = useState<BuyState>('idle');
+  const { canDirectAdd, buyState, handleBuy } = useCardBuy({
+    variantId,
+    variantCount,
+    name,
+    slug,
+    imageUrl,
+    price,
+    stock,
+  });
   const [quickViewOpen, setQuickViewOpen] = useState(false);
-  const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const canDirectAdd = Boolean(variantId) && variantCount <= 1 && stock > 0;
   const canQuickView = variantCount > 1 && stock > 0;
-
-  const handleBuy = useCallback(() => {
-    if (!canDirectAdd || !variantId || buyState !== 'idle') return;
-
-    setBuyState('pending');
-    pendingTimer.current = setTimeout(() => {
-      addItem(
-        {
-          id: `cart-${variantId}-${Date.now()}`,
-          variantId,
-          skuCode: `${slug}-${variantId}`,
-          productNameTh: name,
-          productNameEn: name,
-          productSlug: slug,
-          thumbnailUrl: imageUrl ?? null,
-          denominationThb: price,
-          unitPriceThb: price,
-          vatAmountThb: Math.round((price / 1.07) * 0.07 * 100) / 100,
-          inStock: true,
-          availableQuantity: stock,
-          maxQuantity: Math.min(10, stock),
-        },
-        1,
-      );
-      setBuyState('added');
-      toast.success('เพิ่มลงตะกร้าแล้ว', {
-        message: `${name} × 1`,
-        duration: 2600,
-        variant: 'cart',
-      });
-      resetTimer.current = setTimeout(() => setBuyState('idle'), 1600);
-    }, 450);
-  }, [canDirectAdd, variantId, buyState, addItem, slug, name, imageUrl, price, stock, toast]);
-
   const buyLabel = buyState === 'added' ? 'เพิ่มแล้ว' : canDirectAdd ? 'ซื้อสินค้า' : 'เลือกราคา';
 
   return (
@@ -242,9 +208,7 @@ export function ProductCard({
           categoryName,
           variants:
             variants ??
-            (variantId
-              ? [{ id: variantId, label: '', price, effectivePrice: price, stock }]
-              : []),
+            (variantId ? [{ id: variantId, label: '', price, effectivePrice: price, stock }] : []),
         }}
       />
     </>

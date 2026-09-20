@@ -5,10 +5,10 @@ import { Suspense } from 'react';
 import { FacebookLayout } from '@/components/layout/FacebookLayout';
 import { Footer } from '@/components/layout/Footer';
 import { PageShell } from '@/components/layout/PageShell';
-import { ProductCard } from '@/components/product/ProductCard';
-import { ProductGrid } from '@/components/product/ProductGrid';
+import { SearchProductCard } from '@/components/product/SearchProductCard';
 import { Breadcrumb } from '@/components/data-display/Breadcrumb';
 import { CatalogSearchBox } from '@/components/search/CatalogSearchBox';
+import { SearchToolbar } from '@/components/search/SearchToolbar';
 import { HamsterMascot } from '@/components/ui/ClayIcons';
 
 import { getCatalogProducts, getCategoriesWithProductCounts, type CatalogSort } from '@/lib/data';
@@ -78,7 +78,6 @@ export default async function SearchPage({
   }
   const totalPages = Math.ceil(total / limit);
 
-  // Build sort control that preserves current query/category
   const sortUrl = (sortValue: CatalogSort) =>
     buildUrl({ q: query || undefined, category: category || undefined, sort: sortValue });
 
@@ -98,30 +97,30 @@ export default async function SearchPage({
               ]}
             />
 
-            {/* Live search with Google-style suggestions — client ask;
-                the navbar box is md+ only, phones search here */}
-            <section className="pb-6">
-              <Suspense fallback={<div className="h-11" />}>
-                <CatalogSearchBox className="max-w-xl" />
+            <h1 className="sr-only">
+              {query
+                ? `ผลการค้นหา "${query}"`
+                : category
+                  ? `หมวดหมู่: ${category}`
+                  : 'สินค้าทั้งหมด'}
+            </h1>
+
+            {/* Reference-grid toolbar (img 2): search left, sort dropdown + 1/N pager right */}
+            <section className="pb-4">
+              <Suspense fallback={<div className="h-11 w-full md:max-w-md" />}>
+                <SearchToolbar
+                  page={page}
+                  totalPages={totalPages}
+                  currentSort={sort}
+                  sortOptions={SORT_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+                >
+                  <CatalogSearchBox className="w-full" />
+                </SearchToolbar>
               </Suspense>
             </section>
 
-            {/* Header */}
-            <section className="pb-6">
-              <h1 className="font-display text-2xl font-bold text-fg">
-                {query ? (
-                  <>ผลการค้นหา &ldquo;{query}&rdquo;</>
-                ) : category ? (
-                  <>หมวดหมู่: {category}</>
-                ) : (
-                  'สินค้าทั้งหมด'
-                )}
-              </h1>
-              <p className="mt-2 text-fg-placeholder">พบ {total} รายการ</p>
-            </section>
-
-            {/* Category chips + sort */}
-            <section className="pb-6">
+            {/* Category chips */}
+            <section className="pb-5">
               <div className="flex flex-wrap items-center gap-2">
                 <Link
                   href={buildUrl({ q: query || undefined, sort: sortParam })}
@@ -147,39 +146,19 @@ export default async function SearchPage({
                   </Link>
                 ))}
               </div>
-
-              <div className="mt-4 flex items-center gap-2">
-                <span className="text-sm text-fg-placeholder">เรียงตาม:</span>
-                {SORT_OPTIONS.map((opt) => (
-                  <Link
-                    key={opt.value}
-                    href={sortUrl(opt.value)}
-                    className={`rounded-md px-2.5 py-1 text-sm transition-colors ${
-                      sort === opt.value
-                        ? 'bg-peach-100 font-semibold text-fg-brand'
-                        : 'text-fg-muted hover:bg-surface hover:text-fg'
-                    }`}
-                  >
-                    {opt.label}
-                  </Link>
-                ))}
-              </div>
             </section>
 
-            {/* Results */}
+            {/* Results — dense reference-grid tiles (5 up on desktop) */}
             {products.length > 0 ? (
               <section className="pb-16">
-                <ProductGrid>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                   {products.map((product) => (
-                    <ProductCard
+                    <SearchProductCard
                       key={product.id}
                       id={product.id}
                       name={product.name}
                       slug={product.slug}
-                      shortDescription={product.shortDescription}
                       imageUrl={product.imageUrl}
-                      categoryName={product.category.name}
-                      categorySlug={product.category.slug}
                       price={product.variants[0]?.effectivePrice ?? 0}
                       stock={product.variants.reduce((sum, v) => sum + v.stock, 0)}
                       variantId={product.variants[0]?.id}
@@ -193,42 +172,7 @@ export default async function SearchPage({
                       }))}
                     />
                   ))}
-                </ProductGrid>
-
-                {/* Pagination */}
-                {totalPages > 1 && (
-                  <div className="mt-8 flex items-center justify-center gap-2">
-                    {page > 1 && (
-                      <Link
-                        href={buildUrl({
-                          q: query || undefined,
-                          category: category || undefined,
-                          sort: sortParam,
-                          page: page - 1,
-                        })}
-                        className="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-fg-secondary hover:border-peach-400 hover:text-fg-brand"
-                      >
-                        ← ก่อนหน้า
-                      </Link>
-                    )}
-                    <span className="text-sm text-fg-placeholder">
-                      หน้า {page} จาก {totalPages}
-                    </span>
-                    {page < totalPages && (
-                      <Link
-                        href={buildUrl({
-                          q: query || undefined,
-                          category: category || undefined,
-                          sort: sortParam,
-                          page: page + 1,
-                        })}
-                        className="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-fg-secondary hover:border-peach-400 hover:text-fg-brand"
-                      >
-                        ถัดไป →
-                      </Link>
-                    )}
-                  </div>
-                )}
+                </div>
               </section>
             ) : query || category ? (
               <section className="py-16 text-center">
