@@ -9,7 +9,6 @@ import { Footer } from '@/components/layout/Footer';
 import { PageShell } from '@/components/layout/PageShell';
 import { Breadcrumb } from '@/components/data-display/Breadcrumb';
 import { StructuredData } from '@/components/data-display/StructuredData';
-import { StockBadge } from '@/components/product/StockBadge';
 import { ProductDetailClient } from '@/components/product/ProductDetailClient';
 import { formatThb } from '@/utils/format';
 
@@ -127,53 +126,46 @@ export default async function ProductPage({
             ]}
           />
 
-          {/* Product Detail */}
-          <div className="grid gap-8 pb-16 md:grid-cols-2">
-            {/* Image */}
-            <div className="flex aspect-square items-center justify-center overflow-hidden rounded-lg border border-line-subtle bg-surface">
-              {product.imageUrl ? (
-                <img
-                  src={product.imageUrl}
-                  alt={product.name}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="text-clay-9000 flex flex-col items-center gap-4">
-                  <span className="text-6xl">🎮</span>
-                  <span className="text-sm">ไม่มีรูปภาพ</span>
+          {/* Product Detail — reference layout (img 2): wide banner + overlaid
+              title/heart left with description under it; numbered buy steps right */}
+          <div className="grid gap-8 pb-16 md:grid-cols-5">
+            {/* Banner + description */}
+            <div className="flex flex-col gap-5 md:col-span-2">
+              <div className="relative overflow-hidden rounded-2xl border border-line-subtle bg-surface shadow-clay-sm">
+                <div className="aspect-[16/9] w-full">
+                  {product.imageUrl ? (
+                    <img
+                      src={product.imageUrl}
+                      alt={product.name}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center">
+                      <span className="text-6xl opacity-40">🎮</span>
+                    </div>
+                  )}
+                </div>
+                {/* Title over a scrim (img 2) — heart stays clickable */}
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent px-4 pb-3.5 pt-14">
+                  <h1 className="font-display text-xl font-bold text-white drop-shadow-sm md:text-2xl">
+                    {product.name}
+                  </h1>
+                </div>
+                <div className="absolute bottom-3.5 right-3.5">
+                  <WishCounterBadge productId={product.id} initialCount={wishCount} />
+                </div>
+              </div>
+
+              {/* Description under the banner (img 2) */}
+              {product.description && (
+                <div className="max-w-none text-sm leading-relaxed text-fg-muted">
+                  <p>{product.description}</p>
                 </div>
               )}
             </div>
 
-            {/* Details */}
-            <div className="flex flex-col gap-6">
-              {/* Category tag */}
-              <Link
-                href={`/category/${product.category.slug}`}
-                className="text-sm font-medium text-fg-brand hover:text-fg-brand"
-              >
-                {product.category.name}
-              </Link>
-
-              {/* Title */}
-              <h1 className="font-display text-2xl font-bold text-fg md:text-3xl">
-                {product.name}
-              </h1>
-
-              {/* Stock badge + wishlist social proof */}
-              <div className="flex flex-wrap items-center gap-2">
-                <StockBadge stock={totalStock} />
-                <WishCounterBadge productId={product.id} initialCount={wishCount} />
-              </div>
-
-              {/* Description */}
-              {product.description && (
-                <div className="prose prose-invert max-w-none text-sm text-fg-muted">
-                  <p>{product.description}</p>
-                </div>
-              )}
-
-              {/* Interactive Product Details (variant selection, add to cart) */}
+            {/* Buy steps */}
+            <div className="md:col-span-3">
               <ProductDetailClient
                 productId={product.id}
                 productName={product.name}

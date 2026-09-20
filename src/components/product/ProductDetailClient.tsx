@@ -5,6 +5,7 @@ import { ShoppingCart, Check } from 'lucide-react';
 import { useCart } from '@/hooks/useCart';
 import { formatThb } from '@/utils/format';
 import { cn } from '@/utils/cn';
+import { StockBadge } from './StockBadge';
 
 interface Variant {
   id: string;
@@ -28,8 +29,24 @@ interface ProductDetailClientProps {
 }
 
 /**
- * Client component for product detail page.
- * Handles variant selection, add to cart, and cart state.
+ * Numbered-circle step header (reference layout, img 2): peach circle with
+ * the step number, bold title beside it.
+ */
+function StepHeader({ n, title }: { n: number; title: string }): React.JSX.Element {
+  return (
+    <div className="mb-2.5 flex items-center gap-2.5">
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-peach-500 text-sm font-bold text-white shadow-clay-sm">
+        {n}
+      </span>
+      <h2 className="text-base font-bold text-fg">{title}</h2>
+    </div>
+  );
+}
+
+/**
+ * Client component for product detail page — reference buy flow (img 2):
+ * ① เลือกแพ็กเกจ (package card grid, selected highlighted) ② จำนวน + add to
+ * cart. Handles variant selection, add to cart, and cart state.
  */
 export function ProductDetailClient({
   productId,
@@ -40,7 +57,7 @@ export function ProductDetailClient({
   thumbnailUrl,
   variants,
 }: ProductDetailClientProps): React.JSX.Element {
-  const { addItem, isInCart, getQuantity, itemCount } = useCart();
+  const { addItem, isInCart, getQuantity } = useCart();
   const [selectedVariant, setSelectedVariant] = useState<Variant | null>(
     variants.find((v) => v.stock > 0) ?? null,
   );
@@ -78,120 +95,153 @@ export function ProductDetailClient({
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Price */}
-      <div className="border-t border-line-subtle pt-4">
+      {/* Category + stock */}
+      <div className="flex flex-wrap items-center gap-2">
+        <a
+          href={`/category/${categorySlug}`}
+          className="text-sm font-semibold text-fg-brand hover:underline"
+        >
+          {categoryName}
+        </a>
+        <StockBadge stock={totalStock} />
+      </div>
+
+      {/* Price — the selected package's tier-resolved price */}
+      <div className="border-b border-line-subtle pb-4">
         <span className="text-xs text-fg-placeholder">ราคา</span>
-        <div className="text-2xl font-bold text-fg-brand">
+        <div className="text-3xl font-bold text-fg-brand">
           {selectedVariant
             ? formatThb(selectedVariant.effectivePrice)
             : formatThb(variants[0]?.effectivePrice ?? 0)}
         </div>
         {selectedVariant && (
-          <p className="text-clay-9000 text-xs">
+          <p className="text-xs text-fg-placeholder">
             รวม VAT 7% = {formatThb(selectedVariant.effectivePrice)}
           </p>
         )}
       </div>
 
-      {/* Variant Selection */}
-      {variants.length > 0 && (
-        <div>
-          <h2 className="mb-3 text-sm font-semibold text-fg-secondary">เลือกประเภท</h2>
-          <div className="flex flex-wrap gap-2">
-            {variants.map((variant) => {
-              const isSelected = selectedVariant?.id === variant.id;
-              const inCart = isInCart(variant.id);
-              return (
-                <button
-                  key={variant.id}
-                  onClick={() => setSelectedVariant(variant)}
-                  disabled={variant.stock === 0}
+      {/* Step 1 — package card grid (img 2 "Select Package") */}
+      <section>
+        <StepHeader n={1} title="เลือกแพ็กเกจ" />
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+          {variants.map((variant) => {
+            const isSelected = selectedVariant?.id === variant.id;
+            const inCart = isInCart(variant.id);
+            return (
+              <button
+                key={variant.id}
+                onClick={() => setSelectedVariant(variant)}
+                disabled={variant.stock === 0}
+                aria-pressed={isSelected}
+                className={cn(
+                  'relative flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition-all duration-fast ease-ease-out',
+                  'disabled:cursor-not-allowed disabled:opacity-40',
+                  isSelected
+                    ? 'border-peach-500 bg-peach-100 shadow-brand-glow active:scale-[0.98]'
+                    : 'border-line bg-surface hover:border-peach-400 hover:shadow-clay-sm active:scale-[0.98]',
+                )}
+              >
+                {inCart && (
+                  <span className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-peach-500 text-[10px] font-bold text-white shadow-clay-sm">
+                    {getQuantity(variant.id)}
+                  </span>
+                )}
+                {/* 'default' is an internal single-variant label — show a friendly name.
+                    Selected cards keep the light peach surface in BOTH themes,
+                    so their text stays dark for contrast. */}
+                <span
                   className={cn(
-                    'relative flex flex-col items-center gap-1 rounded-md border px-4 py-2 text-sm transition-all',
-                    'disabled:cursor-not-allowed disabled:opacity-40',
-                    isSelected
-                      ? 'border-peach-500 bg-peach-100 shadow-brand-glow'
-                      : 'border-line bg-surface hover:border-line-brand hover:bg-clay-200',
+                    'line-clamp-1 text-sm font-semibold',
+                    isSelected ? 'text-clay-900' : 'text-fg',
                   )}
                 >
-                  {inCart && (
-                    <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-peach-500 text-[9px] font-bold text-white">
-                      {getQuantity(variant.id)}
-                    </span>
+                  {variant.label !== 'default' ? variant.label : 'แพ็กเกจมาตรฐาน'}
+                </span>
+                <span
+                  className={cn(
+                    'text-sm font-bold',
+                    isSelected ? 'text-peach-800' : 'text-fg-brand',
                   )}
-                  {/* 'default' is an internal single-variant label — show only the price */}
-                  {variant.label !== 'default' && (
-                    <span className="font-medium text-fg">{variant.label}</span>
-                  )}
-                  <span className="text-xs text-fg-placeholder">{formatThb(variant.effectivePrice)}</span>
-                  {variant.stock <= 10 && variant.stock > 0 && (
-                    <span className="text-xs text-fg-brand">เหลือ {variant.stock}</span>
-                  )}
-                  {variant.stock === 0 && <span className="text-xs text-coral-600">หมด</span>}
-                </button>
-              );
-            })}
-          </div>
+                >
+                  {formatThb(variant.effectivePrice)}
+                </span>
+                {variant.stock === 0 ? (
+                  <span className="text-xs text-coral-600">หมด</span>
+                ) : variant.stock <= 10 ? (
+                  <span
+                    className={cn(
+                      'text-xs font-medium',
+                      isSelected ? 'text-peach-800' : 'text-fg-brand',
+                    )}
+                  >
+                    เหลือ {variant.stock}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
         </div>
-      )}
+      </section>
 
-      {/* Quantity */}
+      {/* Step 2 — quantity + add to cart */}
       {selectedVariant && selectedVariant.stock > 0 && (
-        <div>
-          <h2 className="mb-3 text-sm font-semibold text-fg-secondary">จำนวน</h2>
-          <div className="flex items-center gap-3">
+        <section>
+          <StepHeader n={2} title="จำนวน" />
+          <div className="mb-4 flex items-center gap-3">
             <button
               onClick={() => setQuantity(Math.max(1, quantity - 1))}
-              className="flex h-8 w-8 items-center justify-center rounded-md border border-line bg-surface text-fg-secondary hover:border-line-brand"
+              aria-label="ลดจำนวน"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-line bg-surface text-lg text-fg-secondary transition-colors hover:border-peach-400 hover:text-fg active:scale-90"
             >
-              -
+              −
             </button>
-            <span className="w-8 text-center font-mono text-lg text-fg">{quantity}</span>
+            <span className="w-8 text-center font-mono text-lg font-semibold text-fg">
+              {quantity}
+            </span>
             <button
               onClick={() =>
                 setQuantity(Math.min(Math.min(10, selectedVariant.stock), quantity + 1))
               }
-              className="flex h-8 w-8 items-center justify-center rounded-md border border-line bg-surface text-fg-secondary hover:border-line-brand"
+              aria-label="เพิ่มจำนวน"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-line bg-surface text-lg text-fg-secondary transition-colors hover:border-peach-400 hover:text-fg active:scale-90"
             >
               +
             </button>
-            <span className="text-clay-9000 text-xs">/ {Math.min(10, selectedVariant.stock)}</span>
+            <span className="text-xs text-fg-placeholder">
+              / {Math.min(10, selectedVariant.stock)}
+            </span>
           </div>
-        </div>
-      )}
 
-      {/* Add to Cart */}
-      <div className="border-t border-line-subtle pt-4">
-        <button
-          onClick={handleAddToCart}
-          disabled={!selectedVariant || selectedVariant.stock === 0 || addedToCart}
-          className={cn(
-            'flex w-full items-center justify-center gap-2 rounded-md px-6 py-3 text-base font-semibold transition-all',
-            addedToCart
-              ? 'bg-jade-500 text-white'
-              : selectedVariant && selectedVariant.stock > 0
-                ? 'bg-peach-500 text-white shadow-clay-sm hover:bg-peach-400'
-                : 'cursor-not-allowed bg-clay-300 text-fg-placeholder',
+          <button
+            onClick={handleAddToCart}
+            disabled={!selectedVariant || selectedVariant.stock === 0 || addedToCart}
+            className={cn(
+              'flex w-full items-center justify-center gap-2 rounded-full px-6 py-3.5 text-base font-semibold transition-all duration-interactive ease-ease-out',
+              addedToCart
+                ? 'bg-jade-500 text-white shadow-clay-sm'
+                : 'bg-peach-500 text-white shadow-clay-brand hover:scale-[1.01] hover:bg-peach-400 hover:shadow-clay-lg active:scale-[0.97] active:shadow-clay-press',
+            )}
+          >
+            {addedToCart ? (
+              <>
+                <Check size={18} strokeWidth={2.5} />
+                เพิ่มลงตะกร้าแล้ว!
+              </>
+            ) : (
+              <>
+                <ShoppingCart size={18} />
+                เพิ่มลงตะกร้า
+              </>
+            )}
+          </button>
+          {inCartCount > 0 && !addedToCart && (
+            <p className="mt-2 text-center text-xs text-fg-brand">
+              มี {inCartCount} ชิ้นในตะกร้าแล้ว
+            </p>
           )}
-        >
-          {addedToCart ? (
-            <>
-              <Check size={18} />
-              เพิ่มลงตะกร้าแล้ว!
-            </>
-          ) : (
-            <>
-              <ShoppingCart size={18} />
-              เพิ่มลงตะกร้า
-            </>
-          )}
-        </button>
-        {inCartCount > 0 && !addedToCart && (
-          <p className="mt-2 text-center text-xs text-fg-brand">
-            มี {inCartCount} ชิ้นในตะกร้าแล้ว
-          </p>
-        )}
-      </div>
+        </section>
+      )}
     </div>
   );
 }
