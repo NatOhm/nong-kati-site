@@ -1,7 +1,8 @@
 # Admin Login — Test Guide
 
 How to test the admin panel login flow on Nong-Kati, including every failure
-case it is designed to handle.
+case it is designed to handle. สำหรับบัญชีทดสอบฝั่งลูกค้า ดู
+`docs/customer-login-test.md` (มีตารางบัญชี dummy ทั้งสองฝั่ง)
 
 - **Login page (local dev):** `http://localhost:4200/management/login` (or whichever port `npm run dev` prints)
 - **Login page (production):** `https://nong-kati.vercel.app/management/login`
@@ -63,10 +64,22 @@ with the stored token returns the full catalog.
   through `adminFetch` (`src/lib/adminSession.ts`): a 401 triggers one silent
   refresh-and-retry, and the layout refreshes proactively while the tab is
   open. You should almost never see an expiry error.
-- **Refresh token: 30 days**, stored only as a SHA-256 hash in `AdminSession`.
-  Every refresh **rotates** it — the old token is revoked server-side and a
-  new one is returned. Re-login is only needed after 30 days of inactivity,
-  or if the session was revoked (logout, password change).
+- **Refresh token TTL follows the Remember-me box (added 2026-09-20):**
+  - **จดจำการเข้าสู่ระบบไว้ในเครื่องนี้ (30 วัน) checked → 30 days** — the
+    classic keep-me-logged-in; come back next week and you're still in.
+  - **Unchecked → 12 hours AND the session ends with the browser** — a
+    `pagehide` guard (`installSessionScopeGuard` in `src/lib/adminSession.ts`)
+    clears both tokens the moment the tab closes. Close tab → reopen = login
+    page. The 12h cap is the backstop for a browser that never fires pagehide
+    (e.g. force-killed).
+  - The choice is stored in `localStorage.nk_admin_remember` (`1`/`0`) and
+    rides the login API into the session issuer; **refresh rotation preserves
+    the class** (a remembered session stays 30-day after renewals).
+- Refresh tokens are stored only as a SHA-256 hash in `AdminSession`.
+  Every refresh **rotates** the token — the old one is revoked server-side
+  and a new one is returned. Re-login is needed when the refresh token
+  finally expires (per the rules above), or if the session was revoked
+  (logout, password change).
 - **Refresh failure = silent logout.** An invalid/expired/already-rotated
   refresh token clears storage and redirects to the login page — no dead
   admin screens.
@@ -87,15 +100,18 @@ console.log('expired:', p.exp * 1000 < Date.now(), 'role:', p.role);
 
 ## 4. Failure cases to exercise
 
-| #   | Scenario                   | Steps                                             | Expected result                                                                                     |
-| --- | -------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| 1   | Wrong password             | valid email + wrong password                      | Error "อีเมลหรือรหัสผ่านไม่ถูกต้อง"; counter increments (persisted in DB)                           |
-| 2   | Unknown email              | any password                                      | Same invalid-credentials error (no account enumeration; latency masked)                             |
-| 3   | Account lockout            | 5 consecutive wrong passwords                     | Account `locked` in DB for **15 minutes**; message shows minutes remaining; survives server restart |
-| 4   | Wrong TOTP                 | correct email+password, then a wrong 6-digit code | "รหัสไม่ถูกต้อง กรุณาลองใหม่"; remains on 2FA step                                                  |
-| 5   | Expired/consumed challenge | wait > 5 min, or reuse an old challenge           | "หมดเวลายืนยัน" and return to credentials step                                                      |
-| 6   | Deactivated account        | (set `status: 'deactivated'` in DB)               | "บัญชีนี้ถูกปิดใช้งาน"                                                                              |
-| 7   | Empty inputs               | submit blank form                                 | HTML5 required validation blocks submit                                                             |
+| #   | Scenario                          | Steps                                             | Expected result                                                                                     |
+| --- | --------------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| 1   | Wrong password                    | valid email + wrong password                      | Error "อีเมลหรือรหัสผ่านไม่ถูกต้อง"; counter increments (persisted in DB)                           |
+| 2   | Unknown email                     | any password                                      | Same invalid-credentials error (no account enumeration; latency masked)                             |
+| 3   | Account lockout                   | 5 consecutive wrong passwords                     | Account `locked` in DB for **15 minutes**; message shows minutes remaining; survives server restart |
+| 4   | Wrong TOTP                        | correct email+password, then a wrong 6-digit code | "รหัสไม่ถูกต้อง กรุณาลองใหม่"; remains on 2FA step                                                  |
+| 5   | Expired/consumed challenge        | wait > 5 min, or reuse an old challenge           | "หมดเวลายืนยัน" and return to credentials step                                                      |
+| 6   | Deactivated account               | (set `status: 'deactivated'` in DB)               | "บัญชีนี้ถูกปิดใช้งาน"                                                                              |
+| 7   | Empty inputs                      | submit blank form                                 | HTML5 required validation blocks submit                                                             |
+| 8   | Remember-me unchecked, tab closed | login with box unticked → close tab → reopen      | Tokens cleared (`pagehide` guard) → login page; DB session still lives ≤12h but is unreachable      |
+| 9   | Remember-me checked, tab closed   | login with box ticked → close tab → reopen        | Still authenticated — lands on the dashboard without re-login (refresh token ≤30 days)              |
+| 10  | Rotation keeps the class          | with remember ON, wait 15+ min or force refresh   | New `AdminSession` row still has a 30-day `expiresAt − createdAt`                                   |
 
 Unlock a locked account (or reset counters) directly:
 
@@ -120,11 +136,11 @@ allowed self-service path reaching validation.)
 
 Also check the sidebar (it filters by the same permissions):
 
-catalogue_manager sees แดชบอร์ด / สินค้า / หมวดหมู่ / คลังสินค้า;
+catalogue_manager sees แดชบอร์ด / สินค้า / หมวดหมู่ / คลังสินค้า / คูปองส่วนลด;
 order_manager sees คำสั่งซื้อ / ลูกค้า (the dashboard item requires
 `products:read`, so they don't get it either) — never each other's items.
-Note the sidebar has no คูปอง entry yet even for roles that hold
-`coupons:read` — reach it directly at `/management/coupons`.
+Sidebar entries are permission-gated; คูปองส่วนลด and แท็ก appear only for
+roles holding `coupons:read` / `products:read` respectively.
 
 ## 5. What login unlocks (smoke test)
 
@@ -132,19 +148,20 @@ After logging in, confirm each admin page loads. Data sources differ —
 real Prisma-backed pages and M7 placeholders are marked so you know what
 a bug vs a stub looks like:
 
-| Page                     | Data             | Should show                                                                                         |
-| ------------------------ | ---------------- | --------------------------------------------------------------------------------------------------- |
-| `/management/dashboard`  | **real DB**      | Sales stats from `/api/v1/admin/dashboard` (Prisma aggregates)                                      |
-| `/management/products`   | **real DB**      | All 37 products; edit SKU/name/price/cost/stock/description/image; archive; show/hide               |
-| `/management/categories` | **real DB**      | Type-level category tree — add/rename/reorder groups, move app categories between groups            |
-| `/management/inventory`  | **real DB**      | All 37 products with SKU; edit price/stock; hide/show (instantly off the storefront); stock history |
-| `/management/orders`     | **real DB**      | Orders from `/api/v1/admin/orders`; detail + **ยืนยันการชำระเงิน** (verify-payment)                 |
-| `/management/coupons`    | **real DB**      | Coupon CRUD (bath/percent, min spend, expiry). No sidebar link yet — open the URL directly          |
-| `/management/customers`  | M7 mock          | Customer list UI on placeholder data (Prisma migration pending)                                     |
-| `/management/staff`      | M7 mock          | Staff CRUD UI on placeholder data (the real accounts come from the seed table above)                |
-| `/management/reports`    | static catalogue | Report cards with export buttons (no live metrics yet)                                              |
-| `/management/audit`      | in-memory        | Audit log filter/search (resets on server restart)                                                  |
-| `/management/settings`   | **real DB**      | 7 tabs: แถบประกาศ · ธีมและแอนิเมชัน · ร้านค้า · การชำระเงิน · อีเมล · ความปลอดภัย · การแจ้งเตือน    |
+| Page                     | Data             | Should show                                                                                            |
+| ------------------------ | ---------------- | ------------------------------------------------------------------------------------------------------ |
+| `/management/dashboard`  | **real DB**      | Sales stats from `/api/v1/admin/dashboard` (Prisma aggregates)                                         |
+| `/management/products`   | **real DB**      | All 37 products; edit SKU/name/price/cost/stock/description/image; archive; show/hide                  |
+| `/management/categories` | **real DB**      | Type-level category tree — add/rename/reorder groups, move app categories between groups               |
+| `/management/inventory`  | **real DB**      | All 37 products with SKU; edit price/stock; hide/show (instantly off the storefront); stock history    |
+| `/management/orders`     | **real DB**      | Orders from `/api/v1/admin/orders`; detail + **ยืนยันการชำระเงิน** (verify-payment)                    |
+| `/management/coupons`    | **real DB**      | Coupon CRUD (bath/percent, min spend, expiry) — sidebar link: **คูปองส่วนลด**                          |
+| `/management/tags`       | **real DB**      | Tag CRUD with live product counts; tags attach in the product editor, show as #chips on the storefront |
+| `/management/customers`  | **real DB**      | Customer list from Prisma: block/unblock + set price tier (retail/member/dealer)                       |
+| `/management/staff`      | M7 mock          | Staff CRUD UI on placeholder data (the real accounts come from the seed table above)                   |
+| `/management/reports`    | static catalogue | Report cards with export buttons (no live metrics yet)                                                 |
+| `/management/audit`      | in-memory        | Audit log filter/search (resets on server restart)                                                     |
+| `/management/settings`   | **real DB**      | 7 tabs: แถบประกาศ · ธีมและแอนิเมชัน · ร้านค้า · การชำระเงิน · อีเมล · ความปลอดภัย · การแจ้งเตือน       |
 
 Settings specifics worth exercising:
 
@@ -249,7 +266,11 @@ refresh token also returns `TOKEN_INVALID`.
 - [x] Logged-out admin API returns 401; forged token 403 (products, orders, coupons, announcement)
 - [x] Products page lists 37 DB products; editing SKU to a duplicate is rejected with 409 (`SKU_TAKEN`)
 - [x] Inventory: hide a product → its card disappears from the storefront search (2 hrefs → 1; the announcement banner link correctly remains); unhide restores it
-- [x] Coupons page loads (open `/management/coupons` directly — no sidebar link yet)
+- [x] Coupons page loads via its sidebar entry (คูปองส่วนลด)
 - [x] Limited roles see only their sidebar items and get 403 on the other role's APIs
 - [x] After 15 min, admin APIs return 401 → re-login works
 - [x] Change password: wrong current pw rejected (400); short pw rejected (400); success returns `sessionsRevoked: true`, old refresh token then 401 on refresh, old password rejected, new password works
+- [x] **Remember-me unchecked:** DB session row TTL = 12h; firing `pagehide` clears both tokens; reopening the tab lands on the login page
+- [x] **Remember-me checked:** DB session row TTL = 30.0 days; `pagehide` does NOT clear tokens; reload keeps the dashboard session
+- [x] Logout resets the remember flag (`nk_admin_remember` back to `0`)
+      (verified live 2026-09-20 through the real login → TOTP → dashboard flow)
