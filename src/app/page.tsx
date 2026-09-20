@@ -20,7 +20,6 @@ import { LiveSalesPopup } from '@/components/home/LiveSalesPopup';
 import { LINEChatButton } from '@/components/home/LINEChatButton';
 import { ScrollToTop } from '@/components/home/ScrollToTop';
 import { ScrollReveal } from '@/components/home/ScrollReveal';
-import { DeliveredCodeCard } from '@/components/home/DeliveredCodeCard';
 import { HamsterMascot } from '@/components/ui/ClayIcons';
 import { PawDivider } from '@/components/ui/PawDivider';
 
@@ -197,7 +196,7 @@ export default async function HomePage(): Promise<React.JSX.Element> {
                       id: v.id,
                       label: v.label,
                       price: v.effectivePrice,
-                        effectivePrice: v.effectivePrice,
+                      effectivePrice: v.effectivePrice,
                       stock: v.stock,
                     }))}
                   />

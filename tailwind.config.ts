@@ -270,7 +270,6 @@ const config: Config = {
         prose: '680px',
       },
       animation: {
-        float: 'float var(--animate-float-duration, 6s) ease-in-out infinite',
         'glow-pulse': 'glow-pulse 3s cubic-bezier(0.4,0,0.2,1) infinite',
         shimmer: 'shimmer 1.5s linear infinite',
         'page-enter': 'page-enter 300ms cubic-bezier(0.25,1,0.5,1)',
@@ -287,10 +286,6 @@ const config: Config = {
         'seed-pop': 'seed-pop 550ms cubic-bezier(0.34,1.56,0.64,1) both',
       },
       keyframes: {
-        float: {
-          '0%, 100%': { transform: 'translateY(0) rotate(2deg)' },
-          '50%': { transform: 'translateY(-8px) rotate(2deg)' },
-        },
         'glow-pulse': {
           '0%, 100%': {
             boxShadow:
