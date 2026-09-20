@@ -13,12 +13,14 @@ import {
   CheckCircle2,
   AlertTriangle,
   FileUp,
+  BadgePercent,
 } from 'lucide-react';
 
 import { AdminShell } from '@/components/layout/AdminShell';
 import { adminFetch } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
 import { ImportDialog } from './ImportDialog';
+import { BulkPricingDialog } from './BulkPricingDialog';
 /**
  * Admin Products Management — real CRUD over the Prisma catalog.
  * List, search, create, edit (info + image + variants), archive.
@@ -97,6 +99,7 @@ export default function AdminProductsPage(): React.JSX.Element {
 
   const [editing, setEditing] = useState<AdminProduct | 'new' | null>(null);
   const [importing, setImporting] = useState(false);
+  const [bulkPricing, setBulkPricing] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -162,6 +165,13 @@ export default function AdminProductsPage(): React.JSX.Element {
             >
               <FileUp size={16} />
               นำเข้า CSV
+            </button>
+            <button
+              onClick={() => setBulkPricing(true)}
+              className="flex items-center gap-2 rounded-lg border border-line bg-surface px-4 py-2 text-sm font-semibold text-fg transition-colors hover:border-peach-400 hover:text-fg-brand"
+            >
+              <BadgePercent size={16} />
+              ราคาสมาชิก/ตัวแทนทีเดียว
             </button>
             <button
               onClick={() => setEditing('new')}
@@ -321,6 +331,10 @@ export default function AdminProductsPage(): React.JSX.Element {
 
       {importing && (
         <ImportDialog onClose={() => setImporting(false)} onImported={() => void load()} />
+      )}
+
+      {bulkPricing && (
+        <BulkPricingDialog onClose={() => setBulkPricing(false)} onApplied={() => void load()} />
       )}
 
       {editing !== null && (
