@@ -102,37 +102,6 @@
   }
 }
 
-/* Marquee animation */
-@keyframes marquee {
-  0% {
-    transform: translateX(0);
-  }
-  100% {
-    transform: translateX(-50%);
-  }
-}
-
-.animate-marquee {
-  animation: marquee 24s linear infinite;
-}
-
-/* Playful emoji rotation: each deal's icon rocks back and forth,
-   staggered per item so a wave travels along the bar */
-@keyframes emoji-rotate {
-  0%,
-  100% {
-    transform: rotate(-12deg) scale(1);
-  }
-  50% {
-    transform: rotate(14deg) scale(1.18);
-  }
-}
-
-.animate-marquee .deal-emoji {
-  display: inline-block;
-  animation: emoji-rotate 2.2s ease-in-out infinite;
-}
-
 /* ── Claymorphism utilities ── */
 @layer components {
   .clay-card {

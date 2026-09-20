@@ -11,7 +11,6 @@ import { ProductGrid } from '@/components/product/ProductGrid';
 import { StructuredData } from '@/components/data-display/StructuredData';
 
 // New components
-import { MarqueeTicker } from '@/components/home/MarqueeTicker';
 import { HeroCarousel } from '@/components/home/HeroCarousel';
 import { StatsCounter } from '@/components/home/StatsCounter';
 import { TrustBadges } from '@/components/home/TrustBadges';
@@ -75,9 +74,6 @@ export default async function HomePage(): Promise<React.JSX.Element> {
         }}
       />
 
-      {/* Marquee Ticker */}
-      <MarqueeTicker />
-
       <FacebookLayout>
         {/* Hero carousel — admin-managed promo banners (hidden until configured) */}
         {heroSlides.length > 0 && <HeroCarousel slides={heroSlides} />}
@@ -126,9 +122,6 @@ export default async function HomePage(): Promise<React.JSX.Element> {
         </ScrollReveal>
 
         {/* Categories Section */}
-
-        {/* Promotion banner — directly under วิธีการซื้อ (client ask) */}
-        <MarqueeTicker />
 
         <PawDivider className="py-4" />
 
