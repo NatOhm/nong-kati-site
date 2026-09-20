@@ -47,8 +47,8 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-/** No-FOUC: apply the stored/system theme before first paint. */
-const themeInitScript = `(function(){try{var t=localStorage.getItem('nk-theme');if(t!=='dark'&&t!=='light'){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','light');}})();`; /** 14-seo.md §13.1 — single sitewide lang="th", no per-page override. */
+/** No-FOUC: apply the stored/system theme — and the remembered motion choice — before first paint. */
+const themeInitScript = `(function(){try{var t=localStorage.getItem('nk-theme');if(t!=='dark'&&t!=='light'){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','light');}try{var m=localStorage.getItem('nk-motion');if(m==='on'||m==='off'){document.documentElement.setAttribute('data-motion',m);}}catch(e){}})();`; /** 14-seo.md §13.1 — single sitewide lang="th", no per-page override. */
 export default function RootLayout({ children }: { children: React.ReactNode }): React.JSX.Element {
   return (
     <html

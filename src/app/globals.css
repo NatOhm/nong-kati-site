@@ -75,11 +75,25 @@
     border-width: 0;
   }
 
-  /* 04-design-system.md §7.5 — respect prefers-reduced-motion sitewide */
+  /* 04-design-system.md §7.5 — respect prefers-reduced-motion sitewide.
+     Site-level override: <html data-motion="on"> forces animations even when
+     the OS asks for reduce; data-motion="off" suppresses regardless. Set by
+     the navbar motion toggle (src/lib/motionPreference.ts). */
   @media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
+    html:not([data-motion='on']) *,
+    html:not([data-motion='on']) *::before,
+    html:not([data-motion='on']) *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    html[data-motion='off'] *,
+    html[data-motion='off'] *::before,
+    html[data-motion='off'] *::after {
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;

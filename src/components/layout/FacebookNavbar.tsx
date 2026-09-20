@@ -3,16 +3,13 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import {
-  Search,
-  MessageCircle,
-  Menu,
-} from 'lucide-react';
+import { Search, MessageCircle, Menu } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { CartIcon } from '@/components/cart/CartIcon';
 import { CartDrawer } from '@/components/cart/CartDrawer';
 import { NotificationsDropdown } from './NotificationsDropdown';
 import { ThemeToggle } from './ThemeToggle';
+import { MotionToggle } from './MotionToggle';
 import { ProfileMenu } from './ProfileMenu';
 import { useCustomerSession } from './useCustomerSession';
 import { AcornIcon, HamsterFace } from '@/components/ui/ClayIcons';
@@ -228,6 +225,11 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
             {/* Light/dark (md+) — phone users switch via device/system theme */}
             <div className="hidden md:block">
               <ThemeToggle />
+            </div>
+
+            {/* Motion on/off (md+) — overrides the OS reduce-motion setting */}
+            <div className="hidden md:block">
+              <MotionToggle />
             </div>
           </div>
         </div>

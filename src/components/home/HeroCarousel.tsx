@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { cn } from '@/utils/cn';
+import { useMotionReduced } from '@/components/layout/MotionToggle';
 import type { HeroSlideContent } from '@/lib/data';
 
 /**
@@ -20,7 +21,9 @@ const AUTOPLAY_MS = 5000;
 export function HeroCarousel({ slides }: { slides: HeroSlideContent[] }): React.JSX.Element {
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
-  const reducedMotion = useRef(false);
+  // Reactive: site-level override (navbar toggle) + OS, so flipping the
+  // toggle live actually starts/stops the autoplay timer and transitions.
+  const reducedMotion = useMotionReduced();
   const touchStartX = useRef<number | null>(null);
 
   const count = slides.length;
@@ -33,20 +36,10 @@ export function HeroCarousel({ slides }: { slides: HeroSlideContent[] }): React.
   activeRef.current = active;
 
   useEffect(() => {
-    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
-    reducedMotion.current = mq.matches;
-    const onChange = (e: MediaQueryListEvent) => {
-      reducedMotion.current = e.matches;
-    };
-    mq.addEventListener('change', onChange);
-    return () => mq.removeEventListener('change', onChange);
-  }, []);
-
-  useEffect(() => {
-    if (count < 2 || paused || reducedMotion.current) return;
+    if (count < 2 || paused || reducedMotion) return;
     const t = window.setInterval(() => goTo(activeRef.current + 1), AUTOPLAY_MS);
     return () => window.clearInterval(t);
-  }, [count, paused, goTo]);
+  }, [count, paused, goTo, reducedMotion]);
 
   if (count === 0) return <></>;
 
@@ -77,7 +70,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlideContent[] }): React.
             className="flex"
             style={{
               transform: `translateX(-${active * 100}%)`,
-              transition: reducedMotion.current
+              transition: reducedMotion
                 ? 'none'
                 : 'transform var(--duration-interactive, 550ms) var(--ease-out-quart, cubic-bezier(0.25, 1, 0.5, 1))',
             }}
