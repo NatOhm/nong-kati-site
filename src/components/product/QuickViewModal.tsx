@@ -13,6 +13,8 @@ export interface QuickViewVariant {
   id: string;
   label: string;
   price: number;
+  /** Tier-resolved price (server) — what this customer actually pays. */
+  effectivePrice: number;
   stock: number;
 }
 
@@ -112,9 +114,9 @@ export function QuickViewModal({
             productNameEn: product.name,
             productSlug: product.slug,
             thumbnailUrl: product.imageUrl ?? null,
-            denominationThb: selected.price,
-            unitPriceThb: selected.price,
-            vatAmountThb: Math.round((selected.price / 1.07) * 0.07 * 100) / 100,
+            denominationThb: selected.effectivePrice,
+            unitPriceThb: selected.effectivePrice,
+            vatAmountThb: Math.round((selected.effectivePrice / 1.07) * 0.07 * 100) / 100,
             inStock: true,
             availableQuantity: selected.stock,
             maxQuantity: Math.min(10, selected.stock),
@@ -209,8 +211,8 @@ export function QuickViewModal({
                       isOut && 'cursor-not-allowed line-through opacity-45',
                     )}
                   >
-                    {variant.label || formatThb(variant.price)}
-                    <span className="ml-1.5 opacity-80">{formatThb(variant.price)}</span>
+                    {variant.label || formatThb(variant.effectivePrice)}
+                    <span className="ml-1.5 opacity-80">{formatThb(variant.effectivePrice)}</span>
                   </button>
                 );
               })}
@@ -250,7 +252,7 @@ export function QuickViewModal({
             <div>
               <span className="text-[11px] text-fg-muted">รวม</span>
               <p className="text-lg font-bold text-fg-brand">
-                {selected ? formatThb(selected.price * quantity) : '—'}
+                {selected ? formatThb(selected.effectivePrice * quantity) : '—'}
               </p>
             </div>
             <button

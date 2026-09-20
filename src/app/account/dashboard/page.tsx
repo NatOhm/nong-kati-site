@@ -29,7 +29,7 @@ interface CatalogProduct {
   shortDescription: string | null;
   imageUrl: string | null;
   category: { name: string; slug: string };
-  variants: { id: string; label: string; price: number; stock: number }[];
+  variants: { id: string; label: string; price: number; effectivePrice: number; stock: number }[];
 }
 
 export default function ProfilePage(): React.JSX.Element {
@@ -118,7 +118,7 @@ export default function ProfilePage(): React.JSX.Element {
                 imageUrl={p.imageUrl}
                 categoryName={p.category.name}
                 categorySlug={p.category.slug}
-                price={p.variants[0]?.price ?? 0}
+                price={p.variants[0]?.effectivePrice ?? 0}
                 stock={p.variants.reduce((sum, v) => sum + v.stock, 0)}
                 variantId={p.variants[0]?.id}
                 variantCount={p.variants.length}

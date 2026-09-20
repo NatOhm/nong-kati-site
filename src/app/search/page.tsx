@@ -180,14 +180,15 @@ export default async function SearchPage({
                       imageUrl={product.imageUrl}
                       categoryName={product.category.name}
                       categorySlug={product.category.slug}
-                      price={product.variants[0]?.price ?? 0}
+                      price={product.variants[0]?.effectivePrice ?? 0}
                       stock={product.variants.reduce((sum, v) => sum + v.stock, 0)}
                       variantId={product.variants[0]?.id}
                       variantCount={product.variants.length}
                       variants={product.variants.map((v) => ({
                         id: v.id,
                         label: v.label,
-                        price: v.price,
+                        price: v.effectivePrice,
+                        effectivePrice: v.effectivePrice,
                         stock: v.stock,
                       }))}
                     />

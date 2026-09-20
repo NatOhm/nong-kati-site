@@ -28,6 +28,8 @@ interface AdminVariant {
   id: string;
   label: string;
   price: number;
+  memberPrice: number | null;
+  dealerPrice: number | null;
   stock: number;
   isActive: boolean;
   sortOrder: number;
@@ -56,6 +58,8 @@ interface DraftVariant {
   key: number;
   label: string;
   price: string;
+  memberPrice: string;
+  dealerPrice: string;
   stock: string;
   isActive: boolean;
 }
@@ -65,7 +69,7 @@ const MAX_UPLOAD_BYTES = 512 * 1024;
 let draftKey = 1;
 function newDraftVariant(): DraftVariant {
   draftKey += 1;
-  return { key: draftKey, label: '', price: '', stock: '0', isActive: true };
+  return { key: draftKey, label: '', price: '', memberPrice: '', dealerPrice: '', stock: '0', isActive: true };
 }
 
 export default function AdminProductsPage(): React.JSX.Element {
@@ -335,6 +339,8 @@ function ProductEditor({
           key: draftKey++,
           label: v.label,
           price: String(v.price),
+          memberPrice: v.memberPrice === null ? '' : String(v.memberPrice),
+          dealerPrice: v.dealerPrice === null ? '' : String(v.dealerPrice),
           stock: String(v.stock),
           isActive: v.isActive,
         }))
@@ -398,6 +404,8 @@ function ProductEditor({
         variants: variants.map((v) => ({
           label: v.label.trim(),
           price: Number(v.price),
+          memberPrice: v.memberPrice === '' ? null : Number(v.memberPrice),
+          dealerPrice: v.dealerPrice === '' ? null : Number(v.dealerPrice),
           stock: Math.max(0, Math.round(Number(v.stock) || 0)),
           isActive: v.isActive,
         })),
@@ -579,6 +587,38 @@ function ProductEditor({
                     className="w-20 rounded-lg border border-line bg-surface px-2 py-2 text-right text-sm text-fg focus:outline-none focus:ring-2 focus:ring-peach-500"
                   />
                   <input
+                    value={v.memberPrice}
+                    onChange={(e) =>
+                      setVariants((arr) =>
+                        arr.map((x) =>
+                          x.key === v.key
+                            ? { ...x, memberPrice: e.target.value.replace(/[^0-9.]/g, '') }
+                            : x,
+                        ),
+                      )
+                    }
+                    inputMode="decimal"
+                    placeholder="สมาชิก ฿"
+                    title="ราคาสมาชิก (เว้นว่าง = ใช้ราคาปกติ)"
+                    className="w-20 rounded-lg border border-line bg-surface px-2 py-2 text-right text-sm text-fg focus:outline-none focus:ring-2 focus:ring-peach-500"
+                  />
+                  <input
+                    value={v.dealerPrice}
+                    onChange={(e) =>
+                      setVariants((arr) =>
+                        arr.map((x) =>
+                          x.key === v.key
+                            ? { ...x, dealerPrice: e.target.value.replace(/[^0-9.]/g, '') }
+                            : x,
+                        ),
+                      )
+                    }
+                    inputMode="decimal"
+                    placeholder="ตัวแทน ฿"
+                    title="ราคาตัวแทนจำหน่าย (เว้นว่าง = ใช้ราคาปกติ)"
+                    className="w-20 rounded-lg border border-line bg-surface px-2 py-2 text-right text-sm text-fg focus:outline-none focus:ring-2 focus:ring-peach-500"
+                  />
+                  <input
                     value={v.stock}
                     onChange={(e) =>
                       setVariants((arr) =>
@@ -610,7 +650,7 @@ function ProductEditor({
               ))}
             </div>
             <p className="mt-1 text-[10px] text-fg-placeholder">
-              ชื่อตัวเลือก · ราคา (บาท) · สต็อก (โค้ดที่ขายได้)
+              ชื่อตัวเลือก · ราคาปกติ · ราคาสมาชิก · ราคาตัวแทน (เว้นว่าง = ใช้ราคาปกติ) · สต็อก
             </p>
           </div>
 

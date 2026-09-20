@@ -103,7 +103,15 @@ export async function PUT(
         cost = Number(v['cost']);
         if (!Number.isFinite(cost) || cost < 0) return null;
       }
-      return { label, price, stock, isActive, cost };
+      // Tier prices — optional, null means inherit the base price
+      const tier = (raw: unknown): number | null => {
+        if (raw === null || raw === undefined || raw === '') return null;
+        const n = Number(raw);
+        return Number.isFinite(n) && n >= 0 ? n : null;
+      };
+      const memberPrice = tier(v['memberPrice']);
+      const dealerPrice = tier(v['dealerPrice']);
+      return { label, price, stock, isActive, cost, memberPrice, dealerPrice };
     });
     if (parsed.some((v) => v === null)) {
       return NextResponse.json({ error: 'INVALID_VARIANT' }, { status: 400 });
@@ -133,6 +141,8 @@ export async function PUT(
           productId: id,
           label: v!.label,
           price: v!.price,
+          memberPrice: v!.memberPrice,
+          dealerPrice: v!.dealerPrice,
           stock: v!.stock,
           costThb: v!.cost,
           isActive: v!.isActive,
@@ -151,6 +161,8 @@ export async function PUT(
               create: parsed.map((v, i) => ({
                 label: v!.label,
                 price: v!.price,
+                memberPrice: v!.memberPrice,
+                dealerPrice: v!.dealerPrice,
                 stock: v!.stock,
                 costThb: v!.cost,
                 isActive: v!.isActive,
@@ -207,6 +219,8 @@ export async function PUT(
       id: v.id,
       label: v.label,
       price: Number(v.price),
+      memberPrice: v.memberPrice === null ? null : Number(v.memberPrice),
+      dealerPrice: v.dealerPrice === null ? null : Number(v.dealerPrice),
       stock: v.stock,
       cost: v.costThb === null ? null : Number(v.costThb),
       isActive: v.isActive,

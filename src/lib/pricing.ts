@@ -8,6 +8,39 @@
 
 const VAT_RATE = 0.07;
 
+// ─── Price tiers (ราคาปลีก vs สมาชิก vs ตัวแทนจำหน่าย) ──────────
+
+export type PriceTier = 'retail' | 'member' | 'dealer';
+
+export const PRICE_TIERS: readonly PriceTier[] = ['retail', 'member', 'dealer'] as const;
+
+/** Thai labels for the admin UI and storefront badges. */
+export const TIER_LABELS: Record<PriceTier, string> = {
+  retail: 'ราคาปกติ',
+  member: 'ราคาสมาชิก',
+  dealer: 'ราคาตัวแทน',
+};
+
+/** Accepts any untrusted value; unknown → retail. */
+export function normalizeTier(value: unknown): PriceTier {
+  return value === 'member' || value === 'dealer' ? value : 'retail';
+}
+
+/**
+ * Effective unit price for a customer tier.
+ * member/dealer fall back to the base retail price when no tier-specific
+ * price is configured (NULL in DB → undefined here).
+ */
+export function tierPrice(
+  base: number,
+  tier: PriceTier,
+  prices: { memberPrice?: number | null; dealerPrice?: number | null },
+): number {
+  if (tier === 'member' && prices.memberPrice != null) return prices.memberPrice;
+  if (tier === 'dealer' && prices.dealerPrice != null) return prices.dealerPrice;
+  return base;
+}
+
 /**
  * Calculate VAT amount from a VAT-inclusive price.
  * @param inclusivePrice - The price including VAT (e.g. 107.00)

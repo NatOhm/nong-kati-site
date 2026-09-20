@@ -1,8 +1,11 @@
 /**
  * Admin Customers API — 07-api.md §23.
- * Customer lookup and account actions for admin staff.
- * Uses mock data for M7 (Prisma in production).
+ * Prisma-backed customer lookup, account actions, and price-tier management
+ * (ราคาสมาชิก/ตัวแทนจำหน่าย: customer.tier = retail | member | dealer).
+ * SERVER-ONLY: imports Prisma — client pages go through /api/v1/admin/*.
  */
+import { prisma } from '@/lib/db';
+import { normalizeTier, type PriceTier } from '@/lib/pricing';
 import { writeAuditLog } from '@/lib/auditLog';
 
 // ─── Types ──────────────────────────────────────────────
@@ -12,6 +15,7 @@ export type AdminCustomerListItem = {
   email: string;
   fullName: string;
   status: string;
+  tier: PriceTier;
   emailVerified: boolean;
   totalOrders: number;
   totalSpendThb: number;
@@ -32,60 +36,10 @@ export type AdminCustomerDetail = AdminCustomerListItem & {
   }[];
 };
 
-// ─── Mock Customer Store ─────────────────────────────────
-
-const mockCustomers: AdminCustomerListItem[] = [
-  {
-    id: 'cust-001',
-    email: 'kaem@example.com',
-    fullName: 'แก้ม สีดำ',
-    status: 'active',
-    emailVerified: true,
-    totalOrders: 12,
-    totalSpendThb: 1284.0,
-    createdAt: new Date('2026-01-15T10:00:00Z'),
-    lastLoginAt: new Date('2026-08-23T09:00:00Z'),
-  },
-  {
-    id: 'cust-002',
-    email: 'somchai@example.com',
-    fullName: 'สมชาย ใจดี',
-    status: 'active',
-    emailVerified: true,
-    totalOrders: 3,
-    totalSpendThb: 321.0,
-    createdAt: new Date('2026-06-10T14:30:00Z'),
-    lastLoginAt: new Date('2026-08-22T11:00:00Z'),
-  },
-  {
-    id: 'cust-003',
-    email: 'nisa@example.com',
-    fullName: 'นิสา สดใส',
-    status: 'blocked',
-    emailVerified: true,
-    totalOrders: 1,
-    totalSpendThb: 535.0,
-    createdAt: new Date('2026-07-20T08:45:00Z'),
-    lastLoginAt: null,
-  },
-  {
-    id: 'cust-004',
-    email: 'prawit@example.com',
-    fullName: 'ประวิตร มั่นคง',
-    status: 'active',
-    emailVerified: false,
-    totalOrders: 0,
-    totalSpendThb: 0,
-    createdAt: new Date('2026-08-20T16:00:00Z'),
-    lastLoginAt: null,
-  },
-];
-
-// ─── API Functions ───────────────────────────────────────
+// ─── Queries ────────────────────────────────────────────
 
 /**
- * List admin customers with search and pagination.
- * 07-api.md §23 — GET /admin/customers
+ * List customers with aggregates. 07-api.md §23 — GET /admin/customers
  */
 export async function adminListCustomers(params: {
   q?: string;
@@ -95,71 +49,121 @@ export async function adminListCustomers(params: {
 }): Promise<{ data: AdminCustomerListItem[]; total: number; page: number; pageSize: number }> {
   const { q, status, page = 1, pageSize = 20 } = params;
 
-  let filtered = [...mockCustomers];
+  const where = {
+    ...(status ? { status } : {}),
+    ...(q
+      ? {
+          OR: [
+            { email: { contains: q, mode: 'insensitive' as const } },
+            { fullName: { contains: q, mode: 'insensitive' as const } },
+          ],
+        }
+      : {}),
+  };
 
-  if (status) {
-    filtered = filtered.filter((c) => c.status === status);
-  }
-  if (q) {
-    const term = q.toLowerCase();
-    filtered = filtered.filter(
-      (c) =>
-        c.email.toLowerCase().includes(term) ||
-        c.fullName.toLowerCase().includes(term)
-    );
-  }
-
-  const total = filtered.length;
-  const offset = (page - 1) * pageSize;
-  const data = filtered.slice(offset, offset + pageSize);
-
-  return { data, total, page, pageSize };
-}
-
-/**
- * Get full customer detail for admin.
- * 07-api.md §23 — GET /admin/customers/:id
- */
-export async function adminGetCustomer(
-  customerId: string
-): Promise<AdminCustomerDetail | null> {
-  const customer = mockCustomers.find((c) => c.id === customerId);
-  if (!customer) return null;
+  const [rows, total] = await Promise.all([
+    prisma.customer.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: {
+        _count: { select: { orders: true } },
+        orders: { select: { totalAmountThb: true } },
+      },
+    }),
+    prisma.customer.count({ where }),
+  ]);
 
   return {
-    ...customer,
-    phoneNumber: '081****678', // Masked per PDPA
-    lineOptIn: false,
-    marketingOptIn: false,
-    failedLoginAttempts: 0,
-    recentOrders: [
-      {
-        orderNumber: 'NK-2026-000001',
-        status: 'completed',
-        totalAmountThb: 214.0,
-        createdAt: new Date('2026-08-20T14:00:00Z'),
-      },
-    ],
+    data: rows.map((c) => ({
+      id: c.id,
+      email: c.email,
+      fullName: c.fullName ?? '',
+      status: c.status,
+      tier: normalizeTier(c.tier),
+      emailVerified: c.emailVerified,
+      totalOrders: c._count.orders,
+      totalSpendThb: Math.round(c.orders.reduce((s, o) => s + Number(o.totalAmountThb), 0) * 100) / 100,
+      createdAt: c.createdAt,
+      lastLoginAt: c.lastLoginAt,
+    })),
+    total,
+    page,
+    pageSize,
   };
 }
 
 /**
- * Block or unblock a customer.
- * 07-api.md §23 — PATCH /admin/customers/:id/block
+ * Get full customer detail for admin. 07-api.md §23 — GET /admin/customers/:id
+ */
+export async function adminGetCustomer(
+  customerId: string,
+): Promise<AdminCustomerDetail | null> {
+  const c = await prisma.customer.findUnique({
+    where: { id: customerId },
+    include: {
+      _count: { select: { orders: true } },
+      orders: {
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        select: { orderNumber: true, status: true, totalAmountThb: true, createdAt: true },
+      },
+    },
+  }).catch(() => null);
+  if (!c) return null;
+
+  const allSpend = await prisma.order.aggregate({
+    where: { customerId },
+    _sum: { totalAmountThb: true },
+  });
+
+  return {
+    id: c.id,
+    email: c.email,
+    fullName: c.fullName ?? '',
+    status: c.status,
+    tier: normalizeTier(c.tier),
+    emailVerified: c.emailVerified,
+    totalOrders: c._count.orders,
+    totalSpendThb: Number(allSpend._sum.totalAmountThb ?? 0),
+    createdAt: c.createdAt,
+    lastLoginAt: c.lastLoginAt,
+    // Masked per PDPA — never expose the full phone number to staff UI.
+    phoneNumber: c.phoneNumber ? `${c.phoneNumber.slice(0, 3)}****${c.phoneNumber.slice(-3)}` : null,
+    lineOptIn: false,
+    marketingOptIn: c.marketingOptIn,
+    failedLoginAttempts: c.failedLoginAttempts,
+    recentOrders: c.orders.map((o) => ({
+      orderNumber: o.orderNumber,
+      status: o.status,
+      totalAmountThb: Number(o.totalAmountThb),
+      createdAt: o.createdAt,
+    })),
+  };
+}
+
+/**
+ * Block or unblock a customer. 07-api.md §23 — PATCH /admin/customers/:id/block
  */
 export async function adminBlockCustomer(
   customerId: string,
   blocked: boolean,
   adminId: string,
-  adminEmail: string
+  adminEmail: string,
 ): Promise<{ success: boolean; status?: string; error?: string }> {
-  const customer = mockCustomers.find((c) => c.id === customerId);
-  if (!customer) {
-    return { success: false, error: 'CUSTOMER_NOT_FOUND' };
-  }
+  const customer = await prisma.customer.findUnique({
+    where: { id: customerId },
+    select: { id: true, email: true, status: true },
+  });
+  if (!customer) return { success: false, error: 'CUSTOMER_NOT_FOUND' };
 
   const previousStatus = customer.status;
-  customer.status = blocked ? 'blocked' : 'active';
+  const nextStatus = blocked ? 'blocked' : 'active';
+  await prisma.customer.update({
+    where: { id: customerId },
+    data: { status: nextStatus },
+  });
 
   writeAuditLog({
     actorType: 'admin',
@@ -170,12 +174,48 @@ export async function adminBlockCustomer(
     recordId: customerId,
     diff: {
       before: { status: previousStatus },
-      after: { status: customer.status },
+      after: { status: nextStatus },
     },
     metadata: {
       email: customer.email,
     },
   });
 
-  return { success: true, status: customer.status };
+  return { success: true, status: nextStatus };
+}
+
+/**
+ * Change a customer's price tier (ราคาปลีก/สมาชิก/ตัวแทนจำหน่าย).
+ * Audited — tier changes directly change what the customer pays.
+ */
+export async function adminSetCustomerTier(
+  customerId: string,
+  tier: unknown,
+  adminId: string,
+  adminEmail: string,
+): Promise<{ success: boolean; tier?: PriceTier; error?: string }> {
+  const next = normalizeTier(tier);
+  const customer = await prisma.customer.findUnique({
+    where: { id: customerId },
+    select: { id: true, email: true, tier: true },
+  });
+  if (!customer) return { success: false, error: 'CUSTOMER_NOT_FOUND' };
+
+  const previous = normalizeTier(customer.tier);
+  if (previous === next) return { success: true, tier: next };
+
+  await prisma.customer.update({ where: { id: customerId }, data: { tier: next } });
+
+  writeAuditLog({
+    actorType: 'admin',
+    actorId: adminId,
+    actorEmail: adminEmail,
+    action: 'customer_tier_changed',
+    tableName: 'store.customers',
+    recordId: customerId,
+    diff: { before: { tier: previous }, after: { tier: next } },
+    metadata: { email: customer.email },
+  });
+
+  return { success: true, tier: next };
 }

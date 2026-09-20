@@ -16,6 +16,7 @@
 import { prisma } from '@/lib/db';
 import { hashPassword, verifyPassword } from '@/lib/password';
 import { signJwt } from '@/lib/jwt';
+import { normalizeTier } from '@/lib/pricing';
 import { writeAuditLog } from '@/lib/auditLog';
 
 // ─── Types ──────────────────────────────────────────────
@@ -224,6 +225,7 @@ export async function getCustomerProfile(customerId: string) {
     status: customer.status as CustomerAccountStatus,
     emailVerified: customer.emailVerified,
     marketingOptIn: customer.marketingOptIn,
+    tier: normalizeTier(customer.tier),
     createdAt: customer.createdAt,
   };
 }

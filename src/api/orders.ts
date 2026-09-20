@@ -11,7 +11,7 @@
  */
 
 import { prisma } from '@/lib/db';
-import { generateOrderNumber } from '@/lib/pricing';
+import { generateOrderNumber, normalizeTier, tierPrice } from '@/lib/pricing';
 
 export interface OrderItem {
   id: string;
@@ -217,6 +217,17 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
     lineTotalThb: number;
   }[] = [];
 
+  // Tier-aware pricing: resolve the tier from input.customerId (set by the
+  // route from the session cookie — never from the client body).
+  let tier: 'retail' | 'member' | 'dealer' = 'retail';
+  if (input.customerId) {
+    const customer = await prisma.customer.findUnique({
+      where: { id: input.customerId },
+      select: { tier: true },
+    });
+    if (customer) tier = normalizeTier(customer.tier);
+  }
+
   for (const item of input.items) {
     const v = byId.get(item.variantId);
     if (!v) throw new Error('VARIANT_NOT_FOUND');
@@ -224,7 +235,10 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
       throw new Error('INVALID_QUANTITY');
     }
 
-    const unit = Number(v.price);
+    const unit = tierPrice(Number(v.price), tier, {
+      memberPrice: v.memberPrice != null ? Number(v.memberPrice) : null,
+      dealerPrice: v.dealerPrice != null ? Number(v.dealerPrice) : null,
+    });
     const exVat = Math.round((unit / 1.07) * 100) / 100;
     const vatAmount = Math.round((unit - exVat) * 100) / 100;
     const lineTotal = Math.round(unit * item.quantity * 100) / 100;

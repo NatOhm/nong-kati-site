@@ -39,7 +39,7 @@ export function AlsoWished({ items }: { items: WishRankedProduct[] }): React.JSX
               variants={product.variants.map((v) => ({
                 id: v.id,
                 label: v.label,
-                price: v.price,
+                price: v.price, effectivePrice: v.effectivePrice,
                 stock: v.stock,
               }))}
             />

@@ -1,0 +1,70 @@
+import { NextRequest, NextResponse } from 'next/server';
+
+import { adminGetCustomer, adminSetCustomerTier } from '@/api/adminCustomers';
+import { checkPermission } from '@/lib/rbac';
+
+export const dynamic = 'force-dynamic';
+
+function bearer(req: NextRequest): string | null {
+  const header = req.headers.get('authorization');
+  if (!header?.startsWith('Bearer ')) return null;
+  return header.slice(7) || null;
+}
+
+/**
+ * GET /api/v1/admin/customers/[id] — full customer detail (customers:read).
+ */
+export async function GET(
+  req: NextRequest,
+  ctx: { params: Promise<{ id: string }> },
+): Promise<NextResponse> {
+  const token = bearer(req);
+  if (!token) return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 });
+  const check = await checkPermission(token, 'customers:read');
+  if (!check.allowed) {
+    return NextResponse.json({ error: check.error ?? 'FORBIDDEN' }, { status: 403 });
+  }
+  const { id } = await ctx.params;
+  const customer = await adminGetCustomer(id);
+  if (!customer) return NextResponse.json({ error: 'CUSTOMER_NOT_FOUND' }, { status: 404 });
+  return NextResponse.json(customer);
+}
+
+/**
+ * PATCH /api/v1/admin/customers/[id] — change the price tier
+ * (customers:write). Body {tier: 'retail'|'member'|'dealer'}; audited.
+ */
+export async function PATCH(
+  req: NextRequest,
+  ctx: { params: Promise<{ id: string }> },
+): Promise<NextResponse> {
+  const token = bearer(req);
+  if (!token) return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 });
+  const check = await checkPermission(token, 'customers:write');
+  if (!check.allowed) {
+    return NextResponse.json({ error: check.error ?? 'FORBIDDEN' }, { status: 403 });
+  }
+
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'INVALID_JSON' }, { status: 400 });
+  }
+  const b = (body ?? {}) as Record<string, unknown>;
+
+  const { id } = await ctx.params;
+  const result = await adminSetCustomerTier(
+    id,
+    b['tier'],
+    check.payload?.sub ?? 'unknown',
+    check.payload?.email ?? 'unknown',
+  );
+  if (!result.success) {
+    return NextResponse.json(
+      { error: result.error ?? 'TIER_CHANGE_FAILED' },
+      { status: result.error === 'CUSTOMER_NOT_FOUND' ? 404 : 400 },
+    );
+  }
+  return NextResponse.json({ success: true, tier: result.tier });
+}

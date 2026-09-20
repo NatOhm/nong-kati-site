@@ -50,6 +50,7 @@ export const ALL_PERMISSIONS = [
   'customers:read',
   'customers:read:full',
   'customers:block',
+  'customers:write',
 
   // Reviews
   'reviews:read',
@@ -99,7 +100,7 @@ export const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
 
   order_manager: [
     'orders:read', 'orders:read:full', 'orders:write', 'orders:refund',
-    'customers:read', 'customers:read:full', 'customers:block',
+    'customers:read', 'customers:read:full', 'customers:block', 'customers:write',
     'reviews:read', 'reviews:moderate',
   ],
 
@@ -162,6 +163,7 @@ export const ROUTE_PERMISSIONS: Record<string, Permission[]> = {
   'GET /api/v1/admin/customers':              ['customers:read'],
   'GET /api/v1/admin/customers/:id':          ['customers:read'],
   'PATCH /api/v1/admin/customers/:id/block':  ['customers:block'],
+  'PATCH /api/v1/admin/customers/:id/tier':   ['customers:write'],
 
   'GET /api/v1/admin/staff':                  ['staff:read'],
   'POST /api/v1/admin/staff':                 ['staff:write'],

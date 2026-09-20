@@ -47,6 +47,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         id: v.id,
         label: v.label,
         price: Number(v.price),
+        memberPrice: v.memberPrice === null ? null : Number(v.memberPrice),
+        dealerPrice: v.dealerPrice === null ? null : Number(v.dealerPrice),
         stock: v.stock,
         isActive: v.isActive,
         sortOrder: v.sortOrder,
@@ -61,13 +63,23 @@ interface VariantInput {
   price?: unknown;
   stock?: unknown;
   cost?: unknown;
+  memberPrice?: unknown;
+  dealerPrice?: unknown;
   isActive?: unknown;
 }
 
 /** Validate a variant payload; returns null when the shape is wrong. */
 function parseVariant(
   v: VariantInput,
-): { label: string; price: number; stock: number; cost: number | null; isActive: boolean } | null {
+): {
+  label: string;
+  price: number;
+  stock: number;
+  cost: number | null;
+  memberPrice: number | null;
+  dealerPrice: number | null;
+  isActive: boolean;
+} | null {
   if (typeof v.label !== 'string' || v.label.trim() === '') return null;
   const price = typeof v.price === 'number' ? v.price : NaN;
   const stock = typeof v.stock === 'number' ? v.stock : NaN;
@@ -79,7 +91,22 @@ function parseVariant(
     cost = Number(v.cost);
     if (!Number.isFinite(cost) || cost < 0) return null;
   }
-  return { label: v.label.trim(), price, stock, cost, isActive: v.isActive !== false };
+  // Tier prices — optional, null means inherit the base price
+  const tier = (raw: unknown): number | null => {
+    if (raw === null || raw === undefined || raw === '') return null;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 0) return null;
+    return n;
+  };
+  return {
+    label: v.label.trim(),
+    price,
+    stock,
+    cost,
+    memberPrice: tier(v.memberPrice),
+    dealerPrice: tier(v.dealerPrice),
+    isActive: v.isActive !== false,
+  };
 }
 
 /**
@@ -147,6 +174,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         create: variants.map((v, i) => ({
           label: v!.label,
           price: v!.price,
+          memberPrice: v!.memberPrice,
+          dealerPrice: v!.dealerPrice,
           stock: v!.stock,
           costThb: v!.cost,
           isActive: v!.isActive,

@@ -240,7 +240,11 @@ export function ProductCard({
           slug,
           imageUrl,
           categoryName,
-          variants: variants ?? (variantId ? [{ id: variantId, label: '', price, stock }] : []),
+          variants:
+            variants ??
+            (variantId
+              ? [{ id: variantId, label: '', price, effectivePrice: price, stock }]
+              : []),
         }}
       />
     </>

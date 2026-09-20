@@ -10,6 +10,8 @@ interface Variant {
   id: string;
   label: string;
   price: number;
+  /** Tier-resolved price (server) — what this customer actually pays. */
+  effectivePrice: number;
   stock: number;
   isActive: boolean;
   sortOrder: number;
@@ -57,9 +59,9 @@ export function ProductDetailClient({
         productNameEn: productName,
         productSlug,
         thumbnailUrl,
-        denominationThb: selectedVariant.price,
-        unitPriceThb: selectedVariant.price,
-        vatAmountThb: Math.round((selectedVariant.price / 1.07) * 0.07 * 100) / 100,
+        denominationThb: selectedVariant.effectivePrice,
+        unitPriceThb: selectedVariant.effectivePrice,
+        vatAmountThb: Math.round((selectedVariant.effectivePrice / 1.07) * 0.07 * 100) / 100,
         inStock: true,
         availableQuantity: selectedVariant.stock,
         maxQuantity: Math.min(10, selectedVariant.stock),
@@ -80,10 +82,14 @@ export function ProductDetailClient({
       <div className="border-t border-line-subtle pt-4">
         <span className="text-xs text-fg-placeholder">ราคา</span>
         <div className="text-2xl font-bold text-fg-brand">
-          {selectedVariant ? formatThb(selectedVariant.price) : formatThb(variants[0]?.price ?? 0)}
+          {selectedVariant
+            ? formatThb(selectedVariant.effectivePrice)
+            : formatThb(variants[0]?.effectivePrice ?? 0)}
         </div>
         {selectedVariant && (
-          <p className="text-clay-9000 text-xs">รวม VAT 7% = {formatThb(selectedVariant.price)}</p>
+          <p className="text-clay-9000 text-xs">
+            รวม VAT 7% = {formatThb(selectedVariant.effectivePrice)}
+          </p>
         )}
       </div>
 
@@ -117,7 +123,7 @@ export function ProductDetailClient({
                   {variant.label !== 'default' && (
                     <span className="font-medium text-fg">{variant.label}</span>
                   )}
-                  <span className="text-xs text-fg-placeholder">{formatThb(variant.price)}</span>
+                  <span className="text-xs text-fg-placeholder">{formatThb(variant.effectivePrice)}</span>
                   {variant.stock <= 10 && variant.stock > 0 && (
                     <span className="text-xs text-fg-brand">เหลือ {variant.stock}</span>
                   )}

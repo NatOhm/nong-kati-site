@@ -1,59 +1,130 @@
 'use client';
 
-import { useState } from 'react';
-import { Search, Eye, ShieldOff, ShieldCheck, XCircle } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Search, Eye, ShieldOff, ShieldCheck, XCircle, Tag } from 'lucide-react';
 
 import { AdminShell } from '@/components/layout/AdminShell';
+import { adminFetch } from '@/lib/adminSession';
+import { TIER_LABELS, type PriceTier } from '@/lib/pricing';
 import { cn } from '@/utils/cn';
 import { formatThb } from '@/lib/pricing';
-import {
-  adminListCustomers,
-  adminGetCustomer,
-  adminBlockCustomer,
-  type AdminCustomerListItem,
-  type AdminCustomerDetail,
-} from '@/api/adminCustomers';
+
+/**
+ * Admin Customers — real DB-backed list + detail + price-tier management
+ * (ราคาปลีก/สมาชิก/ตัวแทนจำหน่าย). Tiers change what the customer pays on
+ * the storefront; changes are audited server-side.
+ */
+
+type CustomerListItem = {
+  id: string;
+  email: string;
+  fullName: string;
+  status: string;
+  tier: PriceTier;
+  emailVerified: boolean;
+  totalOrders: number;
+  totalSpendThb: number;
+  createdAt: string;
+  lastLoginAt: string | null;
+};
+
+type CustomerDetail = Omit<CustomerListItem, 'createdAt' | 'lastLoginAt'> & {
+  phoneNumber: string | null;
+  marketingOptIn: boolean;
+  failedLoginAttempts: number;
+  recentOrders: {
+    orderNumber: string;
+    status: string;
+    totalAmountThb: number;
+    createdAt: string;
+  }[];
+};
+
+const TIER_BADGE: Record<PriceTier, string> = {
+  retail: 'bg-clay-500/15 text-clay-700',
+  member: 'bg-peach-500/15 text-peach-700',
+  dealer: 'bg-jade-500/15 text-jade-700',
+};
+
+const TIER_OPTIONS: PriceTier[] = ['retail', 'member', 'dealer'];
 
 export default function AdminCustomersPage(): React.JSX.Element {
-  const [customers, setCustomers] = useState<AdminCustomerListItem[]>([]);
-  const [selectedCustomer, setSelectedCustomer] = useState<AdminCustomerDetail | null>(null);
+  const [customers, setCustomers] = useState<CustomerListItem[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerDetail | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
-  const handleSearch = async () => {
+  const handleSearch = useCallback(async () => {
     setLoading(true);
     setActionMessage(null);
     try {
-      const params: Parameters<typeof adminListCustomers>[0] = {};
-      if (searchQuery) params.q = searchQuery;
-      if (statusFilter) params.status = statusFilter;
-      const result = await adminListCustomers(params);
+      const params = new URLSearchParams();
+      if (searchQuery) params.set('q', searchQuery);
+      if (statusFilter) params.set('status', statusFilter);
+      const res = await adminFetch(`/api/v1/admin/customers?${params.toString()}`, {
+        cache: 'no-store',
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error ?? `HTTP ${res.status}`);
+      }
+      const result = (await res.json()) as { data: CustomerListItem[] };
       setCustomers(result.data);
+    } catch (e) {
+      setActionMessage(e instanceof Error ? e.message : 'โหลดลูกค้าไม่สำเร็จ');
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchQuery, statusFilter]);
+
+  // Load the full list once on mount.
+  useEffect(() => {
+    setLoading(true);
+    adminFetch('/api/v1/admin/customers', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : { data: [] }))
+      .then((d: { data?: CustomerListItem[] }) => setCustomers(d.data ?? []))
+      .catch(() => setCustomers([]))
+      .finally(() => setLoading(false));
+  }, []);
 
   const handleViewCustomer = async (customerId: string) => {
-    const detail = await adminGetCustomer(customerId);
-    setSelectedCustomer(detail);
+    const res = await adminFetch(`/api/v1/admin/customers/${customerId}`, { cache: 'no-store' });
+    if (res.ok) setSelectedCustomer((await res.json()) as CustomerDetail);
   };
 
   const handleBlockToggle = async (customerId: string, currentStatus: string) => {
+    // Block toggling goes through the same PATCH endpoint family; the block
+    // action lives on its own route and needs customers:block permission.
     const block = currentStatus !== 'blocked';
-    const result = await adminBlockCustomer(
-      customerId,
-      block,
-      'staff-001',
-      'founder@nong-kati.co.th',
-    );
-    if (result.success) {
+    const res = await adminFetch(`/api/v1/admin/customers/${customerId}/block`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ blocked: block }),
+    });
+    if (res.ok) {
       setActionMessage(block ? 'บล็อคลูกค้าสำเร็จ' : 'ปลดบล็อคสำเร็จ');
       setSelectedCustomer(null);
-      handleSearch();
+      void handleSearch();
     }
+  };
+
+  const handleTierChange = async (customerId: string, tier: PriceTier) => {
+    const res = await adminFetch(`/api/v1/admin/customers/${customerId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tier }),
+    });
+    if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      setActionMessage(data.error ?? 'เปลี่ยนระดับราคาไม่สำเร็จ');
+      return;
+    }
+    setActionMessage(`เปลี่ยนระดับราคาเป็น ${TIER_LABELS[tier]} สำเร็จ`);
+    // Refresh both the row and the open detail view.
+    void handleSearch();
+    void handleViewCustomer(customerId);
   };
 
   return (
@@ -106,7 +177,7 @@ export default function AdminCustomersPage(): React.JSX.Element {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
             <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-line-subtle bg-surface-base p-6">
               <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-bold text-fg">{selectedCustomer.fullName}</h2>
+                <h2 className="text-lg font-bold text-fg">{selectedCustomer.fullName || selectedCustomer.email}</h2>
                 <button
                   onClick={() => setSelectedCustomer(null)}
                   className="text-fg-placeholder hover:text-fg"
@@ -152,6 +223,29 @@ export default function AdminCustomersPage(): React.JSX.Element {
                   </div>
                 </div>
 
+                {/* Price tier — changes what this customer pays storewide */}
+                <div className="rounded-md border border-line-subtle bg-surface p-3">
+                  <p className="mb-2 flex items-center gap-1.5 text-sm font-medium text-fg-muted">
+                    <Tag size={14} /> ระดับราคา (สิทธิ์ราคาสมาชิก/ตัวแทน)
+                  </p>
+                  <div className="flex gap-2">
+                    {TIER_OPTIONS.map((t) => (
+                      <button
+                        key={t}
+                        onClick={() => handleTierChange(selectedCustomer.id, t)}
+                        className={cn(
+                          'rounded-full px-3 py-1.5 text-xs font-semibold transition-colors',
+                          selectedCustomer.tier === t
+                            ? 'bg-peach-500 text-fg'
+                            : 'border border-line-subtle bg-surface-base text-fg-muted hover:bg-clay-300',
+                        )}
+                      >
+                        {TIER_LABELS[t]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Recent Orders */}
                 {selectedCustomer.recentOrders.length > 0 && (
                   <div>
@@ -164,7 +258,7 @@ export default function AdminCustomersPage(): React.JSX.Element {
                         <div>
                           <p className="text-fg-secondary">{order.orderNumber}</p>
                           <p className="text-xs text-fg-placeholder">
-                            {order.createdAt.toLocaleDateString('th-TH')}
+                            {new Date(order.createdAt).toLocaleDateString('th-TH')}
                           </p>
                         </div>
                         <p className="text-fg-secondary">{formatThb(order.totalAmountThb)}</p>
@@ -208,9 +302,9 @@ export default function AdminCustomersPage(): React.JSX.Element {
                 <th className="px-4 py-3 text-left font-medium text-fg-muted">อีเมล</th>
                 <th className="px-4 py-3 text-left font-medium text-fg-muted">ชื่อ</th>
                 <th className="px-4 py-3 text-center font-medium text-fg-muted">สถานะ</th>
+                <th className="px-4 py-3 text-center font-medium text-fg-muted">ระดับราคา</th>
                 <th className="px-4 py-3 text-center font-medium text-fg-muted">คำสั่งซื้อ</th>
                 <th className="px-4 py-3 text-right font-medium text-fg-muted">ยอดซื้อรวม</th>
-                <th className="px-4 py-3 text-center font-medium text-fg-muted">สมัครเมื่อ</th>
                 <th className="px-4 py-3 text-right font-medium text-fg-muted">จัดการ</th>
               </tr>
             </thead>
@@ -225,7 +319,7 @@ export default function AdminCustomersPage(): React.JSX.Element {
                 customers.map((customer) => (
                   <tr key={customer.id} className="border-b border-line-subtle hover:bg-surface">
                     <td className="px-4 py-3 text-fg-secondary">{customer.email}</td>
-                    <td className="px-4 py-3 text-fg-secondary">{customer.fullName}</td>
+                    <td className="px-4 py-3 text-fg-secondary">{customer.fullName || '—'}</td>
                     <td className="px-4 py-3 text-center">
                       <span
                         className={cn(
@@ -238,12 +332,19 @@ export default function AdminCustomersPage(): React.JSX.Element {
                         {customer.status === 'blocked' ? 'บล็อค' : 'ใช้งาน'}
                       </span>
                     </td>
+                    <td className="px-4 py-3 text-center">
+                      <span
+                        className={cn(
+                          'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
+                          TIER_BADGE[customer.tier],
+                        )}
+                      >
+                        {TIER_LABELS[customer.tier]}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-center text-fg-muted">{customer.totalOrders}</td>
                     <td className="px-4 py-3 text-right text-fg-secondary">
                       {formatThb(customer.totalSpendThb)}
-                    </td>
-                    <td className="px-4 py-3 text-center text-xs text-fg-placeholder">
-                      {customer.createdAt.toLocaleDateString('th-TH')}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button

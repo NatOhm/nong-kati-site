@@ -3,7 +3,31 @@
  * Replaces the M2 seed-data mock with real database queries.
  */
 
+import { cache } from 'react';
+
 import { prisma } from '@/lib/db';
+import { normalizeTier, tierPrice, type PriceTier } from '@/lib/pricing';
+
+// ─── Tier-aware price resolution ──────────────────────
+
+/**
+ * The requesting customer's price tier for this request.
+ * Reads the nk_session cookie via React.cache — one DB hit per request no
+ * matter how many product fetchers run (works in server components AND
+ * route handlers). Falls back to retail (base prices) for guests.
+ */
+const getRequestTier = cache(async (): Promise<PriceTier> => {
+  const { cookies } = await import('next/headers');
+  const token = cookies().get('nk_session')?.value;
+  if (!token) return 'retail';
+  const { getCustomerFromToken } = await import('@/api/customerAuth');
+  const customer = await getCustomerFromToken(token).catch(() => null);
+  return customer ? normalizeTier(customer.tier) : 'retail';
+});
+
+export function resolveTier(): Promise<PriceTier> {
+  return getRequestTier();
+}
 
 // ─── Types ────────────────────────────────────────────
 
@@ -27,7 +51,10 @@ export interface CategoryItem {
 export interface ProductVariant {
   id: string;
   label: string;
+  /** Retail price — the base that tier prices fall back to. */
   price: number;
+  /** Price for this request's tier (== price for retail/guests). */
+  effectivePrice: number;
   stock: number;
   isActive: boolean;
   sortOrder: number;
@@ -259,7 +286,7 @@ export async function getAllCategorySlugs(): Promise<string[]> {
 
 // ─── Product helpers ───────────────────────────────────
 
-function mapProduct(p: any, cat: { id: string; name: string; slug: string } | null): ProductItem {
+function mapProduct(p: any, cat: { id: string; name: string; slug: string } | null, tier: PriceTier = 'retail'): ProductItem {
   return {
     id: p.id,
     name: p.name,
@@ -273,6 +300,10 @@ function mapProduct(p: any, cat: { id: string; name: string; slug: string } | nu
       id: v.id,
       label: v.label,
       price: Number(v.price),
+      effectivePrice: tierPrice(Number(v.price), tier, {
+        memberPrice: v.memberPrice != null ? Number(v.memberPrice) : null,
+        dealerPrice: v.dealerPrice != null ? Number(v.dealerPrice) : null,
+      }),
       stock: v.stock,
       isActive: v.isActive,
       sortOrder: v.sortOrder,
@@ -297,7 +328,8 @@ export async function getFeaturedProducts(): Promise<ProductItem[]> {
     orderBy: { createdAt: 'desc' },
   });
 
-  return products.map((p) => mapProduct(p, p.category));
+  const tier = await resolveTier();
+  return products.map((p) => mapProduct(p, p.category, tier));
 }
 
 export async function getProductsByCategory(
@@ -313,6 +345,7 @@ export async function getProductsByCategory(
   const categoryIds = [cat.id, ...descendantIds];
   const where = { categoryId: { in: categoryIds }, isActive: true };
 
+  const tier = await resolveTier();
   const [products, total] = await Promise.all([
     prisma.product.findMany({
       where,
@@ -329,7 +362,7 @@ export async function getProductsByCategory(
   ]);
 
   return {
-    products: products.map((p) => mapProduct(p, p.category)),
+    products: products.map((p) => mapProduct(p, p.category, tier)),
     total,
   };
 }
@@ -345,7 +378,7 @@ export async function getProductBySlug(slug: string): Promise<ProductItem | null
   });
 
   if (!p) return null;
-  return mapProduct(p, p.category);
+  return mapProduct(p, p.category, await resolveTier());
 }
 
 export async function getAllProductSlugs(): Promise<string[]> {
@@ -416,6 +449,8 @@ export async function getCatalogProducts(
   const minPriceOf = (p: (typeof keys)[number]) =>
     p.variants.length ? Math.min(...p.variants.map((v) => Number(v.price))) : null;
 
+  const tier = await resolveTier();
+
   const cmp: (a: (typeof keys)[number], b: (typeof keys)[number]) => number =
     sort === 'price-asc' || sort === 'price-desc'
       ? (a, b) => {
@@ -455,7 +490,7 @@ export async function getCatalogProducts(
     products: pageIds
       .map((id) => rowById.get(id))
       .filter((r): r is NonNullable<typeof r> => Boolean(r))
-      .map((p) => mapProduct(p, p.category)),
+      .map((p) => mapProduct(p, p.category, tier)),
     total,
   };
 }
@@ -477,6 +512,7 @@ export async function searchProducts(
     ],
   };
 
+  const tier = await resolveTier();
   const [products, total] = await Promise.all([
     prisma.product.findMany({
       where,
@@ -493,7 +529,7 @@ export async function searchProducts(
   ]);
 
   return {
-    products: products.map((p) => mapProduct(p, p.category)),
+    products: products.map((p) => mapProduct(p, p.category, tier)),
     total,
     query: trimmed,
   };
@@ -542,9 +578,10 @@ export async function getWishlistProducts(customerId: string): Promise<ProductIt
       },
     },
   });
+  const tier = await resolveTier();
   return wishes
     .filter((w) => w.product.isActive)
-    .map((w) => mapProduct(w.product, w.product.category));
+    .map((w) => mapProduct(w.product, w.product.category, tier));
 }
 
 /** Ids the customer has wished — for heart states on cards. */
@@ -591,7 +628,8 @@ export async function getMostWishedProducts(
       aliases: true,
     },
   });
-  const byId = new Map(products.map((p) => [p.id, mapProduct(p, p.category)]));
+  const tier = await resolveTier();
+  const byId = new Map(products.map((p) => [p.id, mapProduct(p, p.category, tier)]));
   return ranked.flatMap((r) => {
     const product = byId.get(r.productId);
     return product ? [{ product, wishCount: r._count.productId }] : [];

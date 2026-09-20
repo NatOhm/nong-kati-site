@@ -19,12 +19,14 @@ export function OrderSummaryPanel({
   collapsed = false,
   className,
 }: OrderSummaryPanelProps): React.JSX.Element {
+  // Prices are VAT-inclusive everywhere (server: unitPriceExVat = price / 1.07).
+  // The summary must match the server's authoritative total, not add VAT on top.
   const subtotal = items.reduce(
     (sum, i) => Math.round((sum + i.unitPriceThb * i.quantity) * 100) / 100,
     0,
   );
-  const vat = Math.round(subtotal * 0.07 * 100) / 100;
-  const total = Math.round((subtotal + vat) * 100) / 100;
+  const vat = Math.round((subtotal - subtotal / 1.07) * 100) / 100;
+  const total = subtotal;
 
   if (collapsed) {
     return (
@@ -82,7 +84,7 @@ export function OrderSummaryPanel({
           <span>{formatThb(subtotal)}</span>
         </div>
         <div className="flex items-center justify-between text-xs text-fg-muted">
-          <span>VAT 7%</span>
+          <span>VAT 7% (รวมในราคา)</span>
           <span>{formatThb(vat)}</span>
         </div>
         <div className="mt-2 flex items-center justify-between border-t border-line-subtle pt-2">
