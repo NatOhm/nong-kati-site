@@ -29,8 +29,16 @@ export class OmiseAdapter implements PaymentGateway {
   constructor() {
     this.secretKey = process.env['NK_OMISE_SECRET_KEY'] ?? '';
     this.webhookSecret = process.env['NK_OMISE_WEBHOOK_SECRET'] ?? '';
-    // Mock mode when no real keys configured
-    this.isMock = !this.secretKey || this.secretKey.startsWith('skey_test_mock');
+    // Review #1: mocks must be a deliberate nonproduction choice, never a
+    // silent fallback. Production with missing credentials is a hard error
+    // (fail closed) — a fabricated webhook must never reach real fulfilment.
+    this.isMock =
+      process.env.NODE_ENV !== 'production' && process.env['NK_PAYMENT_MOCK'] === 'true';
+    if (!this.isMock && (!this.secretKey || !this.webhookSecret)) {
+      throw new Error(
+        'Payment configuration is required (NK_OMISE_SECRET_KEY + NK_OMISE_WEBHOOK_SECRET)',
+      );
+    }
   }
 
   async createPromptPayCharge(request: ChargeRequest): Promise<ChargeResult> {
@@ -57,14 +65,9 @@ export class OmiseAdapter implements PaymentGateway {
       return this.mockVerifySignature(rawBody, signatureHeader);
     }
     // Real Omise HMAC verification
-    const expected = createHmac('sha256', this.webhookSecret)
-      .update(rawBody)
-      .digest('hex');
+    const expected = createHmac('sha256', this.webhookSecret).update(rawBody).digest('hex');
 
-    return timingSafeEqual(
-      Buffer.from(expected),
-      Buffer.from(signatureHeader),
-    );
+    return timingSafeEqual(Buffer.from(expected), Buffer.from(signatureHeader));
   }
 
   parseWebhookEvent(rawBody: Buffer): WebhookEvent {
@@ -78,10 +81,14 @@ export class OmiseAdapter implements PaymentGateway {
         key: key as WebhookEvent['key'],
         chargeId: charge.id ?? '',
         amount: charge.amount ?? 0,
-        status: charge.status === 'successful' ? 'successful'
-          : charge.status === 'failed' ? 'failed'
-          : charge.status === 'expired' ? 'expired'
-          : 'failed',
+        status:
+          charge.status === 'successful'
+            ? 'successful'
+            : charge.status === 'failed'
+              ? 'failed'
+              : charge.status === 'expired'
+                ? 'expired'
+                : 'failed',
         failureMessage: charge.failure_message ?? undefined,
         failureCode: charge.failure_code ?? undefined,
         rawData: {

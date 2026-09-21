@@ -133,36 +133,55 @@ async function handleChargeSucceeded(chargeId: string, gatewayAmount: number): P
     }
     if (e instanceof InsufficientStockError) {
       // Expected outcome, not a failure: the main tx rolled back, so commit
-      // the manual-fulfilment state in its own retry-guarded transaction.
+      // the manual-fulfilment state. Review #4: claim + order update + attempt
+      // success are one transaction — a crash between writes can no longer
+      // strand the order payment_confirmed with a pending attempt.
       for (let i = 0; i < 3; i++) {
-        const c = await claimOrderForConfirmation(order.id);
-        if (c) {
-          await prisma.order.update({
-            where: { id: order.id },
-            data: {
-              status: 'pending_manual_fulfilment',
-              manualFulfilmentReason: 'INSUFFICIENT_STOCK',
+        try {
+          await prisma.$transaction(
+            async (tx) => {
+              const c = await claimOrderForConfirmation(order.id, tx);
+              if (!c) throw new Error('CLAIM_LOST');
+              await tx.order.update({
+                where: { id: order.id },
+                data: {
+                  status: 'pending_manual_fulfilment',
+                  manualFulfilmentReason: 'INSUFFICIENT_STOCK',
+                },
+              });
+              await tx.paymentAttempt.update({
+                where: { id: attempt.id },
+                data: {
+                  status: 'succeeded',
+                  webhookReceivedAt: new Date(),
+                  webhookSignatureValid: true,
+                },
+              });
+              console.error(
+                `[Webhook] Order ${c.orderNumber} needs manual fulfilment (INSUFFICIENT_STOCK)`,
+              );
             },
-          });
-          await prisma.paymentAttempt.update({
-            where: { id: attempt.id },
-            data: {
-              status: 'succeeded',
-              webhookReceivedAt: new Date(),
-              webhookSignatureValid: true,
-            },
-          });
-          console.error(
-            `[Webhook] Order ${c.orderNumber} needs manual fulfilment (INSUFFICIENT_STOCK)`,
+            { isolationLevel: 'Serializable' },
           );
           return;
+        } catch (txErr) {
+          // CLAIM_LOST = someone else confirmed/consumed it between retries —
+          // not an error for us. Real write failures: retry, then give up so
+          // the gateway redelivers and the whole unit retries.
+          if (txErr instanceof Error && txErr.message === 'CLAIM_LOST') {
+            const cur = await prisma.order.findUnique({
+              where: { id: order.id },
+              select: { status: true },
+            });
+            if (cur && cur.status !== 'pending_payment') return;
+            continue;
+          }
+          if (i < 2) {
+            await new Promise((r) => setTimeout(r, 80));
+            continue;
+          }
+          throw txErr;
         }
-        const cur = await prisma.order.findUnique({
-          where: { id: order.id },
-          select: { status: true },
-        });
-        if (cur && cur.status !== 'pending_payment') return;
-        await new Promise((r) => setTimeout(r, 80));
       }
       console.error('[Webhook] Could not record manual-fulfilment state for', chargeId);
       return;

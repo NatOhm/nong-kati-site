@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { adminGetCustomer, adminSetCustomerTier } from '@/api/adminCustomers';
+import { maskEmail } from '@/lib/rbac';
 import { checkPermission } from '@/lib/rbac';
 
 export const dynamic = 'force-dynamic';
@@ -27,7 +28,14 @@ export async function GET(
   const { id } = await ctx.params;
   const customer = await adminGetCustomer(id);
   if (!customer) return NextResponse.json({ error: 'CUSTOMER_NOT_FOUND' }, { status: 404 });
-  return NextResponse.json(customer);
+  // Review #3: shape the response by permission — support_agent holds
+  // customers:read but not customers:read:full, so raw PII must not leak
+  // through the customer endpoints the way it did through orders.
+  const fullAccess = check.payload!.perms.includes('customers:read:full');
+  return NextResponse.json({
+    ...customer,
+    email: fullAccess ? customer.email : maskEmail(customer.email),
+  });
 }
 
 /**

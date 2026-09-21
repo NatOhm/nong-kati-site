@@ -232,6 +232,22 @@ export async function adminLogin(
     return { success: false, error: 'INVALID_CREDENTIALS' };
   }
 
+  // Review #6: an expired lockout must not linger — the lock window passed,
+  // the password is correct, so restore `active` here. updateMany with the
+  // status guard keeps explicitly deactivated accounts deactivated.
+  await prisma.adminUser.updateMany({
+    where: {
+      id: user.id,
+      status: 'locked',
+      OR: [{ lockedUntil: null }, { lockedUntil: { lte: new Date() } }],
+    },
+    data: {
+      status: 'active',
+      failedLoginAttempts: 0,
+      lockedUntil: null,
+    },
+  });
+
   await prisma.adminUser.update({
     where: { id: user.id },
     data: { failedLoginAttempts: 0, lockedUntil: null },

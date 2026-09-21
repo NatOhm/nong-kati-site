@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { adminListCustomers } from '@/api/adminCustomers';
-import { checkPermission } from '@/lib/rbac';
+import { maskEmail, checkPermission } from '@/lib/rbac';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,5 +37,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     page,
     pageSize,
   });
-  return NextResponse.json(result);
+  // Review #3: same permission-based PII shaping as the detail route.
+  const fullAccess = check.payload!.perms.includes('customers:read:full');
+  return NextResponse.json({
+    ...result,
+    data: result.data.map((customer) => ({
+      ...customer,
+      email: fullAccess ? customer.email : maskEmail(customer.email),
+    })),
+  });
 }

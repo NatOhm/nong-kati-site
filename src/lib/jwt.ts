@@ -163,12 +163,16 @@ export async function verifyAdminJwt(token: string): Promise<AdminJwtPayload | n
   }
   const user = await prisma.adminUser.findUnique({
     where: { id: payload.sub },
-    select: { status: true, sessionsInvalidBefore: true },
+    select: { role: true, status: true, sessionsInvalidBefore: true },
   });
   if (!user || user.status !== 'active') return null;
   if (user.sessionsInvalidBefore && payload.iat * 1000 <= user.sessionsInvalidBefore.getTime()) {
     return null;
   }
+  // Review #2: a refresh racing a demotion could re-issue a token from a
+  // stale super_admin snapshot; comparing the embedded role against the live
+  // row makes any stale-role token dead on arrival.
+  if (payload.role !== user.role) return null;
   return payload;
 }
 

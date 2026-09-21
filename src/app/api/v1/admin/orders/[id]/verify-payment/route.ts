@@ -34,11 +34,67 @@ export async function POST(
   }
   const { id } = await ctx.params;
 
-  // Claim atomically — a second admin clicking confirm sees ALREADY_CONFIRMED.
+  // Review #5: a pending_manual_fulfilment order (restocked after a code
+  // shortage) must RESUME — the old path claimed only pending_payment and
+  // returned 409 NOT_PAYABLE forever. Claim that state atomically, fulfil in
+  // the same transaction (partial allocations roll back), and do NOT touch
+  // coupon usage again — it was already counted at first confirmation.
+  const existing = await getOrderById(id);
+  if (!existing) return NextResponse.json({ error: 'ORDER_NOT_FOUND' }, { status: 404 });
+
+  if (existing.status === 'pending_manual_fulfilment') {
+    const resume = await prisma
+      .$transaction(
+        async (tx) => {
+          const claimed = await tx.order.updateMany({
+            where: { id, status: 'pending_manual_fulfilment' },
+            data: { status: 'payment_confirmed' },
+          });
+          if (claimed.count !== 1) throw new Error('ALREADY_CLAIMED');
+          const result = await fulfilOrder(id, tx);
+          if (!result.success) throw new Error(result.error ?? 'FULFILMENT_FAILED');
+          return result;
+        },
+        { isolationLevel: 'Serializable' },
+      )
+      .catch(async (e: unknown) => {
+        if (e instanceof Error && e.message === 'ALREADY_CLAIMED') {
+          return null;
+        }
+        // Shortage again → back to pending_manual_fulfilment for another round.
+        if (e instanceof Error && e.message === 'INSUFFICIENT_STOCK') {
+          await prisma.order.update({
+            where: { id },
+            data: {
+              status: 'pending_manual_fulfilment',
+              manualFulfilmentReason: 'INSUFFICIENT_STOCK',
+            },
+          });
+          return NextResponse.json({
+            status: 'pending_manual_fulfilment',
+            message: 'ยังส่งมอบไม่ได้ — โค้ดยังไม่พอ โปรดเติมสต๊อกเพิ่มแล้วกดส่งมอบอีกครั้ง',
+          }) as unknown as ReturnType<typeof fulfilOrder>;
+        }
+        throw e;
+      });
+    if (resume === null) {
+      return NextResponse.json(
+        { error: 'ALREADY_CONFIRMED', status: 'completed' },
+        { status: 409 },
+      );
+    }
+    if (resume instanceof NextResponse) return resume;
+
+    return NextResponse.json({
+      status: 'completed',
+      resumed: true,
+      codesDelivered: resume.codes?.length ?? 0,
+    });
+  }
+
+  // Fresh confirmation path — claim atomically from pending_payment.
   const claimed = await claimOrderForConfirmation(id);
   if (!claimed) {
-    const existing = await getOrderById(id);
-    if (!existing) return NextResponse.json({ error: 'ORDER_NOT_FOUND' }, { status: 404 });
     if (existing.status === 'completed') {
       return NextResponse.json(
         { error: 'ALREADY_CONFIRMED', status: existing.status },
