@@ -66,6 +66,12 @@ const NAV_ITEMS: NavItem[] = [
   },
   { label: 'ลูกค้า', href: '/management/customers', icon: Users, permission: 'customers:read' },
   { label: 'รายงาน', href: '/management/reports', icon: BarChart3, permission: 'reports:read' },
+  {
+    label: 'ยอดซื้อรายคน',
+    href: '/management/reports/customer-sales',
+    icon: BarChart3,
+    permission: 'reports:read',
+  },
   { label: 'พนักงาน', href: '/management/staff', icon: Shield, permission: 'staff:read' },
   { label: 'Audit Log', href: '/management/audit', icon: FileText, permission: 'audit:read' },
   { label: 'ตั้งค่า', href: '/management/settings', icon: Settings, permission: 'settings:read' },
