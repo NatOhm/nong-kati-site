@@ -1,52 +1,64 @@
 /**
  * Purchased Codes Page — 12-dashboard.md §7.
- * Flat, searchable, cross-order list of every delivered code.
+ * Flat, searchable, cross-order list of every delivered code — real data
+ * from /api/v1/account/codes (decrypted server-side per row).
  */
 
 'use client';
 
-import { useState } from 'react';
-import { Search, Copy, CheckCircle } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Search, Copy, CheckCircle, Loader2 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
-const MOCK_CODES = [
-  {
-    id: 'code-001',
-    code: 'STEAM-XXXX-YYYY-ZZZZ',
-    product: 'Steam Wallet ฿100',
-    orderNumber: 'NK-2026-000001',
-    deliveredAt: new Date('2026-08-20T14:00:21Z'),
-    used: false,
-  },
-  {
-    id: 'code-002',
-    code: 'STEAM-ABCD-EFGH-IJKL',
-    product: 'Steam Wallet ฿100',
-    orderNumber: 'NK-2026-000001',
-    deliveredAt: new Date('2026-08-20T14:00:21Z'),
-    used: false,
-  },
-  {
-    id: 'code-003',
-    code: 'NETFLIX-MNOP-QRST-UVWX',
-    product: 'Netflix ฿350',
-    orderNumber: 'NK-2026-000002',
-    deliveredAt: new Date('2026-08-15T10:30:18Z'),
-    used: true,
-  },
-];
+interface CodeRow {
+  id: string;
+  code: string;
+  product: string;
+  denomination: number;
+  orderNumber: string;
+  deliveredAt: string | null;
+  used: boolean;
+}
 
 export default function AccountCodesPage(): React.JSX.Element {
+  const [codes, setCodes] = useState<CodeRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const filteredCodes = MOCK_CODES.filter(
-    (c) =>
-      c.code.toLowerCase().includes(search.toLowerCase()) ||
-      c.product.toLowerCase().includes(search.toLowerCase()),
+  const load = useCallback(async (): Promise<void> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/v1/account/codes', { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = (await res.json()) as { codes: CodeRow[] };
+      setCodes(data.codes);
+    } catch {
+      setError('โหลดโค้ดไม่สำเร็จ กรุณาลองใหม่');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const filteredCodes = useMemo(
+    () =>
+      search.trim()
+        ? codes.filter(
+            (c) =>
+              c.code.toLowerCase().includes(search.trim().toLowerCase()) ||
+              c.product.toLowerCase().includes(search.trim().toLowerCase()),
+          )
+        : codes,
+    [codes, search],
   );
 
-  const handleCopy = async (code: string, id: string) => {
+  const handleCopy = async (code: string, id: string): Promise<void> => {
     await navigator.clipboard.writeText(code);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
@@ -71,10 +83,24 @@ export default function AccountCodesPage(): React.JSX.Element {
         />
       </div>
 
+      {error && (
+        <p className="rounded-lg bg-coral-50 px-3 py-2 text-sm text-coral-700 dark:bg-coral-900/20 dark:text-coral-300">
+          {error}
+        </p>
+      )}
+
       {/* Codes List */}
-      {filteredCodes.length === 0 ? (
+      {loading ? (
+        <div className="flex items-center justify-center gap-2 rounded-md border border-line-subtle bg-surface p-8 text-sm text-fg-placeholder">
+          <Loader2 size={16} className="animate-spin" /> กำลังโหลด…
+        </div>
+      ) : filteredCodes.length === 0 ? (
         <div className="rounded-md border border-line-subtle bg-surface p-8 text-center">
-          <p className="text-fg-placeholder">ไม่พบโค้ด</p>
+          <p className="text-fg-placeholder">
+            {codes.length === 0
+              ? 'ยังไม่มีโค้ด — โค้ดจะแสดงที่นี่เมื่อคำสั่งซื้อสำเร็จและส่งมอบแล้ว'
+              : 'ไม่พบโค้ดที่ค้นหา'}
+          </p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -90,17 +116,23 @@ export default function AccountCodesPage(): React.JSX.Element {
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-fg-secondary">{item.product}</p>
+                  <p className="text-sm font-medium text-fg-secondary">
+                    {item.product} · ฿{item.denomination.toLocaleString('th-TH')}
+                  </p>
                   <p className="mt-1 font-mono text-sm text-fg-brand">{item.code}</p>
                   <p className="mt-1 text-xs text-fg-muted">
-                    {item.orderNumber} · ได้รับ {item.deliveredAt.toLocaleDateString('th-TH')}
+                    {item.orderNumber} · ได้รับ{' '}
+                    {item.deliveredAt
+                      ? new Date(item.deliveredAt).toLocaleDateString('th-TH')
+                      : '—'}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   {item.used && <span className="text-xs text-fg-muted">ใช้แล้ว</span>}
                   {!item.used && (
                     <button
-                      onClick={() => handleCopy(item.code, item.id)}
+                      type="button"
+                      onClick={() => void handleCopy(item.code, item.id)}
                       className="inline-flex items-center gap-1 rounded-md border border-line-subtle px-3 py-1.5 text-xs text-fg-muted hover:bg-surface"
                     >
                       {copiedId === item.id ? (
