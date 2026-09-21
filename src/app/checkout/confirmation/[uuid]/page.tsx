@@ -12,6 +12,7 @@ import { TrustBadgeRow } from '@/components/checkout/TrustBadgeRow';
 import { OrderStatusBadge } from '@/components/order/OrderStatusBadge';
 import { getOrderByConfirmationUuid } from '@/api/orders';
 import { getAvailableCodeCount } from '@/lib/delivery/reservation';
+import { getDeliveredCodes } from '@/lib/delivery/customerCodes';
 import { formatThb } from '@/lib/pricing';
 
 interface ConfirmationPageProps {
@@ -33,6 +34,9 @@ export default async function ConfirmationPage({
   const isCompleted = order.status === 'completed';
   const isPendingPayment = order.status === 'pending_payment';
   const isPendingManual = order.status === 'pending_manual_fulfilment';
+
+  // Real delivered codes, decrypted server-side (finding #4).
+  const deliveredCodes = isCompleted ? await getDeliveredCodes(order.id) : [];
 
   return (
     <>
@@ -99,19 +103,24 @@ export default async function ConfirmationPage({
                 </p>
 
                 <div className="space-y-3">
-                  {order.items.map((item) => (
+                  {deliveredCodes.map((delivered, idx) => (
                     <div
-                      key={item.id}
+                      key={`${delivered.code}-${idx}`}
                       className="rounded-md border border-line-brand bg-white p-4 shadow-code-glow"
                     >
                       <p className="mb-2 text-sm text-fg-muted">
-                        {item.productNameTh} × {item.quantity}
+                        {delivered.productName} ฿{delivered.denomination.toLocaleString('th-TH')}
                       </p>
-                      <p className="font-mono text-sm text-fg-brand">
-                        โค้ดจะแสดงหลังการชำระเงินสำเร็จ
-                      </p>
+                      <p className="font-mono text-sm font-bold text-fg-brand">{delivered.code}</p>
                     </div>
                   ))}
+                  {deliveredCodes.length === 0 && (
+                    <div className="rounded-md border border-line-brand bg-white p-4">
+                      <p className="font-mono text-sm text-fg-brand">
+                        โค้ดจะแสดงที่นี่ — รีเฟรชหน้านี้อีกครั้งในอีกสักครู่
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

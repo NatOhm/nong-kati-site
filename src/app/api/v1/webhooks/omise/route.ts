@@ -23,6 +23,10 @@ export const dynamic = 'force-dynamic';
 
 const gateway = new OmiseAdapter();
 
+/** Control-flow markers for expected, non-retryable transaction outcomes. */
+class WebhookAlreadyConfirmedError extends Error {}
+class InsufficientStockError extends Error {}
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
   // Step 1: Read raw body (before signature check)
   const rawBody = Buffer.from(await request.arrayBuffer());
@@ -83,50 +87,91 @@ async function handleChargeSucceeded(chargeId: string, gatewayAmount: number): P
     return;
   }
 
-  await prisma.paymentAttempt.update({
-    where: { id: attempt.id },
-    data: { status: 'succeeded', webhookReceivedAt: new Date(), webhookSignatureValid: true },
-  });
+  // Finding #7: confirmation + fulfilment are ONE transaction. A transient
+  // fulfilment failure rolls the claim and the attempt-status back, so the
+  // gateway's redelivery retries the whole unit — no permanent
+  // payment_confirmed-but-unfulfilled limbo.
+  try {
+    const claimed = await prisma.$transaction(async (tx) => {
+      await tx.paymentAttempt.update({
+        where: { id: attempt.id },
+        data: { status: 'succeeded', webhookReceivedAt: new Date(), webhookSignatureValid: true },
+      });
+      const c = await claimOrderForConfirmation(order.id, tx);
+      if (!c) throw new WebhookAlreadyConfirmedError(order.orderNumber); // duplicate lost the race
+      const fulfilment = await fulfilOrder(order.id, tx);
+      if (fulfilment.error === 'INSUFFICIENT_STOCK')
+        throw new InsufficientStockError(order.orderNumber);
+      if (fulfilment.error === 'ALREADY_FULFILLED')
+        throw new WebhookAlreadyConfirmedError(order.orderNumber);
+      return c;
+    });
 
-  // Claim atomically — duplicate webhooks lose the race here.
-  const claimed = await claimOrderForConfirmation(order.id);
-  if (!claimed) {
-    console.log('[Webhook] Order already confirmed:', order.orderNumber);
-    return;
-  }
-
-  const fulfilment = await fulfilOrder(order.id);
-  if (!fulfilment.success) {
-    if (fulfilment.error === 'INSUFFICIENT_STOCK') {
-      await prisma.order.update({
-        where: { id: order.id },
-        data: { status: 'pending_manual_fulfilment', manualFulfilmentReason: 'INSUFFICIENT_STOCK' },
+    // Notifications (fire-and-forget), only after a real commit.
+    const cfg = await getNotificationSettings();
+    void notifyPaymentConfirmed({
+      orderNumber: claimed.orderNumber,
+      totalThb: Number(claimed.totalAmountThb),
+    });
+    const threshold = cfg.lowStockThreshold ?? 5;
+    const variantIds = [...new Set(claimed.items.map((i: { variantId: string }) => i.variantId))];
+    const low = await prisma.productVariant.findMany({
+      where: { id: { in: variantIds }, stock: { lte: threshold } },
+      include: { product: { select: { name: true } } },
+    });
+    for (const v of low) {
+      void notifyStockLow({
+        productName: v.product.name,
+        variantLabel: v.label,
+        stock: v.stock,
       });
     }
-    return;
-  }
-
-  // Notifications (fire-and-forget).
-  const cfg = await getNotificationSettings();
-  void notifyPaymentConfirmed({
-    orderNumber: claimed.orderNumber,
-    totalThb: Number(claimed.totalAmountThb),
-  });
-  const threshold = cfg.lowStockThreshold ?? 5;
-  const variantIds = [...new Set(claimed.items.map((i: { variantId: string }) => i.variantId))];
-  const low = await prisma.productVariant.findMany({
-    where: { id: { in: variantIds }, stock: { lte: threshold } },
-    include: { product: { select: { name: true } } },
-  });
-  for (const v of low) {
-    void notifyStockLow({
-      productName: v.product.name,
-      variantLabel: v.label,
-      stock: v.stock,
-    });
+  } catch (e) {
+    if (e instanceof WebhookAlreadyConfirmedError) {
+      console.log('[Webhook] Order already confirmed:', e.message);
+      return;
+    }
+    if (e instanceof InsufficientStockError) {
+      // Expected outcome, not a failure: the main tx rolled back, so commit
+      // the manual-fulfilment state in its own retry-guarded transaction.
+      for (let i = 0; i < 3; i++) {
+        const c = await claimOrderForConfirmation(order.id);
+        if (c) {
+          await prisma.order.update({
+            where: { id: order.id },
+            data: {
+              status: 'pending_manual_fulfilment',
+              manualFulfilmentReason: 'INSUFFICIENT_STOCK',
+            },
+          });
+          await prisma.paymentAttempt.update({
+            where: { id: attempt.id },
+            data: {
+              status: 'succeeded',
+              webhookReceivedAt: new Date(),
+              webhookSignatureValid: true,
+            },
+          });
+          console.error(
+            `[Webhook] Order ${c.orderNumber} needs manual fulfilment (INSUFFICIENT_STOCK)`,
+          );
+          return;
+        }
+        const cur = await prisma.order.findUnique({
+          where: { id: order.id },
+          select: { status: true },
+        });
+        if (cur && cur.status !== 'pending_payment') return;
+        await new Promise((r) => setTimeout(r, 80));
+      }
+      console.error('[Webhook] Could not record manual-fulfilment state for', chargeId);
+      return;
+    }
+    // Unexpected failure: everything rolled back and the attempt is still
+    // un-succeeded → the gateway redelivers and retries the whole unit.
+    throw e;
   }
 }
-
 async function handleChargeFailed(
   chargeId: string,
   failureMessage?: string,

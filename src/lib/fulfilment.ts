@@ -23,8 +23,20 @@ export interface FulfilmentResult {
   error?: 'INSUFFICIENT_STOCK' | 'ALREADY_FULFILLED' | 'ORDER_NOT_FOUND';
 }
 
-export async function fulfilOrder(orderId: string): Promise<FulfilmentResult> {
-  const order = await prisma.order.findUnique({
+export type PrismaTx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
+/**
+ * Fulfil an order. When `tx` is supplied (webhook confirmation path), every
+ * write joins the CALLER's transaction so payment confirmation + fulfilment
+ * commit or roll back as one unit (finding #7). INSUFFICIENT_STOCK is
+ * returned, not thrown, so a shared transaction can commit the
+ * pending_manual_fulfilment state instead of losing the confirmation.
+ */
+export async function fulfilOrder(
+  orderId: string,
+  tx: PrismaTx = prisma,
+): Promise<FulfilmentResult> {
+  const order = await tx.order.findUnique({
     where: { id: orderId },
     include: { items: { include: { variant: { include: { product: true } } } } },
   });
@@ -32,7 +44,9 @@ export async function fulfilOrder(orderId: string): Promise<FulfilmentResult> {
   if (order.status === 'completed') return { success: false, error: 'ALREADY_FULFILLED' };
 
   try {
-    const result = await prisma.$transaction(async (tx) => {
+    const run = async (
+      tx: PrismaTx,
+    ): Promise<{ code: string; productName: string; denomination: number }[]> => {
       const delivered: { code: string; productName: string; denomination: number }[] = [];
 
       for (const item of order.items) {
@@ -105,8 +119,11 @@ export async function fulfilOrder(orderId: string): Promise<FulfilmentResult> {
       });
 
       return delivered;
-    });
+    };
 
+    // Standalone callers keep the original single-transaction behaviour;
+    // a supplied tx (webhook path) joins the caller's transaction instead.
+    const result = tx === prisma ? await prisma.$transaction((t) => run(t)) : await run(tx);
     return { success: true, codes: result };
   } catch (err) {
     const msg = err instanceof Error ? err.message : '';

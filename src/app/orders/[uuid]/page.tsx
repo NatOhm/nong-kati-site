@@ -11,6 +11,7 @@ import { Breadcrumb } from '@/components/data-display/Breadcrumb';
 import { OrderDetailCard } from '@/components/order/OrderDetailCard';
 import { TrustBadgeRow } from '@/components/checkout/TrustBadgeRow';
 import { getOrderByConfirmationUuid } from '@/api/orders';
+import { getDeliveredCodes } from '@/lib/delivery/customerCodes';
 
 interface OrderDetailPageProps {
   params: Promise<{ uuid: string }>;
@@ -28,6 +29,10 @@ export default async function OrderDetailPage({
 
   const order = await getOrderByConfirmationUuid(uuid);
   if (!order) notFound();
+
+  // Real delivered codes, decrypted server-side (finding #4) — the order page
+  // must show what the customer actually bought, not a placeholder.
+  const codes = await getDeliveredCodes(order.id);
 
   // Map order status to OrderStatus type
   const orderStatus = order.status as
@@ -69,7 +74,7 @@ export default async function OrderDetailPage({
                   quantity: item.quantity,
                   lineTotalThb: Number(item.lineTotalThb),
                 })),
-                codes: [], // Codes would be populated by delivery pipeline
+                codes, // delivered codes decrypted above; empty until completed
                 subtotalThb: Number(order.subtotalThb),
                 vatAmountThb: Number(order.vatAmountThb),
                 totalAmountThb: Number(order.totalAmountThb),

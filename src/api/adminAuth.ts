@@ -262,6 +262,15 @@ export async function setup2fa(challengeToken: string): Promise<{
 
   const user = await prisma.adminUser.findUnique({ where: { id: challenge.sub } });
   if (!user) return { success: false, error: 'USER_NOT_FOUND' };
+  if (user.status !== 'active') {
+    return { success: false, error: 'ACCOUNT_DEACTIVATED' };
+  }
+  // Already enrolled: never hand the secret back. Knowing the password
+  // alone must not reveal the second factor; re-enrollment goes through
+  // a super-admin reset, not this endpoint.
+  if (user.totpConfirmed) {
+    return { success: false, error: 'ALREADY_ENROLLED' };
+  }
 
   // The seeded row already holds a secret — reuse it so the QR the user
   // scanned earlier keeps working across retries of step 2.

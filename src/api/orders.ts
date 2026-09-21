@@ -401,23 +401,31 @@ export async function updateOrderStatus(
  * admin slip-verify both use this so double-confirmation is impossible).
  * Returns the order if claimed, null if already confirmed/completed.
  */
-export async function claimOrderForConfirmation(orderId: string): Promise<Order | null> {
-  const claimed = await prisma.order.updateMany({
+/**
+ * `tx` overload: when supplied (webhook path) the claim joins the caller's
+ * transaction so claim + fulfilment are atomic (finding #7).
+ */
+export async function claimOrderForConfirmation(
+  orderId: string,
+  tx?: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+): Promise<Order | null> {
+  const db = tx ?? prisma;
+  const claimed = await db.order.updateMany({
     where: { id: orderId, status: 'pending_payment' },
     data: { status: 'payment_confirmed' },
   });
   if (claimed.count !== 1) return null;
   // Coupon usage counts only when payment is actually confirmed.
-  const order = await prisma.order.findUnique({
+  const order = await db.order.findUnique({
     where: { id: orderId },
     select: { couponId: true },
   });
   if (order?.couponId) {
-    await prisma.coupon.update({
+    await db.coupon.update({
       where: { id: order.couponId },
       data: { usageCount: { increment: 1 } },
     });
   }
-  const o = await prisma.order.findUnique({ where: { id: orderId }, include: orderInclude });
+  const o = await db.order.findUnique({ where: { id: orderId }, include: orderInclude });
   return o ? mapOrder(o as unknown as DbOrder) : null;
 }

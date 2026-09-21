@@ -1,17 +1,21 @@
 'use client';
 
-import { useState } from 'react';
-import { Plus, Shield, UserMinus, UserCheck, XCircle, Copy } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  Plus,
+  Shield,
+  UserMinus,
+  UserCheck,
+  XCircle,
+  Copy,
+  KeyRound,
+  LockOpen,
+} from 'lucide-react';
 
 import { AdminShell } from '@/components/layout/AdminShell';
+import { adminJson } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
-import {
-  adminListStaff,
-  adminCreateStaff,
-  adminChangeStaffRole,
-  adminDeactivateStaff,
-  type AdminStaffListItem,
-} from '@/api/adminStaff';
+import type { AdminStaffListItem } from '@/api/adminStaff';
 import type { AdminRole } from '@/types/auth';
 
 const ROLE_LABELS: Record<AdminRole, string> = {
@@ -32,93 +36,158 @@ const ALL_ROLES: AdminRole[] = [
   'marketing_manager',
 ];
 
+/**
+ * Wire shape: JSON timestamps arrive as ISO strings, not Date objects.
+ * (Review finding #6 — calling .toLocaleDateString() on the raw string
+ * crashed the whole table whenever any staff member had ever logged in.)
+ */
+type StaffResponseItem = Omit<AdminStaffListItem, 'lastLoginAt' | 'createdAt'> & {
+  lastLoginAt: string | null;
+  createdAt: string;
+};
+
 export default function AdminStaffPage(): React.JSX.Element {
-  const [staff, setStaff] = useState<AdminStaffListItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [staff, setStaff] = useState<StaffResponseItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
+  const [selfId, setSelfId] = useState<string>('');
 
   // Create form state
   const [newEmail, setNewEmail] = useState('');
   const [newFullName, setNewFullName] = useState('');
   const [newRole, setNewRole] = useState<AdminRole>('order_manager');
 
-  const handleLoadStaff = async () => {
+  const handleLoadStaff = useCallback(async () => {
     setLoading(true);
-    setActionMessage(null);
+    // Review finding #9: clearing actionMessage here erased the just-created
+    // temp password on the refresh that immediately follows create/reset.
+    // Mutation handlers clear it explicitly before starting a new operation.
     try {
-      const result = await adminListStaff();
-      setStaff(result);
+      const me = await adminJson<{ id: string }>('/api/v1/auth/admin/me');
+      setSelfId(me.id);
+      const data = await adminJson<{ items: StaffResponseItem[] }>('/api/v1/admin/staff');
+      setStaff(data.items);
+    } catch (e) {
+      setActionMessage(e instanceof Error ? e.message : 'โหลดรายชื่อไม่สำเร็จ');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    void handleLoadStaff();
+  }, [handleLoadStaff]);
 
   const handleCreateStaff = async () => {
-    const result = await adminCreateStaff(
-      { email: newEmail, fullName: newFullName, role: newRole },
-      'staff-001',
-      'founder@nong-kati.co.th',
-    );
-
-    if ('error' in result) {
-      setActionMessage(
-        result.error === 'EMAIL_ALREADY_EXISTS' ? 'อีเมลนี้มีอยู่แล้ว' : 'เกิดข้อผิดพลาด',
+    try {
+      const result = await adminJson<{ data: StaffResponseItem; tempPassword: string }>(
+        '/api/v1/admin/staff',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: newEmail, fullName: newFullName, role: newRole }),
+        },
       );
-    } else {
       setTempPassword(result.tempPassword);
-      setActionMessage(`สร้างพนักงานสำเร็จ — รหัสผ่านชั่วคราว: ${result.tempPassword}`);
+      setActionMessage(
+        `สร้างพนักงานสำเร็จ — รหัสผ่านชั่วคราว (แสดงครั้งเดียว): ${result.tempPassword}`,
+      );
       setShowCreateForm(false);
       setNewEmail('');
       setNewFullName('');
       setNewRole('order_manager');
-      handleLoadStaff();
-    }
-  };
-
-  const handleChangeRole = async (staffId: string, newRole: AdminRole) => {
-    const result = await adminChangeStaffRole(
-      staffId,
-      newRole,
-      'staff-001',
-      'founder@nong-kati.co.th',
-    );
-    if (result.success) {
-      setActionMessage('เปลี่ยนบทบาทสำเร็จ');
-      handleLoadStaff();
-    }
-  };
-
-  const handleDeactivate = async (staffId: string) => {
-    const result = await adminDeactivateStaff(
-      staffId,
-      true,
-      'staff-001',
-      'founder@nong-kati.co.th',
-    );
-    if (result.success) {
-      setActionMessage('ปิดใช้งานพนักงานสำเร็จ');
-      handleLoadStaff();
-    } else {
+      void handleLoadStaff();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'ERROR';
       setActionMessage(
-        result.error === 'LAST_SUPER_ADMIN'
-          ? 'ไม่สามารถปิดใช้งาน Super Admin คนสุดท้ายได้'
-          : 'เกิดข้อผิดพลาด',
+        msg === 'EMAIL_ALREADY_EXISTS' ? 'อีเมลนี้มีอยู่แล้ว' : `เกิดข้อผิดพลาด: ${msg}`,
       );
     }
   };
 
-  const handleActivate = async (staffId: string) => {
-    const result = await adminDeactivateStaff(
-      staffId,
-      false,
-      'staff-001',
-      'founder@nong-kati.co.th',
+  const handleError = (e: unknown, friendly: string) => {
+    const msg = e instanceof Error ? e.message : 'ERROR';
+    setActionMessage(
+      msg === 'LAST_SUPER_ADMIN'
+        ? 'ไม่สามารถดำเนินการกับ Super Admin คนสุดท้ายได้'
+        : msg === 'CANNOT_MODIFY_SELF'
+          ? 'ไม่สามารถดำเนินการกับบัญชีตัวเองได้'
+          : (`เกิดข้อผิดพลาด: ${msg}` ?? friendly),
     );
-    if (result.success) {
+  };
+
+  const handleChangeRole = async (staffId: string, newRole: AdminRole) => {
+    try {
+      await adminJson(`/api/v1/admin/staff/${staffId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'role', role: newRole }),
+      });
+      setActionMessage('เปลี่ยนบทบาทสำเร็จ — เซสชันเดิมของผู้ใช้ถูกเพิกถอน');
+      void handleLoadStaff();
+    } catch (e) {
+      handleError(e, 'เปลี่ยนบทบาทไม่สำเร็จ');
+    }
+  };
+
+  const handleDeactivate = async (staffId: string) => {
+    try {
+      await adminJson(`/api/v1/admin/staff/${staffId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'deactivate', deactivate: true }),
+      });
+      setActionMessage('ปิดใช้งานพนักงานสำเร็จ — เซสชันทั้งหมดถูกเพิกถอน');
+      void handleLoadStaff();
+    } catch (e) {
+      handleError(e, 'ปิดใช้งานไม่สำเร็จ');
+    }
+  };
+
+  const handleActivate = async (staffId: string) => {
+    try {
+      await adminJson(`/api/v1/admin/staff/${staffId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'deactivate', deactivate: false }),
+      });
       setActionMessage('เปิดใช้งานพนักงานสำเร็จ');
-      handleLoadStaff();
+      void handleLoadStaff();
+    } catch (e) {
+      handleError(e, 'เปิดใช้งานไม่สำเร็จ');
+    }
+  };
+
+  const handleResetPassword = async (staffId: string) => {
+    try {
+      const result = await adminJson<{ tempPassword: string }>(`/api/v1/admin/staff/${staffId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reset-password' }),
+      });
+      setTempPassword(result.tempPassword);
+      setActionMessage(
+        `รีเซ็ตรหัสผ่านสำเร็จ — รหัสชั่วคราว (แสดงครั้งเดียว): ${result.tempPassword}`,
+      );
+      void handleLoadStaff();
+    } catch (e) {
+      handleError(e, 'รีเซ็ตรหัสผ่านไม่สำเร็จ');
+    }
+  };
+
+  const handleUnlock = async (staffId: string) => {
+    try {
+      await adminJson(`/api/v1/admin/staff/${staffId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'unlock' }),
+      });
+      setActionMessage('ปลดล็อกบัญชีสำเร็จ');
+      void handleLoadStaff();
+    } catch (e) {
+      handleError(e, 'ปลดล็อกไม่สำเร็จ');
     }
   };
 
@@ -258,8 +327,10 @@ export default function AdminStaffPage(): React.JSX.Element {
                     <td className="px-4 py-3 text-center">
                       <select
                         value={member.role}
+                        disabled={member.id === selfId}
+                        title={member.id === selfId ? 'บัญชีของคุณเอง' : undefined}
                         onChange={(e) => handleChangeRole(member.id, e.target.value as AdminRole)}
-                        className="rounded border border-line-subtle bg-surface px-2 py-1 text-xs text-fg-secondary focus:border-line-brand focus:outline-none"
+                        className="rounded border border-line-subtle bg-surface px-2 py-1 text-xs text-fg-secondary focus:border-line-brand focus:outline-none disabled:opacity-50"
                       >
                         {ALL_ROLES.map((role) => (
                           <option key={role} value={role}>
@@ -284,24 +355,46 @@ export default function AdminStaffPage(): React.JSX.Element {
                       {member.totpConfirmed ? '✓' : '✗'}
                     </td>
                     <td className="px-4 py-3 text-center text-xs text-fg-placeholder">
-                      {member.lastLoginAt ? member.lastLoginAt.toLocaleDateString('th-TH') : '—'}
+                      {member.lastLoginAt
+                        ? new Date(member.lastLoginAt).toLocaleDateString('th-TH')
+                        : '—'}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      {member.status === 'active' ? (
-                        <button
-                          onClick={() => handleDeactivate(member.id)}
-                          className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-coral-600 hover:bg-coral-50"
-                        >
-                          <UserMinus size={12} /> ปิดใช้งาน
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleActivate(member.id)}
-                          className="text-jade-600 inline-flex items-center gap-1 rounded px-2 py-1 text-xs hover:bg-jade-900/20"
-                        >
-                          <UserCheck size={12} /> เปิดใช้งาน
-                        </button>
-                      )}
+                      <div className="inline-flex items-center gap-1">
+                        {member.status === 'locked' && (
+                          <button
+                            onClick={() => handleUnlock(member.id)}
+                            className="text-topaz-600 hover:bg-topaz-50 inline-flex items-center gap-1 rounded px-2 py-1 text-xs"
+                          >
+                            <LockOpen size={12} /> ปลดล็อก
+                          </button>
+                        )}
+                        {member.id !== selfId && (
+                          <button
+                            onClick={() => handleResetPassword(member.id)}
+                            className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-fg-secondary hover:bg-surface"
+                          >
+                            <KeyRound size={12} /> รีเซ็ตรหัสผ่าน
+                          </button>
+                        )}
+                        {member.status === 'active' ? (
+                          member.id !== selfId && (
+                            <button
+                              onClick={() => handleDeactivate(member.id)}
+                              className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-coral-600 hover:bg-coral-50"
+                            >
+                              <UserMinus size={12} /> ปิดใช้งาน
+                            </button>
+                          )
+                        ) : (
+                          <button
+                            onClick={() => handleActivate(member.id)}
+                            className="text-jade-600 inline-flex items-center gap-1 rounded px-2 py-1 text-xs hover:bg-jade-900/20"
+                          >
+                            <UserCheck size={12} /> เปิดใช้งาน
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))

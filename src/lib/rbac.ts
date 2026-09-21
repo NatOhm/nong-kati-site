@@ -6,7 +6,12 @@
  * No DB lookup per request — permissions embedded in JWT at issuance.
  */
 
-import { type Permission, ROLE_PERMISSIONS, type AdminRole, type AdminJwtPayload } from '@/types/auth';
+import {
+  type Permission,
+  ROLE_PERMISSIONS,
+  type AdminRole,
+  type AdminJwtPayload,
+} from '@/types/auth';
 import { verifyAdminJwt } from './jwt';
 
 export interface RbacCheckResult {
@@ -73,7 +78,9 @@ export function maskPII(data: Record<string, unknown>, role: AdminRole): Record<
   };
 }
 
-function maskEmail(email: string): string {
+/** Mask an email for limited-visibility roles: u***@domain (exported for
+ * permission-based response shaping in the admin order routes). */
+export function maskEmail(email: string): string {
   if (!email) return email;
   const parts = email.split('@');
   const localPart = parts[0] ?? '';
@@ -83,7 +90,8 @@ function maskEmail(email: string): string {
   return `${masked}@${domain}`;
 }
 
-function maskPhone(phone: string | null): string | null {
+/** Mask a phone for limited-visibility roles: 08****56 (exported, same use). */
+export function maskPhone(phone: string | null): string | null {
   if (!phone) return null;
   if (phone.length < 4) return '****';
   return phone.slice(0, 2) + '****' + phone.slice(-2);

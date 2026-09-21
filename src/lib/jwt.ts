@@ -9,6 +9,7 @@
  */
 
 import type { AdminJwtPayload, Permission, AdminRole } from '@/types/auth';
+import { prisma } from './db';
 
 const ALGORITHM = 'HS256'; // Mock: HMAC. Production: RS256
 const ACCESS_TOKEN_TTL = 15 * 60; // 15 minutes
@@ -146,7 +147,29 @@ export async function verifyJwt<T>(token: string): Promise<T | null> {
  * 08-auth.md §6.1 — Admin JWT has role + perms.
  */
 export async function verifyAdminJwt(token: string): Promise<AdminJwtPayload | null> {
-  return verifyJwt<AdminJwtPayload>(token);
+  const payload = await verifyJwt<AdminJwtPayload>(token);
+  if (!payload) return null;
+
+  // Review finding #2: signature + expiry alone let deactivated/demoted
+  // admins ride their access token to its 15-minute expiry, and let
+  // sessions continue past `sessionsInvalidBefore` invalidation.
+  // Enforce the live DB state here — every admin API caller shares this path.
+  if (
+    !Array.isArray(payload.perms) ||
+    typeof payload.sub !== 'string' ||
+    !Number.isFinite(payload.iat)
+  ) {
+    return null;
+  }
+  const user = await prisma.adminUser.findUnique({
+    where: { id: payload.sub },
+    select: { status: true, sessionsInvalidBefore: true },
+  });
+  if (!user || user.status !== 'active') return null;
+  if (user.sessionsInvalidBefore && payload.iat * 1000 <= user.sessionsInvalidBefore.getTime()) {
+    return null;
+  }
+  return payload;
 }
 
 /**

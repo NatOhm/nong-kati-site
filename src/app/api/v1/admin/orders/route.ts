@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { prisma } from '@/lib/db';
-import { checkPermission } from '@/lib/rbac';
+import { checkPermission, maskEmail } from '@/lib/rbac';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +27,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const url = new URL(req.url);
   const status = url.searchParams.get('status');
   const take = Math.min(Number(url.searchParams.get('take') ?? 100), 200);
+
+  // Permission-based PII shaping (finding #5): list responses mask the
+  // customer email unless the caller holds orders:read:full.
+  const fullAccess = check.payload!.perms.includes('orders:read:full');
 
   const where = status ? { status } : {};
   const [orders, statusCounts] = await Promise.all([
@@ -56,7 +60,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     orders: orders.map((o) => ({
       id: o.id,
       orderNumber: o.orderNumber,
-      customerEmail: o.customerEmail,
+      customerEmail: fullAccess ? o.customerEmail : maskEmail(o.customerEmail),
       status: o.status,
       paymentMethod: o.paymentMethod,
       subtotalThb: Number(o.subtotalThb),

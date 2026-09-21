@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { prisma } from '@/lib/db';
-import { checkPermission } from '@/lib/rbac';
+import { checkPermission, maskEmail, maskPhone } from '@/lib/rbac';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +27,11 @@ export async function GET(
   }
   const { id } = await ctx.params;
 
+  // Response shaping by permission (finding #5): without orders:read:full
+  // (support_agent), customer PII leaves this API masked — hiding fields in
+  // the UI would not protect the response itself.
+  const fullAccess = check.payload!.perms.includes('orders:read:full');
+
   const order = await prisma.order.findUnique({
     where: { id },
     include: {
@@ -41,8 +46,8 @@ export async function GET(
   return NextResponse.json({
     id: order.id,
     orderNumber: order.orderNumber,
-    customerEmail: order.customerEmail,
-    customerPhone: order.customerPhone,
+    customerEmail: fullAccess ? order.customerEmail : maskEmail(order.customerEmail),
+    customerPhone: fullAccess ? order.customerPhone : maskPhone(order.customerPhone),
     status: order.status,
     paymentMethod: order.paymentMethod,
     subtotalThb: Number(order.subtotalThb),
