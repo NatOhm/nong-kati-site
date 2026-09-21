@@ -22,6 +22,7 @@ export default function AdminLoginPage(): React.JSX.Element {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [setupData, setSetupData] = useState<{
+    qrDataUrl: string;
     totpUri: string;
     secretBase32: string;
     backupCodes: string[];
@@ -72,17 +73,28 @@ export default function AdminLoginPage(): React.JSX.Element {
           });
           const setup = (await setupRes.json()) as {
             success: boolean;
+            error?: string;
+            qrDataUrl?: string;
             totpUri?: string;
             secretBase32?: string;
             backupCodes?: string[];
           };
           if (setup.success) {
             setSetupData({
+              qrDataUrl: setup.qrDataUrl ?? '',
               totpUri: setup.totpUri ?? '',
               secretBase32: setup.secretBase32 ?? '',
               backupCodes: setup.backupCodes ?? [],
             });
             setStep('2fa-setup');
+          } else {
+            // Setup call failed — previously the page froze silently here.
+            setError(
+              setup.error === 'ALREADY_ENROLLED'
+                ? 'บัญชีนี้ตั้งค่า 2FA ไว้แล้ว กรุณาเข้าสู่ระบบใหม่'
+                : 'โหลดหน้าตั้งค่า 2FA ไม่สำเร็จ กรุณาเข้าสู่ระบบใหม่อีกครั้ง',
+            );
+            return;
           }
         } else {
           setStep('2fa');
@@ -130,16 +142,20 @@ export default function AdminLoginPage(): React.JSX.Element {
           }
           // Redirect to dashboard
           router.push('/management/dashboard');
-        } else if (result.error === 'TOKEN_INVALID') {
-          // Challenge expired/consumed (5-min TTL, single use) — restart cleanly
+        } else if (result.error === 'TOKEN_INVALID' || result.error === 'TOTP_INVALID') {
+          // The challenge is consumed on EVERY confirm attempt (single use,
+          // anti-brute-force) — so after a wrong code, “ลองใหม่” on the same
+          // challenge is a lie. Restart the login cleanly instead.
           setStep('credentials');
           setChallengeToken('');
           setTotpCode('');
-          setError('หมดเวลายืนยัน กรุณาเข้าสู่ระบบใหม่');
-        } else {
           setError(
-            result.error === 'TOTP_INVALID' ? 'รหัสไม่ถูกต้อง กรุณาลองใหม่' : 'เกิดข้อผิดพลาด',
+            result.error === 'TOTP_INVALID'
+              ? 'รหัสไม่ถูกต้อง กรุณาเข้าสู่ระบบและยืนยันใหม่อีกครั้ง'
+              : 'หมดเวลายืนยัน กรุณาเข้าสู่ระบบใหม่',
           );
+        } else {
+          setError('เกิดข้อผิดพลาด');
         }
       } catch {
         setError('เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
@@ -240,13 +256,10 @@ export default function AdminLoginPage(): React.JSX.Element {
             </p>
 
             <div className="flex justify-center">
-              <div className="rounded-md bg-surface p-4">
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(setupData.totpUri)}`}
-                  alt="QR Code"
-                  width={200}
-                  height={200}
-                />
+              <div className="rounded-md bg-white p-4">
+                {/* Server-rendered PNG data URL — no external image host, so the
+                    QR can never fail to load because of a blocked domain. */}
+                <img src={setupData.qrDataUrl} alt="QR Code 2FA" width={200} height={200} />
               </div>
             </div>
 

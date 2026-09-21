@@ -15,6 +15,8 @@
 
 import { createHash } from 'crypto';
 
+import QRCode from 'qrcode';
+
 import { prisma } from '@/lib/db';
 import { hashPassword, verifyPassword } from '@/lib/password';
 import {
@@ -247,10 +249,15 @@ export async function adminLogin(
 /**
  * Setup 2FA — hand out the stored secret + fresh backup codes.
  * 08-auth.md §5.2 — First-login enrollment step.
+ * The QR is rendered server-side (qrcode lib → data URL) and shipped inside
+ * the JSON, so the setup screen never depends on an external image service
+ * (the previous api.qrserver.com <img> rendered blank whenever that host was
+ * blocked — the “2FA page doesn't load” report).
  */
 export async function setup2fa(challengeToken: string): Promise<{
   success: boolean;
   totpUri?: string;
+  qrDataUrl?: string;
   secretBase32?: string;
   backupCodes?: string[];
   error?: string;
@@ -281,7 +288,22 @@ export async function setup2fa(challengeToken: string): Promise<{
 
   const totpUri = `otpauth://totp/Nong-Kati%3A${encodeURIComponent(user.email)}?secret=${secret}&issuer=Nong-Kati`;
 
-  return { success: true, totpUri, secretBase32: secret, backupCodes: generateBackupCodes() };
+  // Render the QR here: a PNG data URL needs no third-party host, no CSP
+  // exception and works offline — the enrollment screen can never blank out
+  // because of an external image request.
+  const qrDataUrl = await QRCode.toDataURL(totpUri, {
+    errorCorrectionLevel: 'M',
+    margin: 2,
+    width: 220,
+  });
+
+  return {
+    success: true,
+    totpUri,
+    qrDataUrl,
+    secretBase32: secret,
+    backupCodes: generateBackupCodes(),
+  };
 }
 
 /**
