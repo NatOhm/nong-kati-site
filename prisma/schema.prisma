@@ -196,9 +196,10 @@ model Customer {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
-  orders   Order[]
-  wishlist WishlistItem[]
-  topups   TopUpLog[]
+  orders         Order[]
+  wishlist       WishlistItem[]
+  topups         TopUpLog[]
+  supportTickets SupportTicket[]
 
   @@index([email])
 }
@@ -497,7 +498,8 @@ model AdminUser {
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
-  sessions AdminSession[]
+  sessions            AdminSession[]
+  supportTicketsAnswered SupportTicket[]
 
   @@index([email])
 }
@@ -584,4 +586,30 @@ model ProductTag {
 
   @@id([productId, tagId])
   @@index([tagId])
+}
+
+// ─── Support Tickets (customer → admin correspondence) ───
+
+model SupportTicket {
+  id            String   @id @default(cuid())
+  ticketNumber  String   @unique
+  customerId    String?
+  customerEmail String
+  customerName  String?
+  subject       String
+  message       String
+  status        String   @default("open") // open, answered, closed
+  adminReply    String?
+  answeredById  String?
+  answeredAt    DateTime?
+  closedAt      DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  customer   Customer?  @relation(fields: [customerId], references: [id])
+  answeredBy AdminUser? @relation(fields: [answeredById], references: [id])
+
+  @@index([customerId])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
 }

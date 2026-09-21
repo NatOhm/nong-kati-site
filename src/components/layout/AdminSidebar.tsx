@@ -9,6 +9,7 @@ import {
   Hash,
   ShoppingCart,
   Ticket,
+  LifeBuoy,
   Users,
   BarChart3,
   Settings,
@@ -65,6 +66,7 @@ const NAV_ITEMS: NavItem[] = [
     permission: 'coupons:read',
   },
   { label: 'ลูกค้า', href: '/management/customers', icon: Users, permission: 'customers:read' },
+  { label: 'ตั๋วสนับสนุน', href: '/management/tickets', icon: LifeBuoy, permission: 'tickets:read' },
   { label: 'รายงาน', href: '/management/reports', icon: BarChart3, permission: 'reports:read' },
   {
     label: 'ยอดซื้อรายคน',

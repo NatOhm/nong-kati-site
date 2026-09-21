@@ -3,6 +3,7 @@ import { JetBrains_Mono, Mitr, Noto_Sans_Thai_Looped } from 'next/font/google';
 
 import { ThemeProvider } from '@/providers/ThemeProvider';
 import { CartProvider } from '@/providers/CartProvider';
+import { CustomerProfileProvider } from '@/components/layout/CustomerProfileProvider';
 import { CookieConsentBanner } from '@/components/pdpa/CookieConsentBanner';
 import { MobileBottomNav } from '@/components/home/MobileBottomNav';
 import { ThemeVars } from '@/components/layout/ThemeVars';
@@ -62,11 +63,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }):
       <body className="text-thai font-ui">
         <ThemeVars />
         <ThemeProvider defaultTheme="light">
-          <CartProvider>
-            {children}
-            {/* Sitewide mobile taskbar (hidden on /management by the component itself) */}
-            <MobileBottomNav />
-          </CartProvider>
+          <CustomerProfileProvider>
+            <CartProvider>
+              {children}
+              {/* Sitewide mobile taskbar (hidden on /management by the component itself) */}
+              <MobileBottomNav />
+            </CartProvider>
+          </CustomerProfileProvider>
           <ToastMount />
           <CookieConsentBanner />
         </ThemeProvider>

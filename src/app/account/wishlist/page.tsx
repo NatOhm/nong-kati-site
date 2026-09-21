@@ -6,7 +6,7 @@ import { Heart } from 'lucide-react';
 import { ProductGrid } from '@/components/product/ProductGrid';
 import { ProductCard } from '@/components/product/ProductCard';
 import { AccountTabs } from '@/components/account/AccountTabs';
-import { useCustomerSession } from '@/components/layout/useCustomerSession';
+import { useCustomerProfile } from '@/components/layout/CustomerProfileProvider';
 import { HamsterLoader } from '@/components/loading/HamsterLoader';
 
 /**
@@ -25,7 +25,7 @@ interface WishProduct {
 }
 
 export default function WishlistPage(): React.JSX.Element {
-  const sessionState = useCustomerSession();
+  const { state: sessionState } = useCustomerProfile();
   const [products, setProducts] = useState<WishProduct[]>([]);
   const [loading, setLoading] = useState(true);
 

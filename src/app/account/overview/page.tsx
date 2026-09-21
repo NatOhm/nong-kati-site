@@ -9,7 +9,7 @@
 import { useEffect, useState } from 'react';
 
 import { AccountTabs } from '@/components/account/AccountTabs';
-import { useCustomerSession } from '@/components/layout/useCustomerSession';
+import { useCustomerProfile } from '@/components/layout/CustomerProfileProvider';
 import { HamsterLoader } from '@/components/loading/HamsterLoader';
 import { formatThb } from '@/lib/pricing';
 
@@ -28,7 +28,7 @@ const METHOD_LABEL: Record<string, string> = {
 };
 
 export default function AccountOverviewPage(): React.JSX.Element {
-  const sessionState = useCustomerSession();
+  const { state: sessionState } = useCustomerProfile();
   const [data, setData] = useState<WalletData | null>(null);
   const [loading, setLoading] = useState(true);
 

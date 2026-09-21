@@ -52,6 +52,10 @@ export const ALL_PERMISSIONS = [
   'customers:block',
   'customers:write',
 
+  // Support tickets
+  'tickets:read',
+  'tickets:write',
+
   // Reviews
   'reviews:read',
   'reviews:moderate',
@@ -112,6 +116,8 @@ export const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
   support_agent: [
     'orders:read',
     'customers:read',
+    'tickets:read',
+    'tickets:write',
     'reviews:read',
   ],
 

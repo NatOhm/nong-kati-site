@@ -3,57 +3,40 @@
 /**
  * Settings Page — 12-dashboard.md §12, 01-prd.md FR-073.
  * Account settings: name, phone, marketing preferences — saved for real via
- * PATCH /api/v1/auth/me. Theme uses semantic tokens so text stays readable
- * in dark mode (the old hardcoded `bg-white` + `text-clay-9000` made labels
- * invisible on the dark storefront theme).
+ * PATCH /api/v1/auth/me. The profile comes from the shared layout context
+ * (single /me fetch per mount — the page no longer refetches); after a save
+ * it pushes the updated profile back into the context so the rest of the
+ * account UI stays in sync without another request. Theme uses semantic
+ * tokens so text stays readable in dark mode.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowLeft, CheckCircle, Loader2, Save } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
+import { useCustomerProfile } from '@/components/layout/CustomerProfileProvider';
 import { cn } from '@/utils/cn';
-
-interface Profile {
-  email: string;
-  fullName: string | null;
-  phoneNumber: string | null;
-  marketingOptIn: boolean;
-}
 
 export default function AccountSettingsPage(): React.JSX.Element {
   const router = useRouter();
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const { profile, setProfile } = useCustomerProfile();
   const [fullName, setFullName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [marketingOptIn, setMarketingOptIn] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [hydrated, setHydrated] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async (): Promise<void> => {
-    try {
-      const res = await fetch('/api/v1/auth/me', { cache: 'no-store' });
-      const data = (await res.json()) as { customer: Profile | null };
-      if (data.customer) {
-        setProfile(data.customer);
-        setFullName(data.customer.fullName ?? '');
-        setPhoneNumber(data.customer.phoneNumber ?? '');
-        setMarketingOptIn(data.customer.marketingOptIn);
-      } else {
-        router.replace('/account/login?next=%2Faccount%2Fsettings');
-      }
-    } catch {
-      setError('โหลดข้อมูลไม่สำเร็จ');
-    } finally {
-      setLoading(false);
-    }
-  }, [router]);
-
+  // Seed the form fields from the shared profile when it arrives (and after
+  // each save, so the form always reflects server state).
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (!profile) return;
+    setFullName(profile.fullName ?? '');
+    setPhoneNumber(profile.phoneNumber ?? '');
+    setMarketingOptIn(profile.marketingOptIn);
+    setHydrated(true);
+  }, [profile]);
 
   const handleSave = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
@@ -75,7 +58,7 @@ export default function AccountSettingsPage(): React.JSX.Element {
           marketingOptIn,
         }),
       });
-      const data = (await res.json()) as { success?: boolean; error?: string; customer?: Profile };
+      const data = (await res.json()) as { success?: boolean; error?: string; customer?: typeof profile };
       if (!res.ok || !data.success) {
         const MSG: Record<string, string> = {
           INVALID_PHONE: 'หมายเลขโทรศัพท์ไม่ถูกต้อง (0XXXXXXXXX)',
@@ -119,26 +102,12 @@ export default function AccountSettingsPage(): React.JSX.Element {
         </p>
       )}
 
-      {loading ? (
+      {!profile || !hydrated ? (
+        // The layout guard guarantees an authed profile here; this neutral
+        // state only covers the instant before hydration (never an editable
+        // form backed by empty defaults).
         <div className="flex items-center justify-center gap-2 p-10 text-sm text-fg-placeholder">
           <Loader2 size={16} className="animate-spin" /> กำลังโหลด…
-        </div>
-      ) : !profile ? (
-        // Review: load failure must not expose an editable form backed by
-        // empty defaults — offer a retry instead.
-        <div className="clay-card flex flex-col items-center gap-3 rounded-2xl p-10 text-center">
-          <p className="text-sm text-fg-muted">โหลดข้อมูลไม่สำเร็จ กรุณาลองใหม่</p>
-          <button
-            type="button"
-            onClick={() => {
-              setLoading(true);
-              setError(null);
-              void load();
-            }}
-            className="rounded-full bg-peach-500 px-5 py-2.5 text-sm font-semibold text-white shadow-clay-sm transition-transform duration-fast ease-out-quart hover:scale-105 active:scale-90"
-          >
-            ลองใหม่
-          </button>
         </div>
       ) : (
         <form onSubmit={handleSave} className="space-y-6">
@@ -153,7 +122,7 @@ export default function AccountSettingsPage(): React.JSX.Element {
                 <input
                   id="settings-email"
                   type="email"
-                  value={profile?.email ?? ''}
+                  value={profile.email}
                   disabled
                   className="w-full rounded-full border border-line bg-surface-base px-4 py-2.5 text-sm text-fg-muted"
                 />

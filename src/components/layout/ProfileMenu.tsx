@@ -6,7 +6,10 @@ import { Settings, History, LogOut, Wallet, ChevronDown } from 'lucide-react';
 
 import { cn } from '@/utils/cn';
 import { formatThb } from '@/utils/format';
-import { useCustomerSession } from './useCustomerSession';
+import {
+  useCustomerProfile,
+  type CustomerProfile,
+} from '@/components/layout/CustomerProfileProvider';
 
 /**
  * Profile popover — client ask: กดโปรไฟล์แล้วเห็นชื่อผู้ใช้, เครดิต/ยอดเงิน,
@@ -15,18 +18,15 @@ import { useCustomerSession } from './useCustomerSession';
  * top-up flow exists (never a fake number).
  */
 export function ProfileMenu(): React.JSX.Element {
-  const sessionState = useCustomerSession();
+  const { state: sessionState, profile } = useCustomerProfile();
   const [open, setOpen] = useState(false);
-  const [profile, setProfile] = useState<{ fullName?: string | null; email?: string } | null>(null);
   const [wallet, setWallet] = useState<{ balanceThb: number } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
+  // Identity comes free from the shared profile context (no /me refetch);
+  // only the wallet balance is fetched, when the session proves authed.
   useEffect(() => {
     if (sessionState !== 'authed') return;
-    fetch('/api/v1/auth/me', { credentials: 'include' })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => setProfile(d?.customer ?? null))
-      .catch(() => {});
     fetch('/api/v1/wallet', { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => setWallet(d ?? { balanceThb: 0 }))
@@ -80,8 +80,8 @@ export function ProfileMenu(): React.JSX.Element {
         >
           {/* Identity */}
           <div className="border-b border-line-subtle px-3 pb-3 pt-2">
-            <p className="truncate text-sm font-bold text-fg">{profile?.fullName ?? 'สมาชิก'}</p>
-            <p className="truncate text-xs text-fg-muted">{profile?.email}</p>
+        <p className="truncate text-sm font-bold text-fg">{(profile as CustomerProfile | null)?.fullName ?? 'สมาชิก'}</p>
+        <p className="truncate text-xs text-fg-muted">{(profile as CustomerProfile | null)?.email}</p>
           </div>
 
           {/* Wallet */}

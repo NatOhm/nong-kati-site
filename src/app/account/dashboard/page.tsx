@@ -19,7 +19,7 @@ import { ShoppingBag, Sparkles } from 'lucide-react';
 import { AccountTabs } from '@/components/account/AccountTabs';
 import { ProductCard } from '@/components/product/ProductCard';
 import { ProductGrid } from '@/components/product/ProductGrid';
-import { useCustomerSession } from '@/components/layout/useCustomerSession';
+import { useCustomerProfile } from '@/components/layout/CustomerProfileProvider';
 import { HamsterLoader } from '@/components/loading/HamsterLoader';
 
 interface CatalogProduct {
@@ -33,7 +33,7 @@ interface CatalogProduct {
 }
 
 export default function ProfilePage(): React.JSX.Element {
-  const sessionState = useCustomerSession();
+  const { state: sessionState } = useCustomerProfile();
   const searchParams = useSearchParams();
   const view = searchParams.get('view') === 'featured' ? 'featured' : 'all';
 

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Wallet, TrendingDown, TrendingUp, Receipt } from 'lucide-react';
 
-import { useCustomerSession } from '@/components/layout/useCustomerSession';
+import { useCustomerProfile } from '@/components/layout/CustomerProfileProvider';
 import { HamsterLoader } from '@/components/loading/HamsterLoader';
 import { formatThb } from '@/utils/format';
 
@@ -22,7 +22,7 @@ interface WalletData {
 }
 
 export default function WalletPage(): React.JSX.Element {
-  const sessionState = useCustomerSession();
+  const { state: sessionState } = useCustomerProfile();
   const [data, setData] = useState<WalletData | null>(null);
   const [loading, setLoading] = useState(true);
 

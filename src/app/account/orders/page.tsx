@@ -11,7 +11,7 @@ import Link from 'next/link';
 import { ShoppingBag } from 'lucide-react';
 
 import { AccountTabs } from '@/components/account/AccountTabs';
-import { useCustomerSession } from '@/components/layout/useCustomerSession';
+import { useCustomerProfile } from '@/components/layout/CustomerProfileProvider';
 import { HamsterLoader } from '@/components/loading/HamsterLoader';
 import { formatThb } from '@/lib/pricing';
 
@@ -38,7 +38,7 @@ const STATUS_LABELS: Record<string, { label: string; className: string }> = {
 };
 
 export default function AccountOrdersPage(): React.JSX.Element {
-  const sessionState = useCustomerSession();
+  const { state: sessionState } = useCustomerProfile();
   const [orders, setOrders] = useState<MyOrder[] | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
 

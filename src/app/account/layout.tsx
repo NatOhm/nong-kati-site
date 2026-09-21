@@ -23,10 +23,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
-import {
-  useCustomerSession,
-  type CustomerSessionState,
-} from '@/components/layout/useCustomerSession';
+import { useCustomerProfile } from '@/components/layout/CustomerProfileProvider';
 
 const NAV_ITEMS: {
   label: string;
@@ -61,14 +58,21 @@ const NAV_ITEMS: {
 ];
 
 /**
- * Customer auth guard: checks the real session cookie via /api/v1/auth/me.
+ * Customer auth guard driven by the shared profile context (single /me fetch
+ * for the whole layout — pages consume the same data, no duplicate requests).
  * Guests browsing any /account/* page (except login/register) are redirected
  * to login with a ?next= param so they land back where they started.
  */
-function useRequireCustomer(isPublicPage: boolean): CustomerSessionState {
+function AccountLayoutInner({
+  children,
+  isPublicPage,
+}: {
+  children: React.ReactNode;
+  isPublicPage: boolean;
+}): React.JSX.Element {
   const router = useRouter();
   const pathname = usePathname();
-  const state = useCustomerSession();
+  const { state, reload } = useCustomerProfile();
 
   useEffect(() => {
     if (state === 'guest' && !isPublicPage) {
@@ -76,24 +80,10 @@ function useRequireCustomer(isPublicPage: boolean): CustomerSessionState {
     }
   }, [state, router, pathname, isPublicPage]);
 
-  return state;
-}
-
-// Pages that should NOT show the sidebar (auth pages)
-const PUBLIC_ACCOUNT_ROUTES = ['/account/login', '/account/register'];
-
-export default function AccountLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}): React.JSX.Element {
-  const router = useRouter();
-  const pathname = usePathname();
-  const isPublicPage = PUBLIC_ACCOUNT_ROUTES.some((r) => pathname?.startsWith(r));
-  const authState = useRequireCustomer(isPublicPage);
-
   const handleLogout = async (): Promise<void> => {
     await fetch('/api/v1/auth/logout', { method: 'POST' });
+    // Clear the shared profile so a same-tab re-login refetches fresh data.
+    await reload();
     router.replace('/');
     router.refresh();
   };
@@ -105,7 +95,7 @@ export default function AccountLayout({
 
   // Private pages: block render until the session check resolves so a guest
   // never sees dashboard content flash (and crawlers/no-JS get nothing private).
-  if (authState !== 'authed') {
+  if (state !== 'authed') {
     return (
       <div
         className="flex min-h-[60vh] items-center justify-center"
@@ -167,4 +157,20 @@ export default function AccountLayout({
       </div>
     </div>
   );
+}
+
+// Pages that should NOT show the sidebar (auth pages)
+const PUBLIC_ACCOUNT_ROUTES = ['/account/login', '/account/register'];
+
+export default function AccountLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}): React.JSX.Element {
+  const pathname = usePathname();
+  const isPublicPage = PUBLIC_ACCOUNT_ROUTES.some((r) => pathname?.startsWith(r));
+
+  // The provider lives in the ROOT layout (one /me for the whole app —
+  // storefront chrome and account pages share it); this layout only consumes it.
+  return <AccountLayoutInner isPublicPage={isPublicPage}>{children}</AccountLayoutInner>;
 }
