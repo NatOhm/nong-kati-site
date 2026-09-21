@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   FileUp,
   BadgePercent,
+  PackagePlus,
 } from 'lucide-react';
 
 import { AdminShell } from '@/components/layout/AdminShell';
@@ -21,15 +22,18 @@ import { adminFetch } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
 import { ImportDialog } from './ImportDialog';
 import { BulkPricingDialog } from './BulkPricingDialog';
+import { BulkStockDialog } from './BulkStockDialog';
 /**
  * Admin Products Management — real CRUD over the Prisma catalog.
- * List, search, create, edit (info + image + variants), archive.
+ * List, search, create, edit (info + image + variants), archive,
+ * bulk publish/unpublish, and per-product bulk stock paste.
  */
 
 interface AdminVariant {
   id: string;
   label: string;
   price: number;
+  cost: number | null;
   memberPrice: number | null;
   dealerPrice: number | null;
   stock: number;
@@ -96,10 +100,13 @@ export default function AdminProductsPage(): React.JSX.Element {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
 
   const [editing, setEditing] = useState<AdminProduct | 'new' | null>(null);
   const [importing, setImporting] = useState(false);
   const [bulkPricing, setBulkPricing] = useState(false);
+  const [stockTarget, setStockTarget] = useState<AdminProduct | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -144,13 +151,46 @@ export default function AdminProductsPage(): React.JSX.Element {
         statusFilter === 'all' ||
         (statusFilter === 'active' && p.isActive) ||
         (statusFilter === 'archived' && !p.isActive);
-      return matchesSearch && matchesStatus;
+      const matchesCategory = categoryFilter === 'all' || p.categoryId === categoryFilter;
+      return matchesSearch && matchesStatus && matchesCategory;
     });
-  }, [products, searchQuery, statusFilter]);
+  }, [products, searchQuery, statusFilter, categoryFilter]);
 
   function handleSaved() {
     setEditing(null);
     void load();
+  }
+
+  async function bulkPublish(value: boolean): Promise<void> {
+    if (
+      !confirm(
+        value
+          ? 'เผยแพร่สินค้าทุกชิ้นที่ถูกซ่อนอยู่?'
+          : 'ซ่อนสินค้าทุกชิ้นจากหน้าเว็บ? ลูกค้าจะไม่เห็นสินค้าใด ๆ จนกว่าจะเผยแพร่อีกครั้ง',
+      )
+    )
+      return;
+    setBulkBusy(true);
+    try {
+      const res = await adminFetch('/api/v1/admin/products/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value }),
+      });
+      if (res.ok) void load();
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  async function togglePublish(p: AdminProduct): Promise<void> {
+    setProducts((prev) => prev.map((x) => (x.id === p.id ? { ...x, isActive: !p.isActive } : x)));
+    const res = await adminFetch(`/api/v1/admin/products/${p.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isActive: !p.isActive }),
+    });
+    if (!res.ok) void load();
   }
 
   return (
@@ -174,6 +214,22 @@ export default function AdminProductsPage(): React.JSX.Element {
               ราคาสมาชิก/ตัวแทนทีเดียว
             </button>
             <button
+              onClick={() => void bulkPublish(true)}
+              disabled={bulkBusy}
+              className="rounded-lg border border-line bg-surface px-3 py-2 text-sm font-semibold text-fg transition-colors hover:border-jade-400 hover:text-jade-700 disabled:opacity-50"
+              title="เผยแพร่สินค้าทั้งหมด"
+            >
+              เผยแพร่ทั้งหมด
+            </button>
+            <button
+              onClick={() => void bulkPublish(false)}
+              disabled={bulkBusy}
+              className="rounded-lg border border-line bg-surface px-3 py-2 text-sm font-semibold text-fg transition-colors hover:border-coral-400 hover:text-coral-700 disabled:opacity-50"
+              title="ซ่อนสินค้าทั้งหมด"
+            >
+              ซ่อนทั้งหมด
+            </button>
+            <button
               onClick={() => setEditing('new')}
               className="flex items-center gap-2 rounded-lg bg-peach-500 px-4 py-2 text-sm font-semibold text-white transition-transform hover:scale-[1.02] hover:bg-peach-400 active:scale-95"
             >
@@ -195,9 +251,31 @@ export default function AdminProductsPage(): React.JSX.Element {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="ค้นหาสินค้าหรือ slug..."
-              className="w-full rounded-lg border border-line bg-surface py-2 pl-9 pr-3 text-sm text-fg placeholder:text-fg-placeholder focus:outline-none focus:ring-2 focus:ring-peach-500"
+              className="w-full rounded-lg border border-line bg-surface py-2 pl-9 pr-9 text-sm text-fg placeholder:text-fg-placeholder focus:outline-none focus:ring-2 focus:ring-peach-500"
             />
+            {searchQuery !== '' && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-placeholder hover:text-fg"
+                aria-label="ล้างการค้นหา"
+              >
+                <X size={14} />
+              </button>
+            )}
           </div>
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg-secondary focus:outline-none focus:ring-2 focus:ring-peach-500"
+            aria-label="กรองตามหมวดหมู่"
+          >
+            <option value="all">ทุกหมวดหมู่</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
@@ -227,6 +305,8 @@ export default function AdminProductsPage(): React.JSX.Element {
                 <tr className="border-b border-line-subtle bg-surface">
                   <th className="px-4 py-3 text-left font-medium text-fg-muted">สินค้า</th>
                   <th className="px-4 py-3 text-left font-medium text-fg-muted">หมวดหมู่</th>
+                  <th className="px-4 py-3 text-right font-medium text-fg-muted">ราคา / ต้นทุน</th>
+                  <th className="px-4 py-3 text-center font-medium text-fg-muted">สต๊อก</th>
                   <th className="px-4 py-3 text-center font-medium text-fg-muted">สถานะ</th>
                   <th className="px-4 py-3 text-center font-medium text-fg-muted">แนะนำ</th>
                   <th className="px-4 py-3 text-center font-medium text-fg-muted">ตัวเลือก</th>
@@ -257,17 +337,58 @@ export default function AdminProductsPage(): React.JSX.Element {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-fg-secondary">{product.categoryName}</td>
+                    <td className="px-4 py-3 text-right">
+                      {(() => {
+                        const v = product.variants[0];
+                        if (!v) return <span className="text-fg-placeholder">—</span>;
+                        return (
+                          <div className="space-y-0.5">
+                            <p className="font-semibold text-fg">฿{v.price.toLocaleString('th-TH')}</p>
+                            {v.cost !== null && (
+                              <p className="text-xs text-fg-placeholder">ต้นทุน ฿{v.cost.toLocaleString('th-TH')}</p>
+                            )}
+                            {(v.memberPrice !== null || v.dealerPrice !== null) && (
+                              <p className="text-xs text-fg-muted">
+                                {v.memberPrice !== null && <>สมาชิก ฿{v.memberPrice.toLocaleString('th-TH')} </>}
+                                {v.dealerPrice !== null && <>ตัวแทน ฿{v.dealerPrice.toLocaleString('th-TH')}</>}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </td>
                     <td className="px-4 py-3 text-center">
-                      <span
+                      {(() => {
+                        const total = product.variants.reduce((s, v) => s + v.stock, 0);
+                        return (
+                          <span
+                            className={cn(
+                              'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
+                              total === 0
+                                ? 'bg-coral-500/15 text-coral-700'
+                                : total <= 5
+                                  ? 'bg-peach-500/15 text-peach-700'
+                                  : 'bg-jade-500/15 text-jade-700',
+                            )}
+                          >
+                            {total}
+                          </span>
+                        );
+                      })()}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        onClick={() => void togglePublish(product)}
                         className={cn(
-                          'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
+                          'inline-flex rounded-full px-2.5 py-1 text-xs font-semibold transition-colors',
                           product.isActive
-                            ? 'bg-jade-500/15 text-jade-700'
-                            : 'bg-surface text-fg-placeholder',
+                            ? 'bg-jade-500/15 text-jade-700 hover:bg-jade-500/25'
+                            : 'bg-surface text-fg-placeholder hover:bg-surface-elevated',
                         )}
+                        title={product.isActive ? 'กดเพื่อซ่อนจากหน้าเว็บ' : 'กดเพื่อเผยแพร่'}
                       >
-                        {product.isActive ? 'ใช้งาน' : 'เก็บถาวร'}
-                      </span>
+                        {product.isActive ? 'เผยแพร่' : 'ซ่อน'}
+                      </button>
                     </td>
                     <td className="px-4 py-3 text-center">
                       {product.isFeatured ? (
@@ -281,6 +402,14 @@ export default function AdminProductsPage(): React.JSX.Element {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => setStockTarget(product)}
+                          className="rounded p-1.5 text-fg-placeholder hover:bg-surface hover:text-fg-brand"
+                          aria-label={`จัดการสต๊อก ${product.name}`}
+                          title="เติมสต๊อกบัญชี"
+                        >
+                          <PackagePlus size={14} />
+                        </button>
                         <button
                           onClick={() => setEditing(product)}
                           className="rounded p-1.5 text-fg-placeholder hover:bg-surface hover:text-fg"
@@ -314,7 +443,7 @@ export default function AdminProductsPage(): React.JSX.Element {
                 ))}
                 {filteredProducts.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-4 py-12 text-center text-sm text-fg-placeholder">
+                    <td colSpan={8} className="px-4 py-12 text-center text-sm text-fg-placeholder">
                       ไม่พบสินค้า
                     </td>
                   </tr>
@@ -335,6 +464,15 @@ export default function AdminProductsPage(): React.JSX.Element {
 
       {bulkPricing && (
         <BulkPricingDialog onClose={() => setBulkPricing(false)} onApplied={() => void load()} />
+      )}
+
+      {stockTarget && (
+        <BulkStockDialog
+          productId={stockTarget.id}
+          productName={stockTarget.name}
+          onClose={() => setStockTarget(null)}
+          onSaved={() => void load()}
+        />
       )}
 
       {editing !== null && (

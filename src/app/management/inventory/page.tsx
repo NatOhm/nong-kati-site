@@ -10,11 +10,13 @@ import {
   History,
   Loader2,
   AlertTriangle,
+  Users,
 } from 'lucide-react';
 
 import { AdminShell } from '@/components/layout/AdminShell';
 import { adminFetch, adminJson } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
+import { BulkStockDialog } from '../products/BulkStockDialog';
 
 /**
  * Admin Inventory — รายการสินค้าจริงทั้งหมด (ชุดเดียวกับหน้าเว็บหลัก)
@@ -99,6 +101,7 @@ export default function AdminInventoryPage(): React.JSX.Element {
   const [saving, setSaving] = useState(false);
   const [toggling, setToggling] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [stockTarget, setStockTarget] = useState<{ id: string; name: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -131,6 +134,10 @@ export default function AdminInventoryPage(): React.JSX.Element {
       );
     });
   }, [items, query, showInactive]);
+
+  /** Result count + total-product count (client list: stock overview footer). */
+  const resultCount = filtered.reduce((s, i) => s + i.codesAvailable, 0);
+  const totalCount = items.reduce((s, i) => s + i.codesAvailable, 0);
 
   const lowCount = items.filter((i) => i.isActive && i.stock <= LOW_STOCK_THRESHOLD).length;
 
@@ -269,7 +276,7 @@ export default function AdminInventoryPage(): React.JSX.Element {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="ค้นหาชื่อ, SKU, หมวดหมู่…"
+              placeholder="ค้นหาชื่อ, SKU/Type ID, หมวดหมู่…"
               className="w-72 rounded-lg border border-line-subtle bg-surface py-2 pl-9 pr-3 text-sm text-fg placeholder:text-fg-placeholder focus:border-line-brand"
             />
           </div>
@@ -384,6 +391,14 @@ export default function AdminInventoryPage(): React.JSX.Element {
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1.5">
                           <button
+                            onClick={() => setStockTarget({ id: item.id, name: item.name })}
+                            aria-label={`จัดการบัญชี ${item.name}`}
+                            title="จัดการบัญชีสต๊อก"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-line-subtle text-fg-secondary transition-colors hover:border-line-brand hover:text-fg-brand"
+                          >
+                            <Users size={14} />
+                          </button>
+                          <button
                             onClick={() => setDraft(newDraft(item))}
                             aria-label={`แก้ไข ${item.name}`}
                             title="แก้ไขรายละเอียด"
@@ -481,6 +496,16 @@ export default function AdminInventoryPage(): React.JSX.Element {
           </div>
         )}
       </div>
+
+      {/* ── Bulk stock editor ── */}
+      {stockTarget && (
+        <BulkStockDialog
+          productId={stockTarget.id}
+          productName={stockTarget.name}
+          onClose={() => setStockTarget(null)}
+          onSaved={() => void load()}
+        />
+      )}
 
       {/* ── Edit modal ── */}
       {draft && (

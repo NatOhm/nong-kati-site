@@ -15,6 +15,7 @@ import {
   Settings,
   Shield,
   FileText,
+  Wallet,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -66,6 +67,7 @@ const NAV_ITEMS: NavItem[] = [
     permission: 'coupons:read',
   },
   { label: 'ลูกค้า', href: '/management/customers', icon: Users, permission: 'customers:read' },
+  { label: 'ประวัติเติมเงิน', href: '/management/topups', icon: Wallet, permission: 'topups:read' },
   { label: 'ตั๋วสนับสนุน', href: '/management/tickets', icon: LifeBuoy, permission: 'tickets:read' },
   { label: 'รายงาน', href: '/management/reports', icon: BarChart3, permission: 'reports:read' },
   {

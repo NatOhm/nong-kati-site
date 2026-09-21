@@ -49,6 +49,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         id: v.id,
         label: v.label,
         price: Number(v.price),
+        cost: v.costThb === null ? null : Number(v.costThb),
         memberPrice: v.memberPrice === null ? null : Number(v.memberPrice),
         dealerPrice: v.dealerPrice === null ? null : Number(v.dealerPrice),
         stock: v.stock,

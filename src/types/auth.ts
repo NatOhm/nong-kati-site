@@ -56,6 +56,9 @@ export const ALL_PERMISSIONS = [
   'tickets:read',
   'tickets:write',
 
+  // Wallet top-ups
+  'topups:read',
+
   // Reviews
   'reviews:read',
   'reviews:moderate',
@@ -118,6 +121,7 @@ export const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
     'customers:read',
     'tickets:read',
     'tickets:write',
+    'topups:read',
     'reviews:read',
   ],
 
