@@ -29,7 +29,7 @@ export default function AccountDownloadsPage(): React.JSX.Element {
       <h1 className="text-2xl font-bold text-fg">ใบเสร็จรับเงิน</h1>
 
       {MOCK_RECEIPTS.length === 0 ? (
-        <div className="rounded-md border border-line-subtle bg-white p-8 text-center">
+        <div className="rounded-md border border-line-subtle bg-surface p-8 text-center">
           <p className="text-fg-placeholder">ยังไม่มีใบเสร็จ</p>
         </div>
       ) : (
@@ -37,11 +37,11 @@ export default function AccountDownloadsPage(): React.JSX.Element {
           {MOCK_RECEIPTS.map((receipt) => (
             <div
               key={receipt.id}
-              className="flex items-center justify-between rounded-md border border-line-subtle bg-white p-4"
+              className="flex items-center justify-between rounded-md border border-line-subtle bg-surface p-4"
             >
               <div>
                 <p className="text-sm font-medium text-fg-secondary">{receipt.orderNumber}</p>
-                <p className="text-clay-9000 text-xs">{receipt.date.toLocaleDateString('th-TH')}</p>
+                <p className="text-xs text-fg-muted">{receipt.date.toLocaleDateString('th-TH')}</p>
               </div>
               <div className="flex items-center gap-3">
                 <p className="text-sm text-fg-secondary">{formatThb(receipt.amount)}</p>

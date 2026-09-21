@@ -41,7 +41,7 @@ export default function AccountSupportPage(): React.JSX.Element {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-fg">สนับสนุน</h1>
-      <div className="rounded-md border border-line-subtle bg-white p-6">
+      <div className="rounded-md border border-line-subtle bg-surface p-6">
         <p className="mb-4 text-sm text-fg-placeholder">
           มีปัญหา? ส่งข้อความหาเรา เราจะตอบกลับภายใน 24 ชั่วโมง
         </p>
@@ -54,7 +54,7 @@ export default function AccountSupportPage(): React.JSX.Element {
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               required
-              className="placeholder:text-clay-9000 w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg focus:border-line-brand focus:outline-none"
+              className="w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand focus:outline-none"
               placeholder="ปัญหาเกี่ยวกับ..."
             />
           </div>
@@ -66,7 +66,7 @@ export default function AccountSupportPage(): React.JSX.Element {
               onChange={(e) => setMessage(e.target.value)}
               required
               rows={5}
-              className="placeholder:text-clay-9000 w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg focus:border-line-brand focus:outline-none"
+              className="w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand focus:outline-none"
               placeholder="อธิบายปัญหาของคุณ..."
             />
           </div>
@@ -82,7 +82,7 @@ export default function AccountSupportPage(): React.JSX.Element {
         </form>
       </div>
       {/* Contact Info */}
-      <div className="rounded-md border border-line-subtle bg-white p-6">
+      <div className="rounded-md border border-line-subtle bg-surface p-6">
         <h2 className="mb-3 text-lg font-semibold text-fg">ช่องทางอื่น</h2>
         <div className="space-y-2 text-sm text-fg-muted">
           <p>

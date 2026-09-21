@@ -92,7 +92,7 @@ export default function RegisterPage(): React.JSX.Element {
           <p className="text-sm text-fg-placeholder">สร้างบัญชีเพื่อจัดการคำสั่งซื้อและโค้ด</p>
         </div>
 
-        <div className="rounded-lg border border-line-subtle bg-white p-6">
+        <div className="rounded-lg border border-line-subtle bg-surface p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Full Name */}
             <div>
@@ -101,7 +101,7 @@ export default function RegisterPage(): React.JSX.Element {
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="placeholder:text-clay-9000 w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg focus:border-line-brand focus:outline-none"
+                className="w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand focus:outline-none"
                 placeholder="ชื่อที่แสดง"
               />
             </div>
@@ -119,7 +119,7 @@ export default function RegisterPage(): React.JSX.Element {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="placeholder:text-clay-9000 w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-3 text-sm text-fg focus:border-line-brand focus:outline-none"
+                  className="w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-3 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand focus:outline-none"
                   placeholder="your@email.com"
                 />
               </div>
@@ -139,7 +139,7 @@ export default function RegisterPage(): React.JSX.Element {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={8}
-                  className="placeholder:text-clay-9000 w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-10 text-sm text-fg focus:border-line-brand focus:outline-none"
+                  className="w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-10 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand focus:outline-none"
                   placeholder="อย่างน้อย 8 ตัวอักษร"
                 />
                 <button
@@ -165,7 +165,7 @@ export default function RegisterPage(): React.JSX.Element {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
-                  className="placeholder:text-clay-9000 w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-3 text-sm text-fg focus:border-line-brand focus:outline-none"
+                  className="w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-3 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand focus:outline-none"
                   placeholder="กรอกรหัสผ่านอีกครั้ง"
                 />
               </div>

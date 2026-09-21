@@ -22,7 +22,7 @@ export default function AccountInvoicesPage(): React.JSX.Element {
       <h1 className="text-2xl font-bold text-fg">ใบกำกับภาษี</h1>
 
       {MOCK_INVOICES.length === 0 ? (
-        <div className="rounded-md border border-line-subtle bg-white p-8 text-center">
+        <div className="rounded-md border border-line-subtle bg-surface p-8 text-center">
           <p className="text-fg-placeholder">ยังไม่มีใบกำกับภาษี</p>
         </div>
       ) : (
@@ -30,11 +30,11 @@ export default function AccountInvoicesPage(): React.JSX.Element {
           {MOCK_INVOICES.map((inv) => (
             <div
               key={inv.id}
-              className="flex items-center justify-between rounded-md border border-line-subtle bg-white p-4"
+              className="flex items-center justify-between rounded-md border border-line-subtle bg-surface p-4"
             >
               <div>
                 <p className="text-sm font-medium text-fg-secondary">{inv.invoiceNumber}</p>
-                <p className="text-clay-9000 text-xs">
+                <p className="text-xs text-fg-muted">
                   {inv.orderNumber} · {inv.date.toLocaleDateString('th-TH')}
                 </p>
               </div>

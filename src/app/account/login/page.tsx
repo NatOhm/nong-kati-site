@@ -79,7 +79,7 @@ export default function LoginPage(): React.JSX.Element {
           </p>
         </div>
 
-        <div className="rounded-lg border border-line-subtle bg-white p-6">
+        <div className="rounded-lg border border-line-subtle bg-surface p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Email */}
             <div>
@@ -94,7 +94,7 @@ export default function LoginPage(): React.JSX.Element {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="placeholder:text-clay-9000 w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-3 text-sm text-fg focus:border-line-brand focus:outline-none"
+                  className="w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-3 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand focus:outline-none"
                   placeholder="your@email.com"
                 />
               </div>
@@ -113,7 +113,7 @@ export default function LoginPage(): React.JSX.Element {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="placeholder:text-clay-9000 w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-10 text-sm text-fg focus:border-line-brand focus:outline-none"
+                  className="w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-10 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand focus:outline-none"
                   placeholder="••••••••"
                 />
                 <button

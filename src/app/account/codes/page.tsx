@@ -67,13 +67,13 @@ export default function AccountCodesPage(): React.JSX.Element {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="ค้นหาโค้ด หรือชื่อสินค้า..."
-          className="placeholder:text-clay-9000 w-full rounded-md border border-line-subtle bg-white py-2 pl-9 pr-3 text-sm text-fg focus:border-line-brand focus:outline-none"
+          className="w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-3 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand focus:outline-none"
         />
       </div>
 
       {/* Codes List */}
       {filteredCodes.length === 0 ? (
-        <div className="rounded-md border border-line-subtle bg-white p-8 text-center">
+        <div className="rounded-md border border-line-subtle bg-surface p-8 text-center">
           <p className="text-fg-placeholder">ไม่พบโค้ด</p>
         </div>
       ) : (
@@ -84,7 +84,7 @@ export default function AccountCodesPage(): React.JSX.Element {
               className={cn(
                 'rounded-md border p-4',
                 item.used
-                  ? 'border-line-subtle bg-white opacity-60'
+                  ? 'border-line-subtle bg-surface opacity-60'
                   : 'border-line-brand bg-peach-50',
               )}
             >
@@ -92,12 +92,12 @@ export default function AccountCodesPage(): React.JSX.Element {
                 <div>
                   <p className="text-sm font-medium text-fg-secondary">{item.product}</p>
                   <p className="mt-1 font-mono text-sm text-fg-brand">{item.code}</p>
-                  <p className="text-clay-9000 mt-1 text-xs">
+                  <p className="mt-1 text-xs text-fg-muted">
                     {item.orderNumber} · ได้รับ {item.deliveredAt.toLocaleDateString('th-TH')}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  {item.used && <span className="text-clay-9000 text-xs">ใช้แล้ว</span>}
+                  {item.used && <span className="text-xs text-fg-muted">ใช้แล้ว</span>}
                   {!item.used && (
                     <button
                       onClick={() => handleCopy(item.code, item.id)}

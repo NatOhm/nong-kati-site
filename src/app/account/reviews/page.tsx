@@ -28,13 +28,13 @@ export default function AccountReviewsPage(): React.JSX.Element {
       <h1 className="text-2xl font-bold text-fg">รีวิวของฉัน</h1>
 
       {MOCK_REVIEWS.length === 0 ? (
-        <div className="rounded-md border border-line-subtle bg-white p-8 text-center">
+        <div className="rounded-md border border-line-subtle bg-surface p-8 text-center">
           <p className="text-fg-placeholder">ยังไม่มีรีวิว</p>
         </div>
       ) : (
         <div className="space-y-3">
           {MOCK_REVIEWS.map((review) => (
-            <div key={review.id} className="rounded-md border border-line-subtle bg-white p-4">
+            <div key={review.id} className="rounded-md border border-line-subtle bg-surface p-4">
               <div className="mb-2 flex items-center justify-between">
                 <p className="text-sm font-medium text-fg-secondary">{review.product}</p>
                 <div className="flex gap-0.5">
@@ -52,7 +52,7 @@ export default function AccountReviewsPage(): React.JSX.Element {
                 </div>
               </div>
               <p className="text-sm text-fg-muted">{review.body}</p>
-              <p className="text-clay-9000 mt-2 text-xs">
+              <p className="mt-2 text-xs text-fg-muted">
                 {review.createdAt.toLocaleDateString('th-TH')}
               </p>
             </div>
