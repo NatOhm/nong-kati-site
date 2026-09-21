@@ -533,7 +533,10 @@ model AdminSession {
 /// Homepage hero carousel slides (admin-managed; images via /api/v1/admin/upload).
 model HeroSlide {
   id        String   @id @default(cuid())
-  imageUrl  String
+  /// Image banner; null when the slide is a text deal card (label only).
+  imageUrl  String?
+  /// Promo deal text, e.g. "🔥 HBO Max 7 วัน ฿25" — the ticker's old role.
+  label     String?
   href      String?
   alt       String
   sortOrder Int      @default(0)

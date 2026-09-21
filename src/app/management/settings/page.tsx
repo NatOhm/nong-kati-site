@@ -28,6 +28,7 @@ import {
   ArrowUp,
   ArrowDown,
   Loader2,
+  Tag,
 } from 'lucide-react';
 import { AdminShell } from '@/components/layout/AdminShell';
 import { adminFetch, clearAdminSession } from '@/lib/adminSession';
@@ -1396,7 +1397,8 @@ function CopyButton({ text }: { text: string }) {
 // ─── Homepage Banner (hero carousel) Settings ───────────
 interface AdminHeroSlide {
   id: string;
-  imageUrl: string;
+  imageUrl: string | null;
+  label: string | null;
   href: string | null;
   alt: string;
   sortOrder: number;
@@ -1464,9 +1466,28 @@ function BannerSettings(): React.JSX.Element {
     }
   }
 
-  /** Add = pick an image first; the slide is created with the uploaded path. */
+  /** Add with image = pick an image first; created with the uploaded path. */
   function startAdd(): void {
     newSlideInput.current?.click();
+  }
+
+  /** Add a text deal card (label only, no image) — the ticker's old role. */
+  async function addDeal(): Promise<void> {
+    const label = window.prompt('ข้อความโปรโมชั่น (เช่น 🔥 HBO Max 7 วัน ฿25)');
+    if (!label?.trim()) return;
+    setError(null);
+    try {
+      const res = await adminFetch('/api/v1/admin/hero-slides', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label: label.trim(), sortOrder: slides.length }),
+      });
+      if (!res.ok)
+        throw new Error((await res.json().catch(() => ({}))).error ?? `HTTP ${res.status}`);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'เพิ่มสไลด์ไม่สำเร็จ');
+    }
   }
 
   async function createFromImage(file: File): Promise<void> {
@@ -1562,7 +1583,7 @@ function BannerSettings(): React.JSX.Element {
         <h2 className="text-base font-bold text-fg">แบนเนอร์หน้าแรก (Carousel)</h2>
         <p className="mt-1 text-sm text-fg-muted">
           อัปโหลดภาพโปรโมชั่น ใส่ลิงก์เมื่อกดภาพ และจัดลำดับการแสดงผล — ภาพแนะนำขนาดกว้าง
-          อัตราส่วนประมาณ 21:8 (สูงสุด 512KB ต่อภาพ)
+          อัตราส่วนประมาณ 21:8 (สูงสุด 512KB ต่อภาพ) หรือเพิ่มเป็นข้อความโปรโมชั่นล้วนก็ได้
         </p>
         {error && (
           <p className="mt-3 rounded-lg bg-coral-50 px-3 py-2 text-sm text-coral-700 dark:bg-coral-900/20 dark:text-coral-300">
@@ -1624,6 +1645,20 @@ function BannerSettings(): React.JSX.Element {
 
             {/* Fields */}
             <div className="min-w-0 flex-1 space-y-2.5">
+              <label className="block">
+                <span className="text-xs font-medium text-fg-muted">
+                  ข้อความโปรโมชั่น (chip บนภาพ หรือข้อความหลักถ้าไม่มีภาพ)
+                </span>
+                <input
+                  defaultValue={slide.label ?? ''}
+                  onBlur={(e) => {
+                    const v = e.target.value.trim();
+                    if (v !== (slide.label ?? '')) void patch(slide.id, { label: v });
+                  }}
+                  placeholder="🔥 HBO Max 7 วัน ฿25"
+                  className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-placeholder focus:border-peach-400 focus:outline-none"
+                />
+              </label>
               <label className="block">
                 <span className="text-xs font-medium text-fg-muted">
                   ลิงก์เมื่อกดภาพ (เว้นว่างได้)
@@ -1709,19 +1744,29 @@ function BannerSettings(): React.JSX.Element {
           if (f) void createFromImage(f);
         }}
       />
-      <button
-        type="button"
-        onClick={startAdd}
-        disabled={uploadingId === 'new'}
-        className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-peach-300 py-4 text-sm font-semibold text-fg-brand transition-colors hover:bg-peach-50 disabled:opacity-60 dark:border-peach-700/60 dark:hover:bg-peach-900/20"
-      >
-        {uploadingId === 'new' ? (
-          <Loader2 size={16} className="animate-spin" />
-        ) : (
-          <Plus size={16} />
-        )}
-        {uploadingId === 'new' ? 'กำลังอัปโหลด…' : 'เพิ่มสไลด์ (เลือกภาพ)'}
-      </button>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <button
+          type="button"
+          onClick={startAdd}
+          disabled={uploadingId === 'new'}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-peach-300 py-4 text-sm font-semibold text-fg-brand transition-colors hover:bg-peach-50 disabled:opacity-60 dark:border-peach-700/60 dark:hover:bg-peach-900/20"
+        >
+          {uploadingId === 'new' ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <Plus size={16} />
+          )}
+          {uploadingId === 'new' ? 'กำลังอัปโหลด…' : 'เพิ่มสไลด์ (เลือกภาพ)'}
+        </button>
+        <button
+          type="button"
+          onClick={() => void addDeal()}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-line py-4 text-sm font-semibold text-fg-muted transition-colors hover:bg-surface"
+        >
+          <Tag size={16} />
+          เพิ่มข้อความโปรโมชั่น (ไม่มีภาพ)
+        </button>
+      </div>
     </div>
   );
 }

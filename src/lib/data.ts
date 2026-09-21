@@ -715,7 +715,10 @@ export async function getStorefrontStats(): Promise<StorefrontStats> {
 
 export interface HeroSlideContent {
   id: string;
-  imageUrl: string;
+  /** Image banner; null = text deal card (label only). */
+  imageUrl: string | null;
+  /** Promo deal text — the old ticker's role, now admin-editable per slide. */
+  label: string | null;
   href: string | null;
   alt: string;
 }
@@ -730,7 +733,13 @@ export async function getHeroSlides(): Promise<HeroSlideContent[]> {
       where: { isActive: true },
       orderBy: { sortOrder: 'asc' },
     });
-    return rows.map((r) => ({ id: r.id, imageUrl: r.imageUrl, href: r.href, alt: r.alt }));
+    return rows.map((r) => ({
+      id: r.id,
+      imageUrl: r.imageUrl,
+      label: r.label,
+      href: r.href,
+      alt: r.alt,
+    }));
   } catch (e) {
     console.error('[data] getHeroSlides failed:', e instanceof Error ? e.message : e);
     return [];

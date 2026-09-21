@@ -15,7 +15,7 @@ type RouteParams = { params: Promise<{ id: string }> };
 
 /**
  * PUT /api/v1/admin/hero-slides/[id] — update a slide (settings:write).
- * Accepts partial bodies: imageUrl, href, alt, sortOrder, isActive.
+ * Accepts partial bodies: imageUrl, label, href, alt, sortOrder, isActive.
  */
 export async function PUT(req: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const token = bearer(req);
@@ -34,14 +34,23 @@ export async function PUT(req: NextRequest, { params }: RouteParams): Promise<Ne
   }
   const b = body as Record<string, unknown>;
   const data: {
-    imageUrl?: string;
+    imageUrl?: string | null;
+    label?: string | null;
     href?: string | null;
     alt?: string;
     sortOrder?: number;
     isActive?: boolean;
   } = {};
-  if (typeof b['imageUrl'] === 'string' && b['imageUrl'].trim())
-    data.imageUrl = b['imageUrl'].trim();
+  // imageUrl/label: a slide may be an image banner, a text deal card, or
+  // both (image + deal chip). Empty string clears the field.
+  if ('imageUrl' in b) {
+    const v = b['imageUrl'];
+    data.imageUrl = typeof v === 'string' && v.trim() ? v.trim() : null;
+  }
+  if ('label' in b) {
+    const v = b['label'];
+    data.label = typeof v === 'string' && v.trim() ? v.trim() : null;
+  }
   if ('href' in b)
     data.href = typeof b['href'] === 'string' && b['href'].trim() ? b['href'].trim() : null;
   if (typeof b['alt'] === 'string' && b['alt'].trim()) data.alt = b['alt'].trim();

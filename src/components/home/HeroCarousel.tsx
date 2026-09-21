@@ -76,15 +76,42 @@ export function HeroCarousel({ slides }: { slides: HeroSlideContent[] }): React.
             }}
           >
             {slides.map((s, i) => {
-              const img = (
-                <img
-                  src={s.imageUrl}
-                  alt={s.alt}
-                  className="aspect-[16/6] w-full object-cover sm:aspect-[21/8]"
-                  loading={i === 0 ? 'eager' : 'lazy'}
-                  draggable={false}
-                />
-              );
+              // A slide is either an image banner, a text deal card (label
+              // only — the old ticker's promo role), or an image with a deal
+              // chip overlay. Image-only slides render exactly as before.
+              const media =
+                s.imageUrl && s.label ? (
+                  <div className="relative">
+                    <img
+                      src={s.imageUrl}
+                      alt={s.alt}
+                      className="aspect-[16/6] w-full object-cover sm:aspect-[21/8]"
+                      loading={i === 0 ? 'eager' : 'lazy'}
+                      draggable={false}
+                    />
+                    <span className="bg-surface/95 absolute bottom-3 left-3 rounded-full px-4 py-1.5 text-sm font-bold text-fg shadow-clay-sm">
+                      {s.label}
+                    </span>
+                  </div>
+                ) : s.imageUrl ? (
+                  <img
+                    src={s.imageUrl}
+                    alt={s.alt}
+                    className="aspect-[16/6] w-full object-cover sm:aspect-[21/8]"
+                    loading={i === 0 ? 'eager' : 'lazy'}
+                    draggable={false}
+                  />
+                ) : (
+                  <div
+                    role="img"
+                    aria-label={s.alt}
+                    className="flex aspect-[16/6] w-full items-center justify-center bg-gradient-to-br from-peach-100 via-surface-base to-peach-50 sm:aspect-[21/8]"
+                  >
+                    <p className="px-6 text-center font-display text-xl font-bold text-fg sm:text-3xl">
+                      {s.label}
+                    </p>
+                  </div>
+                );
               return (
                 <div
                   key={s.id}
@@ -96,10 +123,10 @@ export function HeroCarousel({ slides }: { slides: HeroSlideContent[] }): React.
                 >
                   {s.href ? (
                     <Link href={s.href} tabIndex={i === active ? 0 : -1} className="block">
-                      {img}
+                      {media}
                     </Link>
                   ) : (
-                    img
+                    media
                   )}
                 </div>
               );

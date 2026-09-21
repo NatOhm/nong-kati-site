@@ -27,7 +27,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
 /**
  * POST /api/v1/admin/hero-slides — create a slide (settings:write).
- * Body: { imageUrl (required), href?, alt?, sortOrder?, isActive? }
+ * Body: { imageUrl?, label?, href?, alt?, sortOrder?, isActive? }
+ * Either an image (banner slide) or a label (text deal card) is required.
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const token = bearer(req);
@@ -44,14 +45,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'INVALID_JSON' }, { status: 400 });
   }
   const b = body as Record<string, unknown>;
-  const imageUrl = typeof b['imageUrl'] === 'string' ? b['imageUrl'].trim() : '';
-  if (!imageUrl) return NextResponse.json({ error: 'IMAGE_REQUIRED' }, { status: 400 });
+  const imageUrl =
+    typeof b['imageUrl'] === 'string' && b['imageUrl'].trim() ? b['imageUrl'].trim() : null;
+  const label = typeof b['label'] === 'string' && b['label'].trim() ? b['label'].trim() : null;
+  if (!imageUrl && !label) {
+    return NextResponse.json({ error: 'IMAGE_OR_LABEL_REQUIRED' }, { status: 400 });
+  }
   const alt =
-    typeof b['alt'] === 'string' && b['alt'].trim() ? b['alt'].trim() : 'แบนเนอร์โปรโมชั่น';
+    typeof b['alt'] === 'string' && b['alt'].trim()
+      ? b['alt'].trim()
+      : (label ?? 'แบนเนอร์โปรโมชั่น');
 
   const slide = await prisma.heroSlide.create({
     data: {
       imageUrl,
+      label,
       href: typeof b['href'] === 'string' && b['href'].trim() ? b['href'].trim() : null,
       alt,
       sortOrder: typeof b['sortOrder'] === 'number' ? b['sortOrder'] : 0,
