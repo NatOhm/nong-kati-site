@@ -85,7 +85,7 @@ export default function AccountCodesPage(): React.JSX.Element {
                 'rounded-md border p-4',
                 item.used
                   ? 'border-line-subtle bg-surface opacity-60'
-                  : 'border-line-brand bg-peach-50',
+                  : 'border-line-brand bg-surface-brand-subtle',
               )}
             >
               <div className="flex items-center justify-between">

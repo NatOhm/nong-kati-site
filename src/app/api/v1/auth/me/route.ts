@@ -33,7 +33,13 @@ export async function PATCH(req: NextRequest): Promise<NextResponse> {
 
   let body: { fullName?: unknown; phoneNumber?: unknown; marketingOptIn?: unknown };
   try {
-    body = (await req.json()) as typeof body;
+    // Review: req.json() accepts JSON null — validate the top-level value
+    // before field access or the handler 500s on a malformed request.
+    const parsed: unknown = await req.json();
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return NextResponse.json({ error: 'INVALID_BODY' }, { status: 400 });
+    }
+    body = parsed as typeof body;
   } catch {
     return NextResponse.json({ error: 'INVALID_JSON' }, { status: 400 });
   }

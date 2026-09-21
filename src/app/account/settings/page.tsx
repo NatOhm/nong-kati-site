@@ -57,6 +57,9 @@ export default function AccountSettingsPage(): React.JSX.Element {
 
   const handleSave = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
+    // Review: never save against defaults — if the profile never loaded we
+    // would overwrite existing values with empty ones.
+    if (!profile || saving) return;
     setSaving(true);
     setSaved(false);
     setError(null);
@@ -64,7 +67,13 @@ export default function AccountSettingsPage(): React.JSX.Element {
       const res = await fetch('/api/v1/auth/me', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fullName, phoneNumber, marketingOptIn }),
+        body: JSON.stringify({
+          // Review: omit an unchanged name so nameless accounts (registration
+          // allows null) can still save phone/marketing preferences.
+          ...(fullName !== (profile.fullName ?? '') && { fullName }),
+          phoneNumber,
+          marketingOptIn,
+        }),
       });
       const data = (await res.json()) as { success?: boolean; error?: string; customer?: Profile };
       if (!res.ok || !data.success) {
@@ -113,6 +122,23 @@ export default function AccountSettingsPage(): React.JSX.Element {
       {loading ? (
         <div className="flex items-center justify-center gap-2 p-10 text-sm text-fg-placeholder">
           <Loader2 size={16} className="animate-spin" /> กำลังโหลด…
+        </div>
+      ) : !profile ? (
+        // Review: load failure must not expose an editable form backed by
+        // empty defaults — offer a retry instead.
+        <div className="clay-card flex flex-col items-center gap-3 rounded-2xl p-10 text-center">
+          <p className="text-sm text-fg-muted">โหลดข้อมูลไม่สำเร็จ กรุณาลองใหม่</p>
+          <button
+            type="button"
+            onClick={() => {
+              setLoading(true);
+              setError(null);
+              void load();
+            }}
+            className="rounded-full bg-peach-500 px-5 py-2.5 text-sm font-semibold text-white shadow-clay-sm transition-transform duration-fast ease-out-quart hover:scale-105 active:scale-90"
+          >
+            ลองใหม่
+          </button>
         </div>
       ) : (
         <form onSubmit={handleSave} className="space-y-6">
