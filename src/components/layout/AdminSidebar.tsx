@@ -72,6 +72,12 @@ const NAV_ITEMS: NavItem[] = [
     icon: BarChart3,
     permission: 'reports:read',
   },
+  {
+    label: 'สินค้าค้างสต๊อก',
+    href: '/management/reports/slow-stock',
+    icon: BarChart3,
+    permission: 'reports:read',
+  },
   { label: 'พนักงาน', href: '/management/staff', icon: Shield, permission: 'staff:read' },
   { label: 'Audit Log', href: '/management/audit', icon: FileText, permission: 'audit:read' },
   { label: 'ตั้งค่า', href: '/management/settings', icon: Settings, permission: 'settings:read' },
