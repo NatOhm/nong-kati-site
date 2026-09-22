@@ -54,6 +54,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     if (err instanceof GatewayUnavailableError) {
       return NextResponse.json({ error: { code: 'SERVICE_UNAVAILABLE' } }, { status: 503 });
     }
+    // Review H2: production keys are configured but the real Omise/Opn
+    // integration is not implemented yet — this is a deliberate gate, not
+    // an unexpected 502. Clients show the manual-slip guidance instead of
+    // retrying a dead endpoint. (Wallet payment is unaffected.)
+    const msg = err instanceof Error ? err.message : '';
+    if (msg.includes('not implemented')) {
+      return NextResponse.json({ error: { code: 'PAYMENT_UNAVAILABLE' } }, { status: 503 });
+    }
     return NextResponse.json({ error: { code: 'PAYMENT_INIT_FAILED' } }, { status: 502 });
   }
 

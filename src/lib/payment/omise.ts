@@ -64,10 +64,16 @@ export class OmiseAdapter implements PaymentGateway {
     if (this.isMock) {
       return this.mockVerifySignature(rawBody, signatureHeader);
     }
-    // Real Omise HMAC verification
+    // Real Omise HMAC verification. Review L8: length-safe compare —
+    // timingSafeEqual throws on length mismatch, which turned malformed
+    // (non-hex / truncated) signature headers into 500s. Any malformed
+    // header must be a clean `false` (400), never a throw.
     const expected = createHmac('sha256', this.webhookSecret).update(rawBody).digest('hex');
-
-    return timingSafeEqual(Buffer.from(expected), Buffer.from(signatureHeader));
+    const header = signatureHeader.trim().toLowerCase();
+    if (!/^[0-9a-f]+$/.test(header) || header.length !== expected.length) {
+      return false;
+    }
+    return timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(header, 'hex'));
   }
 
   parseWebhookEvent(rawBody: Buffer): WebhookEvent {

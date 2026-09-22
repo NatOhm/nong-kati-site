@@ -143,7 +143,7 @@ access (Supabase dashboard → SQL editor) is the master key of last resort.
 # Step 1: credentials → challenge token
 TOKEN_JSON=$(curl -s -X POST https://nong-kati.vercel.app/api/v1/auth/admin/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@nong-kati.co.th","password":"admin123"}')
+  -d '{"email":"<admin-email>","password":"<your-password>"}')
 CHALLENGE=$(echo "$TOKEN_JSON" | jq -r .challengeToken)
 
 # Step 2a (first login only): enrollment payload
@@ -199,9 +199,9 @@ Error codes at step 2: `TOTP_INVALID` (wrong code),
   URI (containing the secret) is sent to a third party. Before real staff
   accounts exist, generate the QR locally (e.g. the `qrcode` npm package)
   so the secret never leaves the server response.
-- **Seeded shared secret** — limited accounts ship pre-confirmed with the
-  well-known test secret `JBSWY3DPEHPK3PXP`. Rotate every account's secret
-  (§6 SQL, then re-enroll) before launch.
+- **~~Seeded shared secret~~ FIXED 2026-09-22** — the shared test seed is
+  gone: every account now carries its **own unique TOTP secret**, generated
+  fresh by `scripts/create-admin.ts` (rotation also revokes all sessions).
 - `failedLoginAttempts` counts password failures only; TOTP attempts are
   not rate-limited. Acceptable with 6-digit codes (1-in-a-million per
   window), but worth a counter if this ever shows up in an audit.

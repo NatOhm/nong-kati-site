@@ -83,25 +83,11 @@ export async function POST(
         throw new Error('WALLET_PAY_CLAIM_FAILED');
       }
 
-      const fulfilment = await fulfilOrder(order.id, tx);
+      // Strict: a stock hole rolls back the entire payment (review H3).
+      const fulfilment = await fulfilOrder(order.id, tx, { strict: true });
       if (!fulfilment.success) {
-        if (fulfilment.error === 'INSUFFICIENT_STOCK') {
-          // Payment "succeeded" but there is nothing to deliver: keep the
-          // claim (manual fulfilment flow resolves it) and commit the spend.
-          await tx.order.update({
-            where: { id: order.id },
-            data: {
-              status: 'pending_manual_fulfilment',
-              manualFulfilmentReason: 'INSUFFICIENT_STOCK',
-              paymentMethod: 'wallet',
-            },
-          });
-          return {
-            code: 'OK_MANUAL_FULFILMENT' as const,
-            orderNumber: order.orderNumber,
-            total,
-          };
-        }
+        // Unreachable in strict mode (every failure rethrows) — kept as a
+        // type-level safety net.
         throw new Error(fulfilment.error ?? 'WALLET_PAY_FAILED');
       }
 
@@ -123,6 +109,22 @@ export async function POST(
   } catch (err) {
     // Transaction rolled back — balance, ledger, claim, codes all intact.
     const code = err instanceof Error ? err.message : 'WALLET_PAY_FAILED';
+    // Review H3: a stock hole surfaces as a clean 409 — the customer's
+    // balance is untouched (the transaction rolled back) and PromptPay
+    // remains available in the UI.
+    if (code === 'INSUFFICIENT_STOCK') {
+      return NextResponse.json({ error: { code: 'INSUFFICIENT_STOCK' } }, { status: 409 });
+    }
+    // Review M4: losing a coupon race (limit reached between order creation
+    // and claim) is a client-facing 409, not a server error — the checkout
+    // UI can then offer payment without the coupon.
+    if (
+      code === 'COUPON_USAGE_LIMIT' ||
+      code === 'COUPON_PER_CUSTOMER_LIMIT' ||
+      code === 'COUPON_NO_LONGER_VALID'
+    ) {
+      return NextResponse.json({ error: { code } }, { status: 409 });
+    }
     return NextResponse.json(
       { error: { code: code.startsWith('WALLET_PAY') ? code : 'WALLET_PAY_FAILED' } },
       { status: 500 },

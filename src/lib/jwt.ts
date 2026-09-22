@@ -163,7 +163,7 @@ export async function verifyAdminJwt(token: string): Promise<AdminJwtPayload | n
   }
   const user = await prisma.adminUser.findUnique({
     where: { id: payload.sub },
-    select: { role: true, status: true, sessionsInvalidBefore: true },
+    select: { role: true, status: true, sessionsInvalidBefore: true, mustChangePassword: true },
   });
   if (!user || user.status !== 'active') return null;
   if (user.sessionsInvalidBefore && payload.iat * 1000 <= user.sessionsInvalidBefore.getTime()) {
@@ -173,8 +173,13 @@ export async function verifyAdminJwt(token: string): Promise<AdminJwtPayload | n
   // stale super_admin snapshot; comparing the embedded role against the live
   // row makes any stale-role token dead on arrival.
   if (payload.role !== user.role) return null;
-  return payload;
-}
+  // Review C1: mustChangePassword is now enforced server-side, not just a UI
+  // hint. A forced-change account gets a zero-permission token, so every
+  // RBAC-gated route rejects it; the self-service password-change route
+  // authenticates via verifyAdminJwt directly (no permission required), so
+  // first login → change password still works.
+  if (user.mustChangePassword) return { ...payload, perms: [] };
+  return payload;}
 
 /**
  * Issue an admin access JWT.

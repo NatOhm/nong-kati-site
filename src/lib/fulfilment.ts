@@ -35,6 +35,7 @@ export type PrismaTx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
 export async function fulfilOrder(
   orderId: string,
   tx: PrismaTx = prisma,
+  opts?: { strict?: boolean },
 ): Promise<FulfilmentResult> {
   const order = await tx.order.findUnique({
     where: { id: orderId },
@@ -127,7 +128,16 @@ export async function fulfilOrder(
     return { success: true, codes: result };
   } catch (err) {
     const msg = err instanceof Error ? err.message : '';
-    if (msg === 'INSUFFICIENT_STOCK') return { success: false, error: 'INSUFFICIENT_STOCK' };
+    if (msg === 'INSUFFICIENT_STOCK') {
+      // Review H3: in strict mode (wallet payment) a stock hole must roll
+      // back the WHOLE payment — a partial allocation charged the customer
+      // for codes that were never delivered. Re-throwing aborts the caller's
+      // transaction, undoing the debit, ledger row, claim and any codes
+      // already marked. The webhook path keeps the non-strict fallback
+      // (payment confirmed → pending_manual_fulfilment for admin retry).
+      if (opts?.strict) throw err;
+      return { success: false, error: 'INSUFFICIENT_STOCK' };
+    }
     throw err;
   }
 }

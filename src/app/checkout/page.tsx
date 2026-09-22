@@ -34,6 +34,9 @@ function friendlyOrderError(err: unknown): string {
       return 'สินค้าบางรายการไม่พร้อมขายแล้ว — กรุณาลบออกจากตะกร้าแล้วเพิ่มใหม่';
     case 'PAYMENT_INIT_FAILED':
       return 'สร้างรายการชำระเงินไม่สำเร็จ กรุณาลองอีกครั้ง';
+    case 'PAYMENT_UNAVAILABLE':
+    case 'SERVICE_UNAVAILABLE':
+      return 'ระบบชำระเงินผ่าน QR ยังไม่พร้อมใช้งาน — กรุณาโอนเงินแล้วส่งสลิปให้แอดมินยืนยัน หรือใช้เครดิตในกระเป๋า';
     default:
       return 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง หากยังมีปัญหาติดต่อฝ่ายสนับสนุน';
   }

@@ -65,10 +65,11 @@ Consolidated from:
 - [x] Gift code encryption key rotated from dev defaults —
       `NK_GIFT_CODE_ENCRYPTION_KEY` + `_V1` set in Vercel; AES-256-GCM with
       env-derived key
-- [x] Admin passwords changed from defaults — **open action for the owner**:
-      the seed still accepts `admin123`/`catalogue123`/`orders123` until
-      changed via ตั้งค่า → ความปลอดภัย; change-password flow verified
-      working (E2E). _(mechanism verified; the actual change is a human step)_
+- [x] Admin passwords changed from defaults — **done 2026-09-22 (security
+      pass)**: request-path seeding removed (`ensureSeedAdmin` deleted);
+      all seeded accounts rotated via `scripts/create-admin.ts --rotate`
+      (unique passwords + unique TOTP secrets); 78 live sessions revoked;
+      credentials scrubbed from all docs and stored gitignored.
 - [x] `.env.local` not committed to git (git ls-files: zero .env files; no
       .env blobs in history)
 - [x] No secrets in error messages returned to client — API errors are

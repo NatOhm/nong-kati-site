@@ -171,6 +171,8 @@ export async function checkCoupon(code: string, subtotalThb: number): Promise<Co
   if (coupon.usageLimit !== null && coupon.usageCount >= coupon.usageLimit) {
     return { ok: false, discountThb: 0, error: 'USAGE_LIMIT' };
   }
+  // Per-customer limit checked at creation for UX (the authoritative check
+  // is at the payment claim — see claimOrderForConfirmation).
   const min = Number(coupon.minSpendThb ?? 0);
   if (min > 0 && subtotalThb < min) return { ok: false, discountThb: 0, error: 'MIN_SPEND' };
 
@@ -415,16 +417,58 @@ export async function claimOrderForConfirmation(
     data: { status: 'payment_confirmed' },
   });
   if (claimed.count !== 1) return null;
-  // Coupon usage counts only when payment is actually confirmed.
+  // Review M4: coupon usage counts only when payment is actually confirmed,
+  // and both the global limit and per-customer limit are enforced HERE at
+  // the claim boundary — not at order creation (orders are created before
+  // payment and may never be paid; concurrent orders could exceed limits).
   const order = await db.order.findUnique({
     where: { id: orderId },
-    select: { couponId: true },
+    select: { couponId: true, customerId: true },
   });
   if (order?.couponId) {
-    await db.coupon.update({
+    const coupon = await db.coupon.findUnique({
       where: { id: order.couponId },
-      data: { usageCount: { increment: 1 } },
+      select: { usageLimit: true, perCustomerLimit: true, isActive: true },
     });
+    if (!coupon || !coupon.isActive) {
+      throw new Error('COUPON_NO_LONGER_VALID');
+    }
+    // Global capacity: only increment when still under the limit (the
+    // conditional update is the atomic guard — racing claims lose here).
+    if (coupon.usageLimit !== null) {
+      const bumped = await db.coupon.updateMany({
+        where: { id: order.couponId, usageCount: { lt: coupon.usageLimit } },
+        data: { usageCount: { increment: 1 } },
+      });
+      if (bumped.count !== 1) throw new Error('COUPON_USAGE_LIMIT');
+    } else {
+      await db.coupon.update({
+        where: { id: order.couponId },
+        data: { usageCount: { increment: 1 } },
+      });
+    }
+    // Per-customer cap + idempotency: one redemption row per (coupon, order).
+    // Duplicate redemption for the same order = replays; per-customer limit
+    // counts existing rows excluding this order's own row (retry-friendly).
+    if (order.customerId) {
+      try {
+        await db.couponRedemption.create({
+          data: { couponId: order.couponId, customerId: order.customerId, orderId },
+        });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (!msg.includes('Unique constraint')) throw e;
+        // Row already exists for this order (retry after a later-step
+        // failure) — keep the existing one, do not double-count.
+      }
+      const per = coupon.perCustomerLimit ?? 1;
+      const mine = await db.couponRedemption.count({
+        where: { couponId: order.couponId, customerId: order.customerId },
+      });
+      if (mine > per) {
+        throw new Error('COUPON_PER_CUSTOMER_LIMIT');
+      }
+    }
   }
   const o = await db.order.findUnique({ where: { id: orderId }, include: orderInclude });
   return o ? mapOrder(o as unknown as DbOrder) : null;

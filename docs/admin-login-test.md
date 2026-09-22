@@ -20,23 +20,32 @@ case it is designed to handle. สำหรับบัญชีทดสอบ�
 
 ## 1. Credentials
 
-| Email                       | Role                | Password       | Note                                                                      |
-| --------------------------- | ------------------- | -------------- | ------------------------------------------------------------------------- |
-| `admin@nong-kati.co.th`     | `super_admin`       | `admin123`     | Full permissions. **Change it** in ตั้งค่า → ความปลอดภัย (≥12 chars)      |
-| `catalogue@nong-kati.co.th` | `catalogue_manager` | `catalogue123` | Products/categories/inventory only; forced password change on first login |
-| `orders@nong-kati.co.th`    | `order_manager`     | `orders123`    | Orders/customers/reviews only; forced password change on first login      |
+Admin accounts are **not seeded** — a request-path default can never create
+privileged rows (security review C1). Provision or rotate accounts with the
+explicit bootstrap command (fails closed in production):
 
-All three are seeded lazily on first login attempt against the DB
-(`ensureSeedAdmin`; password overrides `ADMIN_SEED_PASSWORD`,
-`ADMIN_SEED_CATALOGUE_PASSWORD`, `ADMIN_SEED_ORDERS_PASSWORD`). Limited
-accounts ship pre-confirmed TOTP with the shared seed secret and
-`mustChangePassword=true` — their first login lands on the change-password
-form and the sidebar shows only their role's items.
+```bash
+# First account (one-time operational step)
+npx tsx scripts/create-admin.ts admin@nong-kati.co.th "ชื่อแอดมิน" super_admin
+
+# Rotate an existing account: new password + fresh TOTP + sessions revoked
+npx tsx scripts/create-admin.ts admin@nong-kati.co.th "ชื่อแอดมิน" super_admin --rotate
+```
+
+The command prints the password and an `otpauth://` URI (add it in your
+authenticator app). Every new/rotated account has `mustChangePassword=true`
+— the first login lands on the forced-change form, and every new account
+carries its **own unique TOTP secret** (no shared seed). Limited roles show
+only their role's sidebar items.
+
+> 📄 Current credentials: rotated 2026-09-22 and delivered to the owner
+> (stored outside the repository — never commit them).
 
 **2FA: real TOTP** — 6-digit rotating code from any authenticator app.
 
-**2FA enrollment:** on first login the seeded account shows the 2FA-setup
-step with a QR code (secret `JBSWY3DPEHPK3PXP` in the current seed row). Scan
+**2FA enrollment:** on first login a new/rotated account shows the 2FA-setup
+step with a **unique per-account QR code** (printed by `create-admin.ts` as
+an `otpauth://` URI if you prefer manual entry). Scan
 it, then enter the rotating 6-digit code. Codes refresh every 30 seconds;
 ±1 time-window of clock drift is accepted.
 
@@ -214,10 +223,11 @@ curl -s -o /dev/null -w "%{http_code}\n" \
 Login is two HTTP endpoints, plus refresh and logout — fully scriptable:
 
 ```bash
-# Step 1: credentials → challenge token
+# Step 1: credentials → challenge token (password from your manager —
+# no defaults ship with the repo)
 TOKEN_JSON=$(curl -s -X POST https://nong-kati.vercel.app/api/v1/auth/admin/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@nong-kati.co.th","password":"admin123"}')
+  -d '{"email":"admin@nong-kati.co.th","password":"<your-password>"}')
 CHALLENGE=$(echo "$TOKEN_JSON" | jq -r .challengeToken)
 
 # Step 2: TOTP code from your authenticator → access + refresh tokens

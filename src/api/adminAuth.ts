@@ -112,72 +112,11 @@ function hashToken(token: string): string {
 }
 
 /**
- * Ensure the default accounts exist. Called lazily on first login so a fresh
- * database bootstraps itself. Passwords come from env overrides (or the dev
- * defaults below) and are hashed with scrypt before storage — plaintext is
- * never persisted. The super-admin gets a real random TOTP secret; limited
- * accounts share the seeded TOTP secret so they can be test-logged-into
- * without enrolling each one.
- *
- * Limited roles exist so RBAC can be exercised end-to-end: their JWTs carry
- * only their role's permissions (src/types/auth.ts ROLE_PERMISSIONS).
+ * NOTE: the old lazy seed-admin bootstrap was removed from the login path
+ * (security review C1 — documented credentials must never be able to create
+ * privileged rows in production). Provision admins explicitly with
+ * scripts/create-admin.ts instead.
  */
-interface SeedAdminSpec {
-  email: string;
-  fullName: string;
-  role: AdminRole;
-  envVar: string;
-  fallbackPassword: string;
-}
-
-export const SEED_ADMINS: SeedAdminSpec[] = [
-  {
-    email: 'admin@nong-kati.co.th',
-    fullName: 'Founder',
-    role: 'super_admin',
-    envVar: 'ADMIN_SEED_PASSWORD',
-    fallbackPassword: 'admin123',
-  },
-  {
-    email: 'catalogue@nong-kati.co.th',
-    fullName: 'Catalogue Manager',
-    role: 'catalogue_manager',
-    envVar: 'ADMIN_SEED_CATALOGUE_PASSWORD',
-    fallbackPassword: 'catalogue123',
-  },
-  {
-    email: 'orders@nong-kati.co.th',
-    fullName: 'Order Manager',
-    role: 'order_manager',
-    envVar: 'ADMIN_SEED_ORDERS_PASSWORD',
-    fallbackPassword: 'orders123',
-  },
-];
-
-/** Test 2FA secret shared by seeded accounts (standard RFC 6238 vector). */
-const SEED_TOTP_SECRET = 'JBSWY3DPEHPK3PXP';
-
-export async function ensureSeedAdmin(): Promise<void> {
-  for (const spec of SEED_ADMINS) {
-    const existing = await prisma.adminUser.findUnique({ where: { email: spec.email } });
-    if (existing) continue;
-    const password = process.env[spec.envVar] ?? spec.fallbackPassword;
-    await prisma.adminUser.create({
-      data: {
-        email: spec.email,
-        fullName: spec.fullName,
-        role: spec.role,
-        status: 'active',
-        passwordHash: await hashPassword(password),
-        totpSecret: SEED_TOTP_SECRET,
-        // super_admin enrolls via the 2FA-setup flow on first login; the
-        // limited test accounts are pre-confirmed so RBAC tests skip setup.
-        totpConfirmed: spec.role !== 'super_admin',
-        mustChangePassword: true,
-      },
-    });
-  }
-}
 
 /**
  * Admin login — first factor (08-auth.md §5.1).
@@ -195,8 +134,6 @@ export async function adminLogin(
   error?: string;
   retryAfter?: number;
 }> {
-  await ensureSeedAdmin();
-
   const user = await prisma.adminUser.findUnique({ where: { email: email.trim().toLowerCase() } });
   // Generic failure for unknown accounts — same shape as a wrong password.
   if (!user) {

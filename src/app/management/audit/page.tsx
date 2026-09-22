@@ -4,8 +4,23 @@ import { useState } from 'react';
 import { Search, Download, Filter } from 'lucide-react';
 
 import { AdminShell } from '@/components/layout/AdminShell';
+import { adminJson } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
-import { queryAuditLog, exportAuditLogCsv, type AuditLogEntry } from '@/lib/auditLog';
+
+/** Serialized AuditLogEntry as delivered by GET /api/v1/admin/audit-log. */
+interface AuditLogRow {
+  id: string;
+  actorType: string;
+  actorId: string;
+  actorEmail: string;
+  action: string;
+  tableName: string;
+  recordId: string;
+  diff: { before: Record<string, unknown> | null; after: Record<string, unknown> | null } | null;
+  ipAddress: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+}
 
 const ACTION_LABELS: Record<string, string> = {
   resend_email: 'ส่งอีเมลอีกครั้ง',
@@ -30,7 +45,7 @@ const ACTOR_TYPE_LABELS: Record<string, string> = {
 };
 
 export default function AdminAuditPage(): React.JSX.Element {
-  const [entries, setEntries] = useState<AuditLogEntry[]>([]);
+  const [entries, setEntries] = useState<AuditLogRow[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -44,36 +59,61 @@ export default function AdminAuditPage(): React.JSX.Element {
 
   const pageSize = 20;
 
-  const handleSearch = (p: number = 1) => {
+  const handleSearch = async (p: number = 1) => {
     setLoading(true);
     setPage(p);
     try {
-      const params: Parameters<typeof queryAuditLog>[0] = { page: p, pageSize };
-      if (actionFilter) params.action = actionFilter;
-      if (tableFilter) params.tableName = tableFilter;
-      if (actorTypeFilter) params.actorType = actorTypeFilter;
-      if (dateFrom) params.dateFrom = dateFrom;
-      if (dateTo) params.dateTo = dateTo;
-      const result = queryAuditLog(params);
+      const qs = new URLSearchParams({ page: String(p), pageSize: String(pageSize) });
+      if (actionFilter) qs.set('action', actionFilter);
+      if (tableFilter) qs.set('tableName', tableFilter);
+      if (actorTypeFilter) qs.set('actorType', actorTypeFilter);
+      if (dateFrom) qs.set('dateFrom', dateFrom);
+      if (dateTo) qs.set('dateTo', dateTo);
+      const result = await adminJson<{ entries: AuditLogRow[]; total: number }>(
+        `/api/v1/admin/audit-log?${qs.toString()}`,
+      );
       setEntries(result.entries);
       setTotal(result.total);
+    } catch {
+      setEntries([]);
+      setTotal(0);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleExport = () => {
-    const exportParams: Parameters<typeof exportAuditLogCsv>[0] = {};
-    if (dateFrom) exportParams.dateFrom = dateFrom;
-    if (dateTo) exportParams.dateTo = dateTo;
-    const csv = exportAuditLogCsv(exportParams);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `audit-log-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleExport = async () => {
+    try {
+      const qs = new URLSearchParams({ page: '1', pageSize: '100' });
+      if (dateFrom) qs.set('dateFrom', dateFrom);
+      if (dateTo) qs.set('dateTo', dateTo);
+      const result = await adminJson<{ entries: AuditLogRow[]; total: number }>(
+        `/api/v1/admin/audit-log?${qs.toString()}`,
+      );
+      const header = 'timestamp,actorType,actorEmail,action,tableName,recordId';
+      const rows = result.entries.map((e) =>
+        [
+          e.createdAt,
+          e.actorType,
+          e.actorEmail,
+          e.action,
+          e.tableName,
+          e.recordId,
+        ]
+          .map((v) => `"${String(v).replaceAll('"', '""')}"`)
+          .join(','),
+      );
+      const csv = [header, ...rows].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `audit-log-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      // Export is best-effort; the viewer itself remains usable.
+    }
   };
 
   const totalPages = Math.ceil(total / pageSize);
@@ -193,7 +233,7 @@ export default function AdminAuditPage(): React.JSX.Element {
                 entries.map((entry) => (
                   <tr key={entry.id} className="border-b border-line-subtle hover:bg-surface">
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-fg-placeholder">
-                      {entry.createdAt.toLocaleString('th-TH')}
+                      {new Date(entry.createdAt).toLocaleString('th-TH')}
                     </td>
                     <td className="px-4 py-3">
                       <div className="text-xs text-fg-muted">{entry.actorEmail}</div>

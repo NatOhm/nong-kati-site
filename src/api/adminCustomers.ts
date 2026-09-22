@@ -258,16 +258,29 @@ export async function adminAdjustCustomerCredit(
     });
     if (!customer) return { success: false as const, error: 'CUSTOMER_NOT_FOUND' };
 
-    const nextBalance = Number(customer.walletBalanceThb) + amount2;
-    if (nextBalance < 0) {
+    // Review M6: the balance check rides INSIDE the write predicate — a
+    // stale read (concurrent debits) can no longer pass and then overdraw.
+    // The CHECK constraint in the wallet_non_negative migration is the
+    // database backstop for anything this predicate misses.
+    const updated = await tx.customer.updateMany({
+      where: {
+        id: customerId,
+        ...(amount2 < 0
+          ? { walletBalanceThb: { gte: -amount2 } }
+          : {}),
+      },
+      data: { walletBalanceThb: { increment: amount2 } },
+    });
+    if (updated.count !== 1) {
       return { success: false as const, error: 'INSUFFICIENT_BALANCE' };
     }
-
-    const updated = await tx.customer.update({
+    const refreshed = await tx.customer.findUnique({
       where: { id: customerId },
-      data: { walletBalanceThb: { increment: amount2 } },
       select: { walletBalanceThb: true },
     });
+    const updated1 = {
+      walletBalanceThb: refreshed?.walletBalanceThb ?? 0,
+    };
 
     await tx.topUpLog.create({
       data: {
@@ -288,14 +301,14 @@ export async function adminAdjustCustomerCredit(
       recordId: customerId,
       diff: {
         before: { walletBalanceThb: Number(customer.walletBalanceThb) },
-        after: { walletBalanceThb: Number(updated.walletBalanceThb) },
+        after: { walletBalanceThb: Number(updated1.walletBalanceThb) },
       },
       metadata: { email: customer.email, note: note?.slice(0, 200) },
     });
 
     return {
       success: true as const,
-      balanceThb: Number(updated.walletBalanceThb),
+      balanceThb: Number(updated1.walletBalanceThb),
       amountThb: amount2,
     };
   });
