@@ -6,6 +6,7 @@ import { Wallet, TrendingDown, TrendingUp, Receipt } from 'lucide-react';
 import { useCustomerProfile } from '@/components/layout/CustomerProfileProvider';
 import { HamsterLoader } from '@/components/loading/HamsterLoader';
 import { formatThb } from '@/utils/format';
+import { cn } from '@/utils/cn';
 
 /**
  * กระเป๋าเงิน — เครดิตคงเหลือ, เติมเงินในเดือนนี้, ค่าใช้จ่ายเดือนนี้,
@@ -98,7 +99,10 @@ export default function WalletPage(): React.JSX.Element {
                 className="flex items-center justify-between rounded-xl border border-line-subtle px-4 py-3"
               >
                 <div>
-                  <p className="text-sm font-semibold text-fg">{formatThb(t.amountThb)}</p>
+                  <p className={cn('text-sm font-semibold', t.amountThb < 0 ? 'text-coral-600' : 'text-fg')}>
+                    {t.amountThb < 0 ? '' : '+'}
+                    {formatThb(t.amountThb)}
+                  </p>
                   <p className="text-xs text-fg-muted">
                     {new Date(t.createdAt).toLocaleDateString('th-TH', {
                       day: 'numeric',
@@ -107,10 +111,14 @@ export default function WalletPage(): React.JSX.Element {
                     })}
                     {' · '}
                     {t.method === 'promptpay'
-                      ? 'พร้อมเพย์'
+                      ? 'เติมเงินพร้อมเพย์'
                       : t.method === 'credit_card'
-                        ? 'บัตรเครดิต'
-                        : t.method}
+                        ? 'เติมด้วยบัตรเครดิต'
+                        : t.method === 'wallet_spend'
+                          ? 'ใช้ซื้อสินค้า'
+                          : t.method === 'admin_credit'
+                            ? 'แอดมินปรับเครดิต'
+                            : t.method}
                   </p>
                 </div>
                 <span className="rounded-full bg-jade-500/15 px-2.5 py-0.5 text-xs font-medium text-jade-700">

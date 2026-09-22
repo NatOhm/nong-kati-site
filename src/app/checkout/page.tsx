@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Clock, Construction } from 'lucide-react';
 
@@ -59,7 +59,7 @@ export default function CheckoutPage(): React.JSX.Element {
   const [step, setStep] = useState<1 | 2>(1);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [contactData, setContactData] = useState<ContactFormData | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'promptpay' | 'card'>('promptpay');
+  const [paymentMethod, setPaymentMethod] = useState<'promptpay' | 'card' | 'wallet'>('promptpay');
   const [order, setOrder] = useState<Order | null>(null);
   const [paymentState, setPaymentState] = useState<{
     attemptId: string;
@@ -75,6 +75,29 @@ export default function CheckoutPage(): React.JSX.Element {
     null,
   );
   const [couponMsg, setCouponMsg] = useState<string | null>(null);
+  const [walletBalanceThb, setWalletBalanceThb] = useState<number | null>(null);
+  const [walletBusy, setWalletBusy] = useState(false);
+  const [walletMsg, setWalletMsg] = useState<string | null>(null);
+
+  // Wallet balance — fetched once for logged-in customers (the wallet option
+  // is hidden for guests; a 401 here just means no balance).
+  useEffect(() => {
+    if (!isLoaded) return;
+    let cancelled = false;
+    fetch('/api/v1/wallet', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { balanceThb?: number } | null) => {
+        if (!cancelled) {
+          setWalletBalanceThb(typeof d?.balanceThb === 'number' ? d.balanceThb : null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setWalletBalanceThb(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoaded]);
 
   // Validate + stage a coupon code (server check; applied on order create).
   const handleApplyCoupon = useCallback(async () => {
@@ -169,6 +192,52 @@ export default function CheckoutPage(): React.JSX.Element {
       setLoading(false);
     }
   }, []);
+
+  /**
+   * Pay with wallet credit. On ANY failure (insufficient balance, race,
+   * server hiccup) the UI automatically falls back to the PromptPay QR so
+   * the customer always has a way to pay — the wallet attempt never leaves
+   * a half-state (server-side it's one atomic transaction).
+   */
+  const handleWalletPay = useCallback(async () => {
+    if (!order || walletBusy) return;
+    setWalletBusy(true);
+    setWalletMsg(null);
+    setError(null);
+    try {
+      const res = await fetch(`/api/v1/orders/${order.id}/pay-wallet`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        success?: boolean;
+        code?: string;
+        error?: { code?: string };
+      };
+      if (res.ok && body.success) {
+        clearCart();
+        window.location.href = `/checkout/confirmation/${order.confirmationUuid}`;
+        return;
+      }
+      const code = body.error?.code ?? 'WALLET_PAY_FAILED';
+      if (code === 'INSUFFICIENT_BALANCE') {
+        setWalletMsg('ยอดเครดิตไม่พอ — เลือกชำระผ่าน PromptPay แทนได้เลย');
+      } else if (code === 'ORDER_NOT_PAYABLE') {
+        setWalletMsg('คำสั่งซื้อนี้ชำระเงินแล้วหรือถูกยกเลิก');
+      } else {
+        // Any unexpected failure → fall back to PromptPay automatically.
+        setWalletMsg('ระบบเครดิตขัดข้องชั่วคราว — กรุณาชำระผ่าน PromptPay แทน');
+        setPaymentMethod('promptpay');
+        await handleInitiatePayment(order.id);
+      }
+    } catch {
+      setWalletMsg('ระบบเครดิตขัดข้องชั่วคราว — กรุณาชำระผ่าน PromptPay แทน');
+      setPaymentMethod('promptpay');
+      await handleInitiatePayment(order.id);
+    } finally {
+      setWalletBusy(false);
+    }
+  }, [order, walletBusy, clearCart, handleInitiatePayment]);
 
   // Poll payment status (every 3 seconds for PromptPay)
   const startPaymentPolling = useCallback((attemptId: string) => {
@@ -312,8 +381,33 @@ export default function CheckoutPage(): React.JSX.Element {
               <PaymentMethodSelector
                 selected={paymentMethod}
                 onChange={setPaymentMethod}
-                disabled={!!paymentState}
+                disabled={!!paymentState || walletBusy}
+                walletBalanceThb={walletBalanceThb}
               />
+
+              {/* Wallet pay panel */}
+              {paymentMethod === 'wallet' && (
+                <div className="mt-6">
+                  <div className="rounded-md border border-line-brand bg-peach-50 p-4">
+                    <p className="text-sm text-fg-brand">
+                      ยอดชำระ {formatThb(order?.totalAmountThb ?? 0)} จะถูกหักจากเครดิต
+                      ({formatThb(walletBalanceThb ?? 0)}) ทันที — โค้ดส่งถึงหน้าถัดไปเลย
+                    </p>
+                    {walletMsg && (
+                      <p className="mt-2 rounded-md border border-coral-300 bg-coral-50 px-3 py-2 text-xs text-coral-700">
+                        {walletMsg}
+                      </p>
+                    )}
+                    <button
+                      onClick={() => void handleWalletPay()}
+                      disabled={walletBusy || !!paymentState}
+                      className="mt-3 w-full rounded-md bg-peach-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-peach-400 disabled:opacity-50"
+                    >
+                      {walletBusy ? 'กำลังตัดเครดิต...' : 'ยืนยันชำระด้วยเครดิต'}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Payment display */}
               {paymentMethod === 'promptpay' &&

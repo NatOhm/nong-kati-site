@@ -16,6 +16,7 @@ const METHOD_TH: Record<string, string> = {
   credit_card: 'บัตรเครดิต',
   admin_credit: 'แอดมินเพิ่มเครดิต',
   slip: 'สลิปโอนเงิน',
+  wallet_spend: 'ใช้เครดิตซื้อสินค้า',
 };
 
 /**
@@ -47,7 +48,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   const [totals] = await Promise.all([
     prisma.topUpLog.aggregate({
-      where: { status: 'completed' },
+      where: { status: 'completed', amountThb: { gt: 0 } },
       _sum: { amountThb: true },
       _count: true,
     }),
