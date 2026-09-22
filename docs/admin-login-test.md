@@ -2,7 +2,8 @@
 
 How to test the admin panel login flow on Nong-Kati, including every failure
 case it is designed to handle. สำหรับบัญชีทดสอบฝั่งลูกค้า ดู
-`docs/customer-login-test.md` (มีตารางบัญชี dummy ทั้งสองฝั่ง)
+`docs/customer-login-test.md` (มีตารางบัญชี dummy ทั้งสองฝั่ง) ·
+คู่มือใช้งานทั้งหมดหลังล็อกอิน ดู `docs/admin-manual-th.md`
 
 - **Login page (local dev):** `http://localhost:4200/management/login` (or whichever port `npm run dev` prints)
 - **Login page (production):** `https://nong-kati.vercel.app/management/login`
