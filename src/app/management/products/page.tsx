@@ -107,6 +107,7 @@ export default function AdminProductsPage(): React.JSX.Element {
   const [bulkPricing, setBulkPricing] = useState(false);
   const [stockTarget, setStockTarget] = useState<AdminProduct | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [inlineBusy, setInlineBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -191,6 +192,47 @@ export default function AdminProductsPage(): React.JSX.Element {
       body: JSON.stringify({ isActive: !p.isActive }),
     });
     if (!res.ok) void load();
+  }
+
+  /** Inline cell edit — commits to PATCH /api/v1/admin/variants/[id] on blur/Enter. */
+  async function inlineEdit(
+    product: AdminProduct,
+    variantId: string,
+    field: 'price' | 'cost' | 'stock' | 'memberPrice' | 'dealerPrice',
+    raw: string,
+  ): Promise<void> {
+    const v = product.variants.find((x) => x.id === variantId);
+    if (!v) return;
+    const current = field === 'cost' ? v.cost : field === 'memberPrice' ? v.memberPrice : field === 'dealerPrice' ? v.dealerPrice : v[field];
+    const parsed = raw.trim() === '' ? null : Number(raw);
+    if (raw.trim() !== '' && !Number.isFinite(parsed)) return;
+    if (parsed === current) return;
+    const key = `${variantId}:${field}`;
+    setInlineBusy(key);
+    try {
+      const res = await adminFetch(`/api/v1/admin/variants/${variantId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: parsed }),
+      });
+      if (res.ok) {
+        const updated = (await res.json()) as Partial<AdminVariant>;
+        setProducts((prev) =>
+          prev.map((p) =>
+            p.id !== product.id
+              ? p
+              : {
+                  ...p,
+                  variants: p.variants.map((x) => (x.id === variantId ? { ...x, ...updated } : x)),
+                },
+          ),
+        );
+      } else {
+        void load();
+      }
+    } finally {
+      setInlineBusy(null);
+    }
   }
 
   return (
@@ -305,7 +347,7 @@ export default function AdminProductsPage(): React.JSX.Element {
                 <tr className="border-b border-line-subtle bg-surface">
                   <th className="px-4 py-3 text-left font-medium text-fg-muted">สินค้า</th>
                   <th className="px-4 py-3 text-left font-medium text-fg-muted">หมวดหมู่</th>
-                  <th className="px-4 py-3 text-right font-medium text-fg-muted">ราคา / ต้นทุน</th>
+                  <th className="px-4 py-3 text-right font-medium text-fg-muted">ต้นทุนจริง / ราคา / ราคา VIP / ราคาขาจร</th>
                   <th className="px-4 py-3 text-center font-medium text-fg-muted">สต๊อก</th>
                   <th className="px-4 py-3 text-center font-medium text-fg-muted">สถานะ</th>
                   <th className="px-4 py-3 text-center font-medium text-fg-muted">แนะนำ</th>
@@ -337,42 +379,56 @@ export default function AdminProductsPage(): React.JSX.Element {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-fg-secondary">{product.categoryName}</td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3">
                       {(() => {
                         const v = product.variants[0];
                         if (!v) return <span className="text-fg-placeholder">—</span>;
                         return (
-                          <div className="space-y-0.5">
-                            <p className="font-semibold text-fg">฿{v.price.toLocaleString('th-TH')}</p>
-                            {v.cost !== null && (
-                              <p className="text-xs text-fg-placeholder">ต้นทุน ฿{v.cost.toLocaleString('th-TH')}</p>
-                            )}
-                            {(v.memberPrice !== null || v.dealerPrice !== null) && (
-                              <p className="text-xs text-fg-muted">
-                                {v.memberPrice !== null && <>สมาชิก ฿{v.memberPrice.toLocaleString('th-TH')} </>}
-                                {v.dealerPrice !== null && <>ตัวแทน ฿{v.dealerPrice.toLocaleString('th-TH')}</>}
-                              </p>
-                            )}
+                          <div className="space-y-1">
+                            <InlineCell
+                              label="ต้นทุน"
+                              value={v.cost === null ? '' : String(v.cost)}
+                              busy={inlineBusy === `${v.id}:cost`}
+                              tone="cost"
+                              onCommit={(raw) => void inlineEdit(product, v.id, 'cost', raw)}
+                            />
+                            <InlineCell
+                              label="ราคา"
+                              value={String(v.price)}
+                              busy={inlineBusy === `${v.id}:price`}
+                              tone="price"
+                              onCommit={(raw) => void inlineEdit(product, v.id, 'price', raw)}
+                            />
+                            <InlineCell
+                              label="สมาชิก"
+                              value={v.memberPrice === null ? '' : String(v.memberPrice)}
+                              busy={inlineBusy === `${v.id}:memberPrice`}
+                              tone="tier"
+                              onCommit={(raw) => void inlineEdit(product, v.id, 'memberPrice', raw)}
+                            />
+                            <InlineCell
+                              label="ตัวแทน"
+                              value={v.dealerPrice === null ? '' : String(v.dealerPrice)}
+                              busy={inlineBusy === `${v.id}:dealerPrice`}
+                              tone="tier2"
+                              onCommit={(raw) => void inlineEdit(product, v.id, 'dealerPrice', raw)}
+                            />
                           </div>
                         );
                       })()}
                     </td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-4 py-3">
                       {(() => {
-                        const total = product.variants.reduce((s, v) => s + v.stock, 0);
+                        const v = product.variants[0];
+                        if (!v) return <span className="text-fg-placeholder">—</span>;
                         return (
-                          <span
-                            className={cn(
-                              'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
-                              total === 0
-                                ? 'bg-coral-500/15 text-coral-700'
-                                : total <= 5
-                                  ? 'bg-peach-500/15 text-peach-700'
-                                  : 'bg-jade-500/15 text-jade-700',
-                            )}
-                          >
-                            {total}
-                          </span>
+                          <InlineCell
+                            label=""
+                            value={String(v.stock)}
+                            busy={inlineBusy === `${v.id}:stock`}
+                            tone="stock"
+                            onCommit={(raw) => void inlineEdit(product, v.id, 'stock', raw)}
+                          />
                         );
                       })()}
                     </td>
@@ -454,7 +510,10 @@ export default function AdminProductsPage(): React.JSX.Element {
         )}
 
         <p className="text-xs text-fg-placeholder">
-          แสดง {filteredProducts.length} จาก {products.length} สินค้า
+          ทั้งหมด {products.length} รายการ (แสดงผล {products.filter((p) => p.isActive).length} รายการ)
+          {searchQuery !== '' && filteredProducts.length !== products.length && (
+            <> · ค้นเจอ {filteredProducts.length} รายการ</>
+          )}
         </p>
       </div>
 
@@ -936,6 +995,64 @@ function ProductEditor({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Inline editable cell (reference-style table) ────────────
+
+type InlineTone = 'cost' | 'price' | 'tier' | 'tier2' | 'stock';
+
+const TONE_STYLES: Record<InlineTone, string> = {
+  cost: 'border-coral-200 bg-coral-50 text-coral-700',
+  price: 'border-line-subtle bg-surface text-fg',
+  tier: 'border-peach-200 bg-peach-50 text-fg-brand',
+  tier2: 'border-line-subtle bg-surface text-fg-secondary',
+  stock: 'border-sky-200 bg-sky-50 text-fg-brand',
+};
+
+function InlineCell({
+  label,
+  value,
+  busy,
+  tone,
+  onCommit,
+}: {
+  label: string;
+  value: string;
+  busy: boolean;
+  tone: InlineTone;
+  onCommit: (raw: string) => void;
+}): React.JSX.Element {
+  const [draft, setDraft] = useState(value);
+  const [editing, setEditing] = useState(false);
+
+  useEffect(() => {
+    if (!editing) setDraft(value);
+  }, [value, editing]);
+
+  return (
+    <div className="flex items-center justify-end gap-1.5">
+      {label !== '' && <span className="text-[11px] text-fg-placeholder">{label}</span>}
+      <input
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onFocus={() => setEditing(true)}
+        onBlur={() => {
+          setEditing(false);
+          if (draft !== value) onCommit(draft);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+        }}
+        inputMode="decimal"
+        aria-label={label === '' ? 'สต๊อก' : label}
+        className={cn(
+          'w-16 rounded-md border px-2 py-1 text-right text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-peach-400',
+          TONE_STYLES[tone],
+          busy && 'animate-pulse opacity-60',
+        )}
+      />
     </div>
   );
 }

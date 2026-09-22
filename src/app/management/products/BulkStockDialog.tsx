@@ -7,13 +7,12 @@ import { adminJson } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
 
 /**
- * Account/stock editor modal (client list: paste multiple account records,
- * automatic parsing, per-variant preview, independent scrolling areas).
- *
- * Flow: pick format + separator → paste records into the big textarea →
- * live parse preview (ID #1, ID #2, … scrollable) → บันทึก calls
- * POST /api/v1/admin/stock/bulk which stores encrypted GiftCodes and writes
- * StockMove(restock) rows. Cancel discards everything locally.
+ * Account/stock editor modal — mirrors the reference admin's จัดการข้อมูลบัญชี:
+ * radio format (สั้น user:pass / ยาว ข้อมูล+อีขิด blocks), separator chip row,
+ * big paste textarea, and a สิ่งที่จะได้ในการเพิ่มบัญชี preview of ไอดี #1…
+ * cards. Long format keeps blank-line-separated multi-line blocks as ONE
+ * account each (the pretty emoji text is delivered to the customer as-is).
+ * Save → POST /api/v1/admin/stock/bulk (encrypted GiftCodes + StockMove).
  */
 
 interface BulkStockDialogProps {
@@ -34,12 +33,20 @@ interface Plan {
 interface PreviewResponse {
   product: { id: string; name: string };
   plans: Plan[];
+  duplicates?: number;
 }
 
 interface ApplyResponse {
   totalAdded: number;
+  duplicates?: number;
   results: { variantId: string; label: string; added: number }[];
 }
+
+const SEPARATORS: { value: ',' | ';' | 'tab'; label: string }[] = [
+  { value: ',', label: 'Comma (,)' },
+  { value: ';', label: 'Semicolon (;)' },
+  { value: 'tab', label: 'Tab' },
+];
 
 export function BulkStockDialog({ productId, productName, onClose, onSaved }: BulkStockDialogProps) {
   const [format, setFormat] = useState<'short' | 'long'>('short');
@@ -51,7 +58,12 @@ export function BulkStockDialog({ productId, productName, onClose, onSaved }: Bu
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<ApplyResponse | null>(null);
 
-  const lineCount = useMemo(() => raw.split(/\r?\n/).filter((l) => l.trim() !== '').length, [raw]);
+  /** Client-side record estimate: lines (short) or blank-line blocks (long). */
+  const recordCount = useMemo(() => {
+    if (raw.trim() === '') return 0;
+    if (format === 'short') return raw.split(/\r?\n/).filter((l) => l.trim() !== '').length;
+    return raw.split(/(?:\r?\n)\s*(?:\r?\n)/).filter((b) => b.trim() !== '').length;
+  }, [raw, format]);
 
   const dirty = raw.trim() !== '';
 
@@ -96,17 +108,19 @@ export function BulkStockDialog({ productId, productName, onClose, onSaved }: Bu
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="bg-overlay fixed inset-0 z-50 flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
-      aria-label={`จัดการสต๊อกบัญชี ${productName}`}
+      aria-label={`จัดการข้อมูลบัญชี ${productName}`}
     >
-      <div className="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-line-subtle bg-surface shadow-2xl">
+      <div className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-line-subtle bg-surface shadow-2xl">
         {/* Title + close */}
-        <div className="flex items-center justify-between border-b border-line-subtle px-5 py-4">
+        <div className="flex items-start justify-between border-b border-line-subtle px-5 py-4">
           <div>
-            <h2 className="text-lg font-bold text-fg">จัดการบัญชีสต๊อก</h2>
-            <p className="text-sm text-fg-muted">{productName}</p>
+            <h2 className="text-lg font-bold text-fg">จัดการข้อมูลบัญชี - {productName}</h2>
+            <p className="mt-0.5 text-xs text-fg-muted">
+              กรอกข้อมูลบัญชีผู้ใช้ในรูปแบบที่กำหนด เพื่อเพิ่มจำนวนข้อมูลให้สินค้านี้
+            </p>
           </div>
           <button
             onClick={onClose}
@@ -120,7 +134,8 @@ export function BulkStockDialog({ productId, productName, onClose, onSaved }: Bu
         {done ? (
           <div className="flex-1 overflow-y-auto p-6">
             <div className="flex items-center gap-2 rounded-lg border border-jade-500/40 bg-jade-500/15 px-4 py-3 text-sm text-jade-700">
-              <Check size={16} /> เพิ่มสต๊อก {done.totalAdded} บัญชีเรียบร้อย
+              <Check size={16} /> เพิ่มสต๊อก {done.totalAdded} ไอดีเรียบร้อย
+              {done.duplicates ? ` (ข้ามรายการซ้ำ ${done.duplicates})` : ''}
             </div>
             <ul className="mt-3 space-y-1 text-sm text-fg-secondary">
               {done.results.map((r) => (
@@ -137,123 +152,163 @@ export function BulkStockDialog({ productId, productName, onClose, onSaved }: Bu
             </button>
           </div>
         ) : (
-          <>
-            {/* Format + separator */}
-            <div className="flex flex-wrap items-center gap-4 border-b border-line-subtle px-5 py-3">
-              <label className="flex items-center gap-2 text-sm text-fg-secondary">
-                รูปแบบ
-                <select
-                  value={format}
-                  onChange={(e) => {
-                    setFormat(e.target.value as 'short' | 'long');
-                    setPreview(null);
-                  }}
-                  className="rounded-lg border border-line-subtle bg-surface px-2 py-1.5 text-sm text-fg focus:outline-none"
-                >
-                  <option value="short">สั้น (user:pass)</option>
-                  <option value="long">แบบละเอียด (คั่นด้วยเครื่องหมาย)</option>
-                </select>
-              </label>
-              <label className={cn('flex items-center gap-2 text-sm text-fg-secondary', format === 'short' && 'opacity-50')}>
-                ตัวคั่น
-                <select
-                  value={separator}
-                  disabled={format === 'short'}
-                  onChange={(e) => {
-                    setSeparator(e.target.value as ',' | ';' | 'tab');
-                    setPreview(null);
-                  }}
-                  className="rounded-lg border border-line-subtle bg-surface px-2 py-1.5 text-sm text-fg focus:outline-none"
-                >
-                  <option value=",">คอมมา ( , )</option>
-                  <option value=";">เซมิโคลอน ( ; )</option>
-                  <option value="tab">แท็บ</option>
-                </select>
-              </label>
-              <span className="ml-auto text-xs text-fg-placeholder">{lineCount} บรรทัด</span>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-5">
-              <div className="grid gap-4 lg:grid-cols-2">
-                {/* Input area */}
-                <div className="flex flex-col">
-                  <label className="mb-1.5 text-sm font-medium text-fg-secondary" htmlFor="bulk-stock-input">
-                    วางบัญชี (บรรทัดละ 1 บัญชี)
-                  </label>
-                  <textarea
-                    id="bulk-stock-input"
-                    value={raw}
-                    onChange={(e) => {
-                      setRaw(e.target.value);
+          <div className="flex-1 overflow-y-auto px-5 py-4">
+            {/* Format radios */}
+            <fieldset className="mb-4">
+              <legend className="mb-1.5 text-sm font-semibold text-fg">รูปแบบข้อมูลไอดี *</legend>
+              <div className="flex flex-col gap-1.5">
+                <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-fg-secondary">
+                  <input
+                    type="radio"
+                    name="bulk-format"
+                    checked={format === 'short'}
+                    onChange={() => {
+                      setFormat('short');
                       setPreview(null);
                     }}
-                    rows={12}
-                    spellCheck={false}
-                    placeholder={
-                      format === 'short'
-                        ? 'user1:pass1\nuser2:pass2\nuser3:pass3'
-                        : 'user1,pass1,ref: A1\nuser2,pass2,ref: A2'
-                    }
-                    className="min-h-[260px] flex-1 resize-y rounded-lg border border-line-subtle bg-surface-elevated p-3 font-mono text-sm text-fg placeholder:text-fg-placeholder focus:border-line-brand focus:outline-none"
+                    className="h-4 w-4 accent-peach-600"
                   />
-                  <button
-                    onClick={() => void runPreview()}
-                    disabled={!dirty || checking}
-                    className="mt-3 inline-flex items-center justify-center gap-2 rounded-lg border border-line-brand px-4 py-2 text-sm font-semibold text-fg-brand transition-colors hover:bg-peach-500/10 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {checking ? <Loader2 size={15} className="animate-spin" /> : null}
-                    แยกข้อมูล
-                  </button>
-                </div>
+                  รูปแบบสั้น (user:pass)
+                </label>
+                <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-fg-secondary">
+                  <input
+                    type="radio"
+                    name="bulk-format"
+                    checked={format === 'long'}
+                    onChange={() => {
+                      setFormat('long');
+                      setPreview(null);
+                    }}
+                    className="h-4 w-4 accent-peach-600"
+                  />
+                  รูปแบบยาว (ข้อมูลหลายบรรทัด — คั่นบล็อกด้วยบรรทัดว่าง)
+                </label>
+              </div>
+            </fieldset>
 
-                {/* Preview area */}
-                <div className="flex flex-col">
-                  <p className="mb-1.5 text-sm font-medium text-fg-secondary">
-                    ตัวอย่างสต๊อกที่จะถูกสร้าง{' '}
-                    {preview && (
-                      <span className="font-bold text-fg-brand">({totalNew} รายการ)</span>
+            {/* Separator chips */}
+            <div className={cn('mb-4', format === 'short' && 'opacity-50')}>
+              <p className="mb-1.5 text-sm font-semibold text-fg">
+                เลือกช่องทางในการแยกบัญชี / Separator
+              </p>
+              <div className="flex gap-2">
+                {SEPARATORS.map((s) => (
+                  <button
+                    key={s.value}
+                    type="button"
+                    disabled={format === 'short'}
+                    onClick={() => {
+                      setSeparator(s.value);
+                      setPreview(null);
+                    }}
+                    className={cn(
+                      'rounded-full px-4 py-1.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed',
+                      format !== 'short' && separator === s.value
+                        ? 'bg-peach-500 text-white'
+                        : 'border border-line-subtle bg-surface-elevated text-fg-secondary hover:border-line-brand',
                     )}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Input */}
+            <div className="mb-4">
+              <label className="mb-1.5 block text-sm font-semibold text-fg" htmlFor="bulk-stock-input">
+                ข้อมูลไอดีและรหัสผ่าน *
+              </label>
+              <textarea
+                id="bulk-stock-input"
+                value={raw}
+                onChange={(e) => {
+                  setRaw(e.target.value);
+                  setPreview(null);
+                }}
+                rows={10}
+                spellCheck={false}
+                placeholder={
+                  format === 'short'
+                    ? 'user1:pass1\nuser2:pass2\nuser3:pass3'
+                    : '🍎 ➤ HBO MAX 4K  7 days 💜\n\n✅ Mail : mansdevt@gmail.com\n✅ pass : baby123456hii\n\nค ณ + เข้าครั้งแรกที่อื่น\n\n(บล็อกถัดไป คั่นด้วยบรรทัดว่าง)'
+                }
+                className="min-h-[220px] w-full resize-y rounded-lg border border-line-subtle bg-surface-elevated p-3 font-mono text-sm text-fg placeholder:text-fg-placeholder focus:border-line-brand focus:outline-none"
+              />
+              <p className="mt-1 text-xs text-fg-placeholder">
+                ตอนนี้: {recordCount} รายการ
+                {format === 'long' && ' (แยกบล็อกด้วยบรรทัดว่าง)'}
+              </p>
+            </div>
+
+            {/* Preview */}
+            <div>
+              <p className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-fg">
+                📁 สิ่งที่จะได้ในการเพิ่มบัญชี / Value
+              </p>
+              <p className="mb-2 text-xs text-fg-muted">
+                จำนวนไอดีที่จะสร้าง:{' '}
+                <span className="font-bold text-fg">{totalNew} ไอดี</span>
+                {preview && preview.duplicates ? (
+                  <span className="ml-2 text-fg-placeholder">
+                    (ข้ามที่ซ้ำอยู่แล้ว {preview.duplicates})
+                  </span>
+                ) : null}
+              </p>
+              <div className="max-h-[300px] overflow-y-auto rounded-lg border border-line-subtle bg-surface-elevated p-3">
+                {!preview ? (
+                  <p className="text-sm text-fg-placeholder">
+                    วางข้อมูลแล้วกด &quot;แยกข้อมูล&quot; เพื่อดูตัวอย่างก่อนบันทึก
                   </p>
-                  <div className="min-h-[260px] flex-1 overflow-y-auto rounded-lg border border-line-subtle bg-surface-elevated p-3">
-                    {!preview ? (
-                      <p className="text-sm text-fg-placeholder">
-                        วางบัญชีแล้วกด &quot;แยกข้อมูล&quot; เพื่อดูตัวอย่างก่อนบันทึก
-                      </p>
-                    ) : totalNew === 0 ? (
-                      <p className="text-sm text-coral-700">ไม่พบบัญชีที่แยกได้ — ตรวจรูปแบบและตัวคั่น</p>
-                    ) : (
-                      <ol className="space-y-1.5">
-                        {preview.plans.flatMap((plan) =>
-                          plan.codes.map((code, i) => (
-                            <li
-                              key={`${plan.variantId}-${i}`}
-                              className="flex items-baseline gap-2 rounded border border-line-subtle bg-surface px-2.5 py-1.5"
-                            >
-                              <span className="shrink-0 font-mono text-xs text-fg-placeholder">
-                                ID #{i + 1}
-                              </span>
-                              <span className="truncate font-mono text-xs text-fg">{code}</span>
-                              <span className="ml-auto shrink-0 rounded-full bg-peach-500/10 px-2 py-0.5 text-[11px] text-fg-brand">
+                ) : totalNew === 0 ? (
+                  <p className="text-sm text-coral-700">ไม่พบบัญชีที่แยกได้ — ตรวจรูปแบบอีกครั้ง</p>
+                ) : (
+                  <div className="space-y-2.5">
+                    {preview.plans.flatMap((plan, pi) =>
+                      plan.codes.map((code, i) => (
+                        <div
+                          key={`${plan.variantId}-${i}`}
+                          className="rounded-lg border border-line-subtle bg-surface p-3"
+                        >
+                          <p className="mb-1 text-sm font-bold text-fg">
+                            ไอดี #{pi + i + 1}
+                            {preview.plans.length > 1 && (
+                              <span className="ml-2 rounded-full bg-peach-500/10 px-2 py-0.5 text-[11px] font-medium text-fg-brand">
                                 {plan.label}
                               </span>
-                            </li>
-                          )),
-                        )}
-                      </ol>
+                            )}
+                          </p>
+                          <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap break-words font-mono text-xs text-fg-secondary">
+                            {code}
+                          </pre>
+                        </div>
+                      )),
                     )}
                   </div>
-                </div>
+                )}
               </div>
             </div>
 
             {error && (
-              <div className="mx-5 mb-3 rounded-lg border border-coral-300 bg-coral-50 px-4 py-2.5 text-sm text-coral-700">
+              <div className="mt-3 rounded-lg border border-coral-300 bg-coral-50 px-4 py-2.5 text-sm text-coral-700">
                 {error}
               </div>
             )}
+          </div>
+        )}
 
-            {/* Cancel / Save */}
-            <div className="flex items-center justify-end gap-2 border-t border-line-subtle px-5 py-3">
+        {/* Footer */}
+        {!done && (
+          <div className="flex items-center justify-between gap-2 border-t border-line-subtle px-5 py-3">
+            <button
+              onClick={() => void runPreview()}
+              disabled={!dirty || checking}
+              className="inline-flex items-center gap-2 rounded-lg border border-line-brand px-4 py-2 text-sm font-semibold text-fg-brand transition-colors hover:bg-peach-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {checking && <Loader2 size={15} className="animate-spin" />}
+              แยกข้อมูล
+            </button>
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => {
                   setRaw('');
@@ -262,7 +317,7 @@ export function BulkStockDialog({ productId, productName, onClose, onSaved }: Bu
                 }}
                 className="rounded-lg border border-line-subtle px-4 py-2 text-sm font-medium text-fg-secondary transition-colors hover:bg-surface-elevated"
               >
-                ยกเลิกการเปลี่ยนแปลง
+                ยกเลิก
               </button>
               <button
                 onClick={() => void save()}
@@ -270,10 +325,10 @@ export function BulkStockDialog({ productId, productName, onClose, onSaved }: Bu
                 className="inline-flex items-center gap-2 rounded-lg bg-peach-500 px-5 py-2 text-sm font-semibold text-white transition-transform hover:bg-peach-400 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {saving && <Loader2 size={15} className="animate-spin" />}
-                บันทึก ({totalNew})
+                บันทึก
               </button>
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>

@@ -119,7 +119,13 @@ export default function AccountCodesPage(): React.JSX.Element {
                   <p className="text-sm font-medium text-fg-secondary">
                     {item.product} · ฿{item.denomination.toLocaleString('th-TH')}
                   </p>
-                  <p className="mt-1 font-mono text-sm text-fg-brand">{item.code}</p>
+                  {item.code.includes('\n') ? (
+                    <pre className="mt-1 max-h-60 overflow-y-auto whitespace-pre-wrap break-words rounded-lg bg-surface-elevated p-2.5 font-mono text-xs leading-relaxed text-fg-secondary">
+                      {item.code}
+                    </pre>
+                  ) : (
+                    <p className="mt-1 font-mono text-sm text-fg-brand">{item.code}</p>
+                  )}
                   <p className="mt-1 text-xs text-fg-muted">
                     {item.orderNumber} · ได้รับ{' '}
                     {item.deliveredAt

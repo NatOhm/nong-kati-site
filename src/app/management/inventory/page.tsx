@@ -433,6 +433,11 @@ export default function AdminInventoryPage(): React.JSX.Element {
           </div>
         </div>
 
+        {/* Result count footer (reference: แสดงผลลัพธ์ X รายการ จากทั้งหมด Y รายการ) */}
+        <p className="rounded-lg border border-line-subtle bg-surface px-4 py-2.5 text-sm text-fg-muted">
+          แสดงผลลัพธ์ {resultCount} ไอดี จากทั้งหมด {totalCount} ไอดี
+        </p>
+
         {/* ── Stock move history ── */}
         {showHistory && (
           <div className="overflow-hidden rounded-xl border border-line-subtle bg-surface">

@@ -30,20 +30,31 @@ export function CodeBlock({
         {productName} {formatThb(denomination)}
       </p>
 
-      {/* Code + Copy */}
-      <div className="flex items-center justify-between gap-3">
-        <span
-          className="font-mono text-xl font-medium tracking-widest text-fg-brand"
-          style={{ letterSpacing: '0.12em' }}
-          aria-label={`รหัสบัตร: ${code}`}
-          role="textbox"
-          aria-readonly="true"
-        >
-          {code}
-        </span>
+      {/* Code + Copy — multi-line account blocks render pre-wrapped */}
+      {code.includes('\n') ? (
+        <div className="space-y-2">
+          <pre className="max-h-80 overflow-y-auto whitespace-pre-wrap break-words rounded-lg bg-surface-elevated p-3 font-mono text-sm leading-relaxed text-fg">
+            {code}
+          </pre>
+          <div className="flex justify-end">
+            <CopyButton text={code} size="sm" />
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between gap-3">
+          <span
+            className="font-mono text-xl font-medium tracking-widest text-fg-brand"
+            style={{ letterSpacing: '0.12em' }}
+            aria-label={`รหัสบัตร: ${code}`}
+            role="textbox"
+            aria-readonly="true"
+          >
+            {code}
+          </span>
 
-        <CopyButton text={code} size="sm" />
-      </div>
+          <CopyButton text={code} size="sm" />
+        </div>
+      )}
     </div>
   );
 }

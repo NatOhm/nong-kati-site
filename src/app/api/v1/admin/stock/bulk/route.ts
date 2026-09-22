@@ -76,20 +76,47 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   // ── Parse ────────────────────────────────────────────────
   // Round-robin across the product's variants so multi-variant products can be
-  // filled in one paste. An explicit per-line "label" prefix pins the line.
+  // filled in one paste. An explicit "label:" prefix pins a record.
   const perVariant = new Map<string, { variantId: string; label: string; codes: string[] }>(
     product.variants.map((v) => [v.id, { variantId: v.id, label: v.label, codes: [] }]),
   );
   const order = product.variants.map((v) => v.id);
   let cursor = 0;
 
-  const lines = raw
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter((l) => l !== '');
+  // Records: long format = blocks separated by 2+ consecutive blank lines
+  // (single blank lines are preserved INSIDE a record — vendor templates keep
+  // their pretty spacing); short format = one record per line.
+  const records: string[] = [];
+  if (format === 'long') {
+    let block: string[] = [];
+    let blankRun = 0;
+    for (const l of raw.split(/\r?\n/)) {
+      if (l.trim() === '') {
+        blankRun += 1;
+        if (blankRun === 1 && block.length > 0) block.push('');
+        continue;
+      }
+      if (blankRun >= 2 && block.length > 0) {
+        while (block.length > 0 && block[block.length - 1] === '') block.pop();
+        records.push(block.join('\n'));
+        block = [];
+      }
+      blankRun = 0;
+      block.push(l);
+    }
+    if (block.length > 0) {
+      while (block.length > 0 && block[block.length - 1] === '') block.pop();
+      records.push(block.join('\n'));
+    }
+  } else {
+    for (const l of raw.split(/\r?\n/)) {
+      const t = l.trim();
+      if (t !== '') records.push(t);
+    }
+  }
 
-  for (const line of lines) {
-    let work = line;
+  for (const record of records) {
+    let work = record;
     let pinned: string | null = null;
 
     const pin = work.match(/^([^,:;]+)\s*[:：]\s*(.+)$/);
@@ -99,19 +126,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       work = pin[2]!.trim();
     }
 
-    // Long format: drop a trailing reference column, split the rest by separator.
     if (format === 'long') {
-      const parts = work
-        .split(separator === 'tab' ? '\t' : separator)
-        .map((s) => s.trim())
-        .filter((s) => s !== '');
-      // The trailing reference column ("ref: ABC123" / "(order #4)") is dropped;
-      // every other field keeps its own text as one account record.
-      const last = parts.at(-1);
-      if (parts.length > 1 && last && REF_RE.test(last)) {
-        parts.pop();
-      }
-      for (const code of parts) push(code);
+      // Whole multi-line block = one account record, delivered as-is.
+      push(work);
     } else {
       // Short format: strip a reference prefix, whole remainder is the code text.
       const code = work.replace(REF_RE, '').trim();
