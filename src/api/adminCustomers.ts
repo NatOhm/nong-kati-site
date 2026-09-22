@@ -19,6 +19,7 @@ export type AdminCustomerListItem = {
   emailVerified: boolean;
   totalOrders: number;
   totalSpendThb: number;
+  walletBalanceThb: number;
   createdAt: Date;
   lastLoginAt: Date | null;
 };
@@ -86,6 +87,7 @@ export async function adminListCustomers(params: {
       emailVerified: c.emailVerified,
       totalOrders: c._count.orders,
       totalSpendThb: Math.round(c.orders.reduce((s, o) => s + Number(o.totalAmountThb), 0) * 100) / 100,
+      walletBalanceThb: Number(c.walletBalanceThb),
       createdAt: c.createdAt,
       lastLoginAt: c.lastLoginAt,
     })),

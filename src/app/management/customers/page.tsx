@@ -24,6 +24,7 @@ type CustomerListItem = {
   emailVerified: boolean;
   totalOrders: number;
   totalSpendThb: number;
+  walletBalanceThb: number;
   createdAt: string;
   lastLoginAt: string | null;
 };
@@ -257,7 +258,7 @@ export default function AdminCustomersPage(): React.JSX.Element {
                     <p className="text-fg">{selectedCustomer.totalOrders}</p>
                   </div>
                   <div>
-                    <p className="text-fg-placeholder">ยอดซื้อรวม</p>
+                    <p className="text-fg-placeholder">ยอดซื้อรวม (สะสม)</p>
                     <p className="text-fg">{formatThb(selectedCustomer.totalSpendThb)}</p>
                   </div>
                 </div>
@@ -380,7 +381,7 @@ export default function AdminCustomersPage(): React.JSX.Element {
                 <th className="px-4 py-3 text-center font-medium text-fg-muted">สถานะ</th>
                 <th className="px-4 py-3 text-center font-medium text-fg-muted">ระดับราคา</th>
                 <th className="px-4 py-3 text-center font-medium text-fg-muted">คำสั่งซื้อ</th>
-                <th className="px-4 py-3 text-right font-medium text-fg-muted">ยอดซื้อรวม</th>
+                <th className="px-4 py-3 text-right font-medium text-fg-muted">เครดิตคงเหลือ</th>
                 <th className="px-4 py-3 text-right font-medium text-fg-muted">จัดการ</th>
               </tr>
             </thead>
@@ -419,8 +420,13 @@ export default function AdminCustomersPage(): React.JSX.Element {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center text-fg-muted">{customer.totalOrders}</td>
-                    <td className="px-4 py-3 text-right text-fg-secondary">
-                      {formatThb(customer.totalSpendThb)}
+                    <td
+                      className={cn(
+                        'px-4 py-3 text-right font-medium',
+                        customer.walletBalanceThb > 0 ? 'text-jade-600' : 'text-fg-muted',
+                      )}
+                    >
+                      {formatThb(customer.walletBalanceThb)}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button
