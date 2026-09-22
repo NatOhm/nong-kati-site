@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Search, Eye, ShieldOff, ShieldCheck, XCircle, Tag } from 'lucide-react';
+import { Search, Eye, ShieldOff, ShieldCheck, XCircle, Tag, Wallet } from 'lucide-react';
 
 import { AdminShell } from '@/components/layout/AdminShell';
 import { adminFetch } from '@/lib/adminSession';
@@ -30,6 +30,7 @@ type CustomerListItem = {
 
 type CustomerDetail = Omit<CustomerListItem, 'createdAt' | 'lastLoginAt'> & {
   phoneNumber: string | null;
+  walletBalanceThb: number;
   marketingOptIn: boolean;
   failedLoginAttempts: number;
   recentOrders: {
@@ -107,6 +108,44 @@ export default function AdminCustomersPage(): React.JSX.Element {
       setActionMessage(block ? 'บล็อคลูกค้าสำเร็จ' : 'ปลดบล็อคสำเร็จ');
       setSelectedCustomer(null);
       void handleSearch();
+    }
+  };
+
+  /** Wallet credit — signed amount; positive = add, negative = deduct. */
+  const [creditAmount, setCreditAmount] = useState('');
+  const [creditNote, setCreditNote] = useState('');
+  const [creditBusy, setCreditBusy] = useState(false);
+
+  const handleCredit = async (customerId: string) => {
+    const amount = Number(creditAmount);
+    if (!Number.isFinite(amount) || amount === 0) {
+      setActionMessage('ระบุจำนวนเงิน (ใส่เครื่องหมาย - หน้าตัวเลขเพื่อหักเครดิต)');
+      return;
+    }
+    if (amount < 0 && !window.confirm(`ยืนยันหักเครดิต ${formatThb(Math.abs(amount))}?`)) return;
+    setCreditBusy(true);
+    try {
+      const res = await adminFetch(`/api/v1/admin/customers/${customerId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'credit', amountThb: amount, note: creditNote || undefined }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string; balanceThb?: number };
+      if (!res.ok) {
+        setActionMessage(
+          data.error === 'INSUFFICIENT_BALANCE'
+            ? 'ยอดเครดิตไม่พอสำหรับหัก'
+            : (data.error ?? 'ทำรายการไม่สำเร็จ'),
+        );
+        return;
+      }
+      setActionMessage(`ปรับเครดิต ${formatThb(amount)} สำเร็จ — คงเหลือ ${formatThb(data.balanceThb ?? 0)}`);
+      setCreditAmount('');
+      setCreditNote('');
+      void handleSearch();
+      void handleViewCustomer(customerId);
+    } finally {
+      setCreditBusy(false);
     }
   };
 
@@ -221,6 +260,43 @@ export default function AdminCustomersPage(): React.JSX.Element {
                     <p className="text-fg-placeholder">ยอดซื้อรวม</p>
                     <p className="text-fg">{formatThb(selectedCustomer.totalSpendThb)}</p>
                   </div>
+                </div>
+
+                {/* Wallet credit — admin adds/deducts store credit; logged to
+                    TopUpLog('admin_credit') so the customer's ประวัติการเติมเงิน
+                    always reflects the adjustment */}
+                <div className="rounded-md border border-line-subtle bg-surface p-3">
+                  <p className="mb-1 flex items-center gap-1.5 text-sm font-medium text-fg-muted">
+                    <Wallet size={14} /> เครดิต/เงินในกระเป๋า
+                  </p>
+                  <p className="mb-2 text-lg font-bold text-fg">{formatThb(selectedCustomer.walletBalanceThb)}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={creditAmount}
+                      onChange={(e) => setCreditAmount(e.target.value)}
+                      placeholder="+100 หรือ -50"
+                      className="w-28 rounded-md border border-line-subtle bg-surface px-2 py-1.5 text-sm text-fg placeholder:text-clay-400 focus:border-line-brand focus:outline-none"
+                    />
+                    <input
+                      type="text"
+                      value={creditNote}
+                      onChange={(e) => setCreditNote(e.target.value)}
+                      placeholder="หมายเหตุ (ไม่บังคับ)"
+                      className="min-w-36 flex-1 rounded-md border border-line-subtle bg-surface px-2 py-1.5 text-sm text-fg placeholder:text-clay-400 focus:border-line-brand focus:outline-none"
+                    />
+                    <button
+                      onClick={() => handleCredit(selectedCustomer.id)}
+                      disabled={creditBusy || creditAmount.trim() === ''}
+                      className="rounded-md bg-peach-500 px-3 py-1.5 text-sm font-medium text-fg hover:bg-peach-400 disabled:opacity-50"
+                    >
+                      {creditBusy ? 'กำลังบันทึก...' : 'ปรับเครดิต'}
+                    </button>
+                  </div>
+                  <p className="mt-1.5 text-xs text-fg-placeholder">
+                    บวก = เพิ่มเครดิต, ติดลบ = หักเครดิต — บันทึกในประวัติเติมเงินของลูกค้าอัตโนมัติ
+                  </p>
                 </div>
 
                 {/* Price tier — changes what this customer pays storewide */}

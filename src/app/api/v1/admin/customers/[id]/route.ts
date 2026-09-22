@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { adminGetCustomer, adminSetCustomerTier } from '@/api/adminCustomers';
+import { adminAdjustCustomerCredit, adminGetCustomer, adminSetCustomerTier } from '@/api/adminCustomers';
 import { maskEmail } from '@/lib/rbac';
 import { checkPermission } from '@/lib/rbac';
 
@@ -62,6 +62,30 @@ export async function PATCH(
   const b = (body ?? {}) as Record<string, unknown>;
 
   const { id } = await ctx.params;
+
+  // Wallet credit adjustment — {action:'credit', amountThb, note?}.
+  // Same customers:write gate; balance + TopUpLog + audit are one transaction.
+  if (b['action'] === 'credit') {
+    const result = await adminAdjustCustomerCredit(
+      id,
+      b['amountThb'],
+      typeof b['note'] === 'string' ? b['note'] : undefined,
+      check.payload?.sub ?? 'unknown',
+      check.payload?.email ?? 'unknown',
+    );
+    if (!result.success) {
+      return NextResponse.json(
+        { error: result.error },
+        { status: result.error === 'CUSTOMER_NOT_FOUND' ? 404 : 400 },
+      );
+    }
+    return NextResponse.json({
+      success: true,
+      balanceThb: result.balanceThb,
+      amountThb: result.amountThb,
+    });
+  }
+
   const result = await adminSetCustomerTier(
     id,
     b['tier'],

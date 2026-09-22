@@ -25,6 +25,7 @@ export type AdminCustomerListItem = {
 
 export type AdminCustomerDetail = AdminCustomerListItem & {
   phoneNumber: string | null;
+  walletBalanceThb: number;
   lineOptIn: boolean;
   marketingOptIn: boolean;
   failedLoginAttempts: number;
@@ -131,6 +132,7 @@ export async function adminGetCustomer(
     lastLoginAt: c.lastLoginAt,
     // Masked per PDPA — never expose the full phone number to staff UI.
     phoneNumber: c.phoneNumber ? `${c.phoneNumber.slice(0, 3)}****${c.phoneNumber.slice(-3)}` : null,
+    walletBalanceThb: Number(c.walletBalanceThb),
     lineOptIn: false,
     marketingOptIn: c.marketingOptIn,
     failedLoginAttempts: c.failedLoginAttempts,
@@ -218,4 +220,81 @@ export async function adminSetCustomerTier(
   });
 
   return { success: true, tier: next };
+}
+
+/**
+ * Admin wallet credit — add (or, with a negative amount, deduct) store
+ * credit for a customer. Atomic: balance update + TopUpLog(method
+ * 'admin_credit') + audit row land in one transaction, so the customer's
+ * ประวัติการเติมเงิน always matches the balance.
+ */
+export async function adminAdjustCustomerCredit(
+  customerId: string,
+  amountThb: unknown,
+  note: string | undefined,
+  adminId: string,
+  adminEmail: string,
+): Promise<
+  | { success: true; balanceThb: number; amountThb: number }
+  | { success: false; error: string }
+> {
+  const amount = Number(amountThb);
+  if (!Number.isFinite(amount) || amount === 0) {
+    return { success: false, error: 'INVALID_AMOUNT' };
+  }
+  // Cap both directions — typo protection, not a business rule.
+  if (Math.abs(amount) > 1_000_000) {
+    return { success: false, error: 'AMOUNT_TOO_LARGE' };
+  }
+  // Keep the ledger clean: 2 decimals max (Decimal(10,2) in the DB).
+  const amount2 = Math.round(amount * 100) / 100;
+
+  return prisma.$transaction(async (tx) => {
+    const customer = await tx.customer.findUnique({
+      where: { id: customerId },
+      select: { id: true, email: true, walletBalanceThb: true },
+    });
+    if (!customer) return { success: false as const, error: 'CUSTOMER_NOT_FOUND' };
+
+    const nextBalance = Number(customer.walletBalanceThb) + amount2;
+    if (nextBalance < 0) {
+      return { success: false as const, error: 'INSUFFICIENT_BALANCE' };
+    }
+
+    const updated = await tx.customer.update({
+      where: { id: customerId },
+      data: { walletBalanceThb: { increment: amount2 } },
+      select: { walletBalanceThb: true },
+    });
+
+    await tx.topUpLog.create({
+      data: {
+        customerId,
+        amountThb: amount2,
+        method: 'admin_credit',
+        reference: note ? note.slice(0, 200) : null,
+        status: 'completed',
+      },
+    });
+
+    writeAuditLog({
+      actorType: 'admin',
+      actorId: adminId,
+      actorEmail: adminEmail,
+      action: 'customer_wallet_adjusted',
+      tableName: 'store.customers',
+      recordId: customerId,
+      diff: {
+        before: { walletBalanceThb: Number(customer.walletBalanceThb) },
+        after: { walletBalanceThb: Number(updated.walletBalanceThb) },
+      },
+      metadata: { email: customer.email, note: note?.slice(0, 200) },
+    });
+
+    return {
+      success: true as const,
+      balanceThb: Number(updated.walletBalanceThb),
+      amountThb: amount2,
+    };
+  });
 }
