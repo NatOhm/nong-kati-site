@@ -21,7 +21,16 @@ import { getNotificationSettings, notifyPaymentConfirmed, notifyStockLow } from 
 
 export const dynamic = 'force-dynamic';
 
-const gateway = new OmiseAdapter();
+/**
+ * Lazy singleton — see payments/initiate/route.ts: the adapter must not be
+ * constructed at module import (Next collects routes at build time, and the
+ * fail-closed constructor throws without credentials in CI).
+ */
+let gateway: OmiseAdapter | null = null;
+function getGateway(): OmiseAdapter {
+  if (!gateway) gateway = new OmiseAdapter();
+  return gateway;
+}
 
 /** Control-flow markers for expected, non-retryable transaction outcomes. */
 class WebhookAlreadyConfirmedError extends Error {}
@@ -33,14 +42,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const signatureHeader = request.headers.get('x-omise-signature') ?? '';
 
   // Step 2: Verify signature (LD-07)
-  const isValid = gateway.verifyWebhookSignature(rawBody, signatureHeader);
+  const isValid = getGateway().verifyWebhookSignature(rawBody, signatureHeader);
   if (!isValid) {
     console.error('[Webhook] Invalid signature from', request.headers.get('x-forwarded-for'));
     return NextResponse.json({ received: true });
   }
 
   // Step 3-4: Parse and route
-  const event = gateway.parseWebhookEvent(rawBody);
+  const event = getGateway().parseWebhookEvent(rawBody);
 
   if (event.key === 'charge.complete' || event.key === 'charge.failed') {
     if (event.status === 'successful') {

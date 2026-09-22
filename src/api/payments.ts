@@ -13,8 +13,13 @@ import { reserveCodes } from '@/lib/delivery/reservation';
 import { enqueueJob } from '@/lib/jobs/mockQueue';
 import type { Order } from './orders';
 
-// Singleton gateway adapter
-const gateway = new OmiseAdapter();
+// Lazy gateway adapter — never construct at module scope (build-time route
+// collection has no credentials; see src/app/api/v1/payments/initiate/route.ts).
+let gateway: OmiseAdapter | null = null;
+function gw(): OmiseAdapter {
+  if (!gateway) gateway = new OmiseAdapter();
+  return gateway;
+}
 
 // In-memory payment attempt store (mock)
 const paymentAttempts = new Map<string, PaymentAttemptRecord>();
@@ -72,7 +77,7 @@ export async function initiatePayment(
     if (paymentMethod === 'promptpay') {
       // §3 — PromptPay flow
       const result = await gatewayCircuitBreaker.call(() =>
-        gateway.createPromptPayCharge({
+        gw().createPromptPayCharge({
           amountSatang,
           orderNumber: order.orderNumber,
           currency: 'THB',
@@ -113,7 +118,7 @@ export async function initiatePayment(
     } else {
       // §4 — Card flow
       const result = await gatewayCircuitBreaker.call(() =>
-        gateway.createCardCharge(
+        gw().createCardCharge(
           {
             amountSatang,
             orderNumber: order.orderNumber,
@@ -181,7 +186,7 @@ export async function submitCardToken(
   const amountSatang = Math.round(Number(order.totalAmountThb) * 100);
 
   const result = await gatewayCircuitBreaker.call(() =>
-    gateway.createCardCharge(
+    gw().createCardCharge(
       {
         amountSatang,
         orderNumber: order.orderNumber,

@@ -8,7 +8,18 @@ import { notifyNewOrder } from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
 
-const gateway = new OmiseAdapter();
+/**
+ * Lazy singleton — the adapter must NOT be constructed at module import:
+ * Next collects route modules at BUILD time, and the fail-closed constructor
+ * throws when production credentials are absent (as in CI), breaking the
+ * whole build. Constructing lazily means a missing-config error becomes a
+ * runtime 503 from THIS route instead of a failed deploy.
+ */
+let gateway: OmiseAdapter | null = null;
+function getGateway(): OmiseAdapter {
+  if (!gateway) gateway = new OmiseAdapter();
+  return gateway;
+}
 
 /**
  * POST /api/v1/payments/initiate — create a PromptPay charge for an order.
@@ -40,7 +51,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   let expiresAt: Date | undefined;
   try {
     const result = await gatewayCircuitBreaker.call(() =>
-      gateway.createPromptPayCharge({
+      getGateway().createPromptPayCharge({
         amountSatang,
         orderNumber: order.orderNumber,
         currency: 'THB',
