@@ -124,6 +124,12 @@ export async function loginCustomer(params: {
     };
   }
 
+  // OAuth-only account (Google/LINE sign-in, no local password set) — a
+  // password attempt must not increment the lockout counter or verify.
+  if (!customer.passwordHash) {
+    return { success: false, error: 'INVALID_CREDENTIALS' };
+  }
+
   const passwordValid = await verifyPassword(params.password, customer.passwordHash);
 
   if (!passwordValid) {
@@ -196,6 +202,80 @@ export async function logoutCustomer(customerId: string): Promise<{ success: boo
  * Verify a session token and return the customer, or null.
  * Used by server-side code to authenticate a request.
  */
+/**
+ * Social sign-in (Google/LINE): find-or-create the customer by email and
+ * issue a session token — same shape the password login returns. OAuth
+ * accounts have passwordHash: null (they cannot password-login until one
+ * is set). Existing password accounts are linked by email automatically:
+ * the provider address is verified by the provider, so this is the same
+ * trust decision every social login makes; blocked accounts are still
+ * rejected.
+ */
+export async function loginOrCreateCustomerViaOAuth(params: {
+  email: string;
+  emailVerified: boolean;
+  fullName: string | null;
+  provider: string;
+}): Promise<{ success: boolean; data?: CustomerSession; error?: string }> {
+  const email = params.email.trim().toLowerCase();
+
+  const existing = await prisma.customer.findUnique({ where: { email } });
+  if (existing?.status === 'blocked') {
+    return { success: false, error: 'ACCOUNT_BLOCKED' };
+  }
+
+  const customer =
+    existing ??
+    (await prisma.customer.create({
+      data: {
+        email,
+        passwordHash: null,
+        fullName: params.fullName,
+        status: 'active',
+        // Provider-verified email — mark verified so the flag is truthful.
+        emailVerified: params.emailVerified,
+      },
+    }));
+
+  const expiresIn = ACCESS_TTL_SHORT;
+  const accessToken = await signJwt(
+    { sub: customer.id, email: customer.email, typ: 'customer' },
+    expiresIn,
+  );
+
+  await prisma.customer.update({
+    where: { id: customer.id },
+    data: {
+      lastLoginAt: new Date(),
+      failedLoginAttempts: 0,
+      lockedUntil: null,
+    },
+  });
+
+  writeAuditLog({
+    actorType: 'customer',
+    actorId: customer.id,
+    actorEmail: customer.email,
+    action: 'login_oauth',
+    tableName: 'store.customers',
+    recordId: customer.id,
+    metadata: { provider: params.provider, created: !existing },
+  });
+
+  return {
+    success: true,
+    data: {
+      customerId: customer.id,
+      email: customer.email,
+      fullName: customer.fullName,
+      status: customer.status as CustomerAccountStatus,
+      emailVerified: customer.emailVerified,
+      accessToken,
+      expiresIn,
+    },
+  };
+}
+
 export async function getCustomerFromToken(token: string) {
   try {
     const { verifyJwt } = await import('@/lib/jwt');

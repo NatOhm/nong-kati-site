@@ -181,7 +181,8 @@ model CartItem {
 model Customer {
   id                  String    @id @default(cuid())
   email               String    @unique
-  passwordHash        String
+  // Nullable for OAuth-only accounts (Google/LINE sign-in has no local password).
+  passwordHash        String?
   fullName            String?
   phoneNumber         String?
   status              String    @default("active") // active | blocked | anonymised
