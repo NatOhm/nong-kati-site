@@ -28,6 +28,8 @@ interface OrderRow {
   manualFulfilmentReason: string | null;
   /** Customer sent a slip for manual check (ส่งสลิปให้แอดมินตรวจ). */
   slipImageUrl: string | null;
+  /** SlipOK auto-verification (ref + verified amount) when the slip passed. */
+  slip: { ref: string; amountThb: number; verifiedAt: string | null } | null;
   createdAt: string;
   completedAt: string | null;
 }
@@ -211,6 +213,7 @@ export default function AdminOrdersPage(): React.JSX.Element {
                 <th className="px-4 py-3 text-left font-medium text-fg-muted">อีเมล</th>
                 <th className="px-4 py-3 text-center font-medium text-fg-muted">สถานะ</th>
                 <th className="px-4 py-3 text-center font-medium text-fg-muted">ชำระผ่าน</th>
+                <th className="px-4 py-3 text-left font-medium text-fg-muted">สลิป (ref/ยอด)</th>
                 <th className="px-4 py-3 text-right font-medium text-fg-muted">ยอดรวม</th>
                 <th className="px-4 py-3 text-center font-medium text-fg-muted">วันที่</th>
                 <th className="px-4 py-3 text-right font-medium text-fg-muted">จัดการ</th>
@@ -219,13 +222,13 @@ export default function AdminOrdersPage(): React.JSX.Element {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-fg-muted">
+                  <td colSpan={8} className="px-4 py-8 text-center text-fg-muted">
                     กำลังโหลด...
                   </td>
                 </tr>
               ) : orders.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-fg-muted">
+                  <td colSpan={8} className="px-4 py-8 text-center text-fg-muted">
                     ไม่พบคำสั่งซื้อในสถานะนี้
                   </td>
                 </tr>
@@ -250,6 +253,22 @@ export default function AdminOrdersPage(): React.JSX.Element {
                     </td>
                     <td className="px-4 py-3 text-center text-xs text-fg-muted">
                       {PAYMENT_METHODS[order.paymentMethod ?? ''] ?? '—'}
+                    </td>
+                    <td className="px-4 py-3 text-left text-xs">
+                      {order.slip ? (
+                        <span
+                          className="inline-flex max-w-[200px] items-center gap-1 text-jade-600 dark:text-jade-400"
+                          title={`ตรวจสลิปอัตโนมัติ (SlipOK)${order.slip.verifiedAt ? ` เมื่อ ${new Date(order.slip.verifiedAt).toLocaleString('th-TH')}` : ''}`}
+                        >
+                          <ShieldCheck size={13} className="shrink-0" />
+                          <span className="truncate font-mono">{order.slip.ref}</span>
+                          <span className="whitespace-nowrap text-fg-muted">
+                            · {formatThb(order.slip.amountThb)}
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="text-fg-placeholder">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right text-fg-secondary">
                       {formatThb(order.totalThb)}

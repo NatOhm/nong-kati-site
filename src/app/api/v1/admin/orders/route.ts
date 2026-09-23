@@ -52,6 +52,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         createdAt: true,
         completedAt: true,
         _count: { select: { items: true } },
+        // SlipOK auto-verification (latest verified attempt only) so the
+        // list can show ref/amount without a detail fetch.
+        paymentAttempts: {
+          where: { slipVerifiedRef: { not: null } },
+          select: { slipVerifiedRef: true, amountThb: true, slipVerifiedAt: true },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
       },
     }),
     prisma.order.groupBy({ by: ['status'], _count: { _all: true } }),
@@ -71,6 +79,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       manualFulfilmentReason: o.manualFulfilmentReason,
       /** Customer sent a slip for manual check (ส่งสลิปให้แอดมินตรวจ). */
       slipImageUrl: o.slipImageUrl,
+      /** SlipOK auto-verification, when the slip passed the bank check. */
+      slip: o.paymentAttempts[0]
+        ? {
+            ref: o.paymentAttempts[0].slipVerifiedRef ?? '',
+            amountThb: Number(o.paymentAttempts[0].amountThb),
+            verifiedAt: o.paymentAttempts[0].slipVerifiedAt?.toISOString() ?? null,
+          }
+        : null,
       createdAt: o.createdAt.toISOString(),
       completedAt: o.completedAt?.toISOString() ?? null,
     })),
