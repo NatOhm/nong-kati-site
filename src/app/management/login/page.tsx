@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Shield } from 'lucide-react';
+import { Shield, Eye, EyeOff } from 'lucide-react';
 
 import { setAdminSession, setAdminRemembered } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
@@ -16,6 +16,7 @@ export default function AdminLoginPage(): React.JSX.Element {
   const [step, setStep] = useState<'credentials' | '2fa' | '2fa-setup'>('credentials');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(false);
   const [totpCode, setTotpCode] = useState('');
   const [challengeToken, setChallengeToken] = useState('');
@@ -210,14 +211,24 @@ export default function AdminLoginPage(): React.JSX.Element {
               <label htmlFor="admin-password" className="mb-1 block text-sm text-fg-muted">
                 รหัสผ่าน
               </label>
-              <input
-                id="admin-password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="w-full rounded-md border border-line bg-surface px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-peach-500"
-              />
+              <div className="relative">
+                <input
+                  id="admin-password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="w-full rounded-md border border-line bg-surface px-3 py-2.5 pr-10 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-peach-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 p-2 text-fg-placeholder hover:text-fg-secondary"
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
 
             {/* Remember me — unchecked: session ends with the browser tab
