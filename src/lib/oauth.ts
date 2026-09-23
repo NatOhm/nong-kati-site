@@ -33,8 +33,10 @@ const PROVIDERS: Record<OAuthProvider, OAuthProviderConfig> = {
     tokenUrl: 'https://oauth2.googleapis.com/token',
     userinfoUrl: 'https://openidconnect.googleapis.com/v1/userinfo',
     scope: 'openid email profile',
-    clientId: process.env['GOOGLE_CLIENT_ID'],
-    clientSecret: process.env['GOOGLE_CLIENT_SECRET'],
+    // Vercel stores these as NK_GOOGLE_* (set 30d ago); plain GOOGLE_* works
+    // for local .env.local. Either name configures the provider.
+    clientId: process.env['NK_GOOGLE_CLIENT_ID'] ?? process.env['GOOGLE_CLIENT_ID'],
+    clientSecret: process.env['NK_GOOGLE_CLIENT_SECRET'] ?? process.env['GOOGLE_CLIENT_SECRET'],
   },
   line: {
     authorizeUrl: 'https://access.line.me/oauth2/v2.1/authorize',
