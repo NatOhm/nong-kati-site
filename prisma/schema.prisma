@@ -122,17 +122,17 @@ model InventorySnapshot {
 // ─── Stock Moves (ประวัติการจัดสต๊อกแบบละเอียด — ตัด/เติม/ขาย/คืน) ───
 
 model StockMove {
-  id             String   @id @default(cuid())
-  variantId      String
-  delta          Int // +เติม / −ตัด / −ขาย / +คืน
-  reason         String // restock, adjust, sale, refund, import
-  refType        String? // order, upload, manual, csv
-  refId          String?
-  note           String?
-  stockAfter     Int
-  actorType      String   @default("admin") // admin, system
-  actorId        String?
-  createdAt      DateTime @default(now())
+  id         String   @id @default(cuid())
+  variantId  String
+  delta      Int // +เติม / −ตัด / −ขาย / +คืน
+  reason     String // restock, adjust, sale, refund, import
+  refType    String? // order, upload, manual, csv
+  refId      String?
+  note       String?
+  stockAfter Int
+  actorType  String   @default("admin") // admin, system
+  actorId    String?
+  createdAt  DateTime @default(now())
 
   variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
 
@@ -197,11 +197,12 @@ model Customer {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
-  orders         Order[]
-  wishlist       WishlistItem[]
-  topups         TopUpLog[]
-  supportTickets     SupportTicket[]
-  couponRedemptions  CouponRedemption[]
+  orders            Order[]
+  wishlist          WishlistItem[]
+  topups            TopUpLog[]
+  supportTickets    SupportTicket[]
+  couponRedemptions CouponRedemption[]
+  notificationReads NotificationRead[]
 
   @@index([email])
 }
@@ -258,8 +259,9 @@ model Coupon {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  orders      Order[]
-  redemptions CouponRedemption[]
+  orders            Order[]
+  redemptions       CouponRedemption[]
+  notificationReads NotificationRead[]
 
   @@index([isActive])
 }
@@ -318,14 +320,14 @@ model Order {
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
 
-  customer        Customer?        @relation(fields: [customerId], references: [id])
+  customer         Customer?         @relation(fields: [customerId], references: [id])
   couponRedemption CouponRedemption?
-  coupon          Coupon?          @relation(fields: [couponId], references: [id])
-  items           OrderItem[]
-  paymentAttempts PaymentAttempt[]
-  giftCodes       GiftCode[]
-  invoices        Invoice[]
-  refunds         Refund[]
+  coupon           Coupon?           @relation(fields: [couponId], references: [id])
+  items            OrderItem[]
+  paymentAttempts  PaymentAttempt[]
+  giftCodes        GiftCode[]
+  invoices         Invoice[]
+  refunds          Refund[]
 
   @@index([customerId])
   @@index([customerEmail])
@@ -530,7 +532,7 @@ model AdminUser {
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
-  sessions            AdminSession[]
+  sessions               AdminSession[]
   supportTicketsAnswered SupportTicket[]
 
   @@index([email])
@@ -623,20 +625,20 @@ model ProductTag {
 // ─── Support Tickets (customer → admin correspondence) ───
 
 model SupportTicket {
-  id            String   @id @default(cuid())
-  ticketNumber  String   @unique
+  id            String    @id @default(cuid())
+  ticketNumber  String    @unique
   customerId    String?
   customerEmail String
   customerName  String?
   subject       String
   message       String
-  status        String   @default("open") // open, answered, closed
+  status        String    @default("open") // open, answered, closed
   adminReply    String?
   answeredById  String?
   answeredAt    DateTime?
   closedAt      DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   customer   Customer?  @relation(fields: [customerId], references: [id])
   answeredBy AdminUser? @relation(fields: [answeredById], references: [id])
@@ -644,4 +646,23 @@ model SupportTicket {
   @@index([customerId])
   @@index([status])
   @@index([createdAt(sort: Desc)])
+}
+
+// ─── Notifications (storefront bell) ───────────────────────
+// There is no Notification row of its own: promo notifications are the
+// currently-active coupons, rendered live — nothing to go stale. The only
+// stored state is per-customer "read up to" so the unread badge reflects
+// reality instead of mock sample data.
+
+model NotificationRead {
+  id         String   @id @default(cuid())
+  customerId String
+  couponId   String
+  readAt     DateTime @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  coupon   Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, couponId])
+  @@index([customerId])
 }

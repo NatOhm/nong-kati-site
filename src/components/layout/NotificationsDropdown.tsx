@@ -1,47 +1,58 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Bell, CheckCheck, Package, Tag } from 'lucide-react';
+import { Bell, CheckCheck, Tag } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
 /**
- * Navbar bell — popover listing recent notifications.
- * Sample data for now; replace SAMPLE_NOTIFICATIONS with an API call
- * once a notification backend exists (future milestone).
+ * Navbar bell — real data from /api/v1/notifications.
+ * Items are the live active coupons (promos); the unread badge is backed by
+ * per-customer NotificationRead rows. No sample data — an empty list renders
+ * an explicit "no notifications" state.
  */
 interface NotificationItem {
   id: string;
-  icon: 'order' | 'promo';
+  code: string;
   title: string;
   body: string;
-  time: string;
+  expiresAt: string | null;
   read: boolean;
 }
 
-const SAMPLE_NOTIFICATIONS: NotificationItem[] = [
-  // Promo-only placeholders — NEVER fake order statuses. Users must not see
-  // invented "order succeeded" rows before the real notification backend lands.
-  {
-    id: 'n2',
-    icon: 'promo',
-    title: 'โปรโมชั่นใหม่!',
-    body: 'ลด 20% สำหรับ Spotify Premium ทุกแพ็กเกจ',
-    time: '2 ชั่วโมงที่แล้ว',
-    read: false,
-  },
-];
+/** Human-friendly Thai relative time for the expiry hint. */
+function expiryHint(expiresAt: string | null): string | null {
+  if (!expiresAt) return null;
+  const diff = new Date(expiresAt).getTime() - Date.now();
+  if (diff <= 0) return null;
+  const days = Math.floor(diff / 86_400_000);
+  if (days >= 1) return `หมดอายุอีก ${days} วัน`;
+  const hours = Math.floor(diff / 3_600_000);
+  if (hours >= 1) return `หมดอายุอีก ${hours} ชั่วโมง`;
+  return 'ใกล้หมดอายุ — รีบใช้!';
+}
 
 export function NotificationsDropdown(): React.JSX.Element {
   const [open, setOpen] = useState(false);
-  const [notifications, setNotifications] = useState<NotificationItem[]>(SAMPLE_NOTIFICATIONS);
+  const [items, setItems] = useState<NotificationItem[] | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const load = useCallback((): Promise<NotificationItem[] | null> => {
+    return fetch('/api/v1/notifications', { credentials: 'include' })
+      .then((r) => (r.ok ? (r.json() as Promise<{ items: NotificationItem[] }>) : null))
+      .then((d) => d?.items ?? null)
+      .catch(() => null);
+  }, []);
 
-  // Close on outside click + Escape while open
+  // Initial load + refresh whenever the popover opens (admin edits show up
+  // without a page reload).
+  useEffect(() => {
+    void load().then(setItems);
+  }, [load]);
+
   useEffect(() => {
     if (!open) return;
+    void load().then(setItems);
     const handleClick = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false);
@@ -56,9 +67,16 @@ export function NotificationsDropdown(): React.JSX.Element {
       document.removeEventListener('mousedown', handleClick);
       document.removeEventListener('keydown', handleEsc);
     };
-  }, [open]);
+  }, [open, load]);
 
-  const markAllRead = () => setNotifications((ns) => ns.map((n) => ({ ...n, read: true })));
+  const unreadCount = items?.filter((n) => !n.read).length ?? 0;
+
+  const markAllRead = useCallback(() => {
+    void fetch('/api/v1/notifications', { method: 'POST', credentials: 'include' })
+      .then(() => load())
+      .then((fresh) => setItems(fresh))
+      .catch(() => {});
+  }, [load]);
 
   return (
     <div ref={containerRef} className="relative">
@@ -97,33 +115,49 @@ export function NotificationsDropdown(): React.JSX.Element {
             )}
           </div>
 
-          {/* Items */}
-          <ul className="max-h-80 overflow-y-auto overscroll-contain">
-            {notifications.map((n) => {
-              const Icon = n.icon === 'order' ? Package : Tag;
-              return (
-                <li
-                  key={n.id}
-                  className={cn(
-                    'flex gap-3 border-b border-line-subtle px-4 py-3 last:border-b-0',
-                    !n.read && 'bg-peach-50',
-                  )}
-                >
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface text-fg-brand">
-                    <Icon size={16} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-fg">{n.title}</p>
-                    <p className="text-xs text-fg-placeholder">{n.body}</p>
-                    <p className="mt-0.5 text-[11px] text-clay-400">{n.time}</p>
-                  </div>
-                  {!n.read && (
-                    <span className="ml-auto mt-1 h-2 w-2 shrink-0 rounded-full bg-peach-500" />
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+          {/* Items / empty / error */}
+          {items === null ? (
+            <p className="px-4 py-8 text-center text-sm text-fg-placeholder">
+              โหลดการแจ้งเตือนไม่สำเร็จ
+            </p>
+          ) : items.length === 0 ? (
+            <div className="px-4 py-8 text-center">
+              <Tag size={28} className="mx-auto mb-2 text-fg-placeholder" />
+              <p className="text-sm text-fg-placeholder">ยังไม่มีการแจ้งเตือน</p>
+              <p className="mt-1 text-xs text-fg-placeholder">
+                โปรโมชั่นและข่าวสารจะแสดงที่นี่
+              </p>
+            </div>
+          ) : (
+            <ul className="max-h-80 overflow-y-auto overscroll-contain">
+              {items.map((n) => {
+                const hint = expiryHint(n.expiresAt);
+                return (
+                  <li
+                    key={n.id}
+                    className={cn(
+                      'flex gap-3 border-b border-line-subtle px-4 py-3 last:border-b-0',
+                      !n.read && 'bg-peach-50',
+                    )}
+                  >
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface text-fg-brand">
+                      <Tag size={16} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-fg">{n.title}</p>
+                      <p className="text-xs text-fg-placeholder">{n.body}</p>
+                      {hint && (
+                        <p className="mt-0.5 text-[11px] font-medium text-coral-600">{hint}</p>
+                      )}
+                    </div>
+                    {!n.read && (
+                      <span className="ml-auto mt-1 h-2 w-2 shrink-0 rounded-full bg-peach-500" />
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
 
           {/* Footer */}
           <Link
