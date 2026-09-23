@@ -49,6 +49,16 @@ export function clearAdminSession(): void {
   localStorage.removeItem(REFRESH_KEY);
 }
 
+/**
+ * True when admin tokens exist in storage (access or refresh) — used by the
+ * storefront chrome to route an admin's profile icon into /management. The
+ * management layout itself decides freshness (refresh/redirect on arrival).
+ */
+export function hasAdminSession(): boolean {
+  if (typeof window === 'undefined') return false;
+  return Boolean(localStorage.getItem(ACCESS_KEY) || localStorage.getItem(REFRESH_KEY));
+}
+
 // ─── Remember me ──────────────────────────────────────────
 
 const REMEMBER_KEY = 'nk_admin_remember';

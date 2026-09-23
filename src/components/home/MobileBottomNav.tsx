@@ -1,11 +1,13 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Search, ShoppingCart } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { useCart } from '@/hooks/useCart';
 import { useCustomerSession } from '@/components/layout/useCustomerSession';
+import { hasAdminSession } from '@/lib/adminSession';
 import { AcornIcon, SeedIcon, WheelIcon, PawIcon } from '@/components/ui/ClayIcons';
 
 const NAV_ITEMS = [
@@ -19,14 +21,18 @@ export function MobileBottomNav() {
   const { itemCount } = useCart();
   const sessionState = useCustomerSession();
   const isAuthenticated = sessionState === 'authed';
+  // Admin session present → the บัญชี button routes into the admin panel
+  // (client ask). The management layout handles expiry/redirect itself.
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => setIsAdmin(hasAdminSession()), []);
 
   // Sitewide taskbar except the admin panel (which has its own chrome).
   if (pathname?.startsWith('/management')) return null;
 
   const accountItem = {
     icon: PawIcon,
-    href: isAuthenticated ? '/account/dashboard' : '/account/login',
-    label: isAuthenticated ? 'บัญชี' : 'เข้าสู่ระบบ',
+    href: isAdmin ? '/management/dashboard' : isAuthenticated ? '/account/dashboard' : '/account/login',
+    label: isAdmin ? 'แอดมิน' : isAuthenticated ? 'บัญชี' : 'เข้าสู่ระบบ',
     clay: true as const,
   };
   const allItems = [...NAV_ITEMS, accountItem];

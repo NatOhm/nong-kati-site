@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Settings, History, LogOut, Wallet, ChevronDown } from 'lucide-react';
+import { Settings, History, LogOut, Wallet, ChevronDown, ShieldCheck, LogIn } from 'lucide-react';
 
 import { cn } from '@/utils/cn';
 import { formatThb } from '@/utils/format';
+import { hasAdminSession } from '@/lib/adminSession';
 import {
   useCustomerProfile,
   type CustomerProfile,
@@ -21,7 +22,15 @@ export function ProfileMenu(): React.JSX.Element {
   const { state: sessionState, profile } = useCustomerProfile();
   const [open, setOpen] = useState(false);
   const [wallet, setWallet] = useState<{ balanceThb: number } | null>(null);
+  const [admin, setAdmin] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+
+  // Admins get an entry into /management (client ask: admin account must be
+  // able to reach its profile/panel from the storefront). Tokens-only check —
+  // the management layout itself handles expiry/redirect on arrival.
+  useEffect(() => {
+    setAdmin(hasAdminSession());
+  }, []);
 
   // Identity comes free from the shared profile context (no /me refetch);
   // only the wallet balance is fetched, when the session proves authed.
@@ -42,7 +51,9 @@ export function ProfileMenu(): React.JSX.Element {
     return () => document.removeEventListener('mousedown', onDoc);
   }, [open]);
 
-  if (sessionState !== 'authed') {
+  // Guests without an admin session keep the plain login link. Guests WITH an
+  // admin session fall through to the popover so they can reach /management.
+  if (sessionState !== 'authed' && !admin) {
     return (
       <Link
         href="/account/login"
@@ -78,13 +89,18 @@ export function ProfileMenu(): React.JSX.Element {
           aria-label="เมนูบัญชี"
           className="clay-card suggest-drop absolute right-0 top-full z-50 mt-2 w-64 rounded-2xl p-2"
         >
-          {/* Identity */}
+          {/* Identity — customer when signed in, admin badge otherwise */}
           <div className="border-b border-line-subtle px-3 pb-3 pt-2">
-        <p className="truncate text-sm font-bold text-fg">{(profile as CustomerProfile | null)?.fullName ?? 'สมาชิก'}</p>
-        <p className="truncate text-xs text-fg-muted">{(profile as CustomerProfile | null)?.email}</p>
+            <p className="truncate text-sm font-bold text-fg">
+              {profile?.fullName ?? (sessionState === 'authed' ? 'สมาชิก' : 'ผู้ดูแลระบบ')}
+            </p>
+            <p className="truncate text-xs text-fg-muted">
+              {profile?.email ?? (sessionState === 'authed' ? '—' : 'บัญชีแอดมิน')}
+            </p>
           </div>
 
-          {/* Wallet */}
+          {/* Wallet — customer sessions only */}
+          {sessionState === 'authed' && (
           <div className="px-3 py-3">
             <div className="flex items-baseline justify-between">
               <span className="text-xs text-fg-muted">เครดิตคงเหลือ</span>
@@ -102,25 +118,51 @@ export function ProfileMenu(): React.JSX.Element {
               เติมเงิน
             </Link>
           </div>
+          )}
 
           {/* Menu */}
           <div className="border-t border-line-subtle pt-1">
-            <Link
-              href="/account/settings"
-              role="menuitem"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-fg-secondary transition-colors hover:bg-surface-sunken hover:text-fg"
-            >
-              <Settings size={15} /> ตั้งค่าโปรไฟล์
-            </Link>
-            <Link
-              href="/account/wallet"
-              role="menuitem"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-fg-secondary transition-colors hover:bg-surface-sunken hover:text-fg"
-            >
-              <History size={15} /> ประวัติการเดินเงิน
-            </Link>
+            {sessionState === 'authed' && (
+              <>
+                <Link
+                  href="/account/settings"
+                  role="menuitem"
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-fg-secondary transition-colors hover:bg-surface-sunken hover:text-fg"
+                >
+                  <Settings size={15} /> ตั้งค่าโปรไฟล์
+                </Link>
+                <Link
+                  href="/account/wallet"
+                  role="menuitem"
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-fg-secondary transition-colors hover:bg-surface-sunken hover:text-fg"
+                >
+                  <History size={15} /> ประวัติการเดินเงิน
+                </Link>
+              </>
+            )}
+            {admin && (
+              <Link
+                href="/management/dashboard"
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-semibold text-fg-brand transition-colors hover:bg-surface-sunken"
+              >
+                <ShieldCheck size={15} /> เข้าหน้าแอดมิน
+              </Link>
+            )}
+            {sessionState !== 'authed' && admin && (
+              <Link
+                href="/account/login"
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-fg-secondary transition-colors hover:bg-surface-sunken hover:text-fg"
+              >
+                <LogIn size={15} /> เข้าสู่ระบบลูกค้า
+              </Link>
+            )}
+            {sessionState === 'authed' && (
             <button
               type="button"
               role="menuitem"
@@ -133,6 +175,7 @@ export function ProfileMenu(): React.JSX.Element {
             >
               <LogOut size={15} /> ออกจากระบบ
             </button>
+            )}
           </div>
         </div>
       )}
