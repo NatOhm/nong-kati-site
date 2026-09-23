@@ -1,7 +1,7 @@
 'use client';
 
 import { Check } from 'lucide-react';
-import { HamsterMascot } from '@/components/ui/ClayIcons';
+import { SiteMascot } from '@/components/ui/SiteMascot';
 
 /**
  * Compact clay success toast with the clay hamster — used for cart adds.
@@ -21,7 +21,7 @@ export function SuccessToast({
         className="inline-flex shrink-0 animate-seed-pop"
         style={{ animationDuration: '400ms' }}
       >
-        <HamsterMascot size={40} />
+        <SiteMascot size={40} />
       </span>
       <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-jade-500 shadow-clay-xs">
         <Check size={14} strokeWidth={3} className="text-white" />

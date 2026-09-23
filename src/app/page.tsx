@@ -19,7 +19,6 @@ import { LiveSalesPopup } from '@/components/home/LiveSalesPopup';
 import { LINEChatButton } from '@/components/home/LINEChatButton';
 import { ScrollToTop } from '@/components/home/ScrollToTop';
 import { ScrollReveal } from '@/components/home/ScrollReveal';
-import { HamsterMascot } from '@/components/ui/ClayIcons';
 import { PawDivider } from '@/components/ui/PawDivider';
 
 import {

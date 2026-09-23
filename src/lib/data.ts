@@ -753,16 +753,19 @@ export interface AppearanceContent {
   accent: string | null;
   /** Global animation speed: slow | normal | fast | off. */
   speed: 'slow' | 'normal' | 'fast' | 'off';
+  /** Admin-uploaded mascot image (path under /api/v1/images/) — null = built-in hamster. */
+  mascotUrl: string | null;
 }
 
 const SPEEDS = ['slow', 'normal', 'fast', 'off'] as const;
 
 /**
  * Read the runtime theme settings (SiteSetting key 'appearance'). Admin sets
- * accent color + animation speed; the layout turns this into CSS vars.
+ * accent color + animation speed + mascot image; the layout turns this into
+ * CSS vars, and the mascot swap reads it directly.
  */
 export async function getAppearance(): Promise<AppearanceContent> {
-  const fallback: AppearanceContent = { accent: null, speed: 'normal' };
+  const fallback: AppearanceContent = { accent: null, speed: 'normal', mascotUrl: null };
   try {
     const row = await prisma.siteSetting.findUnique({ where: { key: 'appearance' } });
     if (!row) return fallback;
@@ -775,6 +778,10 @@ export async function getAppearance(): Promise<AppearanceContent> {
       speed: SPEEDS.includes(parsed.speed as (typeof SPEEDS)[number])
         ? (parsed.speed as AppearanceContent['speed'])
         : 'normal',
+      mascotUrl:
+        typeof parsed.mascotUrl === 'string' && parsed.mascotUrl.startsWith('/api/v1/images/')
+          ? parsed.mascotUrl
+          : null,
     };
   } catch {
     return fallback;

@@ -1,12 +1,14 @@
 import type { Metadata } from 'next';
 import { JetBrains_Mono, Mitr, Noto_Sans_Thai_Looped } from 'next/font/google';
 
+import { MascotProvider } from '@/providers/MascotProvider';
 import { ThemeProvider } from '@/providers/ThemeProvider';
 import { CartProvider } from '@/providers/CartProvider';
 import { CustomerProfileProvider } from '@/components/layout/CustomerProfileProvider';
 import { CookieConsentBanner } from '@/components/pdpa/CookieConsentBanner';
 import { MobileBottomNav } from '@/components/home/MobileBottomNav';
 import { ThemeVars } from '@/components/layout/ThemeVars';
+import { getAppearance } from '@/lib/data';
 import { ToastMount } from './ToastMount';
 
 import './globals.css';
@@ -50,7 +52,7 @@ export const metadata: Metadata = {
 
 /** No-FOUC: apply the stored/system theme — and the remembered motion choice — before first paint. */
 const themeInitScript = `(function(){try{var t=localStorage.getItem('nk-theme');if(t!=='dark'&&t!=='light'){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','light');}try{var m=localStorage.getItem('nk-motion');if(m==='on'||m==='off'){document.documentElement.setAttribute('data-motion',m);}}catch(e){}})();`; /** 14-seo.md §13.1 — single sitewide lang="th", no per-page override. */
-export default function RootLayout({ children }: { children: React.ReactNode }): React.JSX.Element {
+export default async function RootLayout({ children }: { children: React.ReactNode }): Promise<React.JSX.Element> {
   return (
     <html
       lang="th"
@@ -62,6 +64,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }):
       </head>
       <body className="text-thai font-ui">
         <ThemeVars />
+        <MascotProvider mascotUrl={(await getAppearance()).mascotUrl}>
         <ThemeProvider defaultTheme="light">
           <CustomerProfileProvider>
             <CartProvider>
@@ -73,6 +76,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }):
           <ToastMount />
           <CookieConsentBanner />
         </ThemeProvider>
+        </MascotProvider>
       </body>
     </html>
   );

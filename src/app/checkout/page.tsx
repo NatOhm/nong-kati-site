@@ -5,11 +5,12 @@ import Link from 'next/link';
 import { ArrowLeft, Clock, Construction } from 'lucide-react';
 
 import { PageShell } from '@/components/layout/PageShell';
-import { HamsterMascot } from '@/components/ui/ClayIcons';
+import { SiteMascot } from '@/components/ui/SiteMascot';
 import { CheckoutStepper } from '@/components/checkout/CheckoutStepper';
 import { ContactForm, type ContactFormData } from '@/components/checkout/ContactForm';
 import { PaymentMethodSelector } from '@/components/checkout/PaymentMethodSelector';
 import { PromptPayQR } from '@/components/checkout/PromptPayQR';
+import { SlipUploadPanel } from '@/components/checkout/SlipUploadPanel';
 import { OrderSummaryPanel } from '@/components/checkout/OrderSummaryPanel';
 import { TrustBadgeRow } from '@/components/checkout/TrustBadgeRow';
 import { CartIcon } from '@/components/cart/CartIcon';
@@ -73,6 +74,7 @@ export default function CheckoutPage(): React.JSX.Element {
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [slipEnabled, setSlipEnabled] = useState(false);
   const [couponInput, setCouponInput] = useState('');
   const [couponApplied, setCouponApplied] = useState<{ code: string; discountThb: number } | null>(
     null,
@@ -101,6 +103,24 @@ export default function CheckoutPage(): React.JSX.Element {
       cancelled = true;
     };
   }, [isLoaded]);
+
+  // Automatic slip verification availability — the panel renders only when
+  // the server has NK_SLIP_OK_KEY configured; otherwise the manual admin
+  // confirm fallback applies unchanged.
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/v1/payments/slip-verify', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { enabled?: boolean } | null) => {
+        if (!cancelled) setSlipEnabled(Boolean(d?.enabled));
+      })
+      .catch(() => {
+        if (!cancelled) setSlipEnabled(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Validate + stage a coupon code (server check; applied on order create).
   const handleApplyCoupon = useCallback(async () => {
@@ -281,7 +301,7 @@ export default function CheckoutPage(): React.JSX.Element {
     return (
       <PageShell>
         <div className="flex flex-col items-center justify-center py-24 text-center">
-          <HamsterMascot
+          <SiteMascot
             size={120}
             className="mascot-beg mb-6 drop-shadow-[0_8px_16px_rgba(124,45,18,0.25)]"
           />
@@ -423,6 +443,12 @@ export default function CheckoutPage(): React.JSX.Element {
                       expiresAt={paymentState.qrExpiresAt}
                       onExpire={handleQrExpire}
                     />
+
+                    {/* Automatic slip verification (SlipOK) — renders only
+                        when the server has the feature enabled. */}
+                    {slipEnabled && order && paymentState.status !== 'succeeded' && (
+                      <SlipUploadPanel orderId={order.id} />
+                    )}
 
                     {/* Status messages */}
                     {paymentState.status === 'succeeded' && (

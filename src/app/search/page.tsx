@@ -9,7 +9,7 @@ import { SearchProductCard } from '@/components/product/SearchProductCard';
 import { Breadcrumb } from '@/components/data-display/Breadcrumb';
 import { CatalogSearchBox } from '@/components/search/CatalogSearchBox';
 import { SearchToolbar } from '@/components/search/SearchToolbar';
-import { HamsterMascot } from '@/components/ui/ClayIcons';
+import { SiteMascot } from '@/components/ui/SiteMascot';
 
 import { getCatalogProducts, getCategoriesWithProductCounts, type CatalogSort } from '@/lib/data';
 
@@ -176,7 +176,7 @@ export default async function SearchPage({
               </section>
             ) : query || category ? (
               <section className="py-16 text-center">
-                <HamsterMascot size={96} className="mascot-sniff mx-auto mb-4" />
+                <SiteMascot size={96} className="mascot-sniff mx-auto mb-4" />
                 <h2 className="mb-2 text-lg font-semibold text-fg">
                   {query ? <>ไม่พบสินค้า &ldquo;{query}&rdquo;</> : 'ไม่พบสินค้าในหมวดหมู่นี้'}
                 </h2>
@@ -186,7 +186,7 @@ export default async function SearchPage({
               </section>
             ) : (
               <section className="py-16 text-center">
-                <HamsterMascot size={96} className="mascot-sniff mx-auto mb-4" />
+                <SiteMascot size={96} className="mascot-sniff mx-auto mb-4" />
                 <h2 className="mb-2 text-lg font-semibold text-fg">ยังไม่มีสินค้าในร้าน</h2>
                 <p className="text-sm text-fg-placeholder">
                   น้องแฮมสเตอร์กำลังเก็บสินค้ามาวาง — กลับมาใหม่ภายหลังนะ

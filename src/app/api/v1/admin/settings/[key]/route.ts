@@ -96,9 +96,25 @@ export async function PUT(
     if (typeof speed === 'string' && !['slow', 'normal', 'fast', 'off'].includes(speed)) {
       return NextResponse.json({ error: 'INVALID_SPEED' }, { status: 400 });
     }
+    // Mascot image (client ask: ปลี่ยนมาสคอตจากหน้าแอดมินได้). Only paths
+    // produced by /api/v1/admin/upload are accepted; explicit null restores
+    // the built-in hamster.
+    const mascotUrl =
+      b['mascotUrl'] === null
+        ? null
+        : typeof b['mascotUrl'] === 'string'
+          ? b['mascotUrl']
+          : currentObj['mascotUrl'];
+    if (
+      typeof mascotUrl === 'string' &&
+      !/^\/api\/v1\/images\/[0-9a-z-]+$/i.test(mascotUrl)
+    ) {
+      return NextResponse.json({ error: 'INVALID_MASCOT_URL' }, { status: 400 });
+    }
     next = {};
     if (accent !== undefined) next['accent'] = accent ?? null;
     if (speed !== undefined) next['speed'] = speed;
+    if (mascotUrl !== undefined) next['mascotUrl'] = mascotUrl ?? null;
   } else if (key === 'notifications') {
     // Discord webhook + low-stock threshold (แจ้งเตือน Discord / สต๊อกใกล้หมด).
     next = {};

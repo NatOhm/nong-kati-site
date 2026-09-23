@@ -345,6 +345,9 @@ function AppearanceSettings({
 }): React.JSX.Element {
   const [accent, setAccent] = useState('#F97316');
   const [speed, setSpeed] = useState('normal');
+  const [mascotUrl, setMascotUrl] = useState<string | null>(null);
+  const [mascotBusy, setMascotBusy] = useState(false);
+  const mascotInput = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -355,12 +358,13 @@ function AppearanceSettings({
     adminFetch('/api/v1/admin/settings/appearance')
       .then(async (r) => {
         if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? `HTTP ${r.status}`);
-        return r.json() as Promise<{ accent?: string | null; speed?: string }>;
+        return r.json() as Promise<{ accent?: string | null; speed?: string; mascotUrl?: string | null }>;
       })
       .then((data) => {
         if (cancelled) return;
         if (data.accent) setAccent(data.accent);
         if (data.speed) setSpeed(data.speed);
+        if (data.mascotUrl !== undefined) setMascotUrl(data.mascotUrl);
       })
       .catch((e: Error) => {
         if (!cancelled) setError(e.message);
@@ -408,6 +412,62 @@ function AppearanceSettings({
       setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
     } finally {
       setSaving(false);
+    }
+  }
+
+  /** Mascot image ops save immediately (image op, not part of the form save). */
+  async function saveMascot(url: string | null): Promise<void> {
+    const { accent: a, speed: s } = valuesRef.current;
+    const res = await adminFetch('/api/v1/admin/settings/appearance', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accent: a, speed: s, mascotUrl: url }),
+    });
+    if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(data.error ?? `HTTP ${res.status}`);
+    }
+  }
+
+  async function uploadMascot(file: File): Promise<void> {
+    setMascotBusy(true);
+    setError(null);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error('อ่านไฟล์ไม่สำเร็จ'));
+        reader.readAsDataURL(file);
+      });
+      const up = await adminFetch('/api/v1/admin/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dataUrl }),
+      });
+      if (!up.ok) {
+        const data = (await up.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error ?? `HTTP ${up.status}`);
+      }
+      const { path } = (await up.json()) as { path: string };
+      await saveMascot(path);
+      setMascotUrl(path);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'อัปโหลดมาสคอตไม่สำเร็จ');
+    } finally {
+      setMascotBusy(false);
+    }
+  }
+
+  async function removeMascot(): Promise<void> {
+    setMascotBusy(true);
+    setError(null);
+    try {
+      await saveMascot(null);
+      setMascotUrl(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'ลบมาสคอตไม่สำเร็จ');
+    } finally {
+      setMascotBusy(false);
     }
   }
 
@@ -479,6 +539,69 @@ function AppearanceSettings({
                   <p className="text-[10px] text-fg-placeholder">{opt.desc}</p>
                 </button>
               ))}
+            </div>
+          </Field>
+
+          <Field label="มาสคอตของเว็บ (แฮมสเตอร์)">
+            <div className="flex flex-wrap items-center gap-4">
+              {/* Current mascot preview */}
+              <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl border border-line-subtle bg-surface">
+                {mascotUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={mascotUrl}
+                    alt="มาสคอตปัจจุบัน"
+                    className="h-full w-full object-contain p-1"
+                  />
+                ) : (
+                  <span className="text-3xl" aria-hidden="true">
+                    🐹
+                  </span>
+                )}
+              </div>
+              <div className="min-w-0 flex-1 space-y-2">
+                <p className="text-xs text-fg-placeholder">
+                  {mascotUrl
+                    ? 'ใช้รูปที่อัปโหลดแล้ว — แสดงแทนแฮมสเตอร์ทุกจุด (หน้าแรก, ตะกร้า, ชำระเงิน, toast)'
+                    : 'ยังใช้แฮมสเตอร์ตัวเดิม — อัปโหลดรูป PNG/JPG/WebP/GIF (สูงสุด 512KB) เพื่อเปลี่ยน'}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => mascotInput.current?.click()}
+                    disabled={mascotBusy}
+                    className="flex items-center gap-2 rounded-lg border border-line-subtle bg-surface px-3 py-2 text-sm font-semibold text-fg transition-colors hover:bg-surface-brand-subtle disabled:opacity-50"
+                  >
+                    {mascotBusy ? (
+                      <Loader2 size={15} className="animate-spin" />
+                    ) : (
+                      <ImageIcon size={15} />
+                    )}
+                    {mascotUrl ? 'เปลี่ยนรูป' : 'อัปโหลดรูปมาสคอต'}
+                  </button>
+                  {mascotUrl && (
+                    <button
+                      type="button"
+                      onClick={() => void removeMascot()}
+                      disabled={mascotBusy}
+                      className="flex items-center gap-2 rounded-lg border border-coral-300 px-3 py-2 text-sm font-semibold text-coral-700 transition-colors hover:bg-coral-50 disabled:opacity-50 dark:border-coral-700 dark:text-coral-300 dark:hover:bg-coral-900/20"
+                    >
+                      <Trash2 size={15} /> ใช้แฮมสเตอร์เดิม
+                    </button>
+                  )}
+                </div>
+              </div>
+              <input
+                ref={mascotInput}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                className="sr-only"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = '';
+                  if (f) void uploadMascot(f);
+                }}
+              />
             </div>
           </Field>
 
