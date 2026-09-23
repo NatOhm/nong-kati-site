@@ -39,9 +39,17 @@ export async function GET(
         include: { _count: { select: { giftCodes: true } } },
         orderBy: { createdAt: 'asc' },
       },
+      paymentAttempts: {
+        where: { slipVerifiedRef: { not: null } },
+        select: { slipVerifiedRef: true, slipVerifiedAt: true, slipReceiverAccount: true },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+      },
     },
   });
   if (!order) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
+
+  const slipVerification = order.paymentAttempts[0] ?? null;
 
   return NextResponse.json({
     id: order.id,
@@ -55,6 +63,13 @@ export async function GET(
     discountThb: Number(order.discountThb),
     totalAmountThb: Number(order.totalAmountThb),
     manualFulfilmentReason: order.manualFulfilmentReason,
+    slipVerification: slipVerification
+      ? {
+          ref: slipVerification.slipVerifiedRef,
+          verifiedAt: slipVerification.slipVerifiedAt?.toISOString() ?? null,
+          receiverAccount: slipVerification.slipReceiverAccount,
+        }
+      : null,
     createdAt: order.createdAt.toISOString(),
     completedAt: order.completedAt?.toISOString() ?? null,
     items: order.items.map((i) => ({

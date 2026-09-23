@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Search, Eye, XCircle, CheckCircle, RefreshCw } from 'lucide-react';
+import { Search, Eye, XCircle, CheckCircle, RefreshCw, ShieldCheck } from 'lucide-react';
 
 import { AdminShell } from '@/components/layout/AdminShell';
 import { adminJson } from '@/lib/adminSession';
@@ -39,6 +39,8 @@ interface OrderDetail {
   discountThb: number;
   totalAmountThb: number;
   manualFulfilmentReason: string | null;
+  /** Present when the customer's slip was auto-verified (SlipOK). */
+  slipVerification: { ref: string; verifiedAt: string | null; receiverAccount: string | null } | null;
   items: {
     id: string;
     productNameTh: string;
@@ -342,6 +344,24 @@ export default function AdminOrdersPage(): React.JSX.Element {
                   ))}
                 </div>
               </div>
+
+              {selectedOrder.slipVerification && (
+                <div className="mt-5 flex items-start gap-2 rounded-md border border-jade-500/40 bg-jade-900/5 px-3 py-2.5 text-sm text-jade-700">
+                  <ShieldCheck size={16} className="mt-0.5 shrink-0" />
+                  <div>
+                    <p className="font-medium">ยืนยันอัตโนมัติด้วยสลิป (SlipOK)</p>
+                    <p className="mt-0.5 text-xs">
+                      ref {selectedOrder.slipVerification.ref}
+                      {selectedOrder.slipVerification.receiverAccount
+                        ? ` · เข้าบัญชี ...${selectedOrder.slipVerification.receiverAccount.slice(-4)}`
+                        : ''}
+                      {selectedOrder.slipVerification.verifiedAt
+                        ? ` · ${new Date(selectedOrder.slipVerification.verifiedAt).toLocaleString('th-TH')}`
+                        : ''}
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {(selectedOrder.status === 'pending_payment' ||
                 selectedOrder.status === 'pending_manual_fulfilment') && (

@@ -431,6 +431,12 @@ model PaymentAttempt {
   threeDsStatus         String?
   webhookReceivedAt     DateTime?
   webhookSignatureValid Boolean?
+  // Automatic slip verification (SlipOK): the bank ref is globally unique —
+  // one real transfer can confirm exactly one order.
+  slipVerifiedRef       String?   @unique
+  slipVerifiedAt        DateTime?
+  slipReceiverAccount   String?
+  slipVerifiedBy        String?
   attemptNumber         Int       @default(1)
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
