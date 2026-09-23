@@ -52,7 +52,7 @@ export function AdminShell({
   const staffRole = profile?.role ?? staffRoleProp;
 
   return (
-    <div className="nk-admin-theme flex h-screen overflow-hidden bg-surface-base">
+    <div className="flex h-screen overflow-hidden bg-surface-base">
       {/* Sidebar */}
       <AdminSidebar
         role={staffRole}

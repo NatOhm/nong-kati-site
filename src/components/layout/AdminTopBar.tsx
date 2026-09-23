@@ -6,6 +6,7 @@ import { Bell, LogOut, Menu } from 'lucide-react';
 import { clearAdminSession, setAdminRemembered } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
 import { type AdminRole } from '@/types/auth';
+import { ThemeToggle } from './ThemeToggle';
 
 export interface AdminTopBarProps {
   staffName: string;
@@ -76,6 +77,9 @@ export function AdminTopBar({
       </div>
 
       <div className="flex items-center gap-4">
+        {/* Light/dark toggle — admin follows the sitewide theme */}
+        <ThemeToggle />
+
         {/* Notifications */}
         <button
           className="relative rounded p-1.5 text-fg-placeholder hover:bg-surface hover:text-fg"

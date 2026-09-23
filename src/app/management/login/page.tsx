@@ -168,7 +168,7 @@ export default function AdminLoginPage(): React.JSX.Element {
   );
 
   return (
-    <div className="nk-admin-theme flex min-h-screen items-center justify-center bg-surface-base p-4">
+    <div className="flex min-h-screen items-center justify-center bg-surface-base p-4">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="mb-8 text-center">
