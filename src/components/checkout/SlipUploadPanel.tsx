@@ -6,18 +6,23 @@ import { CheckCircle2, FileImage, Loader2, ShieldCheck, Upload, XCircle } from '
 import { cn } from '@/utils/cn';
 
 /**
- * SlipUploadPanel — automatic slip verification UI (SlipOK).
- * Shown under the PromptPay QR: customer uploads the transfer slip, the
- * backend verifies it against the bank (exact amount + unused ref) and
- * auto-confirms the order. The existing payment-status polling then redirects
- * to the confirmation page — no extra wiring needed here.
- *
- * The panel is inert unless the server offers the feature (GET
- * /api/v1/payments/slip-verify → { enabled }): with no NK_SLIP_OK_KEY the
- * parent hides it entirely and the manual admin-confirm fallback applies.
+ * SlipUploadPanel — customer slip upload under the PromptPay QR.
+ * Two-step behavior in one panel:
+ * 1. If auto-verification is on (slipVerifyEnabled), the slip first goes to
+ *    SlipOK — pass = order confirms instantly; fail = the same slip is then
+ *    saved for the admin (manual check), no re-upload needed.
+ * 2. If auto-verification is off (no NK_SLIP_OK_KEY), the slip goes straight
+ *    to the admin: stored on the order and visible in the admin order
+ *    detail — the admin clicks ยืนยันการชำระเงิน as before.
  */
 
-export function SlipUploadPanel({ orderId }: { orderId: string }): React.JSX.Element {
+export function SlipUploadPanel({
+  orderId,
+  slipVerifyEnabled,
+}: {
+  orderId: string;
+  slipVerifyEnabled: boolean;
+}): React.JSX.Element {
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -42,31 +47,54 @@ export function SlipUploadPanel({ orderId }: { orderId: string }): React.JSX.Ele
     });
   }
 
-  async function verify(): Promise<void> {
+  function buildForm(): FormData {
+    const form = new FormData();
+    form.set('orderId', orderId);
+    form.set('slip', file!);
+    return form;
+  }
+
+  async function sendToAdmin(): Promise<boolean> {
+    const res = await fetch('/api/v1/payments/slip-upload', {
+      method: 'POST',
+      body: buildForm(),
+      credentials: 'include',
+    });
+    const body = (await res.json().catch(() => ({}))) as { message?: string; error?: string };
+    if (res.ok) {
+      setResult({ ok: true, message: body.message ?? 'ได้รับสลิปแล้ว — แอดมินจะตรวจและยืนยันให้เร็วที่สุด' });
+      return true;
+    }
+    setResult({ ok: false, message: body.message ?? body.error ?? 'ส่งสลิปไม่สำเร็จ — ลองอีกครั้ง' });
+    return false;
+  }
+
+  async function submit(): Promise<void> {
     if (!file || busy) return;
     setBusy(true);
     setResult(null);
     try {
-      const form = new FormData();
-      form.set('orderId', orderId);
-      form.set('slip', file);
-      const res = await fetch('/api/v1/payments/slip-verify', {
-        method: 'POST',
-        body: form,
-        credentials: 'include',
-      });
-      const body = (await res.json().catch(() => ({}))) as {
-        status?: string;
-        message?: string;
-        error?: string;
-      };
-      if (res.ok && body.status === 'confirmed') {
-        setResult({ ok: true, message: body.message ?? 'ตรวจสลิปผ่าน — ส่งโค้ดแล้ว' });
-        // The payment poller sees the succeeded attempt and redirects; nudge it along.
-      } else if (body.status === 'pending_manual_fulfilment') {
-        setResult({ ok: true, message: body.message ?? 'ชำระเงินถูกตรวจแล้ว — รอแอดมินส่งโค้ด' });
+      if (slipVerifyEnabled) {
+        // Attempt instant bank verification; fall back to the manual queue
+        // with the same slip when it doesn't pass.
+        const res = await fetch('/api/v1/payments/slip-verify', {
+          method: 'POST',
+          body: buildForm(),
+          credentials: 'include',
+        });
+        const body = (await res.json().catch(() => ({}))) as {
+          status?: string;
+          message?: string;
+          error?: string;
+        };
+        if (res.ok && (body.status === 'confirmed' || body.status === 'pending_manual_fulfilment')) {
+          setResult({ ok: true, message: body.message ?? 'ตรวจสลิปผ่าน — ส่งโค้ดแล้ว' });
+          return;
+        }
+        // Not confirmed automatically → hand the same slip to the admin.
+        await sendToAdmin();
       } else {
-        setResult({ ok: false, message: body.message ?? body.error ?? 'ตรวจสลิปไม่สำเร็จ' });
+        await sendToAdmin();
       }
     } catch {
       setResult({ ok: false, message: 'เครือข่ายขัดข้อง — ลองอีกครั้ง หรือรอแอดมินยืนยัน' });
@@ -80,9 +108,13 @@ export function SlipUploadPanel({ orderId }: { orderId: string }): React.JSX.Ele
       <div className="flex items-start gap-2">
         <ShieldCheck size={18} className="mt-0.5 shrink-0 text-fg-brand" />
         <div className="text-sm">
-          <p className="font-semibold text-fg">โอนแล้ว? อัปโหลดสลิปเพื่อยืนยันอัตโนมัติ</p>
+          <p className="font-semibold text-fg">
+            {slipVerifyEnabled ? 'โอนแล้ว? อัปโหลดสลิปเพื่อยืนยันอัตโนมัติ' : 'โอนแล้ว? ส่งสลิปเพื่อให้แอดมินตรวจยืนยัน'}
+          </p>
           <p className="mt-0.5 text-xs text-fg-muted">
-            ระบบตรวจกับธนาคารจริง: ยอดต้องตรง, 1 สลิปใช้ได้ 1 ออเดอร์ — ใช้เวลาไม่กี่วินาที
+            {slipVerifyEnabled
+              ? 'ระบบตรวจกับธนาคารจริง: ยอดต้องตรง, 1 สลิปใช้ได้ 1 ออเดอร์ — ใช้เวลาไม่กี่วินาที ถ้าระบบตรวจไม่ผ่าน สลิปจะถูกส่งให้แอดมินตรวจต่อทันที'
+              : 'แอดมินจะเห็นสลิปของคุณในหน้าจัดการคำสั่งซื้อ และกดยืนยันให้โค้ดส่งอัตโนมัติ'}
           </p>
         </div>
       </div>
@@ -122,12 +154,12 @@ export function SlipUploadPanel({ orderId }: { orderId: string }): React.JSX.Ele
             {file && (
               <button
                 type="button"
-                onClick={() => void verify()}
+                onClick={() => void submit()}
                 disabled={busy}
                 className="ml-auto flex items-center gap-2 rounded-md bg-peach-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-peach-400 disabled:opacity-60"
               >
                 {busy ? <Loader2 size={15} className="animate-spin" /> : <FileImage size={15} />}
-                {busy ? 'กำลังตรวจสลิป...' : 'ตรวจสลิปอัตโนมัติ'}
+                {busy ? 'กำลังส่งสลิป...' : slipVerifyEnabled ? 'ตรวจสลิป' : 'ส่งสลิปให้แอดมิน'}
               </button>
             )}
           </div>

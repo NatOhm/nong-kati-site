@@ -26,6 +26,8 @@ interface OrderRow {
   totalThb: number;
   itemCount: number;
   manualFulfilmentReason: string | null;
+  /** Customer sent a slip for manual check (ส่งสลิปให้แอดมินตรวจ). */
+  slipImageUrl: string | null;
   createdAt: string;
   completedAt: string | null;
 }
@@ -41,6 +43,9 @@ interface OrderDetail {
   manualFulfilmentReason: string | null;
   /** Present when the customer's slip was auto-verified (SlipOK). */
   slipVerification: { ref: string; verifiedAt: string | null; receiverAccount: string | null } | null;
+  /** Customer-uploaded slip image (manual check). */
+  slipImageUrl: string | null;
+  slipUploadedAt: string | null;
   items: {
     id: string;
     productNameTh: string;
@@ -237,6 +242,11 @@ export default function AdminOrdersPage(): React.JSX.Element {
                       >
                         {STATUS_LABELS[order.status]?.label ?? order.status}
                       </span>
+                      {order.slipImageUrl && order.status === 'pending_payment' && (
+                        <span className="mt-1 block text-[10px] font-semibold text-sky-600">
+                          📎 ส่งสลิปแล้ว
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-center text-xs text-fg-muted">
                       {PAYMENT_METHODS[order.paymentMethod ?? ''] ?? '—'}
@@ -360,6 +370,28 @@ export default function AdminOrdersPage(): React.JSX.Element {
                         : ''}
                     </p>
                   </div>
+                </div>
+              )}
+
+              {selectedOrder.slipImageUrl && (
+                <div className="mt-5 rounded-md border border-sky-300 bg-sky-50 p-3 dark:border-sky-800 dark:bg-sky-900/20">
+                  <p className="text-sm font-semibold text-sky-700 dark:text-sky-300">
+                    📎 สลิปที่ลูกค้าส่งมา
+                    {selectedOrder.slipUploadedAt && (
+                      <span className="ml-2 text-xs font-normal text-fg-muted">
+                        {new Date(selectedOrder.slipUploadedAt).toLocaleString('th-TH')}
+                      </span>
+                    )}
+                  </p>
+                  <a href={selectedOrder.slipImageUrl} target="_blank" rel="noreferrer" className="mt-2 block">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- DB-stored slip image */}
+                    <img
+                      src={selectedOrder.slipImageUrl}
+                      alt="สลิปการโอนเงิน"
+                      className="max-h-72 rounded border border-line-subtle object-contain"
+                    />
+                  </a>
+                  <p className="mt-1 text-xs text-fg-muted">กดที่สลิปเพื่อเปิดภาพเต็ม (ตรวจเลขอ้างอิง/ยอดเงิน)</p>
                 </div>
               )}
 

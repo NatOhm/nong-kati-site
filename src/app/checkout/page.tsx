@@ -444,10 +444,11 @@ export default function CheckoutPage(): React.JSX.Element {
                       onExpire={handleQrExpire}
                     />
 
-                    {/* Automatic slip verification (SlipOK) — renders only
-                        when the server has the feature enabled. */}
-                    {slipEnabled && order && paymentState.status !== 'succeeded' && (
-                      <SlipUploadPanel orderId={order.id} />
+                    {/* Slip upload — ALWAYS available for pending PromptPay:
+                        auto-verify first when SlipOK is on, otherwise the
+                        slip goes straight to the admin for manual check. */}
+                    {order && paymentState.status !== 'succeeded' && (
+                      <SlipUploadPanel orderId={order.id} slipVerifyEnabled={slipEnabled} />
                     )}
 
                     {/* Status messages */}

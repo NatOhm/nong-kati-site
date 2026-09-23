@@ -70,6 +70,9 @@ export async function GET(
           receiverAccount: slipVerification.slipReceiverAccount,
         }
       : null,
+    // Customer-uploaded slip for manual check (ส่งสลิปให้แอดมินตรวจ).
+    slipImageUrl: order.slipImageUrl,
+    slipUploadedAt: order.slipUploadedAt?.toISOString() ?? null,
     createdAt: order.createdAt.toISOString(),
     completedAt: order.completedAt?.toISOString() ?? null,
     items: order.items.map((i) => ({

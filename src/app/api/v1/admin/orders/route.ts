@@ -48,6 +48,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         discountThb: true,
         totalAmountThb: true,
         manualFulfilmentReason: true,
+        slipImageUrl: true,
         createdAt: true,
         completedAt: true,
         _count: { select: { items: true } },
@@ -68,6 +69,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       totalThb: Number(o.totalAmountThb),
       itemCount: o._count.items,
       manualFulfilmentReason: o.manualFulfilmentReason,
+      /** Customer sent a slip for manual check (ส่งสลิปให้แอดมินตรวจ). */
+      slipImageUrl: o.slipImageUrl,
       createdAt: o.createdAt.toISOString(),
       completedAt: o.completedAt?.toISOString() ?? null,
     })),
