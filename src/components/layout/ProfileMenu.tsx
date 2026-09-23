@@ -2,15 +2,31 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Settings, History, LogOut, Wallet, ChevronDown, ShieldCheck, LogIn } from 'lucide-react';
+import { Settings, History, LogOut, Wallet, ChevronDown, ShieldCheck, LogIn, UserCog } from 'lucide-react';
 
 import { cn } from '@/utils/cn';
 import { formatThb } from '@/utils/format';
-import { hasAdminSession } from '@/lib/adminSession';
+import { getAdminToken, hasAdminSession } from '@/lib/adminSession';
+import { type AdminRole } from '@/types/auth';
 import {
   useCustomerProfile,
   type CustomerProfile,
 } from '@/components/layout/CustomerProfileProvider';
+
+const ADMIN_ROLE_LABELS: Record<AdminRole, string> = {
+  super_admin: 'Super Admin',
+  catalogue_manager: 'ผู้จัดการสินค้า',
+  order_manager: 'ผู้จัดการคำสั่งซื้อ',
+  finance_viewer: 'ผู้ดูการเงิน',
+  support_agent: 'ฝ่ายสนับสนุน',
+  marketing_manager: 'ผู้จัดการการตลาด',
+};
+
+interface AdminIdentity {
+  fullName: string;
+  email: string;
+  role: AdminRole;
+}
 
 /**
  * Profile popover — client ask: กดโปรไฟล์แล้วเห็นชื่อผู้ใช้, เครดิต/ยอดเงิน,
@@ -23,13 +39,27 @@ export function ProfileMenu(): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const [wallet, setWallet] = useState<{ balanceThb: number } | null>(null);
   const [admin, setAdmin] = useState(false);
+  const [adminIdentity, setAdminIdentity] = useState<AdminIdentity | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
   // Admins get an entry into /management (client ask: admin account must be
   // able to reach its profile/panel from the storefront). Tokens-only check —
   // the management layout itself handles expiry/redirect on arrival.
   useEffect(() => {
-    setAdmin(hasAdminSession());
+    if (!hasAdminSession()) return;
+    setAdmin(true);
+    // Real identity for the popover header (name/role, like the admin panel
+    // top bar). Failures keep the generic label — non-blocking.
+    const token = getAdminToken();
+    if (!token) return;
+    fetch('/api/v1/auth/admin/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => (r.ok ? (r.json() as Promise<{ fullName: string; email: string; role: AdminRole }>) : null))
+      .then((d) => {
+        if (d?.email) setAdminIdentity(d);
+      })
+      .catch(() => {});
   }, []);
 
   // Identity comes free from the shared profile context (no /me refetch);
@@ -89,13 +119,21 @@ export function ProfileMenu(): React.JSX.Element {
           aria-label="เมนูบัญชี"
           className="clay-card suggest-drop absolute right-0 top-full z-50 mt-2 w-64 rounded-2xl p-2"
         >
-          {/* Identity — customer when signed in, admin badge otherwise */}
+          {/* Identity — customer when signed in; admin identity when admin */}
           <div className="border-b border-line-subtle px-3 pb-3 pt-2">
             <p className="truncate text-sm font-bold text-fg">
-              {profile?.fullName ?? (sessionState === 'authed' ? 'สมาชิก' : 'ผู้ดูแลระบบ')}
+              {profile?.fullName ??
+                (sessionState === 'authed'
+                  ? 'สมาชิก'
+                  : adminIdentity?.fullName ?? 'ผู้ดูแลระบบ')}
             </p>
             <p className="truncate text-xs text-fg-muted">
-              {profile?.email ?? (sessionState === 'authed' ? '—' : 'บัญชีแอดมิน')}
+              {profile?.email ??
+                (sessionState === 'authed'
+                  ? '—'
+                  : adminIdentity
+                    ? `${adminIdentity.email} · ${ADMIN_ROLE_LABELS[adminIdentity.role]}`
+                    : 'บัญชีแอดมิน')}
             </p>
           </div>
 
@@ -143,14 +181,24 @@ export function ProfileMenu(): React.JSX.Element {
               </>
             )}
             {admin && (
-              <Link
-                href="/management/dashboard"
-                role="menuitem"
-                onClick={() => setOpen(false)}
-                className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-semibold text-fg-brand transition-colors hover:bg-surface-sunken"
-              >
-                <ShieldCheck size={15} /> เข้าหน้าแอดมิน
-              </Link>
+              <>
+                <Link
+                  href="/management/dashboard"
+                  role="menuitem"
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-semibold text-fg-brand transition-colors hover:bg-surface-sunken"
+                >
+                  <ShieldCheck size={15} /> เข้าหน้าแอดมิน
+                </Link>
+                <Link
+                  href="/management/settings?tab=security"
+                  role="menuitem"
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-fg-secondary transition-colors hover:bg-surface-sunken hover:text-fg"
+                >
+                  <UserCog size={15} /> โปรไฟล์ผู้ดูแล (รหัสผ่าน/2FA)
+                </Link>
+              </>
             )}
             {sessionState !== 'authed' && admin && (
               <Link
