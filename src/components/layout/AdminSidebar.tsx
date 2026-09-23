@@ -19,6 +19,7 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
+  Home,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { type AdminRole } from '@/types/auth';
@@ -137,6 +138,21 @@ export function AdminSidebar({
             Nong-Kati
           </Link>
         )}
+      </div>
+
+      {/* Client ask: explicit back-to-storefront button above the admin nav. */}
+      <div className="px-2 pt-3">
+        <Link
+          href="/"
+          className={cn(
+            'flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-fg-muted transition-colors hover:bg-surface hover:text-fg',
+            collapsed && 'justify-center px-2',
+          )}
+          title={collapsed ? 'กลับหน้าแรก' : undefined}
+        >
+          <Home size={20} strokeWidth={1.5} />
+          {!collapsed && <span>กลับหน้าแรก</span>}
+        </Link>
       </div>
 
       {/* Navigation */}

@@ -1,55 +1,35 @@
 'use client';
 
-import { Suspense } from 'react';
 import Link from 'next/link';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { cn } from '@/utils/cn';
 
 /**
- * AccountTabs — the profile page's section tabs (client ask: show
- * สินค้าทั้งหมด / แนะนำ / รายการโปรด / คำสั่งซื้อ as a proper profile page
- * with tabs instead of only sidebar links). Clay pill tabs: the active tab
- * gets the brand surface + spring squish, inactive ones stay quiet.
- * Active state uses pathname + ?sort= so สินค้าทั้งหมด and แนะนำ can share
- * the same destination route while staying distinct tabs.
+ * AccountTabs — the profile page's section tabs (รายการโปรด / คำสั่งซื้อ).
+ * The old สินค้าทั้งหมด/แนะนำ store tabs were removed (client ask): shopping
+ * belongs on the storefront, not inside the profile.
+ * Clay pill tabs: the active tab gets the brand surface + spring squish.
  */
 
 export interface AccountTab {
   label: string;
   href: string;
-  /** Exact match against `pathname?sort=` — active test below. */
-  match: { path: string; sort?: string | null };
+  /** Path tested against the current pathname for the active state. */
+  match: { path: string };
 }
 
 export const ACCOUNT_TABS: AccountTab[] = [
-  {
-    label: 'สินค้าทั้งหมด',
-    href: '/account/dashboard?view=all',
-    match: { path: '/account/dashboard', sort: null },
-  },
-  {
-    label: 'แนะนำ',
-    href: '/account/dashboard?view=featured',
-    match: { path: '/account/dashboard', sort: 'featured' },
-  },
   { label: 'รายการโปรด', href: '/account/wishlist', match: { path: '/account/wishlist' } },
   { label: 'คำสั่งซื้อ', href: '/account/orders', match: { path: '/account/orders' } },
 ];
 
-/** Suspense wrapper: useSearchParams must not run during static prerender. */
+/** Tabs render inline — no useSearchParams, so no Suspense wrapper needed. */
 export function AccountTabs({ className }: { className?: string | undefined }): React.JSX.Element {
-  return (
-    <Suspense fallback={<div className="h-9" aria-hidden />}>
-      <AccountTabsInner className={className} />
-    </Suspense>
-  );
+  return <AccountTabsInner className={className} />;
 }
 
 function AccountTabsInner({ className }: { className?: string | undefined }): React.JSX.Element {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const activeSort = searchParams.get('sort') ?? searchParams.get('view');
-  const activeSortKey = activeSort === 'featured' ? 'featured' : null;
 
   return (
     <div
@@ -61,7 +41,7 @@ function AccountTabsInner({ className }: { className?: string | undefined }): Re
       )}
     >
       {ACCOUNT_TABS.map((tab) => {
-        const isActive = tab.match.path === pathname && (tab.match.sort ?? null) === activeSortKey;
+        const isActive = tab.match.path === pathname;
         return (
           <Link
             key={tab.label}

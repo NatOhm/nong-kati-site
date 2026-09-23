@@ -1,133 +1,115 @@
 /**
- * Profile Page (client ask: "Show the account sidebar sections
- * สินค้าทั้งหมด / แนะนำ / รายการโปรด / คำสั่งซื้อ as a proper profile page
- * with tabs instead of only sidebar links"). This route hosts the two
- * product tabs; รายการโปรด and คำสั่งซื้อ are the same tab bar on their own
- * routes, all backed by real APIs:
- *
- *   สินค้าทั้งหมด → GET /api/v1/products              (full live catalog)
- *   แนะนำ        → GET /api/v1/products?sort=featured
+ * Profile Page (โปรไฟล์ของฉัน) — wallet stats + top-up history.
+ * The tabbed store-in-profile views (สินค้าทั้งหมด/แนะนำ) were removed
+ * (client ask): shopping lives on the storefront, the profile owns the
+ * account data. ภาพรวม merges into this page; /account/overview redirects.
  */
 
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
-import { ShoppingBag, Sparkles } from 'lucide-react';
 
 import { AccountTabs } from '@/components/account/AccountTabs';
-import { ProductCard } from '@/components/product/ProductCard';
-import { ProductGrid } from '@/components/product/ProductGrid';
 import { useCustomerProfile } from '@/components/layout/CustomerProfileProvider';
 import { HamsterLoader } from '@/components/loading/HamsterLoader';
+import { formatThb } from '@/lib/pricing';
 
-interface CatalogProduct {
-  id: string;
-  name: string;
-  slug: string;
-  shortDescription: string | null;
-  imageUrl: string | null;
-  category: { name: string; slug: string };
-  variants: { id: string; label: string; price: number; effectivePrice: number; stock: number }[];
+interface WalletData {
+  balanceThb: number;
+  topupThisMonthThb: number;
+  spendThisMonthThb: number;
+  lifetimeSpendThb: number;
+  topups: { id: string; amountThb: number; method: string; status: string; createdAt: string }[];
 }
+
+const METHOD_LABEL: Record<string, string> = {
+  promptpay: 'พร้อมเพย์',
+  credit_card: 'บัตรเครดิต',
+  manual: 'เจ้าหน้าที่ยืนยัน',
+};
 
 export default function ProfilePage(): React.JSX.Element {
   const { state: sessionState } = useCustomerProfile();
-  const searchParams = useSearchParams();
-  const view = searchParams.get('view') === 'featured' ? 'featured' : 'all';
-
-  const [products, setProducts] = useState<CatalogProduct[] | null>(null);
-  const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [data, setData] = useState<WalletData | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (sessionState !== 'authed') return;
-    let cancelled = false;
-    setProducts(null);
-    setState('loading');
-    fetch(`/api/v1/products?limit=24&sort=${view === 'featured' ? 'featured' : 'name-asc'}`, {
-      credentials: 'include',
-    })
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then((d: { products: CatalogProduct[] }) => {
-        if (!cancelled) {
-          setProducts(d.products ?? []);
-          setState('ready');
-        }
+    fetch('/api/v1/wallet', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        setData(d);
+        setLoading(false);
       })
-      .catch(() => {
-        if (!cancelled) setState('error');
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [sessionState, view]);
+      .catch(() => setLoading(false));
+  }, [sessionState]);
 
-  if (sessionState === 'loading') return <HamsterLoader />;
+  if (sessionState === 'loading' || loading) return <HamsterLoader />;
+
+  const stats = [
+    { label: 'เครดิตคงเหลือ', value: formatThb(data?.balanceThb ?? 0) },
+    { label: 'ค่าใช้จ่ายในเดือนนี้', value: formatThb(data?.spendThisMonthThb ?? 0) },
+    { label: 'เติมเงินในเดือนนี้', value: formatThb(data?.topupThisMonthThb ?? 0) },
+    { label: 'ยอดใช้จ่ายสะสม', value: formatThb(data?.lifetimeSpendThb ?? 0) },
+  ];
 
   return (
     <div className="space-y-6">
       {/* Header + tabs */}
       <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-bold text-fg">โปรไฟล์ของฉัน</h1>
-          <Link
-            href="/account/overview"
-            className="clay-btn inline-flex h-9 items-center rounded-full bg-surface px-4 text-sm font-semibold text-fg-muted transition-all duration-interactive ease-ease-out hover:scale-[1.03] hover:text-fg active:scale-[0.96]"
-          >
-            ภาพรวม &amp; กระเป๋าเงิน
-          </Link>
-        </div>
+        <h1 className="text-2xl font-bold text-fg">โปรไฟล์ของฉัน</h1>
         <AccountTabs />
       </div>
 
-      {/* ─── สินค้าทั้งหมด / แนะนำ ─── */}
-      <section aria-label={view === 'featured' ? 'สินค้าแนะนำ' : 'สินค้าทั้งหมด'}>
-        {view === 'featured' ? (
-          <p className="mb-4 flex items-center gap-2 text-sm text-fg-muted">
-            <Sparkles size={16} className="text-fawn-500" aria-hidden />
-            สินค้าที่เราคัดมาแนะนำให้คุณเป็นพิเศษ
+      {/* Stats — plain numbers, no round icons (client ask) */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {stats.map((s) => (
+          <div key={s.label} className="clay-card p-4">
+            <p className="text-xs text-fg-muted">{s.label}</p>
+            <p className="mt-1 text-2xl font-bold text-fg">{s.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Top-up history (client ask: ประวัติการเติมเงิน ไม่ใช่คำสั่งซื้อล่าสุด) */}
+      <div className="clay-card p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-fg">ประวัติการเติมเงิน</h2>
+          <a href="/account/wallet" className="text-sm font-medium text-fg-brand hover:underline">
+            ดูทั้งหมด
+          </a>
+        </div>
+        {!data || data.topups.length === 0 ? (
+          <p className="py-6 text-center text-sm text-fg-muted">
+            ยังไม่มีรายการเติมเงิน — เมื่อเติมเงินแล้วจะแสดงที่นี่
           </p>
         ) : (
-          <p className="mb-4 flex items-center gap-2 text-sm text-fg-muted">
-            <ShoppingBag size={16} aria-hidden />
-            ทุกสินค้าในร้าน พร้อมซื้อได้ทันทีจากการ์ด
-          </p>
-        )}
-
-        {state === 'loading' && <HamsterLoader />}
-        {state === 'error' && (
-          <div className="clay-card p-8 text-center">
-            <p className="text-sm text-fg-muted">โหลดสินค้าไม่สำเร็จ — ลองรีเฟรชหน้าอีกครั้ง</p>
-          </div>
-        )}
-        {state === 'ready' && products && products.length === 0 && (
-          <div className="clay-card p-8 text-center">
-            <p className="text-sm text-fg-muted">ยังไม่มีสินค้าในร้าน</p>
-          </div>
-        )}
-        {state === 'ready' && products && products.length > 0 && (
-          <ProductGrid>
-            {products.map((p) => (
-              <ProductCard
-                key={p.id}
-                id={p.id}
-                name={p.name}
-                slug={p.slug}
-                shortDescription={p.shortDescription}
-                imageUrl={p.imageUrl}
-                categoryName={p.category.name}
-                categorySlug={p.category.slug}
-                price={p.variants[0]?.effectivePrice ?? 0}
-                stock={p.variants.reduce((sum, v) => sum + v.stock, 0)}
-                variantId={p.variants[0]?.id}
-                variantCount={p.variants.length}
-                variants={p.variants}
-              />
+          <div className="space-y-2">
+            {data.topups.slice(0, 5).map((t) => (
+              <div
+                key={t.id}
+                className="flex items-center justify-between rounded-xl border border-line-subtle px-4 py-3"
+              >
+                <div>
+                  <p className="text-sm font-semibold text-fg">{formatThb(t.amountThb)}</p>
+                  <p className="text-xs text-fg-muted">
+                    {new Date(t.createdAt).toLocaleDateString('th-TH', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                    })}
+                    {' · '}
+                    {METHOD_LABEL[t.method] ?? t.method}
+                  </p>
+                </div>
+                <span className="rounded-full bg-jade-500/15 px-2.5 py-0.5 text-xs font-medium text-jade-700">
+                  สำเร็จ
+                </span>
+              </div>
             ))}
-          </ProductGrid>
+          </div>
         )}
-      </section>
+      </div>
     </div>
   );
 }

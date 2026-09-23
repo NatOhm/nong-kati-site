@@ -20,6 +20,7 @@ import {
   Settings,
   LogOut,
   Wallet,
+  Home,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
@@ -33,20 +34,7 @@ const NAV_ITEMS: {
   icon: LucideIcon;
 }[] = [
   { label: 'โปรไฟล์', href: '/account/dashboard', icon: LayoutDashboard },
-  { label: 'ภาพรวม', href: '/account/overview', icon: LayoutDashboard },
   { label: 'กระเป๋าเงิน', href: '/account/wallet', icon: Wallet },
-  {
-    label: 'สินค้าทั้งหมด',
-    href: '/account/dashboard?view=all',
-    match: '/account/dashboard',
-    icon: ShoppingBag,
-  },
-  {
-    label: 'แนะนำ',
-    href: '/account/dashboard?view=featured',
-    match: '/account/dashboard',
-    icon: Star,
-  },
   { label: 'รายการโปรด', href: '/account/wishlist', icon: Heart },
   { label: 'คำสั่งซื้อ', href: '/account/orders', icon: ShoppingBag },
   { label: 'โค้ดที่ซื้อ', href: '/account/codes', icon: Key },
@@ -138,6 +126,14 @@ function AccountLayoutInner({
             </ul>
 
             <div className="mt-4 border-t border-line-subtle pt-4">
+              {/* Client ask: explicit back-to-storefront button on the profile. */}
+              <Link
+                href="/"
+                className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-fg-muted transition-colors hover:bg-surface hover:text-fg"
+              >
+                <Home size={16} />
+                กลับหน้าแรก
+              </Link>
               <button
                 type="button"
                 onClick={() => {

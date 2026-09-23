@@ -1,113 +1,11 @@
 /**
- * Profile Overview (ภาพรวม) — wallet stats + top-up history. Extracted from
- * the old dashboard page so the profile page can own the tabbed product
- * views; linked from the profile header.
+ * /account/overview — merged into /account/dashboard (โปรไฟล์ของฉัน) when the
+ * store tabs were removed from the profile. Kept as a permanent redirect so
+ * old links (and the wallet page's ดูทั้งหมด backlinks) keep working.
  */
 
-'use client';
+import { redirect } from 'next/navigation';
 
-import { useEffect, useState } from 'react';
-
-import { AccountTabs } from '@/components/account/AccountTabs';
-import { useCustomerProfile } from '@/components/layout/CustomerProfileProvider';
-import { HamsterLoader } from '@/components/loading/HamsterLoader';
-import { formatThb } from '@/lib/pricing';
-
-interface WalletData {
-  balanceThb: number;
-  topupThisMonthThb: number;
-  spendThisMonthThb: number;
-  lifetimeSpendThb: number;
-  topups: { id: string; amountThb: number; method: string; status: string; createdAt: string }[];
-}
-
-const METHOD_LABEL: Record<string, string> = {
-  promptpay: 'พร้อมเพย์',
-  credit_card: 'บัตรเครดิต',
-  manual: 'เจ้าหน้าที่ยืนยัน',
-};
-
-export default function AccountOverviewPage(): React.JSX.Element {
-  const { state: sessionState } = useCustomerProfile();
-  const [data, setData] = useState<WalletData | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (sessionState !== 'authed') return;
-    fetch('/api/v1/wallet', { credentials: 'include' })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        setData(d);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, [sessionState]);
-
-  if (sessionState === 'loading' || loading) return <HamsterLoader />;
-
-  const stats = [
-    { label: 'เครดิตคงเหลือ', value: formatThb(data?.balanceThb ?? 0) },
-    { label: 'ค่าใช้จ่ายในเดือนนี้', value: formatThb(data?.spendThisMonthThb ?? 0) },
-    { label: 'เติมเงินในเดือนนี้', value: formatThb(data?.topupThisMonthThb ?? 0) },
-    { label: 'ยอดใช้จ่ายสะสม', value: formatThb(data?.lifetimeSpendThb ?? 0) },
-  ];
-
-  return (
-    <div className="space-y-6">
-      <div className="space-y-4">
-        <h1 className="text-2xl font-bold text-fg">ภาพรวม</h1>
-        <AccountTabs />
-      </div>
-
-      {/* Stats — plain numbers, no round icons (client ask) */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((s) => (
-          <div key={s.label} className="clay-card p-4">
-            <p className="text-xs text-fg-muted">{s.label}</p>
-            <p className="mt-1 text-2xl font-bold text-fg">{s.value}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Top-up history (client ask: เปลี่ยนจากคำสั่งซื้อล่าสุดเป็นประวัติการเติมเงิน) */}
-      <div className="clay-card p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-fg">ประวัติการเติมเงิน</h2>
-          <a href="/account/wallet" className="text-sm font-medium text-fg-brand hover:underline">
-            ดูทั้งหมด
-          </a>
-        </div>
-        {!data || data.topups.length === 0 ? (
-          <p className="py-6 text-center text-sm text-fg-muted">
-            ยังไม่มีรายการเติมเงิน — เมื่อเติมเงินแล้วจะแสดงที่นี่
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {data.topups.slice(0, 5).map((t) => (
-              <div
-                key={t.id}
-                className="flex items-center justify-between rounded-xl border border-line-subtle px-4 py-3"
-              >
-                <div>
-                  <p className="text-sm font-semibold text-fg">{formatThb(t.amountThb)}</p>
-                  <p className="text-xs text-fg-muted">
-                    {new Date(t.createdAt).toLocaleDateString('th-TH', {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric',
-                    })}
-                    {' · '}
-                    {METHOD_LABEL[t.method] ?? t.method}
-                  </p>
-                </div>
-                <span className="rounded-full bg-jade-500/15 px-2.5 py-0.5 text-xs font-medium text-jade-700">
-                  สำเร็จ
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
+export default function AccountOverviewPage(): never {
+  redirect('/account/dashboard');
 }
