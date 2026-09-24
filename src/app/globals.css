@@ -118,6 +118,31 @@
     box-shadow: var(--shadow-clay);
   }
 
+  /* Dark-mode readability: the hardcoded status colors (text-jade-700,
+     text-coral-700, text-amber-600 …) are tuned for cream backgrounds and
+     fall below 4.5:1 on the dark surfaces. Remap the two worst to their
+     light ramp values inside dark mode — 25+ admin usages, one rule. */
+  [data-theme='dark'] .text-jade-700 {
+    color: var(--jade-400);
+  }
+  [data-theme='dark'] .text-coral-700 {
+    color: var(--coral-300);
+  }
+  [data-theme='dark'] .text-amber-600 {
+    color: #fbbf24;
+  }
+
+  /* White text on the peach-500 primary fill drops below 4.5:1 (2.7–2.8:1
+     measured) in both themes. The thin font weights used on pills/buttons
+     need the deeper fill; peach-700 keeps the brand look and passes.
+     Applies to both themes — same pairing, same failure. */
+  .bg-peach-500.text-white {
+    background-color: var(--peach-700);
+  }
+  .hover\:bg-peach-400:hover {
+    background-color: var(--peach-600);
+  }
+
   [data-theme='dark'] .clay-btn {
     box-shadow: var(--shadow-clay-sm);
   }

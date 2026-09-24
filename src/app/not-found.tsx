@@ -13,7 +13,7 @@ export default function NotFound(): React.JSX.Element {
         {/* drifting Zzz */}
         <div
           aria-hidden="true"
-          className="zzz absolute -right-2 -top-2 font-display text-lg font-bold text-fg-placeholder"
+          className="zzz text-fg-secondary absolute -right-2 -top-2 font-display text-lg font-bold"
         >
           <span className="absolute">Z</span>
           <span className="absolute">z</span>

@@ -24,7 +24,7 @@ export default function GlobalError({
         <HamsterSleeping size={150} className="drop-shadow-[0_8px_14px_rgba(147,107,73,0.3)]" />
         <div
           aria-hidden="true"
-          className="zzz absolute -right-2 -top-2 font-display text-lg font-bold text-fg-placeholder"
+          className="zzz text-fg-secondary absolute -right-2 -top-2 font-display text-lg font-bold"
         >
           <span className="absolute">Z</span>
           <span className="absolute">z</span>
@@ -32,7 +32,7 @@ export default function GlobalError({
         </div>
       </div>
       <h1 className="font-display text-3xl font-bold text-fg-brand-strong">เกิดข้อผิดพลาด</h1>
-      <p className="mt-3 max-w-sm text-base text-fg-muted">
+      <p className="text-fg-secondary mt-3 max-w-sm text-base">
         บางอย่างผิดพลาดชั่วคราว — น้องแฮมสเตอร์กำลังพยายามอีกครั้ง
       </p>
       <button

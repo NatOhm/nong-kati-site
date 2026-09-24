@@ -169,7 +169,7 @@ export function AdminSidebar({
                   className={cn(
                     'flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors',
                     isActive
-                      ? 'bg-peach-100 text-fg-brand'
+                      ? 'bg-surface-brand-subtle text-fg-brand'
                       : 'text-fg-muted hover:bg-surface hover:text-fg',
                     collapsed && 'justify-center px-2',
                   )}

@@ -266,7 +266,10 @@
   --bg-overlay: rgba(40, 27, 16, 0.8);
   --bg-brand: var(--peach-400);
   --bg-brand-hover: var(--peach-300);
-  --bg-brand-subtle: var(--clay-800);
+  /* Darker than clay-800: this fill sits under peach-300/jade-400/coral-300
+     accents — at clay-800 the peach pairing lands at 4.47:1 (below WCAG AA
+     for the 12px sidebar text). 5C4426 puts every accent ≥ 4.5:1. */
+  --bg-brand-subtle: #5c4426;
   --bg-success: #14301f;
   --bg-error: #38181d;
   --bg-warning: #33250e;
