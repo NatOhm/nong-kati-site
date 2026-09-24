@@ -29,7 +29,8 @@ import {
 } from '@/lib/data';
 
 export const metadata: Metadata = {
-  title: 'ซื้อบัตรเกม Netflix Steam และอีคอมเมิร์ซ — Nong-Kati',
+  // No manual brand suffix — the root template appends "— Nong-Kati" (audit #12).
+  title: 'ซื้อบัตรเกม Netflix Steam และอีคอมเมิร์ซ',
   description:
     'ซื้อ gift card ออนไลน์ ส่งโค้ดทันที ครอบคลุม เกม สตรีมมิ่ง และ อีคอมเมิร์ซ ราคาดี จ่ายผ่าน PromptPay และบัตรเครดิต',
   openGraph: {
@@ -83,7 +84,9 @@ export default async function HomePage(): Promise<React.JSX.Element> {
             <p className="font-display text-xl font-bold leading-snug text-fg-brand-strong sm:text-2xl">
               📢 โค้ดเกม สตรีมมิ่ง และอีคอมเมิร์ซ ส่งถึงอีเมลใน 60 วินาที
             </p>
-            <p className="mt-1.5 text-sm text-fg-muted">
+            {/* clay-700 lands exactly 4.50 on the peach-50 card — use clay-800
+                for headroom (7.11). Dark keeps the muted token. */}
+            <p className="mt-1.5 text-sm text-clay-800 dark:text-fg-muted">
               จ่ายผ่าน PromptPay หรือบัตรเครดิต รหัสสินค้าถูกส่งอัตโนมัติ ไม่ต้องรอแอดมิน
             </p>
             <Link
@@ -109,7 +112,7 @@ export default async function HomePage(): Promise<React.JSX.Element> {
                   key={item.step}
                   className="clay-card flex items-center gap-4 rounded-xl p-4 transition-transform duration-fast ease-out-quart hover:-translate-y-0.5"
                 >
-                  <span className="shrink-0 text-2xl font-bold text-peach-500">{item.step}</span>
+                  <span className="text-2xl font-bold text-peach-700 dark:text-peach-200">{item.step}</span>
                   <div>
                     <h3 className="text-sm font-semibold text-fg">{item.title}</h3>
                     <p className="text-xs text-fg-muted">{item.desc}</p>
@@ -133,7 +136,7 @@ export default async function HomePage(): Promise<React.JSX.Element> {
               <h2 className="text-lg font-bold text-fg">หมวดเมนูแยกตามแอป</h2>
               <Link
                 href="/search"
-                className="text-sm font-medium text-fg-brand hover:text-fg-brand"
+                className="text-sm font-medium text-fg-brand-strong hover:text-fg-brand-strong"
               >
                 ดูทั้งหมด
               </Link>
@@ -164,7 +167,7 @@ export default async function HomePage(): Promise<React.JSX.Element> {
                 <h2 className="text-lg font-bold text-fg">สินค้าแนะนำ</h2>
                 <Link
                   href="/search?q="
-                  className="text-sm font-medium text-fg-brand hover:text-fg-brand"
+                  className="text-sm font-medium text-fg-brand-strong hover:text-fg-brand-strong"
                 >
                   ดูทั้งหมด →
                 </Link>

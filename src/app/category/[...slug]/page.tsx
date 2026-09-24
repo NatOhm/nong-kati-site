@@ -26,11 +26,11 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
   try {
     result = await getCategoryBySlug(slugPath);
   } catch {
-    return { title: 'หมวดหมู่ — Nong-Kati' };
+    return { title: 'หมวดหมู่' };
   }
 
   if (!result) {
-    return { title: 'ไม่พบหมวดหมู่ — Nong-Kati' };
+    return { title: 'ไม่พบหมวดหมู่' };
   }
 
   const { category } = result;
@@ -40,7 +40,7 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
     title: `${category.name} — ซื้อบัตรออนไลน์`,
     description: `ซื้อ ${category.name} ออนไลน์ ส่งโค้ดทันที ราคาดี`,
     openGraph: {
-      title: `${category.name} — Nong-Kati`,
+      title: category.name,
       description: `ซื้อ ${category.name} ออนไลน์ ส่งโค้ดทันที`,
       type: 'website',
       url: categoryUrl,

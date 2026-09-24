@@ -26,11 +26,11 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
   try {
     product = await getProductBySlug(slug);
   } catch {
-    return { title: 'สินค้า — Nong-Kati' };
+    return { title: 'สินค้า' };
   }
 
   if (!product) {
-    return { title: 'ไม่พบสินค้า — Nong-Kati' };
+    return { title: 'ไม่พบสินค้า' };
   }
 
   const siteUrl = process.env['NEXT_PUBLIC_SITE_URL'] || 'https://nong-kati.com';
@@ -40,7 +40,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
     title: `${product.name} — ซื้อบัตรออนไลน์`,
     description: product.shortDescription || `ซื้อ ${product.name} ออนไลน์ ส่งโค้ดทันที`,
     openGraph: {
-      title: `${product.name} — Nong-Kati`,
+      title: product.name,
       description: product.shortDescription || `ซื้อ ${product.name} ออนไลน์`,
       type: 'website',
       url: productUrl,

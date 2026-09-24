@@ -105,8 +105,10 @@ export function ProductCard({
           </div>
 
           <div className="flex flex-col gap-1.5 p-3 pb-0">
-            <span className="text-xs font-medium text-fg-brand">{categoryName}</span>
-            <h3 className="line-clamp-2 text-sm font-semibold text-fg transition-colors group-hover:text-fg-brand">
+            {/* fg-brand (peach-300 dark) lands at 4.47 on the card fill —
+                brand-strong clears it in both themes. */}
+            <span className="text-xs font-medium text-fg-brand-strong">{categoryName}</span>
+            <h3 className="line-clamp-2 text-sm font-semibold text-fg transition-colors group-hover:text-fg-brand-strong">
               {name}
             </h3>
             {shortDescription && (
@@ -118,7 +120,7 @@ export function ProductCard({
         {/* Price pill + stock urgency + buy button — outside the link */}
         <div className="flex flex-1 flex-col gap-2 p-3">
           <div className="mt-auto flex items-center justify-between gap-2">
-            <span className="shadow-inset-sm rounded-full bg-surface-sunken px-3 py-1 text-sm font-bold text-fg-brand">
+            <span className="shadow-inset-sm rounded-full bg-surface-sunken px-3 py-1 text-sm font-bold text-fg-brand-strong">
               {formatThb(price)}
             </span>
             {/* Stock urgency line */}
@@ -128,7 +130,7 @@ export function ProductCard({
                 stock === 0
                   ? 'text-fg-muted'
                   : stock <= 5
-                    ? 'text-coral-600 dark:text-blush-300'
+                    ? 'text-coral-600 dark:text-coral-200'
                     : 'text-fg-muted',
               )}
             >

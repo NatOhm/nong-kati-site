@@ -176,7 +176,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlideContent[] }): React.
                 'h-2.5 rounded-full transition-all duration-fast ease-out-quart',
                 i === active
                   ? 'w-8 bg-fg-brand shadow-clay-sm'
-                  : 'w-2.5 bg-line hover:bg-fg-placeholder',
+                  : 'w-2.5 bg-clay-600 hover:bg-fg-placeholder',
               )}
             />
           ))}

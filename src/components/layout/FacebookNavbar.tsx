@@ -94,8 +94,13 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
               </span>
             </Link>
 
-            {/* Search bar — suggestions slide down Google-style as you type */}
-            <form onSubmit={handleSearch} className="relative hidden md:block">
+            {/* Search bar — suggestions slide down Google-style as you type.
+                Hidden on /search itself, where the page-level field replaces
+                it (audit #9: one search control per viewport). */}
+            <form
+              onSubmit={handleSearch}
+              className={cn('relative hidden md:block', pathname?.startsWith('/search') && 'md:hidden')}
+            >
               <div
                 className={cn(
                   'shadow-inset-sm group/search relative flex items-center gap-2 rounded-full border bg-surface-elevated px-3 py-2 transition-all duration-interactive ease-ease-out',
@@ -181,7 +186,7 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
                   className={cn(
                     'relative rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-interactive ease-ease-out',
                     isActive
-                      ? 'bg-peach-100 text-fg-brand'
+                      ? 'bg-peach-100 text-fg-brand-strong'
                       : 'text-fg-secondary hover:-translate-y-0.5 hover:bg-surface-sunken hover:text-fg active:translate-y-0 active:scale-95',
                   )}
                   aria-current={isActive ? 'page' : undefined}

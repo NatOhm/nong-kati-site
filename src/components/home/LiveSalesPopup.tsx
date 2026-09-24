@@ -58,28 +58,28 @@ export function LiveSalesPopup() {
       <div className="bg-surface-base/95 flex items-center gap-3 rounded-xl border border-line-subtle p-3 shadow-clay-lg backdrop-blur-md">
         {/* Icon */}
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-jade-500/15">
-          <ShoppingCart size={18} className="text-green-400" />
+          <ShoppingCart size={18} className="text-jade-700" />
         </div>
 
         {/* Content */}
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium text-green-400">🛒 ยอดขายล่าสุด</p>
+          <p className="text-xs font-medium text-jade-700">🛒 ยอดขายล่าสุด</p>
           <p className="truncate text-sm text-fg">
             <span className="font-medium">{sale.name}</span> ซื้อ{' '}
-            <span className="text-fg-brand">{sale.product}</span>
+            <span className="text-fg-brand-strong">{sale.product}</span>
           </p>
-          <p className="text-xs text-clay-400">{sale.time}</p>
+          <p className="text-xs text-fg-secondary">{sale.time}</p>
         </div>
 
         {/* Price */}
         <div className="shrink-0 text-right">
-          <p className="text-sm font-bold text-fg-brand">฿{sale.price}</p>
+          <p className="text-sm font-bold text-fg-brand-strong">฿{sale.price}</p>
         </div>
 
         {/* Close */}
         <button
           onClick={() => setIsDismissed(true)}
-          className="shrink-0 rounded-full p-1 text-clay-400 hover:bg-surface hover:text-fg-muted"
+          className="shrink-0 rounded-full p-1 text-fg-muted hover:bg-surface hover:text-fg"
         >
           <X size={14} />
         </button>

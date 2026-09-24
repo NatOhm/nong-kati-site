@@ -114,17 +114,19 @@ export default function LoginPage(): React.JSX.Element {
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Email */}
             <div>
-              <label className="mb-1 block text-sm text-fg-muted">อีเมล</label>
+              <label htmlFor="login-email" className="mb-1 block text-sm text-fg-muted">อีเมล</label>
               <div className="relative">
                 <Mail
                   size={16}
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-placeholder"
                 />
                 <input
+                  id="login-email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  autoComplete="email"
                   className="w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-3 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand focus:outline-none"
                   placeholder="your@email.com"
                 />
@@ -133,24 +135,28 @@ export default function LoginPage(): React.JSX.Element {
 
             {/* Password */}
             <div>
-              <label className="mb-1 block text-sm text-fg-muted">รหัสผ่าน</label>
+              <label htmlFor="login-password" className="mb-1 block text-sm text-fg-muted">รหัสผ่าน</label>
               <div className="relative">
                 <Lock
                   size={16}
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-placeholder"
                 />
                 <input
+                  id="login-password"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  autoComplete="current-password"
                   className="w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-10 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand focus:outline-none"
                   placeholder="••••••••"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-1 top-1/2 -translate-y-1/2 p-2.5 text-fg-placeholder hover:text-fg-secondary"
+                  aria-label={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
+                  aria-pressed={showPassword}
+                  className="absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center p-2.5 text-fg-placeholder hover:text-fg-secondary"
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -229,12 +235,8 @@ export default function LoginPage(): React.JSX.Element {
             </>
           )}
 
-          {/* Magic Link */}
-          <div className="mt-4 border-t border-line-subtle pt-4 text-center">
-            <Link href="/account/magic-link" className="text-sm text-fg-brand hover:text-fg-brand">
-              เข้าสู่ระบบด้วย Magic Link
-            </Link>
-          </div>
+          {/* Magic Link — hidden until /account/magic-link + its API exist;
+              never advertise a dead destination (audit #5). */}
         </div>
 
         {/* Register link */}

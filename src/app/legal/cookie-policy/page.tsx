@@ -6,7 +6,7 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'นโยบายคุกกี้ — Nong-Kati',
+  title: 'นโยบายคุกกี้',
   description: 'นโยบายคุกกี้ของ Nong-Kati',
 };
 

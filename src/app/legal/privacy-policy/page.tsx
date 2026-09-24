@@ -6,7 +6,7 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'นโยบายความเป็นส่วนตัว — Nong-Kati',
+  title: 'นโยบายความเป็นส่วนตัว',
   description: 'นโยบายความเป็นส่วนตัวของ Nong-Kati ตาม พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562',
 };
 

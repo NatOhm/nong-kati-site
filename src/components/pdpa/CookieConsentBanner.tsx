@@ -105,44 +105,43 @@ export function CookieConsentBanner(): React.JSX.Element | null {
   if (!visible) return null;
 
   return (
-    <div className="fixed inset-x-0 bottom-[4.25rem] z-50 border border-line-subtle bg-surface-base p-4 shadow-lg md:bottom-0 md:border-x-0 md:border-b-0 md:border-t lg:bottom-0 lg:p-6">
-      {/* Mobile: sits above the fixed bottom taskbar (bottom-[4.25rem]) so the
-          taskbar stays reachable; md/lg have no taskbar → full bottom. */}
+    <div className="fixed inset-x-0 bottom-[4.25rem] z-50 border border-line-subtle bg-surface-base px-3 py-3 shadow-lg md:bottom-0 md:border-x-0 md:border-b-0 md:border-t md:px-6 md:py-4 lg:bottom-0">
+      {/* Mobile: compact two-row banner above the taskbar (audit #7) — copy
+          is one line with truncation-resistant short text so page CTAs stay
+          reachable before consent. */}
       <div className="mx-auto max-w-4xl">
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           {/* Icon + Text */}
-          <div className="flex items-start gap-3">
-            <ShieldCheck size={24} className="mt-0.5 shrink-0 text-fg-brand" />
-            <div>
-              <h3 className="mb-1 text-sm font-semibold text-fg">การใช้คุกกี้</h3>
-              <p className="text-xs leading-relaxed text-fg-placeholder">
-                เราใช้คุกกี้เพื่อให้เว็บไซต์ทำงานได้อย่างถูกต้อง
-                และปรับปรุงประสบการณ์การใช้งานของคุณ
-                คุณสามารถเลือกประเภทของคุกกี้ที่ต้องการอนุญาตได้
-              </p>
-            </div>
+          <div className="flex items-center gap-2.5">
+            <ShieldCheck size={20} className="shrink-0 text-fg-brand" />
+            <p className="text-xs leading-snug text-fg-secondary">
+              <span className="font-semibold text-fg">การใช้คุกกี้:</span>{' '}
+              เราใช้คุกกี้เพื่อการทำงานของเว็บไซต์และประสบการณ์ของคุณ
+            </p>
           </div>
 
-          {/* Actions */}
-          <div className="flex shrink-0 flex-wrap gap-2">
+          {/* Actions — 44px targets (audit #6) with equal-prominence
+              accept/reject. */}
+          <div className="flex shrink-0 items-center gap-2">
             <button
               onClick={() => setShowDetails(!showDetails)}
-              className="inline-flex min-h-[32px] items-center gap-1 rounded-md border border-line-subtle px-3 py-1.5 text-xs text-fg-muted hover:bg-surface"
+              className="inline-flex h-11 items-center gap-1 rounded-md border border-line-subtle px-3 text-xs text-fg-secondary hover:bg-surface"
+              aria-expanded={showDetails}
             >
-              <Settings size={12} />
+              <Settings size={14} />
               {showDetails ? 'ซ่อน' : 'ตั้งค่า'}
             </button>
             <button
               onClick={handleRejectAll}
-              className="inline-flex min-h-[32px] rounded-md border border-line-subtle px-3 py-1.5 text-xs text-fg-muted hover:bg-surface"
+              className="inline-flex h-11 items-center rounded-md border border-line-subtle px-3 text-xs text-fg-secondary hover:bg-surface"
             >
-              ปฏิเสธทั้งหมด
+              ปฏิเสธ
             </button>
             <button
               onClick={handleAcceptAll}
-              className="inline-flex min-h-[32px] rounded-md bg-peach-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-peach-400"
+              className="inline-flex h-11 items-center rounded-md bg-peach-700 px-4 text-xs font-semibold text-white hover:bg-peach-800"
             >
-              ยอมรับทั้งหมด
+              ยอมรับ
             </button>
           </div>
         </div>

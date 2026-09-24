@@ -182,12 +182,14 @@
 
   /* ── Animation ── */
   --duration-instant: 80ms;
-  --duration-fast: 150ms;
-  --duration-default: 200ms;
-  --duration-moderate: 300ms;
-  --duration-slow: 400ms;
-  --duration-deliberate: 600ms;
-  --duration-interactive: 550ms;
+  /* Motion (audit #11): controls 120–180ms, page entry 180–240ms.
+     550ms made routine navigation feel sluggish. */
+  --duration-fast: 120ms;
+  --duration-default: 180ms;
+  --duration-moderate: 240ms;
+  --duration-slow: 300ms;
+  --duration-deliberate: 450ms;
+  --duration-interactive: 180ms;
 
   --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
   --ease-in-quart: cubic-bezier(0.5, 0, 0.75, 0);
@@ -236,12 +238,17 @@
 
   --fg-primary: var(--clay-900);
   --fg-secondary: var(--clay-700);
-  --fg-muted: var(--clay-600);
-  --fg-placeholder: var(--clay-500);
+  /* WCAG 2.2 AA on the cream base (#fff7ed): muted needs >=4.5 for its
+     12–14px helper copy (clay-600 was 3.02) and placeholder 4.5 where it
+     labels form fields (clay-500 was 2.2). clay-700 = 4.50 on cream and
+     4.68 on white cards. The storefront keeps hierarchy via size/weight
+     instead of failing contrast (audit #3). */
+  --fg-muted: var(--clay-700);
+  --fg-placeholder: var(--clay-700);
   --fg-inverse: var(--clay-50);
-  --fg-brand: var(--peach-600);
+  --fg-brand: var(--peach-700);
   --fg-brand-strong: var(--peach-800);
-  --fg-success: #2e7d4f;
+  --fg-success: #1f6b44;
   --fg-error: var(--coral-700);
   --fg-warning: #8a5b12;
   --fg-info: #3b5b9e;
@@ -280,7 +287,7 @@
   --fg-muted: var(--clay-400);
   --fg-placeholder: var(--clay-500);
   --fg-inverse: var(--clay-900);
-  --fg-brand: var(--peach-300);
+  --fg-brand: var(--peach-200);
   --fg-brand-strong: var(--peach-200);
   --fg-success: #9fd4b0;
   --fg-error: var(--coral-300);

@@ -47,7 +47,7 @@ export async function generateMetadata({ searchParams }: SearchPageProps): Promi
   const query = q || '';
 
   return {
-    title: query ? `ค้นหา "${query}" — Nong-Kati` : 'สินค้าทั้งหมด — Nong-Kati',
+    title: query ? `ค้นหา "${query}"` : `สินค้าทั้งหมด`,
     description: query
       ? `ผลการค้นหา "${query}" — ซื้อบัตรเกม สตรีมมิ่ง และอีคอมเมิร์ซ ออนไลน์`
       : 'เลือกซื้อสินค้าทั้งหมด gift card ออนไลน์ ส่งโค้ดทันที',
@@ -84,7 +84,8 @@ export default async function SearchPage({
   return (
     <>
       <FacebookLayout>
-        <main>
+        {/* The layout owns the single <main> landmark (audit #4). */}
+        <div>
           <PageShell>
             {/* Breadcrumb */}
             <Breadcrumb
@@ -97,7 +98,8 @@ export default async function SearchPage({
               ]}
             />
 
-            <h1 className="sr-only">
+            {/* Visible page anchor (audit #8): 24px mobile / 28px desktop. */}
+            <h1 className="pb-4 pt-1 text-2xl font-bold text-fg md:text-[28px]">
               {query
                 ? `ผลการค้นหา "${query}"`
                 : category
@@ -194,7 +196,7 @@ export default async function SearchPage({
               </section>
             )}
           </PageShell>
-        </main>
+        </div>
       </FacebookLayout>
 
       <Footer />

@@ -19,9 +19,11 @@ export function StockBadge({ stock, className }: StockBadgeProps): React.JSX.Ele
     <span
       className={cn(
         'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold',
-        isOutOfStock && 'bg-coral-500 text-white',
-        isLowStock && 'border border-topaz-200 bg-topaz-400 text-fg',
-        !isOutOfStock && !isLowStock && 'bg-jade-500 text-white',
+        isOutOfStock && 'bg-coral-700 text-white',
+        // fg (clay-900 light / warm-white dark) is 2.09 on topaz-400 in dark;
+        // clay-900 passes on the amber fill in both themes (4.96).
+        isLowStock && 'border border-topaz-200 bg-topaz-400 text-clay-900',
+        !isOutOfStock && !isLowStock && 'bg-jade-600 text-white',
         className,
       )}
     >

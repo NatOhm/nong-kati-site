@@ -18,7 +18,7 @@ export function CartIcon({ count, onClick, className }: CartIconProps): React.JS
     <button
       onClick={onClick}
       className={cn(
-        'relative inline-flex items-center justify-center rounded-md p-2 text-fg-secondary transition-colors hover:bg-clay-200 hover:text-fg-brand',
+        'relative inline-flex h-11 w-11 items-center justify-center rounded-md text-fg-secondary transition-colors hover:bg-clay-200 hover:text-fg-brand',
         className,
       )}
       aria-label={`ตะกร้าสินค้า (${count} รายการ)`}

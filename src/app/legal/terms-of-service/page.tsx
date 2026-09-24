@@ -6,7 +6,7 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'ข้อกำหนดการใช้งาน — Nong-Kati',
+  title: 'ข้อกำหนดการใช้งาน',
   description: 'ข้อกำหนดการใช้งานเว็บไซต์ Nong-Kati',
 };
 

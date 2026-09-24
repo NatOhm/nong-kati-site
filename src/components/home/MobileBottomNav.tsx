@@ -80,7 +80,7 @@ export function MobileBottomNav() {
                   aria-haspopup="menu"
                   aria-label="เมนูผู้ดูแลระบบ"
                   className={cn(
-                    'flex min-w-[60px] flex-col items-center gap-0.5 rounded-lg px-3 py-2 transition-colors',
+                    'flex min-h-[44px] min-w-[60px] flex-col items-center justify-center gap-0.5 rounded-lg px-3 py-1.5 transition-colors',
                     adminMenuOpen || isActive
                       ? 'text-fg-brand'
                       : 'text-fg-placeholder hover:text-fg-secondary',
@@ -126,7 +126,7 @@ export function MobileBottomNav() {
                       href="/management/dashboard"
                       role="menuitem"
                       onClick={() => setAdminMenuOpen(false)}
-                      className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-semibold text-fg-brand-strong transition-colors hover:bg-surface-sunken"
+                      className="flex min-h-[44px] items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-semibold text-fg-brand-strong transition-colors hover:bg-surface-sunken"
                     >
                       <ShieldCheck size={16} /> เข้าหน้าแอดมิน
                     </Link>
@@ -134,7 +134,7 @@ export function MobileBottomNav() {
                       href="/management/settings?tab=security"
                       role="menuitem"
                       onClick={() => setAdminMenuOpen(false)}
-                      className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-fg-secondary transition-colors hover:bg-surface-sunken hover:text-fg"
+                      className="flex min-h-[44px] items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-fg-secondary transition-colors hover:bg-surface-sunken hover:text-fg"
                     >
                       <UserCog size={16} /> โปรไฟล์ผู้ดูแล (รหัสผ่าน/2FA)
                     </Link>
@@ -149,7 +149,7 @@ export function MobileBottomNav() {
               key={item.href}
               href={item.href}
               className={cn(
-                'flex min-w-[60px] flex-col items-center gap-0.5 rounded-lg px-3 py-2 transition-colors',
+                'flex min-h-[44px] min-w-[60px] flex-col items-center justify-center gap-0.5 rounded-lg px-3 py-1.5 transition-colors',
                 isActive ? 'text-fg-brand' : 'text-fg-placeholder hover:text-fg-secondary',
               )}
             >
@@ -165,7 +165,7 @@ export function MobileBottomNav() {
                   <Icon size={22} strokeWidth={isActive ? 2.5 : 1.5} />
                 )}
                 {isCart && itemCount > 0 && (
-                  <span className="absolute -right-2 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                  <span className="absolute -right-2 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-crimson-700 text-[10px] font-bold text-white">
                     {itemCount}
                   </span>
                 )}

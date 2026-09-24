@@ -7,7 +7,7 @@ import type { Metadata } from 'next';
 import { DataRequestForm } from '@/components/pdpa/DataRequestForm';
 
 export const metadata: Metadata = {
-  title: 'ขอจัดการข้อมูลส่วนบุคคล — Nong-Kati',
+  title: 'ขอจัดการข้อมูลส่วนบุคคล',
   description: 'ส่งคำขอเข้าถึง แก้ไข ลบ หรือโอนย้ายข้อมูลส่วนบุคคลของคุณ',
 };
 

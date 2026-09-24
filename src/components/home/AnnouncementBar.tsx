@@ -10,8 +10,8 @@ interface AnnouncementContent {
 }
 
 const FALLBACK: AnnouncementContent = {
-  message: '🎉 โปรโมชั่นพิเศษ! HBO Max 7 วัน ลดเหลือ ฿25',
-  href: '/product/hbo-max-7-4k-4',
+  message: `🎉 โปรโมชั่นพิเศษ! ส่วนลดทุกบัตรในหน้าร้าน`,
+  href: '/search',
   enabled: true,
 };
 

@@ -309,8 +309,9 @@ export default function CheckoutPage(): React.JSX.Element {
           <p className="mb-6 text-fg-placeholder">
             น้องแฮมสเตอร์ขอสินค้าหน่อย — เพิ่มสินค้าในตะกร้าก่อนชำระเงินนะ
           </p>
+          {/* Recovery goes to the catalog, not the homepage (audit #1). */}
           <Link
-            href="/"
+            href="/search"
             className="inline-flex items-center gap-2 rounded-md bg-peach-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-peach-400"
           >
             <ArrowLeft size={16} />
