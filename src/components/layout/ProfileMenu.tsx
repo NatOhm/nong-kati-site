@@ -26,6 +26,22 @@ interface AdminIdentity {
   fullName: string;
   email: string;
   role: AdminRole;
+  lastLoginAt?: string | null;
+  activeSessions?: number | null;
+}
+
+/** Thai relative-ish time for the popover activity line. */
+function formatLastLogin(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return '—';
+  const mins = Math.floor((Date.now() - then) / 60000);
+  if (mins < 1) return 'เมื่อสักครู่';
+  if (mins < 60) return `${mins} นาทีที่แล้ว`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} ชม. ${mins % 60} นาทีที่แล้ว`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days} วันที่แล้ว`;
+  return new Date(iso).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 /**
@@ -55,7 +71,17 @@ export function ProfileMenu(): React.JSX.Element {
     fetch('/api/v1/auth/admin/me', {
       headers: { Authorization: `Bearer ${token}` },
     })
-      .then((r) => (r.ok ? (r.json() as Promise<{ fullName: string; email: string; role: AdminRole }>) : null))
+      .then((r) =>
+        r.ok
+          ? (r.json() as Promise<{
+              fullName: string;
+              email: string;
+              role: AdminRole;
+              lastLoginAt?: string | null;
+              activeSessions?: number | null;
+            }>)
+          : null,
+      )
       .then((d) => {
         if (d?.email) setAdminIdentity(d);
       })
@@ -135,6 +161,18 @@ export function ProfileMenu(): React.JSX.Element {
                     ? `${adminIdentity.email} · ${ADMIN_ROLE_LABELS[adminIdentity.role]}`
                     : 'บัญชีแอดมิน')}
             </p>
+            {/* Recent admin activity — real data from /me (client ask). */}
+            {!profile && adminIdentity?.lastLoginAt && (
+              <p className="mt-1 text-[11px] text-fg-secondary">
+                เข้าสู่ระบบล่าสุด: {formatLastLogin(adminIdentity.lastLoginAt)}
+              </p>
+            )}
+            {!profile && typeof adminIdentity?.activeSessions === 'number' && (
+              <p className="mt-0.5 flex items-center gap-1.5 text-[11px] text-fg-secondary">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-jade-500" />
+                Sessions ที่ใช้งานอยู่: {adminIdentity.activeSessions}
+              </p>
+            )}
           </div>
 
           {/* Wallet — customer sessions only */}

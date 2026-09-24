@@ -31,5 +31,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     role: user.role,
     status: user.status,
     mustChangePassword: user.mustChangePassword,
+    // Recent-activity block in the profile popover (ISO timestamps; the
+    // client formats them).
+    lastLoginAt: user.lastLoginAt,
+    activeSessions: user.activeSessions,
   });
 }

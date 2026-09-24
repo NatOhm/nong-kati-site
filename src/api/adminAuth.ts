@@ -40,6 +40,8 @@ export interface AdminUser {
   mustChangePassword: boolean;
   failedLoginAttempts: number;
   lockedUntil: Date | null;
+  lastLoginAt: Date | null;
+  activeSessions: number;
 }
 
 export interface AdminSession {
@@ -437,7 +439,20 @@ export async function changeAdminPassword(
  * Get admin user by ID (reads the DB).
  */
 export async function getAdminUserById(id: string): Promise<AdminUser | undefined> {
-  const user = await prisma.adminUser.findUnique({ where: { id } });
+  const user = await prisma.adminUser.findUnique({
+    where: { id },
+    include: {
+      // Active sessions = not revoked and not yet expired. Shown as "Sessions
+      // ที่ใช้งานอยู่" in the profile popover.
+      _count: {
+        select: {
+          sessions: {
+            where: { revokedAt: null, expiresAt: { gt: new Date() } },
+          },
+        },
+      },
+    },
+  });
   if (!user) return undefined;
   return {
     id: user.id,
@@ -449,5 +464,7 @@ export async function getAdminUserById(id: string): Promise<AdminUser | undefine
     mustChangePassword: user.mustChangePassword,
     failedLoginAttempts: user.failedLoginAttempts,
     lockedUntil: user.lockedUntil,
+    lastLoginAt: user.lastLoginAt,
+    activeSessions: user._count.sessions,
   };
 }
