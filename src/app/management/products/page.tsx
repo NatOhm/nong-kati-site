@@ -1008,7 +1008,7 @@ const TONE_STYLES: Record<InlineTone, string> = {
   price: 'border-line-subtle bg-surface text-fg',
   tier: 'border-peach-200 bg-peach-50 text-fg-brand',
   tier2: 'border-line-subtle bg-surface text-fg-secondary',
-  stock: 'border-sky-200 bg-sky-50 text-fg-brand',
+  stock: 'border-sapphire-200 bg-sky-50 text-sapphire-700',
 };
 
 function InlineCell({

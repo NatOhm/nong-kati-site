@@ -29,7 +29,7 @@ const STATUS_LABELS: Record<
   processing: {
     label: 'กำลังดำเนินการ',
     icon: <Clock size={14} />,
-    color: 'text-sky-400 bg-sky-900/30',
+    color: 'text-sapphire-200 bg-sapphire-400/15',
   },
   completed: {
     label: 'เสร็จสิ้น',
@@ -183,7 +183,7 @@ export default function AdminPdpaPage(): React.JSX.Element {
                         <div className="flex justify-end gap-2">
                           <button
                             onClick={() => handleUpdateStatus(req.id, 'processing')}
-                            className="rounded bg-sky-900/30 px-2 py-1 text-xs text-sky-400 hover:bg-sky-900/50"
+                            className="rounded bg-sapphire-400/15 px-2 py-1 text-xs text-sapphire-700 hover:bg-sapphire-400/30"
                           >
                             รับดำเนินการ
                           </button>

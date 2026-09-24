@@ -172,7 +172,7 @@ export default function AdminTicketsPage(): React.JSX.Element {
               onClick={() => setStatus(f.v)}
               className={cn(
                 'rounded-md px-3 py-1.5 text-sm',
-                status === f.v ? 'bg-surface-brand text-fg font-semibold' : 'text-fg-muted hover:bg-surface-subtle',
+                status === f.v ? 'bg-surface-brand text-fg-inverse font-semibold' : 'text-fg-muted hover:bg-surface-subtle',
               )}
             >
               {f.label}
@@ -199,7 +199,7 @@ export default function AdminTicketsPage(): React.JSX.Element {
       </div>
 
       {error && (
-        <div className="mb-4 rounded-md border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-600">
+        <div className="mb-4 rounded-md border border-coral-300 bg-coral-500/10 p-4 text-sm text-coral-700">
           {error}{' '}
           <button type="button" onClick={() => void load()} className="underline">
             ลองใหม่
@@ -353,7 +353,7 @@ export default function AdminTicketsPage(): React.JSX.Element {
                 )}
 
                 {actionMsg && <p className="mt-3 text-sm text-jade-600">{actionMsg}</p>}
-                {actionErr && <p className="mt-3 text-sm text-red-600">{actionErr}</p>}
+                {actionErr && <p className="mt-3 text-sm text-coral-700">{actionErr}</p>}
               </>
             )}
           </div>

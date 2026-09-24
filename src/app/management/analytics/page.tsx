@@ -52,7 +52,7 @@ export default function AdminAnalyticsPage(): React.JSX.Element {
           </div>
           <div className="rounded-md border border-line-subtle bg-surface p-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-sky-900/30 text-sky-400">
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-sapphire-400/15 text-sapphire-700">
                 <TrendingUp size={20} />
               </div>
               <div>
@@ -63,7 +63,7 @@ export default function AdminAnalyticsPage(): React.JSX.Element {
           </div>
           <div className="rounded-md border border-line-subtle bg-surface p-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-violet-900/30 text-violet-400">
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-topaz-400/20 text-peach-800">
                 <Users size={20} />
               </div>
               <div>

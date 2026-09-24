@@ -144,8 +144,38 @@
   .bg-peach-500.text-white {
     background-color: var(--peach-700);
   }
+  /* Same primary button but labelled with the theme fg token (admin
+     search/submit buttons, login). Deepen the fill the same way; the label
+     must flip per theme: white passes on peach-700 in light (5.18), while
+     the dark fg (warm white) passes at 4.89 — dark clay text would be
+     2.12. */
+  .bg-peach-500.text-fg {
+    background-color: var(--peach-700);
+  }
+  [data-theme='light'] .bg-peach-500.text-fg {
+    color: #ffffff;
+  }
+  [data-theme='dark'] .bg-peach-500.text-fg {
+    color: var(--clay-50);
+  }
   .hover\:bg-peach-400:hover {
-    background-color: var(--peach-600);
+    background-color: var(--peach-800);
+  }
+  /* Site-wide primary button fill (bg-surface-brand → --bg-brand):
+     light lands on peach-500 where the clay-50 label is 2.65 — deepen to
+     peach-700 (clay-50 = 4.89). Dark is peach-400 + clay-900 = 4.86 and
+     stays untouched. The Button component's hover:bg-peach-600 would then
+     LIGHTEN on hover — redirect it deeper with a bright label. */
+  [data-theme='light'] .bg-surface-brand {
+    background-color: var(--peach-700);
+  }
+  .hover\:bg-peach-600:hover {
+    background-color: var(--peach-800);
+  }
+  /* Dark keeps its clay-900 label, so hover brightens (peach-300 +
+     clay-900 = 6.52) instead of deepening into a failing 3.09 pair. */
+  [data-theme='dark'] .hover\:bg-peach-600:hover {
+    background-color: var(--peach-300);
   }
 
   [data-theme='dark'] .clay-btn {
@@ -492,6 +522,18 @@ body {
 [data-theme='dark'] .bg-clay-200.text-fg-placeholder {
   color: var(--clay-800);
 }
+/* Dark clay-card fill is --clay-800 (lighter than the page base), so the
+   dark-tuned muted tokens fall short on it: placeholder 3.23, muted 4.45.
+   Lift both inside cards: clay-300 = 5.58, clay-200 = 6.38 on clay-800. */
+[data-theme='dark'] .clay-card .text-fg-placeholder {
+  color: var(--clay-300);
+}
+[data-theme='dark'] .clay-card .text-clay-400 {
+  color: var(--clay-200);
+}
+[data-theme='dark'] .clay-card .text-fg-muted {
+  color: var(--clay-300);
+}
 [data-theme='light'] .text-coral-600 {
   color: var(--coral-700);
 }
@@ -515,6 +557,23 @@ body {
 }
 [data-theme='light'] .admin-shell .bg-peach-500\/20.text-fg-brand {
   color: var(--peach-800);
+}
+/* Price-tier chips (customers): tint+text pairs. Light keeps dark text —
+   clay-800 6.77 / peach-800 6.27 on their tints (clay-700 4.06 and
+   peach-700 3.99 fail). Dark flips to the light ramp — clay-300 6.33 /
+   peach-300 5.27 on the tinted dark fills (clay-700 1.79 / peach-700
+   1.72 fail). Jade pair already covered by the jade-500/15 rule. */
+[data-theme='light'] .bg-clay-500\/15.text-clay-700 {
+  color: var(--clay-800);
+}
+[data-theme='light'] .bg-peach-500\/15.text-peach-700 {
+  color: var(--peach-800);
+}
+[data-theme='dark'] .bg-clay-500\/15.text-clay-700 {
+  color: var(--clay-300);
+}
+[data-theme='dark'] .bg-peach-500\/15.text-peach-700 {
+  color: var(--peach-300);
 }
 /* --fg-success (#2e7d4f) is 5.05 on white but only 4.11 on the jade-500/15
    chip fill it's paired with in inventory (#d8ede1 composite). #1f6b44

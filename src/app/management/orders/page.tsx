@@ -62,7 +62,7 @@ interface OrderDetail {
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   pending_payment: { label: 'รอชำระเงิน', color: 'text-amber-600' },
-  payment_confirmed: { label: 'ชำระแล้ว', color: 'text-sky-600' },
+  payment_confirmed: { label: 'ชำระแล้ว', color: 'text-sapphire-700' },
   pending_manual_fulfilment: { label: 'รอส่งโค้ด', color: 'text-fg-brand' },
   completed: { label: 'สำเร็จ', color: 'text-jade-600' },
   refunded: { label: 'คืนเงิน', color: 'text-coral-600' },
@@ -246,7 +246,7 @@ export default function AdminOrdersPage(): React.JSX.Element {
                         {STATUS_LABELS[order.status]?.label ?? order.status}
                       </span>
                       {order.slipImageUrl && order.status === 'pending_payment' && (
-                        <span className="mt-1 block text-[10px] font-semibold text-sky-600">
+                        <span className="mt-1 block text-[10px] font-semibold text-sapphire-700">
                           📎 ส่งสลิปแล้ว
                         </span>
                       )}
@@ -393,8 +393,8 @@ export default function AdminOrdersPage(): React.JSX.Element {
               )}
 
               {selectedOrder.slipImageUrl && (
-                <div className="mt-5 rounded-md border border-sky-300 bg-sky-50 p-3 dark:border-sky-800 dark:bg-sky-900/20">
-                  <p className="text-sm font-semibold text-sky-700 dark:text-sky-300">
+                <div className="mt-5 rounded-md border border-sapphire-200 bg-sky-50 p-3 dark:border-sapphire-700/50 dark:bg-sapphire-400/15">
+                  <p className="text-sm font-semibold text-sapphire-700 dark:text-sapphire-200">
                     📎 สลิปที่ลูกค้าส่งมา
                     {selectedOrder.slipUploadedAt && (
                       <span className="ml-2 text-xs font-normal text-fg-muted">

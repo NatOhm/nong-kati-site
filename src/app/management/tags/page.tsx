@@ -99,7 +99,7 @@ export default function TagsPage(): React.JSX.Element {
       breadcrumbs={[{ label: 'แดชบอร์ด', href: '/management/dashboard' }, { label: 'แท็ก' }]}
     >
       <div className="mx-auto max-w-2xl">
-        <h1 className="font-display text-2xl font-bold text-fg">แท็กสินค้า</h1>
+        <h1 className="text-2xl font-bold text-fg">แท็กสินค้า</h1>
         <p className="mb-5 mt-1 text-sm text-fg-muted">
           ป้ายกำกับอิสระนอกเหนือจากหมวดหมู่ — ผูกที่หน้าสินค้า (แก้ไขสินค้า)
         </p>
