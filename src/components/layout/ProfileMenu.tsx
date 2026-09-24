@@ -186,7 +186,7 @@ export function ProfileMenu(): React.JSX.Element {
                   href="/management/dashboard"
                   role="menuitem"
                   onClick={() => setOpen(false)}
-                  className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-semibold text-fg-brand transition-colors hover:bg-surface-sunken"
+                  className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-semibold text-fg-brand-strong transition-colors hover:bg-surface-sunken"
                 >
                   <ShieldCheck size={15} /> เข้าหน้าแอดมิน
                 </Link>

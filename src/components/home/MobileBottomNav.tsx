@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Search, ShoppingCart } from 'lucide-react';
+import { Search, ShoppingCart, ShieldCheck, UserCog } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { useCart } from '@/hooks/useCart';
 import { useCustomerSession } from '@/components/layout/useCustomerSession';
@@ -21,17 +21,34 @@ export function MobileBottomNav() {
   const { itemCount } = useCart();
   const sessionState = useCustomerSession();
   const isAuthenticated = sessionState === 'authed';
-  // Admin session present → the บัญชี button routes into the admin panel
-  // (client ask). The management layout handles expiry/redirect itself.
+  // Admin session present → the แอดมิน button opens a chooser mirroring the
+  // desktop ProfileMenu: dashboard vs admin profile (password/2FA). The
+  // management layout handles expiry/redirect itself on arrival.
   const [isAdmin, setIsAdmin] = useState(false);
+  const [adminMenuOpen, setAdminMenuOpen] = useState(false);
+  const adminMenuRef = useRef<HTMLDivElement>(null);
   useEffect(() => setIsAdmin(hasAdminSession()), []);
+
+  // Close the chooser on navigation or on a tap outside (same treatment as
+  // the desktop popover).
+  useEffect(() => setAdminMenuOpen(false), [pathname]);
+  useEffect(() => {
+    if (!adminMenuOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (adminMenuRef.current && !adminMenuRef.current.contains(e.target as Node)) {
+        setAdminMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [adminMenuOpen]);
 
   // Sitewide taskbar except the admin panel (which has its own chrome).
   if (pathname?.startsWith('/management')) return null;
 
   const accountItem = {
     icon: PawIcon,
-    href: isAdmin ? '/management/dashboard' : isAuthenticated ? '/account/dashboard' : '/account/login',
+    href: isAdmin ? '' : isAuthenticated ? '/account/dashboard' : '/account/login',
     label: isAdmin ? 'แอดมิน' : isAuthenticated ? 'บัญชี' : 'เข้าสู่ระบบ',
     clay: true as const,
   };
@@ -42,9 +59,67 @@ export function MobileBottomNav() {
       <div className="flex items-center justify-around px-2 py-1">
         {allItems.map((item) => {
           const isActive =
-            pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href));
+            item.href !== '' &&
+            (pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href)));
           const Icon = item.icon;
           const isCart = item.label === 'ตะกร้า';
+
+          // Admin: taskbar button opens the dashboard/profile chooser instead
+          // of jumping straight to the panel (mirrors desktop ProfileMenu).
+          if (isAdmin && item.label === 'แอดมิน') {
+            return (
+              <div key="account" ref={adminMenuRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => setAdminMenuOpen((o) => !o)}
+                  aria-expanded={adminMenuOpen}
+                  aria-haspopup="menu"
+                  aria-label="เมนูผู้ดูแลระบบ"
+                  className={cn(
+                    'flex min-w-[60px] flex-col items-center gap-0.5 rounded-lg px-3 py-2 transition-colors',
+                    adminMenuOpen || isActive
+                      ? 'text-fg-brand'
+                      : 'text-fg-placeholder hover:text-fg-secondary',
+                  )}
+                >
+                  <div
+                    className={cn(
+                      'transition-transform duration-interactive ease-spring',
+                      (adminMenuOpen || isActive) && 'scale-110',
+                    )}
+                  >
+                    <PawIcon size={24} />
+                  </div>
+                  <span className="text-[10px] font-medium">{item.label}</span>
+                </button>
+
+                {adminMenuOpen && (
+                  <div
+                    role="menu"
+                    aria-label="เมนูผู้ดูแลระบบ"
+                    className="clay-card suggest-drop absolute bottom-full right-0 z-50 mb-2 w-60 rounded-2xl p-2"
+                  >
+                    <Link
+                      href="/management/dashboard"
+                      role="menuitem"
+                      onClick={() => setAdminMenuOpen(false)}
+                      className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-semibold text-fg-brand-strong transition-colors hover:bg-surface-sunken"
+                    >
+                      <ShieldCheck size={16} /> เข้าหน้าแอดมิน
+                    </Link>
+                    <Link
+                      href="/management/settings?tab=security"
+                      role="menuitem"
+                      onClick={() => setAdminMenuOpen(false)}
+                      className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-fg-secondary transition-colors hover:bg-surface-sunken hover:text-fg"
+                    >
+                      <UserCog size={16} /> โปรไฟล์ผู้ดูแล (รหัสผ่าน/2FA)
+                    </Link>
+                  </div>
+                )}
+              </div>
+            );
+          }
 
           return (
             <Link
