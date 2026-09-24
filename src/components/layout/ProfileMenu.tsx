@@ -6,43 +6,16 @@ import { Settings, History, LogOut, Wallet, ChevronDown, ShieldCheck, LogIn, Use
 
 import { cn } from '@/utils/cn';
 import { formatThb } from '@/utils/format';
-import { getAdminToken, hasAdminSession } from '@/lib/adminSession';
-import { type AdminRole } from '@/types/auth';
+import {
+  useAdminIdentity,
+  ADMIN_ROLE_LABELS,
+  formatLastLogin,
+  type AdminIdentity,
+} from '@/components/layout/useAdminIdentity';
 import {
   useCustomerProfile,
   type CustomerProfile,
 } from '@/components/layout/CustomerProfileProvider';
-
-const ADMIN_ROLE_LABELS: Record<AdminRole, string> = {
-  super_admin: 'Super Admin',
-  catalogue_manager: 'ผู้จัดการสินค้า',
-  order_manager: 'ผู้จัดการคำสั่งซื้อ',
-  finance_viewer: 'ผู้ดูการเงิน',
-  support_agent: 'ฝ่ายสนับสนุน',
-  marketing_manager: 'ผู้จัดการการตลาด',
-};
-
-interface AdminIdentity {
-  fullName: string;
-  email: string;
-  role: AdminRole;
-  lastLoginAt?: string | null;
-  activeSessions?: number | null;
-}
-
-/** Thai relative-ish time for the popover activity line. */
-function formatLastLogin(iso: string): string {
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return '—';
-  const mins = Math.floor((Date.now() - then) / 60000);
-  if (mins < 1) return 'เมื่อสักครู่';
-  if (mins < 60) return `${mins} นาทีที่แล้ว`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs} ชม. ${mins % 60} นาทีที่แล้ว`;
-  const days = Math.floor(hrs / 24);
-  if (days < 30) return `${days} วันที่แล้ว`;
-  return new Date(iso).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
-}
 
 /**
  * Profile popover — client ask: กดโปรไฟล์แล้วเห็นชื่อผู้ใช้, เครดิต/ยอดเงิน,
@@ -54,39 +27,11 @@ export function ProfileMenu(): React.JSX.Element {
   const { state: sessionState, profile } = useCustomerProfile();
   const [open, setOpen] = useState(false);
   const [wallet, setWallet] = useState<{ balanceThb: number } | null>(null);
-  const [admin, setAdmin] = useState(false);
-  const [adminIdentity, setAdminIdentity] = useState<AdminIdentity | null>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
-
   // Admins get an entry into /management (client ask: admin account must be
-  // able to reach its profile/panel from the storefront). Tokens-only check —
-  // the management layout itself handles expiry/redirect on arrival.
-  useEffect(() => {
-    if (!hasAdminSession()) return;
-    setAdmin(true);
-    // Real identity for the popover header (name/role, like the admin panel
-    // top bar). Failures keep the generic label — non-blocking.
-    const token = getAdminToken();
-    if (!token) return;
-    fetch('/api/v1/auth/admin/me', {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((r) =>
-        r.ok
-          ? (r.json() as Promise<{
-              fullName: string;
-              email: string;
-              role: AdminRole;
-              lastLoginAt?: string | null;
-              activeSessions?: number | null;
-            }>)
-          : null,
-      )
-      .then((d) => {
-        if (d?.email) setAdminIdentity(d);
-      })
-      .catch(() => {});
-  }, []);
+  // able to reach its profile/panel from the storefront). Shared hook also
+  // powers the mobile taskbar chooser.
+  const { isAdmin: admin, identity: adminIdentity } = useAdminIdentity();
+  const rootRef = useRef<HTMLDivElement>(null);
 
   // Identity comes free from the shared profile context (no /me refetch);
   // only the wallet balance is fetched, when the session proves authed.
@@ -153,7 +98,7 @@ export function ProfileMenu(): React.JSX.Element {
                   ? 'สมาชิก'
                   : adminIdentity?.fullName ?? 'ผู้ดูแลระบบ')}
             </p>
-            <p className="truncate text-xs text-fg-muted">
+            <p className="truncate text-xs text-fg-secondary">
               {profile?.email ??
                 (sessionState === 'authed'
                   ? '—'

@@ -7,7 +7,11 @@ import { Search, ShoppingCart, ShieldCheck, UserCog } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { useCart } from '@/hooks/useCart';
 import { useCustomerSession } from '@/components/layout/useCustomerSession';
-import { hasAdminSession } from '@/lib/adminSession';
+import {
+  useAdminIdentity,
+  ADMIN_ROLE_LABELS,
+  formatLastLogin,
+} from '@/components/layout/useAdminIdentity';
 import { AcornIcon, SeedIcon, WheelIcon, PawIcon } from '@/components/ui/ClayIcons';
 
 const NAV_ITEMS = [
@@ -22,12 +26,12 @@ export function MobileBottomNav() {
   const sessionState = useCustomerSession();
   const isAuthenticated = sessionState === 'authed';
   // Admin session present → the แอดมิน button opens a chooser mirroring the
-  // desktop ProfileMenu: dashboard vs admin profile (password/2FA). The
-  // management layout handles expiry/redirect itself on arrival.
-  const [isAdmin, setIsAdmin] = useState(false);
+  // desktop ProfileMenu: identity + recent activity, then dashboard vs admin
+  // profile (password/2FA). The management layout handles expiry/redirect
+  // itself on arrival.
+  const { isAdmin, identity: adminIdentity } = useAdminIdentity();
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
   const adminMenuRef = useRef<HTMLDivElement>(null);
-  useEffect(() => setIsAdmin(hasAdminSession()), []);
 
   // Close the chooser on navigation or on a tap outside (same treatment as
   // the desktop popover).
@@ -93,12 +97,31 @@ export function MobileBottomNav() {
                   <span className="text-[10px] font-medium">{item.label}</span>
                 </button>
 
-                {adminMenuOpen && (
-                  <div
-                    role="menu"
-                    aria-label="เมนูผู้ดูแลระบบ"
-                    className="clay-card suggest-drop absolute bottom-full right-0 z-50 mb-2 w-60 rounded-2xl p-2"
-                  >
+                {adminMenuOpen && (                    <div
+                      role="menu"
+                      aria-label="เมนูผู้ดูแลระบบ"
+                      className="clay-card suggest-drop absolute bottom-full right-0 z-50 mb-2 w-64 rounded-2xl p-2"
+                    >
+                      {/* Identity + recent activity — same data as the desktop popover. */}
+                      {adminIdentity && (
+                        <div className="border-b border-line-subtle px-3 pb-2.5 pt-1.5">
+                          <p className="truncate text-sm font-bold text-fg">{adminIdentity.fullName}</p>
+                          <p className="truncate text-xs text-fg-secondary">
+                            {adminIdentity.email} · {ADMIN_ROLE_LABELS[adminIdentity.role]}
+                          </p>
+                          {adminIdentity.lastLoginAt && (
+                            <p className="mt-1 text-[11px] text-fg-secondary">
+                              เข้าสู่ระบบล่าสุด: {formatLastLogin(adminIdentity.lastLoginAt)}
+                            </p>
+                          )}
+                          {typeof adminIdentity.activeSessions === 'number' && (
+                            <p className="mt-0.5 flex items-center gap-1.5 text-[11px] text-fg-secondary">
+                              <span className="inline-block h-1.5 w-1.5 rounded-full bg-jade-500" />
+                              Sessions ที่ใช้งานอยู่: {adminIdentity.activeSessions}
+                            </p>
+                          )}
+                        </div>
+                      )}
                     <Link
                       href="/management/dashboard"
                       role="menuitem"
