@@ -65,6 +65,7 @@ export default function CheckoutPage(): React.JSX.Element {
   const [contactData, setContactData] = useState<ContactFormData | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'promptpay' | 'card' | 'wallet'>('promptpay');
   const [order, setOrder] = useState<Order | null>(null);
+  const [slipUploadToken, setSlipUploadToken] = useState<string | null>(null);
   const [paymentState, setPaymentState] = useState<{
     attemptId: string;
     qrImageUrl?: string;
@@ -175,6 +176,7 @@ export default function CheckoutPage(): React.JSX.Element {
 
         setContactData(data);
         setOrder(result.order);
+        setSlipUploadToken(result.slipUploadToken ?? null);
         setCompletedSteps([1]);
         setStep(2);
 
@@ -449,7 +451,11 @@ export default function CheckoutPage(): React.JSX.Element {
                         auto-verify first when SlipOK is on, otherwise the
                         slip goes straight to the admin for manual check. */}
                     {order && paymentState.status !== 'succeeded' && (
-                      <SlipUploadPanel orderId={order.id} slipVerifyEnabled={slipEnabled} />
+                      <SlipUploadPanel
+                        orderId={order.id}
+                        slipUploadToken={slipUploadToken}
+                        slipVerifyEnabled={slipEnabled}
+                      />
                     )}
 
                     {/* Status messages */}

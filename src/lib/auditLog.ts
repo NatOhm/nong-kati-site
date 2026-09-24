@@ -15,6 +15,26 @@ import type { Prisma } from '@prisma/client';
 
 import { prisma } from '@/lib/db';
 
+/**
+ * Resolve Next's `after` at runtime. writeAuditLog only ever runs on the
+ * server, but this module is also *bundled* into client components (via
+ * isomorphic api/ helpers), where a static `import { after } from
+ * 'next/server'` is a build error. The indirection keeps webpack from
+ * linking it into the client graph; on the server it behaves exactly like
+ * the static import.
+ */
+async function nextAfter(): Promise<((cb: () => Promise<unknown>) => void) | null> {
+  try {
+    const load = new Function('m', 'return import(m)') as (
+      m: string,
+    ) => Promise<{ after: (cb: () => Promise<unknown>) => void }>;
+    const mod = await load('next/server');
+    return typeof mod?.after === 'function' ? mod.after : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Prisma Json input accepts our loose records; cast at the DB boundary. */
 type JsonInput = Prisma.InputJsonValue;
 const asJson = (v: Record<string, unknown>): JsonInput => v as JsonInput;
@@ -39,9 +59,11 @@ export type AuditLogEntry = {
 };
 
 /**
- * Write an audit log entry to the DB. Synchronous signature so every
- * existing call site stays valid; internally queues the insert and
- * reports failures via console.error only.
+ * Write an audit log entry to the DB. Returns synchronously with the entry
+ * (so every existing call site stays valid); the insert itself is scheduled
+ * to run after the response via Next's after() — keeping the serverless
+ * invocation alive so the row cannot be frozen away. Failures are reported
+ * via console.error only.
  */
 export function writeAuditLog(params: {
   actorType: AuditActorType;
@@ -71,9 +93,12 @@ export function writeAuditLog(params: {
     createdAt: new Date(),
   };
 
-  // Fire-and-forget insert. Never awaited by callers today; failures are
-  // logged rather than propagated so audit cannot break the action itself.
-  void prisma.auditLog
+  // Durable-after-response insert (finding: a bare floating promise can be
+  // frozen away on serverless once the response returns, losing the audit
+  // row of a SUCCESSFUL mutation). `after` keeps the invocation alive until
+  // the insert settles; failures are logged rather than propagated so audit
+  // cannot break the action itself.
+  const insert = prisma.auditLog
     .create({
       data: {
         actorType: entry.actorType,
@@ -91,6 +116,19 @@ export function writeAuditLog(params: {
     .catch((err: unknown) => {
       console.error('[audit] write failed:', err instanceof Error ? err.message : err);
     });
+
+  void (async () => {
+    try {
+      const after = await nextAfter();
+      if (after) {
+        after(() => insert);
+      }
+      // Outside a request context (scripts/tests) — degrade to floating
+      // promise as before.
+    } catch {
+      // Scheduler unavailable — degrade to floating promise as before.
+    }
+  })();
 
   return entry;
 }

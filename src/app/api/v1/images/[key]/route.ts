@@ -8,6 +8,10 @@ const KEY_RE = /^[0-9a-z-]+$/i;
 /**
  * GET /api/v1/images/[key] — serve an admin-uploaded image from its
  * SiteSetting row. Public: image paths are unguessable (timestamp+size+type).
+ *
+ * Private namespaces (`slip:` payment evidence) are refused here — they are
+ * served only through /api/v1/payments/slip-download/[key] which requires
+ * admin authorization (or the order's own upload token).
  */
 export async function GET(
   _req: NextRequest,
@@ -16,6 +20,13 @@ export async function GET(
   const { key } = await ctx.params;
   if (!KEY_RE.test(key)) {
     return NextResponse.json({ error: 'INVALID_KEY' }, { status: 400 });
+  }
+
+  // Financial documents (payment slips) must not be publicly readable even
+  // when the key is known.
+  const slip = await prisma.siteSetting.findUnique({ where: { key: `slip:${key}` } });
+  if (slip) {
+    return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
   }
 
   const row = await prisma.siteSetting.findUnique({ where: { key: `image:${key}` } });

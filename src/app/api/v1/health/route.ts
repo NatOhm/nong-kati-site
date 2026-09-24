@@ -7,6 +7,13 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 
+// Always re-evaluate: monitoring must see live DB/uptime, not a CDN-cached
+// snapshot (the no-store header alone was not enough on Vercel — the route
+// got statically cached for hours).
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
+
 interface HealthStatus {
   status: 'healthy' | 'unhealthy';
   timestamp: string;

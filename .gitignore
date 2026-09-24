@@ -11,3 +11,4 @@ tsconfig.tsbuildinfo
 
 # Git worktrees
 .worktrees/
+.nk-totp-qr.*

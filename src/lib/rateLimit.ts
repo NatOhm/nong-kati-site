@@ -1,3 +1,5 @@
+
+
 /**
  * Rate Limiting — 13-security.md §5.
  * Redis-backed sliding window counter per route + IP/email.
@@ -52,7 +54,7 @@ export const RATE_LIMIT_RULES: RateLimitRule[] = [
   { route: '/api/v1/legal/data-requests', maxRequests: 5, windowMs: 86_400_000, keyBy: 'email' }, // 5 / 24h
 ];
 
-// ─── In-Memory Mock Store ────────────────────────────────
+// ─── In-Memory Store (fallback) ──────────────────────────
 
 type WindowEntry = {
   count: number;
@@ -73,17 +75,63 @@ if (typeof setInterval !== 'undefined') {
   }, 300_000);
 }
 
+// ─── Shared Store (Upstash Redis REST) ─────────────────
+// In-memory counters are per serverless instance and vanish on cold start,
+// so documented limits are trivially bypassed by spreading requests across
+// instances. When Upstash REST credentials are configured, counters are
+// shared atomically via INCR on a fixed-window bucket key.
+
+const UPSTASH_URL = process.env['UPSTASH_REDIS_REST_URL'];
+const UPSTASH_TOKEN = process.env['UPSTASH_REDIS_REST_TOKEN'];
+const SHARED_ENABLED = Boolean(UPSTASH_URL && UPSTASH_TOKEN);
+
+async function sharedIncrement(
+  key: string,
+  windowMs: number,
+): Promise<{ count: number; resetAt: number } | null> {
+  if (!SHARED_ENABLED) return null;
+  const bucket = Math.floor(Date.now() / windowMs);
+  const redisKey = `ratelimit:${key}:${bucket}`;
+  try {
+    const res = await fetch(`${UPSTASH_URL}/pipeline`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${UPSTASH_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify([
+        ['INCR', redisKey],
+        ['PEXPIRE', redisKey, String(windowMs)],
+      ]),
+      // Never let limiter downtime take the API down — degrade to memory.
+      signal: AbortSignal.timeout(1_500),
+    });
+    if (!res.ok) return null;
+    const results = (await res.json()) as { result?: unknown }[];
+    const count = Number(results[0]?.result ?? 0);
+    if (!Number.isFinite(count) || count <= 0) return null;
+    return { count, resetAt: (bucket + 1) * windowMs };
+  } catch {
+    return null;
+  }
+}
+
 // ─── Core Functions ──────────────────────────────────────
 
 /**
  * Check if a request should be rate-limited.
  * Returns { allowed, remaining, resetAt }.
+ *
+ * Uses the shared Upstash counter when configured (serverless-safe: the
+ * limit is global across instances), otherwise falls back to the
+ * per-instance memory store (dev / self-hosted single process).
  */
-export function checkRateLimit(
+export async function checkRateLimit(
   route: string,
   identifier: string,
+
   rule?: RateLimitRule,
-): { allowed: boolean; remaining: number; resetAt: number } {
+): Promise<{ allowed: boolean; remaining: number; resetAt: number }> {
   const matchedRule = rule ?? findMatchingRule(route);
   if (!matchedRule) {
     // No rule = unlimited
@@ -91,6 +139,20 @@ export function checkRateLimit(
   }
 
   const key = `${matchedRule.route}:${identifier}`;
+
+  if (SHARED_ENABLED) {
+    const shared = await sharedIncrement(key, matchedRule.windowMs);
+    if (shared) {
+      const allowed = shared.count <= matchedRule.maxRequests;
+      return {
+        allowed,
+        remaining: Math.max(0, matchedRule.maxRequests - shared.count),
+        resetAt: shared.resetAt,
+      };
+    }
+    // Shared store unavailable → fall through to the memory store.
+  }
+
   const now = Date.now();
   const entry = store.get(key);
 
@@ -133,12 +195,12 @@ export function getRateLimitHeaders(
  * Apply rate limit to a NextResponse.
  * Returns the response with rate limit headers, or 429 if exceeded.
  */
-export function applyRateLimit(
+export async function applyRateLimit(
   route: string,
   identifier: string,
   response?: NextResponse,
-): NextResponse {
-  const result = checkRateLimit(route, identifier);
+): Promise<NextResponse> {
+  const result = await checkRateLimit(route, identifier);
   const fallbackRule: RateLimitRule = RATE_LIMIT_RULES[0]!;
   const rule = findMatchingRule(route) ?? fallbackRule;
   const res = response ?? NextResponse.next();

@@ -19,9 +19,9 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: { provider: string } },
+  { params }: { params: Promise<{ provider: string }> },
 ): Promise<NextResponse> {
-  const { provider } = params;
+  const { provider } = await params;
   if (!isOAuthProvider(provider) || !isProviderConfigured(provider)) {
     return NextResponse.json({ error: 'PROVIDER_UNAVAILABLE' }, { status: 503 });
   }

@@ -28,14 +28,13 @@ jobs:
       - run: npx tsc --noEmit
 
   # ─── Dependency Audit ─────────────────────────────────
-  # Non-blocking: the remaining advisories live in next@14 itself (critical
-  # DoS/request-smuggling class) and are only fixed by the planned major
-  # Next.js upgrade — a separate pass. The report is always uploaded so new
-  # advisories stay visible without holding every build hostage.
+  # Blocking (was report-only): after the Next.js 15.5 upgrade there are no
+  # known high/critical advisories in the tree, so a failure is a real
+  # regression and should hold the deploy. The full JSON report is still
+  # uploaded on every run.
   audit:
-    name: Security Audit (report)
+    name: Security Audit
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -43,10 +42,11 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - name: npm audit (full report)
+      - name: npm audit (report + gate)
+        if: always()
         run: |
           npm audit --json > audit-report.json || true
-          npm audit --audit-level=high || true
+          npm audit --audit-level=high
       - uses: actions/upload-artifact@v4
         if: always()
         with:

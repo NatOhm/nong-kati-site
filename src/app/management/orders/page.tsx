@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Search, Eye, XCircle, CheckCircle, RefreshCw, ShieldCheck } from 'lucide-react';
 
 import { AdminShell } from '@/components/layout/AdminShell';
-import { adminJson } from '@/lib/adminSession';
+import { adminJson, adminFetch } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
 import { formatThb } from '@/lib/pricing';
 
@@ -402,15 +402,8 @@ export default function AdminOrdersPage(): React.JSX.Element {
                       </span>
                     )}
                   </p>
-                  <a href={selectedOrder.slipImageUrl} target="_blank" rel="noreferrer" className="mt-2 block">
-                    {/* eslint-disable-next-line @next/next/no-img-element -- DB-stored slip image */}
-                    <img
-                      src={selectedOrder.slipImageUrl}
-                      alt="สลิปการโอนเงิน"
-                      className="max-h-72 rounded border border-line-subtle object-contain"
-                    />
-                  </a>
-                  <p className="mt-1 text-xs text-fg-muted">กดที่สลิปเพื่อเปิดภาพเต็ม (ตรวจเลขอ้างอิง/ยอดเงิน)</p>
+                  <SlipImageView url={selectedOrder.slipImageUrl} />
+                  <p className="mt-1 text-xs text-fg-muted">สลิปถูกเก็บแบบส่วนตัว — เปิดได้เฉพาะแอดมินที่ล็อกอิน</p>
                 </div>
               )}
 
@@ -439,5 +432,46 @@ export default function AdminOrdersPage(): React.JSX.Element {
         )}
       </div>
     </AdminShell>
+  );
+}
+
+/**
+ * Slips are private (`slip:` namespace; the public image route refuses
+ * them). Fetch the bytes with the admin's Bearer token via adminFetch and
+ * render from a blob URL — no public URL is ever exposed.
+ */
+function SlipImageView({ url }: { url: string }): React.JSX.Element {
+  const [src, setSrc] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let revoke: string | null = null;
+    let alive = true;
+    (async () => {
+      try {
+        const res = await adminFetch(url);
+        if (!res.ok) throw new Error(String(res.status));
+        const blob = await res.blob();
+        revoke = URL.createObjectURL(blob);
+        if (alive) setSrc(revoke);
+      } catch {
+        if (alive) setFailed(true);
+      }
+    })();
+    return () => {
+      alive = false;
+      if (revoke) URL.revokeObjectURL(revoke);
+    };
+  }, [url]);
+
+  if (failed) {
+    return <p className="mt-2 text-xs text-coral-600">เปิดสลิปไม่สำเร็จ — ลองปิดแล้วเปิดรายการใหม่</p>;
+  }
+  if (!src) {
+    return <p className="mt-2 text-xs text-fg-muted">กำลังโหลดสลิป...</p>
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- fetched privately as a blob
+    <img src={src} alt="สลิปการโอนเงิน" className="mt-2 max-h-72 rounded border border-line-subtle object-contain" />
   );
 }

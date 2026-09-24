@@ -3,26 +3,27 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getOrderById } from '@/api/orders';
 import { prisma } from '@/lib/db';
 import { getClientIp, checkRateLimit } from '@/lib/rateLimit';
+import { isValidSlipUploadToken, mintSlipStorageKey, slipImageRoute } from '@/lib/slipSecurity';
 
 export const dynamic = 'force-dynamic';
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-const KEY_RE = /^[0-9a-z-]+$/i;
 
 /**
  * POST /api/v1/payments/slip-upload — ส่งสลิปให้แอดมินตรวจ (manual check).
- * Customer uploads the transfer slip for an order; the image is stored in the
- * existing SiteSetting image store and linked to the order for the admin.
- * Works whether or not SlipOK auto-verification is configured — the admin
- * still confirms with ยืนยันการชำระเงิน (unchanged), this just gives them
- * the actual slip to look at instead of asking the customer in chat.
+ * Customer uploads the transfer slip for an order. The upload must present
+ * the capability token minted with the order (see lib/slipSecurity.ts);
+ * the image is stored PRIVATELY under the `slip:` namespace and linked to
+ * the order for the admin. Each upload writes a new key — prior evidence
+ * is never overwritten. Works whether or not SlipOK auto-verification is
+ * configured — the admin still confirms with ยืนยันการชำระเงิน.
  *
- * Body: multipart { orderId, slip: File } (same shape as slip-verify).
+ * Body: multipart { orderId, token, slip: File }.
  * Rate limit: 10 / 10 min per IP.
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const ip = getClientIp(req);
-  const rl = checkRateLimit('_slip_upload_ip', ip, {
+  const rl = await checkRateLimit('_slip_upload_ip', ip, {
     route: '_slip_upload_ip',
     maxRequests: 10,
     windowMs: 10 * 60_000,
@@ -33,10 +34,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   let orderId = '';
+  let uploadToken = '';
   let dataUrl = '';
   try {
     const form = await req.formData();
     orderId = String(form.get('orderId') ?? '');
+    uploadToken = String(form.get('token') ?? '');
     const file = form.get('slip');
     if (file instanceof File) {
       if (file.size > MAX_IMAGE_BYTES) {
@@ -51,8 +54,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   } catch {
     return NextResponse.json({ error: 'INVALID_BODY' }, { status: 400 });
   }
-  if (!orderId || !dataUrl) {
-    return NextResponse.json({ error: 'ORDER_AND_SLIP_REQUIRED' }, { status: 400 });
+  if (!orderId || !uploadToken || !dataUrl) {
+    return NextResponse.json({ error: 'ORDER_SLIP_AND_TOKEN_REQUIRED' }, { status: 400 });
+  }
+
+  // Capability check (finding: an order ID alone must not authorize
+  // replacing payment evidence). The token is an HMAC over
+  // (orderId, confirmationUuid) minted into the checkout response —
+  // someone who merely knows an order ID fails here.
+  if (!isValidSlipUploadToken(orderId, uploadToken)) {
+    return NextResponse.json({ error: 'INVALID_UPLOAD_TOKEN' }, { status: 403 });
   }
 
   const order = await getOrderById(orderId);
@@ -73,17 +84,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'CONTENT_MISMATCH' }, { status: 400 });
   }
 
-  // Store in the same image table admin uploads use (immutable, unguessable key).
-  const key = `image:${Date.now().toString(36)}-${bytes.length.toString(36)}-png`;
-  await prisma.siteSetting.upsert({
-    where: { key },
-    update: { value: dataUrl },
-    create: { key, value: dataUrl },
+  // Private storage: random key in the `slip:` namespace (finding: slips
+  // must not ride the public, year-cached image namespace). Every upload
+  // gets a NEW key so previous evidence is preserved, not overwritten.
+  const key = mintSlipStorageKey();
+  await prisma.siteSetting.create({
+    data: { key, value: dataUrl },
   });
-  const imagePath = `/api/v1/images/${key.slice('image:'.length)}`;
-  if (!KEY_RE.test(key.slice('image:'.length))) {
-    return NextResponse.json({ error: 'INTERNAL' }, { status: 500 });
-  }
+  const imagePath = slipImageRoute(key);
 
   await prisma.order.update({
     where: { id: order.id },

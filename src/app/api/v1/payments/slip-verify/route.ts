@@ -35,7 +35,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const ip = getClientIp(req);
-  const rl = checkRateLimit('_slip_verify_ip', ip, {
+  const rl = await checkRateLimit('_slip_verify_ip', ip, {
     route: '_slip_verify_ip',
     maxRequests: 10,
     windowMs: 10 * 60_000,

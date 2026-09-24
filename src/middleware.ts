@@ -70,20 +70,21 @@ function isWebhookRoute(pathname: string): boolean {
 
 // ─── Middleware ──────────────────────────────────────────
 
-export function middleware(request: NextRequest): NextResponse {
+export async function middleware(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
 
   // ─── Rate limiting (API routes) ───────────────────
-  // Sliding-window limiter from 13-security.md §5 — in-memory store (per
-  // serverless instance; per-account brute force is additionally covered by
-  // the DB lockout in adminLogin). Only API routes are limited.
+  // Sliding-window limiter from 13-security.md §5 — shared Upstash counter
+  // when configured (serverless-safe), per-instance memory otherwise.
+  // Per-account brute force is additionally covered by the DB lockout in
+  // adminLogin. Only API routes are limited.
   let limited: NextResponse | null = null;
   if (pathname.startsWith('/api/')) {
     const ip =
       request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
       request.headers.get('x-real-ip') ??
       'unknown';
-    limited = applyRateLimit(pathname, ip);
+    limited = await applyRateLimit(pathname, ip);
     limited.headers.set('X-RateLimit-Scoped-By', 'ip');
     if (limited.status === 429) return limited;
   }

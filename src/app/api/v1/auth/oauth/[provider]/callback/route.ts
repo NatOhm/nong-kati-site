@@ -20,13 +20,13 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: { provider: string } },
+  { params }: { params: Promise<{ provider: string }> },
 ): Promise<NextResponse> {
   const loginUrl = new URL('/account/login', req.url);
   const fail = (reason: string): NextResponse =>
     NextResponse.redirect(`${loginUrl}?oauth=${reason}`);
 
-  const { provider } = params;
+  const { provider } = await params;
   if (!isOAuthProvider(provider) || !isProviderConfigured(provider)) return fail('unavailable');
 
   const stateCookie = req.cookies.get(OAUTH_STATE_COOKIE)?.value ?? null;

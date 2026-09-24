@@ -14,6 +14,8 @@ export interface CreateOrderResponse {
   discountThb: number;
   couponCode: string | null;
   couponError: string | null;
+  /** Capability token authorizing THIS order's slip upload (server-minted HMAC). */
+  slipUploadToken: string | null;
 }
 
 export interface CheckoutContactInput {

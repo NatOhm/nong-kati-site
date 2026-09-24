@@ -12,6 +12,7 @@
 
 import { prisma } from '@/lib/db';
 import { generateOrderNumber, normalizeTier, tierPrice } from '@/lib/pricing';
+import { mintSlipUploadToken } from '@/lib/slipSecurity';
 
 export interface OrderItem {
   id: string;
@@ -70,6 +71,8 @@ export interface CreateOrderResult {
   discountThb: number;
   couponCode: string | null;
   couponError: string | null;
+  /** Capability token for slip upload — only present on creation. */
+  slipUploadToken: string;
 }
 
 // ─── Mapping helpers ─────────────────────────────────────
@@ -281,46 +284,68 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
 
   const total = Math.max(Math.round((subtotal - discount) * 100) / 100, 0);
 
-  // Order number: sequence = count of existing orders + 1 (collisions retried).
+  // Order number allocation. The count-based seed is only a starting point:
+  // concurrent checkouts can all pass the old lookup-then-insert together, so
+  // the insert itself retries on the orderNumber unique violation (P2002)
+  // with the next candidate. The unique constraint is the source of truth.
   const count = await prisma.order.count();
-  let orderNumber = generateOrderNumber(count + 1);
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const exists = await prisma.order.findUnique({ where: { orderNumber } });
-    if (!exists) break;
-    orderNumber = generateOrderNumber(count + 2 + attempt);
+  let created: DbOrder | null = null;
+  for (let attempt = 0; attempt < 5 && !created; attempt++) {
+    const orderNumber = generateOrderNumber(count + 1 + attempt);
+    try {
+      created = (await prisma.order.create({
+        data: {
+          orderNumber,
+          customerId: input.customerId ?? null,
+          customerEmail: input.customerEmail,
+          customerPhone: input.customerPhone ?? null,
+          status: 'pending_payment',
+          paymentMethod: input.paymentMethod,
+          subtotalThb: subtotal,
+          vatAmountThb: vat,
+          discountThb: discount,
+          totalAmountThb: total,
+          couponId,
+          lineOptIn: input.lineOptIn,
+          marketingOptIn: input.marketingOptIn,
+          tosAcceptedAt: new Date(),
+          tosVersion: input.tosVersion,
+          requiresTaxInvoice: input.requiresTaxInvoice,
+          taxInvoiceName: input.taxInvoiceName ?? null,
+          taxInvoiceTaxId: input.taxInvoiceTaxId ?? null,
+          confirmationUuid: crypto.randomUUID(),
+          items: { create: rows },
+        },
+        include: orderInclude,
+      })) as unknown as DbOrder;
+    } catch (err) {
+      // P2002 = unique constraint. orderNumber is the only realistically
+      // colliding key here (confirmationUuid is a fresh UUID), so retry with
+      // the next candidate number; anything else is a real failure.
+      if (
+        attempt < 4 &&
+        typeof err === 'object' &&
+        err !== null &&
+        (err as { code?: string }).code === 'P2002'
+      ) {
+        continue;
+      }
+      throw err;
+    }
+  }
+  if (!created) {
+    throw new Error('ORDER_NUMBER_ALLOCATION_FAILED');
   }
 
-  const created = await prisma.order.create({
-    data: {
-      orderNumber,
-      customerId: input.customerId ?? null,
-      customerEmail: input.customerEmail,
-      customerPhone: input.customerPhone ?? null,
-      status: 'pending_payment',
-      paymentMethod: input.paymentMethod,
-      subtotalThb: subtotal,
-      vatAmountThb: vat,
-      discountThb: discount,
-      totalAmountThb: total,
-      couponId,
-      lineOptIn: input.lineOptIn,
-      marketingOptIn: input.marketingOptIn,
-      tosAcceptedAt: new Date(),
-      tosVersion: input.tosVersion,
-      requiresTaxInvoice: input.requiresTaxInvoice,
-      taxInvoiceName: input.taxInvoiceName ?? null,
-      taxInvoiceTaxId: input.taxInvoiceTaxId ?? null,
-      confirmationUuid: crypto.randomUUID(),
-      items: { create: rows },
-    },
-    include: orderInclude,
-  });
-
   return {
-    order: mapOrder(created as unknown as DbOrder),
+    order: mapOrder(created),
     discountThb: discount,
     couponCode,
     couponError,
+    // Capability token for slip upload (finding: order ID alone must not
+    // authorize replacing payment evidence). Only the checkout response of
+    // the creating customer receives it.
+    slipUploadToken: mintSlipUploadToken(created.id, created.confirmationUuid),
   };
 }
 

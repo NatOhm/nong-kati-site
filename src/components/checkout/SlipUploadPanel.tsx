@@ -18,9 +18,12 @@ import { cn } from '@/utils/cn';
 
 export function SlipUploadPanel({
   orderId,
+  slipUploadToken,
   slipVerifyEnabled,
 }: {
   orderId: string;
+  /** Capability token minted with the order — required by the upload API. */
+  slipUploadToken: string | null;
   slipVerifyEnabled: boolean;
 }): React.JSX.Element {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -50,6 +53,9 @@ export function SlipUploadPanel({
   function buildForm(): FormData {
     const form = new FormData();
     form.set('orderId', orderId);
+    if (slipUploadToken) {
+      form.set('token', slipUploadToken);
+    }
     form.set('slip', file!);
     return form;
   }

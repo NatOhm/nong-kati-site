@@ -51,7 +51,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const ip = getClientIp(req);
   // 5 tickets / hour per IP (per-email 5/24h lives in createSupportTicket).
-  const ipRl = checkRateLimit('_support_ticket_ip', ip, {
+  const ipRl = await checkRateLimit('_support_ticket_ip', ip, {
     route: '_support_ticket_ip',
     maxRequests: 5,
     windowMs: 3_600_000,

@@ -55,7 +55,7 @@ export async function createSupportTicket(
 ): Promise<{ ticket: SupportTicket } | { error: 'RATE_LIMITED' }> {
   // 5 tickets / 24h per email (reuses the auth limiter's in-memory windows).
   const { checkRateLimit } = await import('@/lib/rateLimit');
-  const rl = checkRateLimit('_support_ticket_email', input.email, {
+  const rl = await checkRateLimit('_support_ticket_email', input.email, {
     route: '_support_ticket_email',
     maxRequests: 5,
     windowMs: 86_400_000,

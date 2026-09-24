@@ -18,7 +18,9 @@ import { normalizeTier, tierPrice, type PriceTier } from '@/lib/pricing';
  */
 const getRequestTier = cache(async (): Promise<PriceTier> => {
   const { cookies } = await import('next/headers');
-  const token = cookies().get('nk_session')?.value;
+  // Next 15: cookies() is async — await before reading.
+  const cookieStore = await cookies();
+  const token = cookieStore.get('nk_session')?.value;
   if (!token) return 'retail';
   const { getCustomerFromToken } = await import('@/api/customerAuth');
   const customer = await getCustomerFromToken(token).catch(() => null);
