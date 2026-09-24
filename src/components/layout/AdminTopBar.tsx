@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Bell, LogOut, Menu } from 'lucide-react';
+import { Bell, LogOut, Menu, Store } from 'lucide-react';
 import { clearAdminSession, setAdminRemembered } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
 import { type AdminRole } from '@/types/auth';
@@ -77,6 +78,16 @@ export function AdminTopBar({
       </div>
 
       <div className="flex items-center gap-4">
+        {/* Client ask: quick jump back to the storefront. */}
+        <Link
+          href="/"
+          className="rounded p-1.5 text-fg-placeholder hover:bg-surface hover:text-fg"
+          aria-label="กลับหน้าร้าน"
+          title="กลับหน้าร้าน"
+        >
+          <Store size={18} strokeWidth={1.5} />
+        </Link>
+
         {/* Light/dark toggle — admin follows the sitewide theme */}
         <ThemeToggle />
 

@@ -19,7 +19,7 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
-  Home,
+  Store,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { type AdminRole } from '@/types/auth';
@@ -148,10 +148,10 @@ export function AdminSidebar({
             'flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-fg-muted transition-colors hover:bg-surface hover:text-fg',
             collapsed && 'justify-center px-2',
           )}
-          title={collapsed ? 'กลับหน้าแรก' : undefined}
+          title={collapsed ? 'กลับหน้าร้าน' : undefined}
         >
-          <Home size={20} strokeWidth={1.5} />
-          {!collapsed && <span>กลับหน้าแรก</span>}
+          <Store size={20} strokeWidth={1.5} />
+          {!collapsed && <span>กลับหน้าร้าน</span>}
         </Link>
       </div>
 
