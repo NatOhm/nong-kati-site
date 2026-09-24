@@ -666,3 +666,23 @@ model NotificationRead {
   @@unique([customerId, couponId])
   @@index([customerId])
 }
+
+// ─── Magic Link sign-in ────────────────────────────────
+// Single-use sign-in tokens, stored as SHA-256 hashes (never the raw
+// token): a DB leak cannot produce a usable link. attemptedAt records
+// consumption attempts for auditing; usedAt marks successful single-use
+// consumption. Expired rows are swept opportunistically on request.
+
+model MagicLinkToken {
+  id          String    @id @default(cuid())
+  email       String
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  attemptedAt DateTime?
+  ipAddress   String?
+  createdAt   DateTime  @default(now())
+
+  @@index([email])
+  @@index([expiresAt])
+}

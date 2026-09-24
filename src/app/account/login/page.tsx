@@ -235,8 +235,19 @@ export default function LoginPage(): React.JSX.Element {
             </>
           )}
 
-          {/* Magic Link — hidden until /account/magic-link + its API exist;
-              never advertise a dead destination (audit #5). */}
+          {/* Magic Link — passwordless sign-in (08-auth.md §4.2). */}
+          <div className="my-4 flex items-center gap-3 text-xs text-fg-placeholder">
+            <span className="h-px flex-1 bg-line-subtle" />
+            หรือ
+            <span className="h-px flex-1 bg-line-subtle" />
+          </div>
+          <a
+            href={`/account/magic-link?next=${encodeURIComponent(safeNext(searchParams.get('next')))}`}
+            className="flex w-full items-center justify-center gap-2 rounded-md border border-line-subtle bg-surface px-4 py-2.5 text-sm font-medium text-fg transition-colors hover:bg-peach-50"
+          >
+            <Mail size={18} className="text-fg-brand" />
+            เข้าสู่ระบบด้วยลิงก์อีเมล (ไม่ต้องใช้รหัสผ่าน)
+          </a>
         </div>
 
         {/* Register link */}

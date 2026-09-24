@@ -155,8 +155,10 @@ function AccountLayoutInner({
   );
 }
 
-// Pages that should NOT show the sidebar (auth pages)
-const PUBLIC_ACCOUNT_ROUTES = ['/account/login', '/account/register'];
+// Pages that should NOT show the sidebar (auth pages). magic-link is public
+// too: it is the passwordless sign-in surface and consumes ?token= links
+// opened straight from email (guests must never be redirected away from it).
+const PUBLIC_ACCOUNT_ROUTES = ['/account/login', '/account/register', '/account/magic-link'];
 
 export default function AccountLayout({
   children,
