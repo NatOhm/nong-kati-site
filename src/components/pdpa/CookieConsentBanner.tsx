@@ -105,7 +105,7 @@ export function CookieConsentBanner(): React.JSX.Element | null {
   if (!visible) return null;
 
   return (
-    <div className="fixed inset-x-0 bottom-[4.25rem] z-50 border border-line-subtle bg-surface-base px-3 py-3 shadow-lg md:bottom-0 md:border-x-0 md:border-b-0 md:border-t md:px-6 md:py-4 lg:bottom-0">
+    <div className="fixed inset-x-0 bottom-[4.25rem] z-50 border border-line-subtle bg-surface-base px-3 py-3 shadow-clay-sm md:bottom-0 md:border-x-0 md:border-b-0 md:border-t md:px-6 md:py-4 lg:bottom-0">
       {/* Mobile: compact two-row banner above the taskbar (audit #7) — copy
           is one line with truncation-resistant short text so page CTAs stay
           reachable before consent. */}

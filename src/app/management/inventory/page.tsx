@@ -519,7 +519,7 @@ export default function AdminInventoryPage(): React.JSX.Element {
           onClick={() => !saving && setDraft(null)}
         >
           <div
-            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line-subtle bg-surface p-6 shadow-xl"
+            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line-subtle bg-surface p-6 shadow-clay-lg"
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="mb-4 text-lg font-bold text-fg">แก้ไขสินค้า</h2>
@@ -594,8 +594,7 @@ export default function AdminInventoryPage(): React.JSX.Element {
               </div>
               {draft.variantCount > 1 && (
                 <p className="rounded-lg border border-oat-200 bg-oat px-3 py-2 text-xs text-fg-warning">
-                  สินค้านี้มี {draft.variantCount} ตัวเลือก — แก้ราคา/สต๊อกรายตัวเลือกในหน้า
-                  สินค้า
+                  สินค้านี้มี {draft.variantCount} ตัวเลือก — แก้ราคา/สต๊อกรายตัวเลือกในหน้า สินค้า
                 </p>
               )}
               <div>

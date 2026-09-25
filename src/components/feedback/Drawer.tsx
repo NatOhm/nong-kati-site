@@ -65,7 +65,7 @@ export function Drawer({
         data-open={isOpen}
         style={side !== 'bottom' ? { width } : undefined}
         className={cn(
-          'absolute flex flex-col bg-white shadow-xl transition-transform duration-slow ease-out-quart',
+          'absolute flex flex-col bg-white shadow-clay-lg transition-transform duration-slow ease-out-quart',
           side === 'bottom' ? 'max-h-[85vh] rounded-t-3xl' : 'w-full max-w-full',
           sideTransform[side],
         )}

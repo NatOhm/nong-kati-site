@@ -83,7 +83,8 @@ export function CartDrawer({
         aria-modal="true"
         aria-label="ตะกร้าสินค้า"
         className={cn(
-          'fixed right-0 top-0 z-[90] flex h-full w-full max-w-[400px] flex-col border-l border-line-subtle bg-surface-base shadow-xl',
+          // shadow-clay-lg = the one allowed modal-level elevation (design-system.md §4)
+          'fixed right-0 top-0 z-[90] flex h-full w-full max-w-[400px] flex-col border-l border-line-subtle bg-surface-base shadow-clay-lg',
           closing ? 'animate-cart-exit' : 'animate-cart-enter',
         )}
       >

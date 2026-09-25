@@ -203,7 +203,14 @@ export default function AdminProductsPage(): React.JSX.Element {
   ): Promise<void> {
     const v = product.variants.find((x) => x.id === variantId);
     if (!v) return;
-    const current = field === 'cost' ? v.cost : field === 'memberPrice' ? v.memberPrice : field === 'dealerPrice' ? v.dealerPrice : v[field];
+    const current =
+      field === 'cost'
+        ? v.cost
+        : field === 'memberPrice'
+          ? v.memberPrice
+          : field === 'dealerPrice'
+            ? v.dealerPrice
+            : v[field];
     const parsed = raw.trim() === '' ? null : Number(raw);
     if (raw.trim() !== '' && !Number.isFinite(parsed)) return;
     if (parsed === current) return;
@@ -347,7 +354,9 @@ export default function AdminProductsPage(): React.JSX.Element {
                 <tr className="border-b border-line-subtle bg-surface">
                   <th className="px-4 py-3 text-left font-medium text-fg-muted">สินค้า</th>
                   <th className="px-4 py-3 text-left font-medium text-fg-muted">หมวดหมู่</th>
-                  <th className="px-4 py-3 text-right font-medium text-fg-muted">ต้นทุนจริง / ราคา / ราคา VIP / ราคาขาจร</th>
+                  <th className="px-4 py-3 text-right font-medium text-fg-muted">
+                    ต้นทุนจริง / ราคา / ราคา VIP / ราคาขาจร
+                  </th>
                   <th className="px-4 py-3 text-center font-medium text-fg-muted">สต๊อก</th>
                   <th className="px-4 py-3 text-center font-medium text-fg-muted">สถานะ</th>
                   <th className="px-4 py-3 text-center font-medium text-fg-muted">แนะนำ</th>
@@ -510,7 +519,8 @@ export default function AdminProductsPage(): React.JSX.Element {
         )}
 
         <p className="text-xs text-fg-placeholder">
-          ทั้งหมด {products.length} รายการ (แสดงผล {products.filter((p) => p.isActive).length} รายการ)
+          ทั้งหมด {products.length} รายการ (แสดงผล {products.filter((p) => p.isActive).length}{' '}
+          รายการ)
           {searchQuery !== '' && filteredProducts.length !== products.length && (
             <> · ค้นเจอ {filteredProducts.length} รายการ</>
           )}
@@ -705,7 +715,7 @@ function ProductEditor({
       aria-label={product ? `แก้ไข ${product.name}` : 'เพิ่มสินค้า'}
     >
       <button aria-label="ปิด" onClick={onClose} className="bg-overlay absolute inset-0" />
-      <div className="absolute inset-y-0 right-0 flex w-full max-w-lg animate-[drawer-in_300ms_cubic-bezier(0,0,0.2,1)_both] flex-col bg-surface shadow-xl">
+      <div className="absolute inset-y-0 right-0 flex w-full max-w-lg animate-[drawer-in_300ms_cubic-bezier(0,0,0.2,1)_both] flex-col bg-surface shadow-clay-lg">
         <div className="flex items-center justify-between border-b border-line-subtle px-6 py-4">
           <h2 className="text-lg font-bold text-fg">
             {product ? `แก้ไข: ${product.name}` : 'เพิ่มสินค้าใหม่'}

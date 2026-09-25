@@ -180,6 +180,14 @@
   --shadow-inset-sm: inset 2px 2px 4px rgba(124, 45, 18, 0.1);
   --shadow-inset-md: inset 3px 3px 8px rgba(124, 45, 18, 0.14);
 
+  /* ── Elevation system (docs/design-system.md §4): exactly three levels ──
+     subtle → shadow-clay-xs (rows, chips, resting tiles)
+     raised → shadow-clay-sm (cards, product tiles, inputs, sticky bars)
+     modal  → shadow-clay-lg (drawers, dialogs, popovers ONLY)
+     shadow-clay / shadow-clay-brand are brand accents for hero CTA/floating
+     launcher, not generic surfaces. Tailwind shadow-lg/xl are forbidden
+     (cool-grey, off-palette) — use the clay ramps. */
+
   /* ── Animation ── */
   --duration-instant: 80ms;
   /* Motion (audit #11): controls 120–180ms, page entry 180–240ms.

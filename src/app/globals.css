@@ -260,6 +260,29 @@ body {
   transform-origin: 70% 90%;
 }
 
+/* Success mascot: one celebratory bounce on entry (design-system.md §7).
+   The global reduced-motion rule disables it automatically. */
+@keyframes mascot-celebrate {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  35% {
+    transform: translateY(-10px) scale(1.04);
+  }
+  60% {
+    transform: translateY(0) scale(0.98);
+  }
+  80% {
+    transform: translateY(-4px) scale(1.01);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+.mascot-celebrate {
+  animation: mascot-celebrate 900ms var(--ease-spring) 1 both;
+}
+
 /* 404/error mascot: drifting Zzz letters above the sleeping hamster. */
 @keyframes zzz-drift {
   0% {

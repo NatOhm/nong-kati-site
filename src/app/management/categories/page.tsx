@@ -385,7 +385,7 @@ export default function AdminCategoriesPage(): React.JSX.Element {
           onClick={() => !saving && setModal(null)}
         >
           <div
-            className="w-full max-w-md rounded-lg border border-line bg-surface p-6 shadow-xl"
+            className="w-full max-w-md rounded-lg border border-line bg-surface p-6 shadow-clay-lg"
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"

@@ -333,10 +333,7 @@ export default function CheckoutPage(): React.JSX.Element {
     return (
       <PageShell>
         <div className="flex flex-col items-center justify-center py-24 text-center">
-          <SiteMascot
-            size={120}
-            className="mascot-beg mb-6 drop-shadow-[0_8px_16px_rgba(124,45,18,0.25)]"
-          />
+          <SiteMascot size={120} className="mascot-wave mb-6" />
           <h1 className="mb-4 text-2xl font-bold text-fg">ตะกร้าว่างเปล่า</h1>
           <p className="mb-6 text-fg-placeholder">
             น้องแฮมสเตอร์ขอสินค้าหน่อย — เพิ่มสินค้าในตะกร้าก่อนชำระเงินนะ
@@ -415,7 +412,7 @@ export default function CheckoutPage(): React.JSX.Element {
                     type="button"
                     onClick={handleApplyCoupon}
                     disabled={!couponInput.trim()}
-                    className="h-10 shrink-0 rounded-md bg-surface-brand px-4 text-sm font-semibold text-fg-inverse shadow-clay-brand transition-all duration-interactive ease-ease-out hover:scale-[1.02] active:scale-[0.96] disabled:opacity-50"
+                    className="h-10 shrink-0 rounded-md bg-surface-brand px-4 text-sm font-semibold text-fg-inverse transition-colors hover:opacity-90 disabled:opacity-50"
                   >
                     ใช้โค้ด
                   </button>

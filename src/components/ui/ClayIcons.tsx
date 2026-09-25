@@ -383,3 +383,114 @@ export function HamsterSleeping({ size = 120, className }: ClayIconProps): React
     </svg>
   );
 }
+
+/** Celebrating hamster — arms up, for successful payment / code delivery. */
+export function HamsterCelebrating({ size = 120, className }: ClayIconProps): React.JSX.Element {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 120 120"
+      fill="none"
+      className={className}
+      aria-hidden="true"
+    >
+      {/* confetti specks — on-palette, sparse */}
+      <circle cx="14" cy="28" r="3" fill="#FECDD3" />
+      <rect
+        x="97"
+        y="18"
+        width="6"
+        height="6"
+        rx="1.5"
+        fill="#86EBB4"
+        transform="rotate(20 97 18)"
+      />
+      <rect
+        x="22"
+        y="8"
+        width="5"
+        height="5"
+        rx="1.2"
+        fill="#FDE68A"
+        transform="rotate(-15 22 8)"
+      />
+      <circle cx="104" cy="46" r="2.5" fill="#9CB8F8" />
+      {/* raised arms */}
+      <path d="M38 52 Q24 44 20 32" stroke="#FDBA74" strokeWidth="9" strokeLinecap="round" />
+      <path d="M82 52 Q96 44 100 32" stroke="#FDBA74" strokeWidth="9" strokeLinecap="round" />
+      <circle cx="20" cy="31" r="5" fill="#FED7AA" />
+      <circle cx="100" cy="31" r="5" fill="#FED7AA" />
+      {/* body */}
+      <ellipse cx="60" cy="74" rx="34" ry="30" fill="#FDBA74" />
+      <ellipse cx="60" cy="74" rx="34" ry="30" fill="url(#hamsterCheer)" />
+      {/* ears */}
+      <circle cx="36" cy="42" r="9" fill="#FDBA74" />
+      <circle cx="36" cy="42" r="4.5" fill="#FFEDD5" />
+      <circle cx="84" cy="42" r="9" fill="#FDBA74" />
+      <circle cx="84" cy="42" r="4.5" fill="#FFEDD5" />
+      {/* happy closed eyes ^^ */}
+      <path d="M44 64 q5 -6 10 0" stroke="#4E3820" strokeWidth="2.6" strokeLinecap="round" />
+      <path d="M66 64 q5 -6 10 0" stroke="#4E3820" strokeWidth="2.6" strokeLinecap="round" />
+      {/* open smile */}
+      <path d="M50 74 q10 10 20 0" stroke="#4E3820" strokeWidth="2.6" strokeLinecap="round" />
+      {/* belly + blush */}
+      <ellipse cx="60" cy="86" rx="20" ry="11" fill="#FFF7ED" />
+      <ellipse cx="38" cy="72" rx="4.5" ry="2.6" fill="#FECDD3" opacity="0.8" />
+      <ellipse cx="82" cy="72" rx="4.5" ry="2.6" fill="#FECDD3" opacity="0.8" />
+      <defs>
+        <radialGradient id="hamsterCheer" cx="0.35" cy="0.25" r="1.1">
+          <stop offset="0" stopColor="#FED7AA" />
+          <stop offset="1" stopColor="#FB923C" />
+        </radialGradient>
+      </defs>
+    </svg>
+  );
+}
+
+/** Worried hamster — for recoverable errors (retry possible), not fatal ones. */
+export function HamsterWorried({ size = 120, className }: ClayIconProps): React.JSX.Element {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 120 120"
+      fill="none"
+      className={className}
+      aria-hidden="true"
+    >
+      {/* body */}
+      <ellipse cx="60" cy="74" rx="34" ry="30" fill="#FDBA74" />
+      <ellipse cx="60" cy="74" rx="34" ry="30" fill="url(#hamsterWorry)" />
+      {/* ears drooped slightly */}
+      <circle cx="34" cy="46" r="9" fill="#FDBA74" />
+      <circle cx="34" cy="46" r="4.5" fill="#FFEDD5" />
+      <circle cx="86" cy="46" r="9" fill="#FDBA74" />
+      <circle cx="86" cy="46" r="4.5" fill="#FFEDD5" />
+      {/* worried brows + round eyes */}
+      <path d="M42 58 q6 -4 11 0" stroke="#4E3820" strokeWidth="2.2" strokeLinecap="round" />
+      <path d="M67 58 q5 -4 11 0" stroke="#4E3820" strokeWidth="2.2" strokeLinecap="round" />
+      <circle cx="49" cy="66" r="3.2" fill="#4E3820" />
+      <circle cx="71" cy="66" r="3.2" fill="#4E3820" />
+      {/* wavy mouth */}
+      <path
+        d="M50 78 q5 -4 10 0 q5 4 10 0"
+        stroke="#4E3820"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+      />
+      {/* sweat drop */}
+      <path d="M94 54 q7 9 0 14 q-7 -5 0 -14z" fill="#9CB8F8" />
+      {/* belly + blush */}
+      <ellipse cx="60" cy="88" rx="20" ry="11" fill="#FFF7ED" />
+      <ellipse cx="38" cy="74" rx="4.5" ry="2.6" fill="#FECDD3" opacity="0.8" />
+      <ellipse cx="82" cy="74" rx="4.5" ry="2.6" fill="#FECDD3" opacity="0.8" />
+      <defs>
+        <radialGradient id="hamsterWorry" cx="0.35" cy="0.25" r="1.1">
+          <stop offset="0" stopColor="#FED7AA" />
+          <stop offset="1" stopColor="#FB923C" />
+        </radialGradient>
+      </defs>
+    </svg>
+  );
+}

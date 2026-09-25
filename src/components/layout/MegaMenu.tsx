@@ -47,7 +47,7 @@ export function MegaMenu({
       {/* Menu panel */}
       <div
         className={cn(
-          'bg-surface-base/98 fixed left-0 top-16 z-50 w-full border-b border-line-subtle shadow-xl backdrop-blur-md',
+          'bg-surface-base/98 fixed left-0 top-16 z-50 w-full border-b border-line-subtle shadow-clay-lg backdrop-blur-md',
           className,
         )}
         onMouseLeave={onClose}

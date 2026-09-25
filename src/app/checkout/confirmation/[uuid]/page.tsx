@@ -1,8 +1,9 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Clock, Mail, FileText, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Clock, Mail, FileText } from 'lucide-react';
 
 import { FacebookLayout } from '@/components/layout/FacebookLayout';
+import { SiteMascot } from '@/components/ui/SiteMascot';
 
 export const dynamic = 'force-dynamic';
 import { Footer } from '@/components/layout/Footer';
@@ -57,9 +58,11 @@ export default async function ConfirmationPage({
             <div className="mb-8 rounded-md border border-line-subtle bg-white p-6 text-center">
               <div className="mb-4 flex justify-center">
                 {isCompleted ? (
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-jade-500/15">
-                    <CheckCircle size={28} className="text-jade-600" />
-                  </div>
+                  <>
+                    {/* Celebrating hamster — one bounce, then still (§7 of the
+                        design doc): success earns the character moment. */}
+                    <SiteMascot size={96} className="mascot-celebrate" />
+                  </>
                 ) : (
                   <div className="flex h-16 w-16 items-center justify-center rounded-full bg-peach-100">
                     <Clock size={28} className="text-fg-brand" />
@@ -106,7 +109,7 @@ export default async function ConfirmationPage({
                   {deliveredCodes.map((delivered, idx) => (
                     <div
                       key={`${delivered.code}-${idx}`}
-                      className="rounded-md border border-line-brand bg-white p-4 shadow-code-glow"
+                      className="rounded-md border border-line-brand bg-white p-4"
                     >
                       <p className="mb-2 text-sm text-fg-muted">
                         {delivered.productName} ฿{delivered.denomination.toLocaleString('th-TH')}
@@ -186,7 +189,7 @@ export default async function ConfirmationPage({
               {isPendingPayment && (
                 <Link
                   href="/checkout"
-                  className="flex w-full items-center justify-center gap-2 rounded-md bg-peach-500 px-5 py-3 text-base font-semibold text-white hover:bg-peach-400"
+                  className="flex w-full items-center justify-center gap-2 rounded-md bg-peach-500 px-5 py-3 text-base font-semibold text-white shadow-clay-brand transition-colors hover:bg-peach-400"
                 >
                   ดำเนินการชำระเงิน
                 </Link>

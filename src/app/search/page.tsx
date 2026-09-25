@@ -10,6 +10,7 @@ import { Breadcrumb } from '@/components/data-display/Breadcrumb';
 import { CatalogSearchBox } from '@/components/search/CatalogSearchBox';
 import { SearchToolbar } from '@/components/search/SearchToolbar';
 import { SiteMascot } from '@/components/ui/SiteMascot';
+import { HamsterWorried } from '@/components/ui/ClayIcons';
 
 import { getCatalogProducts, getCategoriesWithProductCounts, type CatalogSort } from '@/lib/data';
 
@@ -191,7 +192,9 @@ export default async function SearchPage({
               </section>
             ) : dbDown ? (
               <section className="py-16 text-center" role="alert">
-                <SiteMascot size={96} className="mascot-beg mx-auto mb-4" />
+                {/* Recoverable outage → worried hamster (retry possible); the
+                    sleeping one is reserved for fatal 404/error pages. */}
+                <HamsterWorried size={96} className="mx-auto mb-4" />
                 <h2 className="mb-2 text-lg font-semibold text-fg">ระบบขัดข้องชั่วคราว</h2>
                 <p className="mx-auto max-w-md text-sm text-fg-muted">
                   ไม่สามารถโหลดสินค้าได้ในขณะนี้ (ไม่ใช่เพราะสินค้าหมด) — กรุณาลองใหม่อีกครั้ง

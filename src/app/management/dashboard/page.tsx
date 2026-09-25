@@ -81,7 +81,7 @@ function MiniBarChart({
               style={{ height: `${height}%`, minHeight: d.revenue > 0 ? 4 : 0 }}
             />
             {/* Tooltip */}
-            <div className="pointer-events-none absolute bottom-full left-1/2 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-md bg-surface px-2 py-1 text-xs text-fg shadow-lg group-hover:block">
+            <div className="pointer-events-none absolute bottom-full left-1/2 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-md bg-surface px-2 py-1 text-xs text-fg shadow-clay-sm group-hover:block">
               {formatThb(d.revenue)}
               <div className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-clay-300" />
             </div>
