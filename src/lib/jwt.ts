@@ -15,10 +15,30 @@ const ALGORITHM = 'HS256'; // Mock: HMAC. Production: RS256
 const ACCESS_TOKEN_TTL = 15 * 60; // 15 minutes
 const REFRESH_TOKEN_TTL = 30 * 24 * 60 * 60; // 30 days
 
+/**
+ * Entropy floor for configured secrets — a 32+ char random value has ~256
+ * bits; anything shorter is brute-forceable offline.
+ */
+const MIN_SECRET_LENGTH = 32;
+
 function getSecret(): string {
-  // Server-side only. Falls back to a dev secret when the env var is absent
-  // so local dev never crashes; production (Vercel) sets NK_JWT_SECRET.
-  return process.env['NK_JWT_SECRET'] ?? 'dev-only-insecure-secret';
+  const configured = process.env['NK_JWT_SECRET'];
+  if (configured) {
+    if (configured.length < MIN_SECRET_LENGTH) {
+      throw new Error('JWT_SECRET_TOO_WEAK: NK_JWT_SECRET must be at least 32 characters');
+    }
+    return configured;
+  }
+  // Review finding (High): the dev fallback must never run in production —
+  // a publicly known secret would let anyone forge customer/admin tokens.
+  // Fail closed instead: signing throws (routes answer 500) and verification
+  // returns null, so no auth route is usable until the variable is set.
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'NK_JWT_SECRET is not configured — refusing to sign or verify tokens with the dev fallback',
+    );
+  }
+  return 'dev-only-insecure-secret';
 }
 
 // ─── Browser-compatible helpers ──────────────────────────
@@ -179,7 +199,8 @@ export async function verifyAdminJwt(token: string): Promise<AdminJwtPayload | n
   // authenticates via verifyAdminJwt directly (no permission required), so
   // first login → change password still works.
   if (user.mustChangePassword) return { ...payload, perms: [] };
-  return payload;}
+  return payload;
+}
 
 /**
  * Issue an admin access JWT.

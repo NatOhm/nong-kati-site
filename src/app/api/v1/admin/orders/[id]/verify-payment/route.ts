@@ -16,11 +16,12 @@ function bearer(req: NextRequest): string | null {
 
 /**
  * POST /api/v1/admin/orders/[id]/verify-payment — ระบบตรวจสอบการชำระเงิน.
- * Admin confirms the customer's payment slip: the order is atomically claimed
- * from pending_payment, then fulfilment assigns gift codes, decrements stock,
- * writes stock moves and completes the order in one transaction. If codes run
- * short, the order lands in pending_manual_fulfilment (admin restocks and
- * retries). Discord gets a payment-confirmed ping plus low-stock warnings.
+ * Admin confirms the customer's payment slip: claim from pending_payment,
+ * coupon reservation, fulfilment (gift codes, stock, moves) and the payment
+ * attempt settlement commit in ONE serializable transaction — a failure
+ * anywhere rolls the whole confirmation back. If codes run short, the order
+ * lands in pending_manual_fulfilment (admin restocks and retries). Discord
+ * gets a payment-confirmed ping plus low-stock warnings.
  */
 export async function POST(
   req: NextRequest,
@@ -92,27 +93,81 @@ export async function POST(
     });
   }
 
-  // Fresh confirmation path — claim atomically from pending_payment.
-  const claimed = await claimOrderForConfirmation(id);
-  if (!claimed) {
-    if (existing.status === 'completed') {
+  // Fresh confirmation path (review High): claim + coupon reservation +
+  // fulfilment + attempt settlement must commit as ONE unit — separate steps
+  // could leave a paid order with coupons committed and its attempt still
+  // pending, recoverable only by hand. Any failure rolls everything back.
+  let claimed: Awaited<ReturnType<typeof claimOrderForConfirmation>> = null;
+  let codesDelivered = 0;
+  try {
+    const result = await prisma.$transaction(
+      async (tx) => {
+        const claimedInTx = await claimOrderForConfirmation(id, tx);
+        if (!claimedInTx) throw new Error('NOT_PAYABLE');
+        // Strict: any fulfilment failure (stock hole, lost code race)
+        // rethrows and rolls the whole confirmation back.
+        const fulfilment = await fulfilOrder(id, tx, { strict: true });
+        if (!fulfilment.success) throw new Error(fulfilment.error ?? 'FULFILMENT_FAILED');
+        // Settle the pending attempt (slip verified manually) inside the
+        // same unit — a completed order never keeps a pending attempt.
+        await tx.paymentAttempt.updateMany({
+          where: { orderId: id, status: 'pending' },
+          data: { status: 'succeeded', webhookReceivedAt: new Date() },
+        });
+        return { claimed: claimedInTx, codes: fulfilment.codes?.length ?? 0 };
+      },
+      { isolationLevel: 'Serializable' },
+    );
+    claimed = result.claimed;
+    codesDelivered = result.codes;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg === 'NOT_PAYABLE') {
+      if (existing.status === 'completed') {
+        return NextResponse.json(
+          { error: 'ALREADY_CONFIRMED', status: existing.status },
+          { status: 409 },
+        );
+      }
+      return NextResponse.json({ error: 'NOT_PAYABLE', status: existing.status }, { status: 409 });
+    }
+    // Coupon guards (review Medium): losing a limit race inside the claim
+    // now rolls back the WHOLE confirmation — nothing is half-committed.
+    if (
+      msg === 'COUPON_USAGE_LIMIT' ||
+      msg === 'COUPON_PER_CUSTOMER_LIMIT' ||
+      msg === 'COUPON_NO_LONGER_VALID'
+    ) {
       return NextResponse.json(
-        { error: 'ALREADY_CONFIRMED', status: existing.status },
+        { error: msg, message: 'โค้ดส่วนลดนี้ใช้ไม่ได้อีกต่อไป — ยังไม่มีการตัดสถานะใด ๆ' },
         { status: 409 },
       );
     }
-    return NextResponse.json({ error: 'NOT_PAYABLE', status: existing.status }, { status: 409 });
-  }
-
-  // Fulfil: codes + stock + status in one transaction.
-  const fulfilment = await fulfilOrder(id);
-
-  if (!fulfilment.success) {
-    if (fulfilment.error === 'INSUFFICIENT_STOCK') {
-      await prisma.order.update({
-        where: { id },
-        data: { status: 'pending_manual_fulfilment', manualFulfilmentReason: 'INSUFFICIENT_STOCK' },
-      });
+    // Shortage: the transaction rolled back cleanly (order still
+    // pending_payment, coupon un-counted). Commit the recovery unit:
+    // re-claim (counts the coupon once), settle the attempt, park the order
+    // for restock-and-resume — same shape as the slip-verify recovery.
+    if (msg === 'INSUFFICIENT_STOCK') {
+      await prisma
+        .$transaction(
+          async (tx) => {
+            const recl = await claimOrderForConfirmation(id, tx);
+            if (!recl) throw new Error('ALREADY_CLAIMED');
+            await tx.paymentAttempt.updateMany({
+              where: { orderId: id, status: 'pending' },
+              data: { status: 'succeeded', webhookReceivedAt: new Date() },
+            });
+            await tx.order.update({
+              where: { id },
+              data: {
+                status: 'pending_manual_fulfilment',
+                manualFulfilmentReason: 'INSUFFICIENT_STOCK',
+              },
+            });
+          },
+          { isolationLevel: 'Serializable' },
+        )
+        .catch(() => undefined);
       return NextResponse.json(
         {
           status: 'pending_manual_fulfilment',
@@ -121,19 +176,8 @@ export async function POST(
         { status: 200 },
       );
     }
-    return NextResponse.json({ error: fulfilment.error ?? 'FULFILMENT_FAILED' }, { status: 500 });
-  }
-
-  // Mark the latest pending attempt as succeeded (slip verified manually).
-  const attempt = await prisma.paymentAttempt.findFirst({
-    where: { orderId: id, status: 'pending' },
-    orderBy: { createdAt: 'desc' },
-  });
-  if (attempt) {
-    await prisma.paymentAttempt.update({
-      where: { id: attempt.id },
-      data: { status: 'succeeded', webhookReceivedAt: new Date() },
-    });
+    console.error('[verify-payment] confirmation transaction failed:', msg);
+    return NextResponse.json({ error: 'FULFILMENT_FAILED' }, { status: 500 });
   }
 
   // Notifications (fire-and-forget).
@@ -156,6 +200,6 @@ export async function POST(
 
   return NextResponse.json({
     status: 'completed',
-    codesDelivered: fulfilment.codes?.length ?? 0,
+    codesDelivered,
   });
 }

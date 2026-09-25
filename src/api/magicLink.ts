@@ -34,7 +34,7 @@ const MAX_TOKENS_PER_EMAIL = 5; // opportunistic sweep keeps the table small
 export const ACCESS_TTL_SHORT = 15 * 60; // same session TTL as password login
 
 export type MagicLinkRequestResult =
-  | { ok: true; token: string; expiresAt: Date }
+  | { ok: true; token: string; expiresAt: Date; accountExists: boolean }
   | { ok: false; error: 'INVALID_EMAIL' | 'ACCOUNT_BLOCKED' };
 
 export type MagicLinkConsumeResult =
@@ -59,9 +59,11 @@ function hashToken(raw: string): string {
 /**
  * Create a magic link token for an email and return the RAW token (the
  * caller builds the URL and emails it — the raw value is never persisted).
- * Always creates the token row even for unknown emails: consumption simply
- * finds no customer, which keeps request timing/behaviour uniform without
- * pretending to send mail for addresses that can never sign in.
+ * A row is created for unknown addresses too (uniform behaviour), but the
+ * result now reports whether the account exists so the ROUTE can skip the
+ * outbound email — the HTTP response stays identical either way, while the
+ * sender is no longer a free relay for arbitrary recipient lists (review
+ * Medium: rotating unknown addresses used to reach the real mailbox).
  */
 export async function createMagicLinkToken(params: {
   email: string;
@@ -75,7 +77,12 @@ export async function createMagicLinkToken(params: {
   // Opportunistic cleanup: drop expired rows and cap per-email history.
   const cutoff = new Date(Date.now() - TOKEN_TTL_MS);
   await prisma.magicLinkToken.deleteMany({
-    where: { OR: [{ expiresAt: { lt: cutoff } }, { createdAt: { lt: new Date(Date.now() - 24 * 60 * 60 * 1000) } }] },
+    where: {
+      OR: [
+        { expiresAt: { lt: cutoff } },
+        { createdAt: { lt: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
+      ],
+    },
   });
 
   const raw = randomBytes(32).toString('base64url');
@@ -90,6 +97,14 @@ export async function createMagicLinkToken(params: {
     },
   });
 
+  // Deliverability decision (not an enumeration signal — the response does
+  // not change): only real, active accounts enqueue outbound mail.
+  const customer = await prisma.customer.findUnique({
+    where: { email },
+    select: { status: true },
+  });
+  const accountExists = Boolean(customer && customer.status !== 'blocked');
+
   // Keep at most MAX_TOKENS_PER_EMAIL rows per address (oldest first).
   const keep = await prisma.magicLinkToken.findMany({
     where: { email },
@@ -103,7 +118,7 @@ export async function createMagicLinkToken(params: {
     });
   }
 
-  return { ok: true, token: raw, expiresAt };
+  return { ok: true, token: raw, expiresAt, accountExists };
 }
 
 /**

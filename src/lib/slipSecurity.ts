@@ -22,16 +22,29 @@ import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
 function macKey(): string {
   // Server-side only. Distinct env var keeps rotation independent from the
-  // JWT secret; dev fallback keeps local dev working.
-  return (
-    process.env['NK_SLIP_TOKEN_SECRET'] ??
-    process.env['NK_JWT_SECRET'] ??
-    'dev-only-insecure-secret'
-  );
+  // JWT secret. Review finding (High): the dev fallback must never run in
+  // production — capability tokens would be forgeable with the publicly
+  // known literal. Fail closed: minting/verification throws until a secret
+  // is configured (weakest link wins — falls back to NK_JWT_SECRET rules).
+  const configured = process.env['NK_SLIP_TOKEN_SECRET'] ?? process.env['NK_JWT_SECRET'];
+  if (configured) {
+    if (configured.length < 32) {
+      throw new Error('SLIP_TOKEN_SECRET_TOO_WEAK: must be at least 32 characters');
+    }
+    return configured;
+  }
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'NK_SLIP_TOKEN_SECRET (or NK_JWT_SECRET) is not configured — refusing to mint or verify slip capability tokens',
+    );
+  }
+  return 'dev-only-insecure-secret';
 }
 
 function mac(orderId: string, confirmationUuid: string): string {
-  return createHmac('sha256', macKey()).update(`${orderId}:${confirmationUuid}`).digest('base64url');
+  return createHmac('sha256', macKey())
+    .update(`${orderId}:${confirmationUuid}`)
+    .digest('base64url');
 }
 
 /** Token format: <confirmationUuid>.<base64url HMAC> */
