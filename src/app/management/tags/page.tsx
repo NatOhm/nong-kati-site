@@ -116,14 +116,14 @@ export default function TagsPage(): React.JSX.Element {
               onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && create()}
               placeholder="ชื่อแท็กใหม่ เช่น ขายดี, มาใหม่"
-              className="h-10 w-full rounded-xl border border-line bg-surface pl-9 pr-3 text-sm text-fg placeholder:text-fg-placeholder focus:border-peach-500 focus:outline-none"
+              className="h-10 w-full rounded-xl border border-line bg-surface pl-9 pr-3 text-sm text-fg placeholder:text-fg-placeholder focus:border-peach-500"
             />
           </div>
           <button
             type="button"
             onClick={create}
             disabled={creating || newName.trim() === ''}
-            className="clay-btn inline-flex h-10 items-center gap-1.5 rounded-xl bg-surface-brand px-4 text-sm font-semibold text-fg-inverse shadow-clay-brand transition-all duration-interactive ease-ease-out hover:scale-[1.02] active:scale-[0.96] disabled:opacity-50"
+            className="clay-btn transition-smart inline-flex h-10 items-center gap-1.5 rounded-xl bg-surface-brand px-4 text-sm font-semibold text-fg-inverse shadow-clay-brand duration-interactive ease-ease-out hover:scale-[1.02] active:scale-[0.96] disabled:opacity-50"
           >
             {creating ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
             เพิ่มแท็ก
@@ -158,7 +158,7 @@ export default function TagsPage(): React.JSX.Element {
                         if (e.key === 'Enter') rename(tag.id);
                         if (e.key === 'Escape') setEditingId(null);
                       }}
-                      className="h-9 flex-1 rounded-lg border border-peach-500 bg-surface-elevated px-3 text-sm text-fg focus:outline-none"
+                      className="h-9 flex-1 rounded-lg border border-peach-500 bg-surface-elevated px-3 text-sm text-fg"
                     />
                     <button
                       type="button"

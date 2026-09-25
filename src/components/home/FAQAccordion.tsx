@@ -54,7 +54,7 @@ function FAQItem({ q, a, id }: { q: string; a: string; id: string }) {
         id={`${id}-answer`}
         hidden={!isOpen}
         className={cn(
-          'overflow-hidden transition-all duration-300',
+          'transition-smart overflow-hidden duration-300',
           isOpen ? 'max-h-40' : 'max-h-0',
         )}
       >

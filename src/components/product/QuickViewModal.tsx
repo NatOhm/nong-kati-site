@@ -179,7 +179,7 @@ export function QuickViewModal({
             </div>
             <button
               onClick={requestClose}
-              className="clay-btn rounded-full p-1.5 text-fg-muted transition-all duration-fast hover:bg-surface-sunken hover:text-fg-secondary active:scale-95"
+              className="clay-btn transition-smart rounded-full p-1.5 text-fg-muted duration-fast hover:bg-surface-sunken hover:text-fg-secondary active:scale-95"
               aria-label="ปิดหน้าต่างเลือกราคา"
             >
               <X size={18} strokeWidth={1.5} />
@@ -204,7 +204,7 @@ export function QuickViewModal({
                     }}
                     aria-pressed={isSelected}
                     className={cn(
-                      'clay-btn rounded-full px-3.5 py-2 text-xs font-semibold transition-all duration-fast ease-ease-out',
+                      'clay-btn transition-smart rounded-full px-3.5 py-2 text-xs font-semibold duration-fast ease-ease-out',
                       isSelected
                         ? 'bg-surface-brand text-fg-inverse shadow-clay-brand'
                         : 'bg-surface-elevated text-fg-secondary shadow-clay-xs hover:-translate-y-0.5 hover:text-fg-brand active:scale-95',
@@ -227,7 +227,7 @@ export function QuickViewModal({
                 type="button"
                 onClick={() => setQuantity((q) => Math.max(1, q - 1))}
                 disabled={quantity <= 1 || addState !== 'idle'}
-                className="clay-btn flex h-8 w-8 items-center justify-center rounded-full bg-surface-elevated text-fg-secondary shadow-clay-xs transition-all hover:text-fg-brand active:scale-90 disabled:opacity-40"
+                className="clay-btn transition-smart flex h-8 w-8 items-center justify-center rounded-full bg-surface-elevated text-fg-secondary shadow-clay-xs hover:text-fg-brand active:scale-90 disabled:opacity-40"
                 aria-label="ลดจำนวน"
               >
                 <Minus size={14} />
@@ -239,7 +239,7 @@ export function QuickViewModal({
                 type="button"
                 onClick={() => setQuantity((q) => Math.min(maxQty, q + 1))}
                 disabled={quantity >= maxQty || addState !== 'idle'}
-                className="clay-btn flex h-8 w-8 items-center justify-center rounded-full bg-surface-elevated text-fg-secondary shadow-clay-xs transition-all hover:text-fg-brand active:scale-90 disabled:opacity-40"
+                className="clay-btn transition-smart flex h-8 w-8 items-center justify-center rounded-full bg-surface-elevated text-fg-secondary shadow-clay-xs hover:text-fg-brand active:scale-90 disabled:opacity-40"
                 aria-label="เพิ่มจำนวน"
               >
                 <Plus size={14} />
@@ -260,7 +260,7 @@ export function QuickViewModal({
               onClick={handleAdd}
               disabled={!selected || addState !== 'idle'}
               className={cn(
-                'clay-btn inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-full text-sm font-semibold transition-all duration-interactive ease-ease-out',
+                'clay-btn transition-smart inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-full text-sm font-semibold duration-interactive ease-ease-out',
                 addState === 'added'
                   ? 'bg-jade-500 text-white shadow-clay-sm'
                   : 'bg-surface-brand text-fg-inverse shadow-clay-brand hover:scale-[1.03] hover:shadow-clay-lg active:scale-[0.96] active:shadow-clay-press',

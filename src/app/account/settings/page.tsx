@@ -58,7 +58,11 @@ export default function AccountSettingsPage(): React.JSX.Element {
           marketingOptIn,
         }),
       });
-      const data = (await res.json()) as { success?: boolean; error?: string; customer?: typeof profile };
+      const data = (await res.json()) as {
+        success?: boolean;
+        error?: string;
+        customer?: typeof profile;
+      };
       if (!res.ok || !data.success) {
         const MSG: Record<string, string> = {
           INVALID_PHONE: 'หมายเลขโทรศัพท์ไม่ถูกต้อง (0XXXXXXXXX)',
@@ -137,7 +141,7 @@ export default function AccountSettingsPage(): React.JSX.Element {
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="w-full rounded-full border border-line bg-surface px-4 py-2.5 text-sm text-fg focus:border-peach-400 focus:outline-none"
+                  className="w-full rounded-full border border-line bg-surface px-4 py-2.5 text-sm text-fg focus:border-peach-400"
                 />
               </div>
               <div>
@@ -149,7 +153,7 @@ export default function AccountSettingsPage(): React.JSX.Element {
                   type="tel"
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
-                  className="w-full rounded-full border border-line bg-surface px-4 py-2.5 text-sm text-fg focus:border-peach-400 focus:outline-none"
+                  className="w-full rounded-full border border-line bg-surface px-4 py-2.5 text-sm text-fg focus:border-peach-400"
                   placeholder="08XXXXXXXX"
                 />
               </div>

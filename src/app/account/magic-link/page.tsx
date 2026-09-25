@@ -148,7 +148,7 @@ export default function MagicLinkPage(): React.JSX.Element {
 
             {consume === 'success' && (
               <>
-                <CheckCircle2 size={48} className="mx-auto mb-4 text-jade-600" />
+                <CheckCircle2 size={48} className="text-jade-600 mx-auto mb-4" />
                 <h1 className="text-xl font-bold text-fg">เข้าสู่ระบบสำเร็จ!</h1>
                 <p className="mt-2 text-sm text-fg-secondary">กำลังพาไปหน้าบัญชีของคุณ...</p>
               </>
@@ -228,7 +228,7 @@ export default function MagicLinkPage(): React.JSX.Element {
                         onChange={(e) => setEmail(e.target.value)}
                         required
                         autoComplete="email"
-                        className="w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-3 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand focus:outline-none"
+                        className="w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-3 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand"
                         placeholder="your@email.com"
                       />
                     </div>
@@ -252,7 +252,10 @@ export default function MagicLinkPage(): React.JSX.Element {
 
                 <p className="mt-4 text-center text-sm text-fg-placeholder">
                   มีรหัสผ่าน?{' '}
-                  <Link href={`/account/login?next=${encodeURIComponent(next)}`} className="text-fg-brand hover:text-fg-brand">
+                  <Link
+                    href={`/account/login?next=${encodeURIComponent(next)}`}
+                    className="text-fg-brand hover:text-fg-brand"
+                  >
                     เข้าสู่ระบบแบบปกติ
                   </Link>
                 </p>
@@ -260,7 +263,7 @@ export default function MagicLinkPage(): React.JSX.Element {
             ) : (
               <>
                 <div className="mb-6 text-center">
-                  <CheckCircle2 size={48} className="mx-auto mb-3 text-jade-600" />
+                  <CheckCircle2 size={48} className="text-jade-600 mx-auto mb-3" />
                   <h1 className="mb-2 text-2xl font-bold text-fg">ส่งลิงก์แล้ว!</h1>
                   <p className="text-sm text-fg-secondary">
                     เราได้ส่งลิงก์เข้าสู่ระบบไปที่{' '}
@@ -284,7 +287,9 @@ export default function MagicLinkPage(): React.JSX.Element {
                   }}
                   className="mt-4 w-full rounded-md border border-line-subtle px-4 py-2.5 text-sm font-medium text-fg transition-colors hover:bg-peach-50 disabled:opacity-50"
                 >
-                  {cooldown > 0 ? `ขอลิงก์ใหม่ได้ใน ${cooldown} วินาที` : 'ส่งไปอีเมลอื่น / ขอลิงก์ใหม่'}
+                  {cooldown > 0
+                    ? `ขอลิงก์ใหม่ได้ใน ${cooldown} วินาที`
+                    : 'ส่งไปอีเมลอื่น / ขอลิงก์ใหม่'}
                 </button>
               </>
             )}

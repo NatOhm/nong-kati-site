@@ -49,7 +49,7 @@ export function DenominationSelector({
             disabled={!isAvailable || disabled}
             onClick={() => onSelect?.(denom.id)}
             className={cn(
-              'flex flex-col items-center gap-1 rounded-md border px-4 py-2 text-sm transition-all duration-fast ease-out-quart',
+              'transition-smart flex flex-col items-center gap-1 rounded-md border px-4 py-2 text-sm duration-fast ease-out-quart',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-peach-500 focus-visible:ring-offset-2 focus-visible:ring-offset-clay-50',
               isSelected
                 ? 'border-peach-500 bg-peach-100 text-peach-800 shadow-brand-glow'

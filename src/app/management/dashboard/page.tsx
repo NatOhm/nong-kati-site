@@ -75,7 +75,7 @@ function MiniBarChart({
           <div key={d.date} className="group relative flex flex-1 items-end">
             <div
               className={cn(
-                'w-full rounded-t-sm transition-all duration-200 group-hover:opacity-80',
+                'transition-smart w-full rounded-t-sm duration-200 group-hover:opacity-80',
                 isToday ? 'bg-peach-500' : 'bg-clay-300 group-hover:bg-clay-400',
               )}
               style={{ height: `${height}%`, minHeight: d.revenue > 0 ? 4 : 0 }}
@@ -98,7 +98,7 @@ function HBar({ value, max, color }: { value: number; max: number; color: string
   return (
     <div className="h-2 w-full overflow-hidden rounded-full bg-surface">
       <div
-        className={cn('h-full rounded-full transition-all duration-500', color)}
+        className={cn('transition-smart h-full rounded-full duration-500', color)}
         style={{ width: `${pct}%` }}
       />
     </div>
@@ -295,7 +295,7 @@ export default function AdminDashboardPage(): React.JSX.Element {
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={cn(
-                  'rounded-md px-3 py-1.5 text-xs font-medium transition-all',
+                  'transition-smart rounded-md px-3 py-1.5 text-xs font-medium',
                   activeTab === tab
                     ? 'bg-peach-500 text-white'
                     : 'text-fg-placeholder hover:text-fg',
@@ -763,7 +763,7 @@ function KPICard({
   return (
     <div
       className={cn(
-        'group rounded-xl border bg-surface p-4 transition-all duration-200 hover:border-line',
+        'transition-smart group rounded-xl border bg-surface p-4 duration-200 hover:border-line',
         alert ? 'border-line-brand shadow-brand-glow' : 'border-line-subtle',
       )}
     >
@@ -859,7 +859,7 @@ function QuickAction({
   return (
     <Link
       href={href}
-      className="group flex items-center gap-3 rounded-lg border border-line-subtle bg-surface px-4 py-3 transition-all duration-200 hover:border-line-brand hover:bg-surface"
+      className="transition-smart group flex items-center gap-3 rounded-lg border border-line-subtle bg-surface px-4 py-3 duration-200 hover:border-line-brand hover:bg-surface"
     >
       <Icon size={16} className="text-fg-placeholder transition-colors group-hover:text-fg-brand" />
       <span className="flex-1 text-sm font-medium text-fg-secondary transition-colors group-hover:text-fg">

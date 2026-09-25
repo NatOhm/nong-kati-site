@@ -406,7 +406,7 @@ export default function CheckoutPage(): React.JSX.Element {
                     value={couponInput}
                     onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
                     placeholder="เช่น SUMMER10"
-                    className="h-10 flex-1 rounded-md border border-line bg-surface px-3 text-sm text-fg placeholder:text-fg-placeholder focus:border-clay-400 focus:outline-none"
+                    className="h-10 flex-1 rounded-md border border-line bg-surface px-3 text-sm text-fg placeholder:text-fg-placeholder focus:border-clay-400"
                   />
                   <button
                     type="button"

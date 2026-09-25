@@ -56,6 +56,17 @@ export function CookieConsentBanner(): React.JSX.Element | null {
     }
   }, []);
 
+  // Audit #5: on mobile the consent banner sits above the bottom taskbar and
+  // together they cover ~18% of the first viewport. While consent is open the
+  // taskbar steps aside; MobileBottomNav listens for this event.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(new CustomEvent('nk:consent-visible', { detail: visible }));
+    return () => {
+      window.dispatchEvent(new CustomEvent('nk:consent-visible', { detail: false }));
+    };
+  }, [visible]);
+
   const handleAcceptAll = () => {
     const consent: CookieConsent = {
       version: CONSENT_VERSION,
@@ -162,54 +173,71 @@ export function CookieConsentBanner(): React.JSX.Element | null {
               </div>
             </label>
 
-            {/* Analytics */}
-            <label className="flex cursor-pointer items-center justify-between">
+            {/* Analytics — the switch is a 44px hit region with the 36×20px
+                visual track inside it, named and state-exposed (audit #2). */}
+            <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-fg-secondary">คุกกี้เพื่อการวิเคราะห์</p>
                 <p className="text-clay-9000 text-xs">ช่วยเราเข้าใจวิธีที่ผู้เข้าชมใช้เว็บไซต์</p>
               </div>
               <button
+                type="button"
+                role="switch"
+                aria-checked={analytics}
+                aria-label="คุกกี้เพื่อการวิเคราะห์"
                 onClick={() => setAnalytics(!analytics)}
-                className={cn(
-                  'relative h-5 w-9 rounded-full transition-colors',
-                  analytics ? 'bg-peach-500' : 'bg-clay-300',
-                )}
+                className="flex h-11 w-11 items-center justify-center"
               >
-                <div
+                <span
                   className={cn(
-                    'absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform',
-                    analytics ? 'left-[18px]' : 'left-0.5',
+                    'relative h-5 w-9 rounded-full transition-colors',
+                    analytics ? 'bg-peach-500' : 'bg-clay-300',
                   )}
-                />
+                >
+                  <span
+                    className={cn(
+                      'absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform',
+                      analytics ? 'left-[18px]' : 'left-0.5',
+                    )}
+                  />
+                </span>
               </button>
-            </label>
+            </div>
 
-            {/* Marketing */}
-            <label className="flex cursor-pointer items-center justify-between">
+            {/* Marketing — same 44px named-switch treatment */}
+            <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-fg-secondary">คุกกี้เพื่อการตลาด</p>
                 <p className="text-clay-9000 text-xs">ใช้สำหรับแสดงโฆษณาที่เกี่ยวข้อง</p>
               </div>
               <button
+                type="button"
+                role="switch"
+                aria-checked={marketing}
+                aria-label="คุกกี้เพื่อการตลาด"
                 onClick={() => setMarketing(!marketing)}
-                className={cn(
-                  'relative h-5 w-9 rounded-full transition-colors',
-                  marketing ? 'bg-peach-500' : 'bg-clay-300',
-                )}
+                className="flex h-11 w-11 items-center justify-center"
               >
-                <div
+                <span
                   className={cn(
-                    'absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform',
-                    marketing ? 'left-[18px]' : 'left-0.5',
+                    'relative h-5 w-9 rounded-full transition-colors',
+                    marketing ? 'bg-peach-500' : 'bg-clay-300',
                   )}
-                />
+                >
+                  <span
+                    className={cn(
+                      'absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform',
+                      marketing ? 'left-[18px]' : 'left-0.5',
+                    )}
+                  />
+                </span>
               </button>
-            </label>
+            </div>
 
             <div className="pt-2">
               <button
                 onClick={handleAcceptSelected}
-                className="inline-flex min-h-[36px] rounded-md bg-peach-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-peach-400"
+                className="inline-flex min-h-[44px] items-center rounded-md bg-peach-500 px-4 text-xs font-medium text-white hover:bg-peach-400"
               >
                 บันทึกการเลือก
               </button>

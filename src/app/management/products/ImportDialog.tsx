@@ -195,7 +195,7 @@ export function ImportDialog({
           placeholder={
             'sku,name,category,price,stock,cost,description\nNETFLIX-30,Netflix 30 วัน,netflix,120,10,80,แบบจอส่วนตัว'
           }
-          className="mt-3 w-full rounded-lg border border-line bg-surface p-3 font-mono text-xs text-fg placeholder:text-fg-placeholder focus:border-peach-400 focus:outline-none"
+          className="mt-3 w-full rounded-lg border border-line bg-surface p-3 font-mono text-xs text-fg placeholder:text-fg-placeholder focus:border-peach-400"
         />
         <p className="mt-1 text-xs text-fg-placeholder">
           {dataRows > 0 ? `${dataRows} แถวข้อมูล (ไม่รวมหัวตาราง)` : 'วาง CSV หรือเลือกไฟล์ด้านบน'}

@@ -198,7 +198,7 @@ export default function AdminTicketsPage(): React.JSX.Element {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="ค้นหา เลขตั๋ว / หัวข้อ / อีเมล"
-              className="w-56 rounded-md border border-line-subtle bg-surface py-1.5 pl-8 pr-3 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand focus:outline-none"
+              className="w-56 rounded-md border border-line-subtle bg-surface py-1.5 pl-8 pr-3 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand"
             />
           </div>
           <button
@@ -344,7 +344,7 @@ export default function AdminTicketsPage(): React.JSX.Element {
                         value={reply}
                         onChange={(e) => setReply(e.target.value)}
                         placeholder="พิมพ์คำตอบถึงลูกค้า..."
-                        className="w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand focus:outline-none"
+                        className="w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand"
                       />
                       <div className="flex flex-wrap gap-2">
                         <button

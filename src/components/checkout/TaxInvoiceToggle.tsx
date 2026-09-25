@@ -68,7 +68,7 @@ export function TaxInvoiceToggle({
               onChange={(e) => onChange?.({ name: e.target.value, taxId: value?.taxId ?? '' })}
               placeholder="ชื่อหรือชื่อบริษัท"
               className={cn(
-                'w-full rounded-md border bg-surface-base px-3 py-2 text-sm text-fg placeholder:text-fg-placeholder focus:outline-none focus:ring-2 focus:ring-peach-500',
+                'w-full rounded-md border bg-surface-base px-3 py-2 text-sm text-fg placeholder:text-fg-placeholder focus:ring-2 focus:ring-peach-500',
                 errors?.name ? 'border-crimson-500' : 'border-line',
               )}
             />
@@ -88,7 +88,7 @@ export function TaxInvoiceToggle({
               placeholder="0-0000-00000-00-0"
               maxLength={13}
               className={cn(
-                'w-full rounded-md border bg-surface-base px-3 py-2 text-sm text-fg placeholder:text-fg-placeholder focus:outline-none focus:ring-2 focus:ring-peach-500',
+                'w-full rounded-md border bg-surface-base px-3 py-2 text-sm text-fg placeholder:text-fg-placeholder focus:ring-2 focus:ring-peach-500',
                 errors?.taxId ? 'border-crimson-500' : 'border-line',
               )}
             />

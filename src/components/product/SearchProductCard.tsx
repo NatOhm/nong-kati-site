@@ -62,7 +62,7 @@ export function SearchProductCard({
     buyState === 'added' ? 'เพิ่มแล้ว' : canDirectAdd ? 'ซื้อสินค้า' : 'เลือกราคา';
 
   const outlinedBtn = cn(
-    'inline-flex h-9 w-full items-center justify-center gap-2 rounded-full border text-sm font-semibold transition-all duration-interactive ease-ease-out',
+    'inline-flex h-9 w-full items-center justify-center gap-2 rounded-full border text-sm font-semibold transition-smart duration-interactive ease-ease-out',
     'border-line-strong bg-transparent text-fg-secondary',
     'hover:border-peach-400 hover:bg-peach-100 hover:text-peach-900',
     'active:scale-[0.96]',

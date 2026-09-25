@@ -203,7 +203,7 @@ export default function AdminLoginPage(): React.JSX.Element {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full rounded-md border border-line bg-surface px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-peach-500"
+                className="w-full rounded-md border border-line bg-surface px-3 py-2.5 text-sm text-fg focus:ring-2 focus:ring-peach-500"
               />
             </div>
 
@@ -218,7 +218,7 @@ export default function AdminLoginPage(): React.JSX.Element {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="w-full rounded-md border border-line bg-surface px-3 py-2.5 pr-10 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-peach-500"
+                  className="w-full rounded-md border border-line bg-surface px-3 py-2.5 pr-10 text-sm text-fg focus:ring-2 focus:ring-peach-500"
                 />
                 <button
                   type="button"
@@ -297,7 +297,7 @@ export default function AdminLoginPage(): React.JSX.Element {
                 onChange={(e) => setTotpCode(e.target.value)}
                 placeholder="กรอกรหัส 6 หลัก"
                 maxLength={6}
-                className="w-full rounded-md border border-line bg-surface px-3 py-2.5 text-center font-mono text-lg tracking-widest text-fg focus:outline-none focus:ring-2 focus:ring-peach-500"
+                className="w-full rounded-md border border-line bg-surface px-3 py-2.5 text-center font-mono text-lg tracking-widest text-fg focus:ring-2 focus:ring-peach-500"
               />
               {error && <p className="text-sm text-coral-600">{error}</p>}
               <button
@@ -333,7 +333,7 @@ export default function AdminLoginPage(): React.JSX.Element {
               placeholder="กรอกรหัส 6 หลัก"
               maxLength={6}
               autoFocus
-              className="w-full rounded-md border border-line bg-surface px-3 py-2.5 text-center font-mono text-lg tracking-widest text-fg focus:outline-none focus:ring-2 focus:ring-peach-500"
+              className="w-full rounded-md border border-line bg-surface px-3 py-2.5 text-center font-mono text-lg tracking-widest text-fg focus:ring-2 focus:ring-peach-500"
             />
 
             <button

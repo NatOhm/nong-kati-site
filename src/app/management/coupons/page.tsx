@@ -134,7 +134,7 @@ export default function AdminCouponsPage(): React.JSX.Element {
   };
 
   const inputCls =
-    'h-9 w-full rounded-md border border-line bg-surface px-2.5 text-sm text-fg placeholder:text-fg-placeholder focus:border-line-brand focus:outline-none';
+    'h-9 w-full rounded-md border border-line bg-surface px-2.5 text-sm text-fg placeholder:text-fg-placeholder focus:border-line-brand';
 
   return (
     <AdminShell
@@ -285,9 +285,11 @@ export default function AdminCouponsPage(): React.JSX.Element {
                   </td>
                 </tr>
               ) : coupons.length === 0 ? (
-                <tr>                    <td colSpan={7} className="px-4 py-8 text-center text-fg-muted">
-                      ยังไม่มีคูปอง — กด สร้างคูปอง ด้านบนเพื่อเริ่ม
-                    </td>
+                <tr>
+                  {' '}
+                  <td colSpan={7} className="px-4 py-8 text-center text-fg-muted">
+                    ยังไม่มีคูปอง — กด สร้างคูปอง ด้านบนเพื่อเริ่ม
+                  </td>
                 </tr>
               ) : (
                 coupons.map((c) => {

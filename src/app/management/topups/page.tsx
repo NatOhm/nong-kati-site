@@ -61,7 +61,11 @@ export default function AdminTopupsPage(): React.JSX.Element {
   }, [load]);
 
   return (
-    <AdminShell staffName="Founder" staffRole="super_admin" breadcrumbs={[{ label: 'ประวัติเติมเงิน' }]}>
+    <AdminShell
+      staffName="Founder"
+      staffRole="super_admin"
+      breadcrumbs={[{ label: 'ประวัติเติมเงิน' }]}
+    >
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-fg">ประวัติเติมเงิน</h1>
@@ -100,7 +104,7 @@ export default function AdminTopupsPage(): React.JSX.Element {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="rounded-lg border border-line-subtle bg-surface px-3 py-2 text-sm text-fg-secondary focus:outline-none focus:ring-2 focus:ring-peach-500"
+            className="rounded-lg border border-line-subtle bg-surface px-3 py-2 text-sm text-fg-secondary focus:ring-2 focus:ring-peach-500"
           >
             <option value="all">ทุกสถานะ</option>
             <option value="completed">สำเร็จ</option>
@@ -145,7 +149,10 @@ export default function AdminTopupsPage(): React.JSX.Element {
                 </tr>
               ) : (
                 data.logs.map((t) => (
-                  <tr key={t.id} className="border-b border-line-subtle last:border-0 hover:bg-surface-elevated">
+                  <tr
+                    key={t.id}
+                    className="border-b border-line-subtle last:border-0 hover:bg-surface-elevated"
+                  >
                     <td className="px-4 py-3 text-fg-secondary">
                       {new Date(t.createdAt).toLocaleDateString('th-TH', {
                         day: 'numeric',
@@ -158,7 +165,9 @@ export default function AdminTopupsPage(): React.JSX.Element {
                       <p className="font-medium text-fg">{t.customerName ?? '—'}</p>
                       <p className="text-xs text-fg-placeholder">{t.customerEmail}</p>
                     </td>
-                    <td className="px-4 py-3 text-right font-semibold text-fg">฿{t.amount.toLocaleString('th-TH')}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-fg">
+                      ฿{t.amount.toLocaleString('th-TH')}
+                    </td>
                     <td className="px-4 py-3 text-fg-secondary">{t.methodLabel}</td>
                     <td className="max-w-[180px] truncate px-4 py-3 font-mono text-xs text-fg-placeholder">
                       {t.reference ?? '—'}

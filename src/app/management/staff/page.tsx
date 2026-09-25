@@ -249,7 +249,7 @@ export default function AdminStaffPage(): React.JSX.Element {
                   type="email"
                   value={newEmail}
                   onChange={(e) => setNewEmail(e.target.value)}
-                  className="w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg focus:border-line-brand focus:outline-none"
+                  className="w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg focus:border-line-brand"
                   placeholder="staff@nong-kati.co.th"
                 />
               </div>
@@ -259,7 +259,7 @@ export default function AdminStaffPage(): React.JSX.Element {
                   type="text"
                   value={newFullName}
                   onChange={(e) => setNewFullName(e.target.value)}
-                  className="w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg focus:border-line-brand focus:outline-none"
+                  className="w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg focus:border-line-brand"
                   placeholder="ชื่อ-นามสกุล"
                 />
               </div>
@@ -268,7 +268,7 @@ export default function AdminStaffPage(): React.JSX.Element {
                 <select
                   value={newRole}
                   onChange={(e) => setNewRole(e.target.value as AdminRole)}
-                  className="w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg focus:border-line-brand focus:outline-none"
+                  className="w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg focus:border-line-brand"
                 >
                   {ALL_ROLES.map((role) => (
                     <option key={role} value={role}>
@@ -330,7 +330,7 @@ export default function AdminStaffPage(): React.JSX.Element {
                         disabled={member.id === selfId}
                         title={member.id === selfId ? 'บัญชีของคุณเอง' : undefined}
                         onChange={(e) => handleChangeRole(member.id, e.target.value as AdminRole)}
-                        className="rounded border border-line-subtle bg-surface px-2 py-1 text-xs text-fg-secondary focus:border-line-brand focus:outline-none disabled:opacity-50"
+                        className="rounded border border-line-subtle bg-surface px-2 py-1 text-xs text-fg-secondary focus:border-line-brand disabled:opacity-50"
                       >
                         {ALL_ROLES.map((role) => (
                           <option key={role} value={role}>

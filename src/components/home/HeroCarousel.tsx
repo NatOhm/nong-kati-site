@@ -173,7 +173,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlideContent[] }): React.
               aria-label={`สไลด์ที่ ${i + 1}`}
               onClick={() => goTo(i)}
               className={cn(
-                'h-2.5 rounded-full transition-all duration-fast ease-out-quart',
+                'transition-smart h-2.5 rounded-full duration-fast ease-out-quart',
                 i === active
                   ? 'w-8 bg-fg-brand shadow-clay-sm'
                   : 'w-2.5 bg-clay-600 hover:bg-fg-placeholder',

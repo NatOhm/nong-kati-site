@@ -60,7 +60,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       ref={ref}
       disabled={disabled ?? loading}
       className={cn(
-        'inline-flex items-center justify-center gap-2 whitespace-nowrap font-ui font-semibold transition-all duration-interactive ease-ease-out active:scale-[0.97] active:duration-instant',
+        'transition-smart inline-flex items-center justify-center gap-2 whitespace-nowrap font-ui font-semibold duration-interactive ease-ease-out active:scale-[0.97] active:duration-instant',
         variantClasses[variant],
         variant !== 'link' && sizeClasses[size],
         fullWidth && 'w-full',

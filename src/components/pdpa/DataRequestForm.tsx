@@ -106,7 +106,7 @@ export function DataRequestForm(): React.JSX.Element {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          className="placeholder:text-clay-9000 w-full rounded-md border border-line-subtle bg-white px-3 py-2 text-sm text-fg focus:border-line-brand focus:outline-none"
+          className="placeholder:text-clay-9000 w-full rounded-md border border-line-subtle bg-white px-3 py-2 text-sm text-fg focus:border-line-brand"
           placeholder="your@email.com"
         />
       </div>
@@ -118,7 +118,7 @@ export function DataRequestForm(): React.JSX.Element {
           onChange={(e) => setDetails(e.target.value)}
           required
           rows={4}
-          className="placeholder:text-clay-9000 w-full rounded-md border border-line-subtle bg-white px-3 py-2 text-sm text-fg focus:border-line-brand focus:outline-none"
+          className="placeholder:text-clay-9000 w-full rounded-md border border-line-subtle bg-white px-3 py-2 text-sm text-fg focus:border-line-brand"
           placeholder="กรุณาระบุรายละเอียดเพิ่มเติม..."
         />
       </div>

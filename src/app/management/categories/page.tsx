@@ -232,7 +232,7 @@ export default function AdminCategoriesPage(): React.JSX.Element {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="ค้นหาหมวดหมู่..."
-            className="w-full rounded-md border border-line bg-surface py-2 pl-9 pr-3 text-sm text-fg placeholder:text-fg-placeholder focus:outline-none focus:ring-2 focus:ring-peach-500"
+            className="w-full rounded-md border border-line bg-surface py-2 pl-9 pr-3 text-sm text-fg placeholder:text-fg-placeholder focus:ring-2 focus:ring-peach-500"
           />
         </div>
 
@@ -422,7 +422,7 @@ export default function AdminCategoriesPage(): React.JSX.Element {
                     }));
                   }}
                   maxLength={80}
-                  className="w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-peach-500"
+                  className="w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-fg focus:ring-2 focus:ring-peach-500"
                 />
               </div>
 
@@ -442,7 +442,7 @@ export default function AdminCategoriesPage(): React.JSX.Element {
                     setForm((f) => ({ ...f, slug: e.target.value }));
                   }}
                   placeholder="เช่น movie-series"
-                  className="w-full rounded-md border border-line bg-surface px-3 py-2 font-mono text-sm text-fg focus:outline-none focus:ring-2 focus:ring-peach-500"
+                  className="w-full rounded-md border border-line bg-surface px-3 py-2 font-mono text-sm text-fg focus:ring-2 focus:ring-peach-500"
                 />
               </div>
 
@@ -457,7 +457,7 @@ export default function AdminCategoriesPage(): React.JSX.Element {
                   id="cat-parent"
                   value={form.parentId}
                   onChange={(e) => setForm((f) => ({ ...f, parentId: e.target.value }))}
-                  className="w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-peach-500"
+                  className="w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-fg focus:ring-2 focus:ring-peach-500"
                 >
                   <option value="">— ไม่มี (หมวดใหญ่) —</option>
                   {parentOptions.map((c) => (

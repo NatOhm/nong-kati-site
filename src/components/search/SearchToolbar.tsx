@@ -52,7 +52,7 @@ export function SearchToolbar({
 
   const arrowCls = (enabled: boolean) =>
     cn(
-      'inline-flex h-9 w-9 items-center justify-center rounded-md border transition-all duration-fast',
+      'inline-flex h-9 w-9 items-center justify-center rounded-md border transition-smart duration-fast',
       enabled
         ? 'border-line-strong bg-surface-elevated text-fg hover:border-peach-400 hover:text-peach-800 active:scale-90'
         : 'cursor-not-allowed border-line bg-surface-sunken text-fg-placeholder opacity-50',

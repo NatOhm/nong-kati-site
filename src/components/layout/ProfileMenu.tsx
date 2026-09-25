@@ -2,7 +2,16 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Settings, History, LogOut, Wallet, ChevronDown, ShieldCheck, LogIn, UserCog } from 'lucide-react';
+import {
+  Settings,
+  History,
+  LogOut,
+  Wallet,
+  ChevronDown,
+  ShieldCheck,
+  LogIn,
+  UserCog,
+} from 'lucide-react';
 
 import { cn } from '@/utils/cn';
 import { formatThb } from '@/utils/format';
@@ -60,7 +69,7 @@ export function ProfileMenu(): React.JSX.Element {
         href="/account/login"
         aria-label="เข้าสู่ระบบ"
         title="เข้าสู่ระบบ"
-        className="clay-btn hidden h-10 w-10 items-center justify-center rounded-full text-fg-muted transition-all duration-interactive ease-ease-out hover:-translate-y-0.5 hover:text-fg-brand active:translate-y-0 active:scale-95 active:shadow-clay-press md:flex"
+        className="clay-btn transition-smart hidden h-10 w-10 items-center justify-center rounded-full text-fg-muted duration-interactive ease-ease-out hover:-translate-y-0.5 hover:text-fg-brand active:translate-y-0 active:scale-95 active:shadow-clay-press md:flex"
       >
         <UserIcon />
       </Link>
@@ -76,7 +85,7 @@ export function ProfileMenu(): React.JSX.Element {
         aria-haspopup="menu"
         aria-label="บัญชีของฉัน"
         className={cn(
-          'clay-btn flex h-10 items-center gap-1 rounded-full px-2.5 text-fg-muted transition-all duration-interactive ease-ease-out hover:-translate-y-0.5 hover:text-fg-brand active:translate-y-0 active:scale-95 active:shadow-clay-press',
+          'clay-btn transition-smart flex h-10 items-center gap-1 rounded-full px-2.5 text-fg-muted duration-interactive ease-ease-out hover:-translate-y-0.5 hover:text-fg-brand active:translate-y-0 active:scale-95 active:shadow-clay-press',
           open && 'text-fg-brand',
         )}
       >
@@ -94,9 +103,7 @@ export function ProfileMenu(): React.JSX.Element {
           <div className="border-b border-line-subtle px-3 pb-3 pt-2">
             <p className="truncate text-sm font-bold text-fg">
               {profile?.fullName ??
-                (sessionState === 'authed'
-                  ? 'สมาชิก'
-                  : adminIdentity?.fullName ?? 'ผู้ดูแลระบบ')}
+                (sessionState === 'authed' ? 'สมาชิก' : (adminIdentity?.fullName ?? 'ผู้ดูแลระบบ'))}
             </p>
             <p className="truncate text-xs text-fg-secondary">
               {profile?.email ??
@@ -122,23 +129,23 @@ export function ProfileMenu(): React.JSX.Element {
 
           {/* Wallet — customer sessions only */}
           {sessionState === 'authed' && (
-          <div className="px-3 py-3">
-            <div className="flex items-baseline justify-between">
-              <span className="text-xs text-fg-muted">เครดิตคงเหลือ</span>
-              <span className="text-lg font-bold text-fg-brand">
-                {formatThb(wallet?.balanceThb ?? 0)}
-              </span>
+            <div className="px-3 py-3">
+              <div className="flex items-baseline justify-between">
+                <span className="text-xs text-fg-muted">เครดิตคงเหลือ</span>
+                <span className="text-lg font-bold text-fg-brand">
+                  {formatThb(wallet?.balanceThb ?? 0)}
+                </span>
+              </div>
+              <Link
+                href="/account/wallet"
+                className="transition-smart mt-2 flex h-9 w-full items-center justify-center gap-1.5 rounded-full bg-surface-brand text-sm font-semibold text-fg-inverse shadow-clay-brand duration-interactive ease-ease-out hover:scale-[1.02] active:scale-[0.96]"
+                role="menuitem"
+                onClick={() => setOpen(false)}
+              >
+                <Wallet size={15} />
+                เติมเงิน
+              </Link>
             </div>
-            <Link
-              href="/account/wallet"
-              className="mt-2 flex h-9 w-full items-center justify-center gap-1.5 rounded-full bg-surface-brand text-sm font-semibold text-fg-inverse shadow-clay-brand transition-all duration-interactive ease-ease-out hover:scale-[1.02] active:scale-[0.96]"
-              role="menuitem"
-              onClick={() => setOpen(false)}
-            >
-              <Wallet size={15} />
-              เติมเงิน
-            </Link>
-          </div>
           )}
 
           {/* Menu */}
@@ -194,18 +201,18 @@ export function ProfileMenu(): React.JSX.Element {
               </Link>
             )}
             {sessionState === 'authed' && (
-            <button
-              type="button"
-              role="menuitem"
-              onClick={async () => {
-                setOpen(false);
-                await fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'include' });
-                window.location.href = '/';
-              }}
-              className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm text-coral-600 transition-colors hover:bg-coral-500/10"
-            >
-              <LogOut size={15} /> ออกจากระบบ
-            </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={async () => {
+                  setOpen(false);
+                  await fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'include' });
+                  window.location.href = '/';
+                }}
+                className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm text-coral-600 transition-colors hover:bg-coral-500/10"
+              >
+                <LogOut size={15} /> ออกจากระบบ
+              </button>
             )}
           </div>
         </div>

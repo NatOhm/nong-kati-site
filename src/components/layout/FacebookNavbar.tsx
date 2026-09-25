@@ -77,7 +77,7 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
             {/* Mobile menu button - opens sidebar drawer */}
             <button
               onClick={onMenuToggle}
-              className="clay-btn cursor-pointer rounded-lg p-2 text-fg-muted transition-all duration-interactive ease-ease-out hover:-translate-y-0.5 hover:text-fg-brand active:translate-y-0 active:scale-95 active:shadow-clay-press lg:hidden"
+              className="clay-btn transition-smart cursor-pointer rounded-lg p-2 text-fg-muted duration-interactive ease-ease-out hover:-translate-y-0.5 hover:text-fg-brand active:translate-y-0 active:scale-95 active:shadow-clay-press lg:hidden"
               aria-label="เปิดเมนู"
             >
               <Menu size={22} />
@@ -106,7 +106,7 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
             >
               <div
                 className={cn(
-                  'shadow-inset-sm group/search relative flex items-center gap-2 rounded-full border bg-surface-elevated px-3 py-2 transition-all duration-interactive ease-ease-out',
+                  'shadow-inset-sm group/search transition-smart relative flex items-center gap-2 rounded-full border bg-surface-elevated px-3 py-2 duration-interactive ease-ease-out',
                   searchFocused
                     ? 'border-peach-500 shadow-clay-sm'
                     : 'border-line hover:border-line-strong',
@@ -115,7 +115,7 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
                 <div
                   aria-hidden="true"
                   className={cn(
-                    'pointer-events-none absolute -top-7 right-3 origin-bottom transition-all duration-interactive ease-spring',
+                    'transition-smart pointer-events-none absolute -top-7 right-3 origin-bottom duration-interactive ease-spring',
                     searchFocused
                       ? 'translate-y-0 scale-100 opacity-100'
                       : 'translate-y-4 scale-75 opacity-0',
@@ -139,7 +139,7 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
                   onKeyDown={(e) => {
                     if (e.key === 'Escape') setSuggestions([]);
                   }}
-                  className="placeholder:text-clay-9000 w-48 bg-transparent text-sm text-fg focus:outline-none lg:w-64"
+                  className="placeholder:text-clay-9000 w-48 bg-transparent text-sm text-fg lg:w-64"
                 />
               </div>
 
@@ -187,7 +187,7 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    'relative rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-interactive ease-ease-out',
+                    'transition-smart relative rounded-xl px-4 py-2.5 text-sm font-semibold duration-interactive ease-ease-out',
                     isActive
                       ? // Same active treatment as the sidebar: the fixed peach-100
                         // needs dark overrides — text-fg-brand-strong flips light in
@@ -224,7 +224,7 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
               }
               aria-label="ฝ่ายสนับสนุน"
               title="ฝ่ายสนับสนุน"
-              className="clay-btn hidden h-10 w-10 items-center justify-center rounded-full text-fg-muted transition-all duration-interactive ease-ease-out hover:-translate-y-0.5 hover:text-fg-brand active:translate-y-0 active:scale-95 active:shadow-clay-press md:flex"
+              className="clay-btn transition-smart hidden h-10 w-10 items-center justify-center rounded-full text-fg-muted duration-interactive ease-ease-out hover:-translate-y-0.5 hover:text-fg-brand active:translate-y-0 active:scale-95 active:shadow-clay-press md:flex"
             >
               <MessageCircle size={20} strokeWidth={1.5} />
             </Link>

@@ -112,7 +112,7 @@ export function ContactForm({
           aria-describedby={errors.email ? 'checkout-email-error' : undefined}
           placeholder="kaem@example.com"
           className={cn(
-            'w-full rounded-md border bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-fg-placeholder focus:outline-none focus:ring-2 focus:ring-peach-500',
+            'w-full rounded-md border bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-fg-placeholder focus:ring-2 focus:ring-peach-500',
             errors.email ? 'border-crimson-500' : 'border-line',
             readOnlyEmail && 'cursor-not-allowed opacity-70',
           )}
@@ -139,7 +139,7 @@ export function ContactForm({
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           placeholder="0812345678"
-          className="w-full rounded-md border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-fg-placeholder focus:outline-none focus:ring-2 focus:ring-peach-500"
+          className="w-full rounded-md border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-fg-placeholder focus:ring-2 focus:ring-peach-500"
         />
       </div>
 

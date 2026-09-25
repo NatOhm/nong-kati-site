@@ -86,7 +86,7 @@ export function CatalogSearchBox({ className }: { className?: string }): React.J
             onKeyDown={(e) => {
               if (e.key === 'Escape') setOpen(false);
             }}
-            className="h-11 w-full bg-transparent text-base text-fg focus:outline-none"
+            className="h-11 w-full bg-transparent text-base text-fg"
           />
         </div>
       </form>

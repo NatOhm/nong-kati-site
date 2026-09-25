@@ -45,14 +45,16 @@ export default async function HomePage(): Promise<React.JSX.Element> {
   let featuredProducts: Awaited<ReturnType<typeof getFeaturedProducts>> = [];
   let heroSlides: Awaited<ReturnType<typeof getHeroSlides>> = [];
   let stats: Awaited<ReturnType<typeof getStorefrontStats>> | null = null;
+  let dbDown = false;
   try {
     categories = await getCategoriesWithProductCounts();
     featuredProducts = await getFeaturedProducts();
     heroSlides = await getHeroSlides();
     stats = await getStorefrontStats();
   } catch (e) {
+    dbDown = true;
     console.error(
-      '[HomePage] Database unavailable, rendering with empty data:',
+      '[HomePage] Database unavailable, rendering degraded state:',
       e instanceof Error ? e.message : e,
     );
   }
@@ -83,7 +85,7 @@ export default async function HomePage(): Promise<React.JSX.Element> {
             {/* Site-wide h1 (landmark spec): the notice-board headline is the
                 page's main heading — p→h1 keeps the identical clay styling. */}
             <h1 className="font-display text-xl font-bold leading-snug text-fg-brand-strong sm:text-2xl">
-              📢 โค้ดเกม สตรีมมิ่ง และอีคอมเมิร์ซ ส่งถึงอีเมลใน 60 วินาที
+              โค้ดเกม สตรีมมิ่ง และอีคอมเมิร์ซ ส่งถึงอีเมลใน 60 วินาที
             </h1>
             {/* clay-700 lands exactly 4.50 on the peach-50 card — use clay-800
                 for headroom (7.11). Dark keeps the muted token. */}
@@ -92,7 +94,7 @@ export default async function HomePage(): Promise<React.JSX.Element> {
             </p>
             <Link
               href="/search"
-              className="mt-4 inline-flex items-center justify-center rounded-full bg-peach-500 px-8 py-2.5 text-sm font-semibold text-white shadow-clay-brand transition-all hover:bg-peach-400 hover:shadow-clay-lg active:scale-95 active:shadow-clay-press"
+              className="transition-smart mt-4 inline-flex items-center justify-center rounded-full bg-peach-500 px-8 py-2.5 text-sm font-semibold text-white shadow-clay-brand hover:bg-peach-400 hover:shadow-clay-lg active:scale-95 active:shadow-clay-press"
             >
               เลือกซื้อสินค้า
             </Link>
@@ -125,6 +127,36 @@ export default async function HomePage(): Promise<React.JSX.Element> {
             </div>
           </section>
         </ScrollReveal>
+
+        {/* Data-outage alert (audit round 2 #4): during a DB outage the
+            catalogue region must not silently render as an empty shop — an
+            explicit recoverable alert replaces it. Server-rendered anchors
+            only (no client handlers in this tree). */}
+        {dbDown && (
+          <section role="alert" className="px-4 pb-4 md:px-8">
+            <div className="mx-auto flex max-w-2xl flex-col items-center gap-3 rounded-2xl border border-coral-300 bg-coral-50 px-6 py-6 text-center">
+              <p className="text-lg font-bold text-fg">โหลดสินค้าไม่สำเร็จ</p>
+              <p className="text-base text-fg-muted">
+                ช่วงนี้ระบบขัดข้องชั่วคราว (ไม่ใช่เพราะสินค้าหมด) — ลองรีเฟรชอีกครั้ง
+                หรือแวะร้านใหม่ภายหลัง
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <Link
+                  href="/"
+                  className="transition-smart inline-flex min-h-[44px] items-center justify-center rounded-full bg-peach-500 px-6 text-sm font-semibold text-white shadow-clay-sm hover:bg-peach-400"
+                >
+                  ลองอีกครั้ง
+                </Link>
+                <Link
+                  href="/orders/lookup"
+                  className="transition-smart inline-flex min-h-[44px] items-center justify-center rounded-full border border-line bg-surface px-6 text-sm font-semibold text-fg hover:border-clay-400"
+                >
+                  ค้นหาคำสั่งซื้อเดิม
+                </Link>
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* Categories Section */}
 
@@ -216,19 +248,19 @@ export default async function HomePage(): Promise<React.JSX.Element> {
           <FAQAccordion />
         </ScrollReveal>
 
-        {/* Stats — real counts, plain numbers, horizontal, at the bottom (client ask) */}
-        <StatsCounter
-          stats={
-            stats
-              ? [
-                  { value: stats.customers, label: 'ลูกค้า' },
-                  { value: stats.products, label: 'สินค้า' },
-                  { value: stats.itemsSold, label: 'ขายแล้ว' },
-                  { value: stats.stock, label: 'สต๊อก' },
-                ]
-              : undefined
-          }
-        />
+        {/* Stats — real counts, plain numbers, horizontal, at the bottom (client ask).
+            Hidden entirely during an outage: zero rows read as “no business”
+            (audit round 2 #4) — they return with the data. */}
+        {stats && (
+          <StatsCounter
+            stats={[
+              { value: stats.customers, label: 'ลูกค้า' },
+              { value: stats.products, label: 'สินค้า' },
+              { value: stats.itemsSold, label: 'ขายแล้ว' },
+              { value: stats.stock, label: 'สต๊อก' },
+            ]}
+          />
+        )}
       </FacebookLayout>
 
       <Footer />

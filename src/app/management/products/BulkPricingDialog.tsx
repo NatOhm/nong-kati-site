@@ -105,7 +105,7 @@ export function BulkPricingDialog({
               onChange={(e) => setMemberPercent(e.target.value.replace(/[^0-9.]/g, ''))}
               inputMode="decimal"
               placeholder="เช่น 80 = ลด 20%"
-              className="h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm text-fg placeholder:text-fg-placeholder focus:border-peach-500 focus:outline-none"
+              className="h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm text-fg placeholder:text-fg-placeholder focus:border-peach-500"
             />
           </label>
           <label className="block">
@@ -115,7 +115,7 @@ export function BulkPricingDialog({
               onChange={(e) => setDealerPercent(e.target.value.replace(/[^0-9.]/g, ''))}
               inputMode="decimal"
               placeholder="เช่น 70 = ลด 30%"
-              className="h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm text-fg placeholder:text-fg-placeholder focus:border-peach-500 focus:outline-none"
+              className="h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm text-fg placeholder:text-fg-placeholder focus:border-peach-500"
             />
           </label>
         </div>
@@ -191,7 +191,7 @@ export function BulkPricingDialog({
             onClick={() => void run(true)}
             className={cn(
               'clay-btn h-10 rounded-full bg-surface-brand px-5 text-sm font-semibold text-fg-inverse shadow-clay-brand',
-              'transition-all duration-interactive ease-ease-out hover:scale-[1.02] active:scale-[0.96] disabled:opacity-50',
+              'transition-smart duration-interactive ease-ease-out hover:scale-[1.02] active:scale-[0.96] disabled:opacity-50',
             )}
           >
             {busy && preview ? <Loader2 size={14} className="inline animate-spin" /> : null} ใช้จริง

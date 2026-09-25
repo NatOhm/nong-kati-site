@@ -69,7 +69,12 @@ const NAV_ITEMS: NavItem[] = [
   },
   { label: 'ลูกค้า', href: '/management/customers', icon: Users, permission: 'customers:read' },
   { label: 'ประวัติเติมเงิน', href: '/management/topups', icon: Wallet, permission: 'topups:read' },
-  { label: 'ตั๋วสนับสนุน', href: '/management/tickets', icon: LifeBuoy, permission: 'tickets:read' },
+  {
+    label: 'ตั๋วสนับสนุน',
+    href: '/management/tickets',
+    icon: LifeBuoy,
+    permission: 'tickets:read',
+  },
   { label: 'รายงาน', href: '/management/reports', icon: BarChart3, permission: 'reports:read' },
   {
     label: 'ยอดซื้อรายคน',
@@ -126,7 +131,7 @@ export function AdminSidebar({
   return (
     <aside
       className={cn(
-        'flex h-full flex-col border-r border-line-subtle bg-surface-base transition-all duration-200',
+        'transition-smart flex h-full flex-col border-r border-line-subtle bg-surface-base duration-200',
         collapsed ? 'w-16' : 'w-64',
         className,
       )}

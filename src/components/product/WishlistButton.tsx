@@ -103,7 +103,7 @@ export function WishlistButton({
       aria-label={wished ? 'เอาออกจากรายการโปรด' : 'เพิ่มในรายการโปรด'}
       title={wished ? 'เอาออกจากรายการโปรด' : 'เพิ่มในรายการโปรด'}
       className={cn(
-        'clay-btn flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-all duration-interactive ease-spring hover:scale-110 active:scale-90',
+        'clay-btn transition-smart flex h-8 w-8 cursor-pointer items-center justify-center rounded-full duration-interactive ease-spring hover:scale-110 active:scale-90',
         wished ? 'text-coral-500' : 'text-fg-muted hover:text-coral-400',
         className,
       )}

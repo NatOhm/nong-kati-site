@@ -133,7 +133,7 @@ export default function AdminSettingsPage(): React.JSX.Element {
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
                     className={cn(
-                      'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
+                      'transition-smart flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium',
                       activeTab === tab.id
                         ? 'border-line-brand/30 border bg-peach-100 text-fg-brand'
                         : 'border border-transparent text-fg-placeholder hover:bg-surface hover:text-fg',
@@ -267,7 +267,7 @@ function AnnouncementSettings({
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder="เช่น 🎉 โปรโมชั่นพิเศษ! HBO Max 7 วัน ลดเหลือ ฿25"
-              className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+              className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
             />
           </Field>
           <Field label="ลิงก์ (ไม่บังคับ) — เช่น /product/hbo-max-7-4k-4">
@@ -275,7 +275,7 @@ function AnnouncementSettings({
               value={href}
               onChange={(e) => setHref(e.target.value)}
               placeholder="/product/..."
-              className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 font-mono text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+              className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 font-mono text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
             />
           </Field>
           <div className="flex items-center justify-between rounded-lg border border-line-subtle bg-surface px-4 py-3">
@@ -538,7 +538,7 @@ function AppearanceSettings({
                   key={opt.value}
                   onClick={() => setSpeed(opt.value)}
                   className={cn(
-                    'rounded-lg border px-3 py-3 text-left transition-all',
+                    'transition-smart rounded-lg border px-3 py-3 text-left',
                     speed === opt.value
                       ? 'border-peach-500 bg-peach-50 ring-1 ring-peach-500'
                       : 'border-line-subtle hover:bg-surface',
@@ -629,7 +629,7 @@ function AppearanceSettings({
               </button>
               <div className="h-4 w-32 overflow-hidden rounded-full bg-surface">
                 <div
-                  className="h-full rounded-full transition-all duration-700"
+                  className="transition-smart h-full rounded-full duration-700"
                   style={{ width: '72%', backgroundColor: accent }}
                 />
               </div>
@@ -775,7 +775,7 @@ function StoreSettings({
               value={form.name}
               onChange={(e) => set('name', e.target.value)}
               placeholder="Nong-Kati"
-              className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+              className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
             />
           </Field>
           <Field label="คำอธิบายร้านค้า">
@@ -784,7 +784,7 @@ function StoreSettings({
               onChange={(e) => set('description', e.target.value)}
               rows={3}
               placeholder="ซื้อบัตรเกม Netflix Steam และอื่นๆ ได้ที่ Nong-Kati ส่งโค้ดทันที"
-              className="w-full resize-none rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+              className="w-full resize-none rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
             />
           </Field>
           <div className="grid grid-cols-2 gap-4">
@@ -793,7 +793,7 @@ function StoreSettings({
                 value={form.email}
                 onChange={(e) => set('email', e.target.value)}
                 placeholder="support@nong-kati.co.th"
-                className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+                className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
               />
             </Field>
             <Field label="เบอร์โทรศัพท์">
@@ -801,7 +801,7 @@ function StoreSettings({
                 value={form.phone}
                 onChange={(e) => set('phone', e.target.value)}
                 placeholder="02-123-4567"
-                className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+                className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
               />
             </Field>
           </div>
@@ -811,7 +811,7 @@ function StoreSettings({
                 value={form.line}
                 onChange={(e) => set('line', e.target.value)}
                 placeholder="@nongkati"
-                className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+                className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
               />
             </Field>
             <Field label="Facebook Page">
@@ -819,7 +819,7 @@ function StoreSettings({
                 value={form.facebook}
                 onChange={(e) => set('facebook', e.target.value)}
                 placeholder="https://facebook.com/..."
-                className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+                className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
               />
             </Field>
           </div>
@@ -988,7 +988,7 @@ function ManualTransferSettings(): React.JSX.Element {
                 value={form.accountName}
                 onChange={(e) => set('accountName', e.target.value)}
                 placeholder="ชื่อ-นามสกุล เจ้าของบัญชี"
-                className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+                className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
               />
             </Field>
             <Field
@@ -1001,7 +1001,7 @@ function ManualTransferSettings(): React.JSX.Element {
                 onChange={(e) => set('accountNumber', e.target.value)}
                 placeholder={form.accountType === 'bank' ? '000-0-00000-0' : '0800000000'}
                 inputMode="numeric"
-                className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 font-mono text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+                className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 font-mono text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
               />
             </Field>
             {form.accountType === 'bank' && (
@@ -1010,7 +1010,7 @@ function ManualTransferSettings(): React.JSX.Element {
                   value={form.bankName}
                   onChange={(e) => set('bankName', e.target.value)}
                   placeholder="เช่น ธนาคารกสิกรไทย"
-                  className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+                  className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
                 />
               </Field>
             )}
@@ -1072,7 +1072,7 @@ function PaymentSettings(): React.JSX.Element {
               <input
                 value={promptpayId}
                 onChange={(e) => setPromptpayId(e.target.value)}
-                className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 font-mono text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+                className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 font-mono text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
               />
             </Field>
             <div className="rounded-md bg-surface p-3 text-xs text-fg-placeholder">
@@ -1108,7 +1108,7 @@ function PaymentSettings(): React.JSX.Element {
                 <input
                   value={omisePublicKey}
                   onChange={(e) => setOmisePublicKey(e.target.value)}
-                  className="flex-1 rounded-lg border border-line bg-surface px-3 py-2.5 font-mono text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+                  className="flex-1 rounded-lg border border-line bg-surface px-3 py-2.5 font-mono text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
                 />
                 <CopyButton text={omisePublicKey} />
               </div>
@@ -1119,7 +1119,7 @@ function PaymentSettings(): React.JSX.Element {
                   type={showSecret ? 'text' : 'password'}
                   value={showSecret ? 'sk_test_xxxxxxxxxxxxxxxx' : omiseSecretKey}
                   readOnly
-                  className="flex-1 rounded-lg border border-line bg-surface px-3 py-2.5 font-mono text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+                  className="flex-1 rounded-lg border border-line bg-surface px-3 py-2.5 font-mono text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
                 />
                 <button
                   onClick={() => setShowSecret(!showSecret)}
@@ -1178,14 +1178,14 @@ function EmailSettings(): React.JSX.Element {
           <input
             value={smtpHost}
             onChange={(e) => setSmtpHost(e.target.value)}
-            className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 font-mono text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+            className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 font-mono text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
           />
         </Field>
         <Field label="SMTP Port">
           <input
             value={smtpPort}
             onChange={(e) => setSmtpPort(e.target.value)}
-            className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 font-mono text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+            className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 font-mono text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
           />
         </Field>
       </div>
@@ -1193,7 +1193,7 @@ function EmailSettings(): React.JSX.Element {
         <input
           value={smtpUser}
           onChange={(e) => setSmtpUser(e.target.value)}
-          className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+          className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
         />
       </Field>
       <div className="grid grid-cols-2 gap-4">
@@ -1201,14 +1201,14 @@ function EmailSettings(): React.JSX.Element {
           <input
             value={fromName}
             onChange={(e) => setFromName(e.target.value)}
-            className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+            className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
           />
         </Field>
         <Field label="อีเมลผู้ส่ง (From Email)">
           <input
             value={fromEmail}
             onChange={(e) => setFromEmail(e.target.value)}
-            className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+            className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
           />
         </Field>
       </div>
@@ -1287,7 +1287,7 @@ function SecuritySettings(): React.JSX.Element {
               defaultValue={12}
               min={8}
               max={64}
-              className="w-24 rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+              className="w-24 rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
             />
           </Field>
           <div className="flex flex-wrap gap-3">
@@ -1362,7 +1362,7 @@ function SecuritySettings(): React.JSX.Element {
               defaultValue={5}
               min={3}
               max={10}
-              className="w-24 rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+              className="w-24 rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
             />
           </Field>
           <Field label="ล็อกอิน (นาที)">
@@ -1371,7 +1371,7 @@ function SecuritySettings(): React.JSX.Element {
               defaultValue={30}
               min={5}
               max={1440}
-              className="w-24 rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+              className="w-24 rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
             />
           </Field>
         </div>
@@ -1508,7 +1508,7 @@ function NotificationSettings({
 // ─── Change Password ────────────────────────────
 
 const INPUT_CLASS =
-  'w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500';
+  'w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500';
 
 /**
  * Self-service password change for the signed-in admin. On success the API
@@ -1984,7 +1984,7 @@ function BannerSettings(): React.JSX.Element {
                     if (v !== (slide.label ?? '')) void patch(slide.id, { label: v });
                   }}
                   placeholder="🔥 HBO Max 7 วัน ฿25"
-                  className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-placeholder focus:border-peach-400 focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-placeholder focus:border-peach-400"
                 />
               </label>
               <label className="block">
@@ -1998,7 +1998,7 @@ function BannerSettings(): React.JSX.Element {
                     if (v !== (slide.href ?? '')) void patch(slide.id, { href: v });
                   }}
                   placeholder="/search หรือ https://…"
-                  className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-placeholder focus:border-peach-400 focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-placeholder focus:border-peach-400"
                 />
               </label>
               <label className="block">
@@ -2009,7 +2009,7 @@ function BannerSettings(): React.JSX.Element {
                     const v = e.target.value.trim();
                     if (v && v !== slide.alt) void patch(slide.id, { alt: v });
                   }}
-                  className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg focus:border-peach-400 focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg focus:border-peach-400"
                 />
               </label>
               <div className="flex flex-wrap items-center gap-3">

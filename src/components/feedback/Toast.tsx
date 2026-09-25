@@ -62,7 +62,7 @@ export function Toast({
           type="button"
           aria-label="ปิดการแจ้งเตือน"
           onClick={() => onDismiss(id)}
-          className="clay-btn rounded-full p-1 text-fg-placeholder transition-all hover:bg-surface-sunken hover:text-fg-secondary active:scale-90"
+          className="clay-btn transition-smart rounded-full p-1 text-fg-placeholder hover:bg-surface-sunken hover:text-fg-secondary active:scale-90"
         >
           <X size={16} />
         </button>
@@ -84,7 +84,7 @@ export function Toast({
         type="button"
         aria-label="ปิดการแจ้งเตือน"
         onClick={() => onDismiss(id)}
-        className="clay-btn rounded-full p-1 text-fg-placeholder transition-all hover:bg-surface-sunken hover:text-fg-secondary active:scale-90"
+        className="clay-btn transition-smart rounded-full p-1 text-fg-placeholder hover:bg-surface-sunken hover:text-fg-secondary active:scale-90"
       >
         <X size={16} />
       </button>

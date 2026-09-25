@@ -92,7 +92,7 @@ export function SearchOverlay({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="ค้นหาสินค้า..."
-            className="flex-1 bg-transparent text-base text-fg placeholder:text-fg-placeholder focus:outline-none"
+            className="flex-1 bg-transparent text-base text-fg placeholder:text-fg-placeholder"
             aria-label="ค้นหาสินค้า"
           />
         </form>

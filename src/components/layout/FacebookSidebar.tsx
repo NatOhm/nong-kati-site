@@ -95,7 +95,7 @@ function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
                 href={item.href}
                 onClick={linkClickHandler}
                 className={cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150',
+                  'transition-smart flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium duration-150',
                   isActive
                     ? 'bg-peach-100 text-peach-800 dark:bg-peach-900/40 dark:text-peach-200'
                     : 'text-fg-secondary hover:bg-surface-sunken hover:text-fg',
@@ -121,7 +121,7 @@ function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
           {/* See more / See less */}
           <button
             onClick={() => setShowMore(!showMore)}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-fg-muted transition-all duration-150 hover:bg-surface-sunken hover:text-fg"
+            className="transition-smart flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-fg-muted duration-150 hover:bg-surface-sunken hover:text-fg"
           >
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-sunken">
               {showMore ? (

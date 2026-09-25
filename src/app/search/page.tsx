@@ -191,22 +191,34 @@ export default async function SearchPage({
                 </p>
               </section>
             ) : dbDown ? (
+              // Audit round 2 #1: the outage state must stay inside the normal
+              // shell. A button onClick here CRASHES a server component
+              // ("Event handlers cannot be passed to Client Component props")
+              // and took the whole /search frame down during a DB outage —
+              // anchors are the correct primitive in a server tree.
               <section className="py-16 text-center" role="alert">
                 {/* Recoverable outage → worried hamster (retry possible); the
                     sleeping one is reserved for fatal 404/error pages. */}
                 <HamsterWorried size={96} className="mx-auto mb-4" />
-                <h2 className="mb-2 text-lg font-semibold text-fg">ระบบขัดข้องชั่วคราว</h2>
-                <p className="mx-auto max-w-md text-sm text-fg-muted">
-                  ไม่สามารถโหลดสินค้าได้ในขณะนี้ (ไม่ใช่เพราะสินค้าหมด) — กรุณาลองใหม่อีกครั้ง
+                <h2 className="mb-2 text-2xl font-bold text-fg">โหลดสินค้าไม่สำเร็จ</h2>
+                <p className="mx-auto max-w-md text-base text-fg-muted">
+                  ไม่สามารถโหลดสินค้าได้ในขณะนี้ (ไม่ใช่เพราะสินค้าหมด) — ลองกดรีเฟรชหรือกลับหน้าแรก
                   หากยังมีปัญหาติดต่อฝ่ายสนับสนุนทาง LINE
                 </p>
-                <button
-                  type="button"
-                  onClick={() => window.location.reload()}
-                  className="mt-5 inline-flex min-h-[44px] items-center justify-center rounded-full bg-peach-500 px-6 text-sm font-semibold text-white shadow-clay-sm transition-colors hover:bg-peach-400"
-                >
-                  ลองอีกครั้ง
-                </button>
+                <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+                  <Link
+                    href="/search"
+                    className="transition-smart inline-flex min-h-[44px] items-center justify-center rounded-full bg-peach-500 px-6 text-sm font-semibold text-white shadow-clay-sm hover:bg-peach-400"
+                  >
+                    ลองอีกครั้ง
+                  </Link>
+                  <Link
+                    href="/"
+                    className="transition-smart inline-flex min-h-[44px] items-center justify-center rounded-full border border-line bg-surface px-6 text-sm font-semibold text-fg hover:border-clay-400"
+                  >
+                    กลับหน้าแรก
+                  </Link>
+                </div>
               </section>
             ) : (
               <section className="py-16 text-center">

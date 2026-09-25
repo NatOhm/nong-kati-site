@@ -135,7 +135,7 @@ export function ProductDetailClient({
                 disabled={variant.stock === 0}
                 aria-pressed={isSelected}
                 className={cn(
-                  'relative flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition-all duration-fast ease-ease-out',
+                  'transition-smart relative flex flex-col items-start gap-1 rounded-xl border p-3 text-left duration-fast ease-ease-out',
                   'disabled:cursor-not-allowed disabled:opacity-40',
                   isSelected
                     ? 'border-peach-500 bg-peach-100 shadow-brand-glow active:scale-[0.98]'
@@ -217,7 +217,7 @@ export function ProductDetailClient({
             onClick={handleAddToCart}
             disabled={!selectedVariant || selectedVariant.stock === 0 || addedToCart}
             className={cn(
-              'flex w-full items-center justify-center gap-2 rounded-full px-6 py-3.5 text-base font-semibold transition-all duration-interactive ease-ease-out',
+              'transition-smart flex w-full items-center justify-center gap-2 rounded-full px-6 py-3.5 text-base font-semibold duration-interactive ease-ease-out',
               addedToCart
                 ? 'bg-jade-500 text-white shadow-clay-sm'
                 : 'bg-peach-500 text-white shadow-clay-brand hover:scale-[1.01] hover:bg-peach-400 hover:shadow-clay-lg active:scale-[0.97] active:shadow-clay-press',

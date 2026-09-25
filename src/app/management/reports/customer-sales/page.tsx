@@ -153,7 +153,7 @@ export default function CustomerSalesReportPage(): React.JSX.Element {
                   aria-selected={period === v}
                   onClick={() => setPeriod(v)}
                   className={cn(
-                    'rounded-full px-4 py-1.5 text-sm font-semibold transition-all duration-fast ease-out-quart',
+                    'transition-smart rounded-full px-4 py-1.5 text-sm font-semibold duration-fast ease-out-quart',
                     period === v
                       ? 'bg-peach-500 text-white shadow-clay-sm'
                       : 'text-fg-muted hover:text-fg',
@@ -218,7 +218,7 @@ export default function CustomerSalesReportPage(): React.JSX.Element {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="ค้นหาชื่อหรืออีเมล…"
-            className="w-full rounded-full border border-line bg-surface py-2.5 pl-10 pr-4 text-sm text-fg placeholder:text-fg-placeholder focus:border-peach-400 focus:outline-none"
+            className="w-full rounded-full border border-line bg-surface py-2.5 pl-10 pr-4 text-sm text-fg placeholder:text-fg-placeholder focus:border-peach-400"
           />
         </div>
 

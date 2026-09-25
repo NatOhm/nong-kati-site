@@ -49,7 +49,7 @@ function AccountTabsInner({ className }: { className?: string | undefined }): Re
             role="tab"
             aria-selected={isActive}
             className={cn(
-              'clay-btn shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition-all duration-interactive ease-spring hover:scale-[1.03] active:scale-[0.96]',
+              'clay-btn transition-smart shrink-0 rounded-full px-4 py-2 text-sm font-semibold duration-interactive ease-spring hover:scale-[1.03] active:scale-[0.96]',
               isActive
                 ? 'bg-surface-brand text-fg-inverse shadow-clay-brand'
                 : 'bg-surface text-fg-muted hover:text-fg',

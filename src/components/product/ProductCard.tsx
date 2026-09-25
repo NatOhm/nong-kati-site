@@ -147,7 +147,7 @@ export function ProductCard({
                 disabled={buyState !== 'idle'}
                 aria-live="polite"
                 className={cn(
-                  'clay-btn inline-flex h-10 w-full items-center justify-center gap-2 rounded-full text-sm font-semibold transition-all duration-interactive ease-ease-out',
+                  'clay-btn transition-smart inline-flex h-10 w-full items-center justify-center gap-2 rounded-full text-sm font-semibold duration-interactive ease-ease-out',
                   buyState === 'added'
                     ? 'bg-jade-500 text-white shadow-clay-sm'
                     : 'bg-surface-brand text-fg-inverse shadow-clay-brand hover:scale-[1.03] hover:shadow-clay-lg active:scale-[0.96] active:shadow-clay-press',
@@ -176,14 +176,14 @@ export function ProductCard({
                 type="button"
                 onClick={() => setQuickViewOpen(true)}
                 aria-haspopup="dialog"
-                className="clay-btn inline-flex h-10 w-full items-center justify-center gap-2 rounded-full bg-surface-brand text-sm font-semibold text-fg-inverse shadow-clay-brand transition-all duration-interactive ease-ease-out hover:scale-[1.03] hover:shadow-clay-lg active:scale-[0.96] active:shadow-clay-press"
+                className="clay-btn transition-smart inline-flex h-10 w-full items-center justify-center gap-2 rounded-full bg-surface-brand text-sm font-semibold text-fg-inverse shadow-clay-brand duration-interactive ease-ease-out hover:scale-[1.03] hover:shadow-clay-lg active:scale-[0.96] active:shadow-clay-press"
               >
                 เลือกราคา →
               </button>
             ) : (
               <Link
                 href={`/product/${slug}`}
-                className="clay-btn inline-flex h-10 w-full items-center justify-center rounded-full bg-surface-brand text-sm font-semibold text-fg-inverse shadow-clay-brand transition-all duration-interactive ease-ease-out hover:scale-[1.03] hover:shadow-clay-lg active:scale-[0.96] active:shadow-clay-press"
+                className="clay-btn transition-smart inline-flex h-10 w-full items-center justify-center rounded-full bg-surface-brand text-sm font-semibold text-fg-inverse shadow-clay-brand duration-interactive ease-ease-out hover:scale-[1.03] hover:shadow-clay-lg active:scale-[0.96] active:shadow-clay-press"
               >
                 เลือกราคา →
               </Link>

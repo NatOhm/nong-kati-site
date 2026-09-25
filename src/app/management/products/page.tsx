@@ -300,7 +300,7 @@ export default function AdminProductsPage(): React.JSX.Element {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="ค้นหาสินค้าหรือ slug..."
-              className="w-full rounded-lg border border-line bg-surface py-2 pl-9 pr-9 text-sm text-fg placeholder:text-fg-placeholder focus:outline-none focus:ring-2 focus:ring-peach-500"
+              className="w-full rounded-lg border border-line bg-surface py-2 pl-9 pr-9 text-sm text-fg placeholder:text-fg-placeholder focus:ring-2 focus:ring-peach-500"
             />
             {searchQuery !== '' && (
               <button
@@ -315,7 +315,7 @@ export default function AdminProductsPage(): React.JSX.Element {
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg-secondary focus:outline-none focus:ring-2 focus:ring-peach-500"
+            className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg-secondary focus:ring-2 focus:ring-peach-500"
             aria-label="กรองตามหมวดหมู่"
           >
             <option value="all">ทุกหมวดหมู่</option>
@@ -328,7 +328,7 @@ export default function AdminProductsPage(): React.JSX.Element {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg-secondary focus:outline-none focus:ring-2 focus:ring-peach-500"
+            className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg-secondary focus:ring-2 focus:ring-peach-500"
           >
             <option value="all">ทุกสถานะ</option>
             <option value="active">ใช้งาน</option>
@@ -779,7 +779,7 @@ function ProductEditor({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="เช่น HBO Max 7 วัน 4K แชร์"
-              className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-fg-placeholder focus:outline-none focus:ring-2 focus:ring-peach-500"
+              className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-fg-placeholder focus:ring-2 focus:ring-peach-500"
             />
           </div>
 
@@ -790,7 +790,7 @@ function ProductEditor({
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
               placeholder="รายละเอียดที่ลูกค้าจะเห็นในหน้าสินค้า"
-              className="w-full resize-none rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-fg-placeholder focus:outline-none focus:ring-2 focus:ring-peach-500"
+              className="w-full resize-none rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-fg-placeholder focus:ring-2 focus:ring-peach-500"
             />
           </div>
 
@@ -800,7 +800,7 @@ function ProductEditor({
               <select
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
-                className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-peach-500"
+                className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg focus:ring-2 focus:ring-peach-500"
               >
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -840,7 +840,7 @@ function ProductEditor({
                         )
                       }
                       className={cn(
-                        'rounded-full border px-3 py-1.5 text-xs font-medium transition-all duration-fast active:scale-95',
+                        'transition-smart rounded-full border px-3 py-1.5 text-xs font-medium duration-fast active:scale-95',
                         on
                           ? 'border-peach-500 bg-peach-100 text-peach-800'
                           : 'border-line bg-surface text-fg-secondary hover:border-peach-400',
@@ -858,7 +858,7 @@ function ProductEditor({
                 onChange={(e) => setNewTagName(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && void handleCreateTag()}
                 placeholder="สร้างแท็กใหม่…"
-                className="h-9 flex-1 rounded-lg border border-line bg-surface px-3 text-sm text-fg placeholder:text-fg-placeholder focus:outline-none focus:ring-2 focus:ring-peach-500"
+                className="h-9 flex-1 rounded-lg border border-line bg-surface px-3 text-sm text-fg placeholder:text-fg-placeholder focus:ring-2 focus:ring-peach-500"
               />
               <button
                 type="button"
@@ -896,7 +896,7 @@ function ProductEditor({
                       )
                     }
                     placeholder="ชื่อ เช่น 7 วัน 4K"
-                    className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-placeholder focus:outline-none focus:ring-2 focus:ring-peach-500"
+                    className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-placeholder focus:ring-2 focus:ring-peach-500"
                   />
                   <input
                     value={v.price}
@@ -911,7 +911,7 @@ function ProductEditor({
                     }
                     inputMode="decimal"
                     placeholder="ราคา ฿"
-                    className="w-20 rounded-lg border border-line bg-surface px-2 py-2 text-right text-sm text-fg focus:outline-none focus:ring-2 focus:ring-peach-500"
+                    className="w-20 rounded-lg border border-line bg-surface px-2 py-2 text-right text-sm text-fg focus:ring-2 focus:ring-peach-500"
                   />
                   <input
                     value={v.memberPrice}
@@ -927,7 +927,7 @@ function ProductEditor({
                     inputMode="decimal"
                     placeholder="สมาชิก ฿"
                     title="ราคาสมาชิก (เว้นว่าง = ใช้ราคาปกติ)"
-                    className="w-20 rounded-lg border border-line bg-surface px-2 py-2 text-right text-sm text-fg focus:outline-none focus:ring-2 focus:ring-peach-500"
+                    className="w-20 rounded-lg border border-line bg-surface px-2 py-2 text-right text-sm text-fg focus:ring-2 focus:ring-peach-500"
                   />
                   <input
                     value={v.dealerPrice}
@@ -943,7 +943,7 @@ function ProductEditor({
                     inputMode="decimal"
                     placeholder="ตัวแทน ฿"
                     title="ราคาตัวแทนจำหน่าย (เว้นว่าง = ใช้ราคาปกติ)"
-                    className="w-20 rounded-lg border border-line bg-surface px-2 py-2 text-right text-sm text-fg focus:outline-none focus:ring-2 focus:ring-peach-500"
+                    className="w-20 rounded-lg border border-line bg-surface px-2 py-2 text-right text-sm text-fg focus:ring-2 focus:ring-peach-500"
                   />
                   <input
                     value={v.stock}
@@ -959,7 +959,7 @@ function ProductEditor({
                     inputMode="numeric"
                     placeholder="สต็อก"
                     title="สต็อก"
-                    className="w-16 rounded-lg border border-line bg-surface px-2 py-2 text-right text-sm text-fg focus:outline-none focus:ring-2 focus:ring-peach-500"
+                    className="w-16 rounded-lg border border-line bg-surface px-2 py-2 text-right text-sm text-fg focus:ring-2 focus:ring-peach-500"
                   />
                   <button
                     onClick={() =>
@@ -1058,7 +1058,7 @@ function InlineCell({
         inputMode="decimal"
         aria-label={label === '' ? 'สต๊อก' : label}
         className={cn(
-          'w-16 rounded-md border px-2 py-1 text-right text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-peach-400',
+          'w-16 rounded-md border px-2 py-1 text-right text-xs font-medium transition-colors focus:ring-2 focus:ring-peach-400',
           TONE_STYLES[tone],
           busy && 'animate-pulse opacity-60',
         )}

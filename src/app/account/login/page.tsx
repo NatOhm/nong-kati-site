@@ -263,7 +263,7 @@ export default function LoginPage(): React.JSX.Element {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   autoComplete="email"
-                  className="w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-3 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand focus:outline-none"
+                  className="w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-3 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand"
                   placeholder="your@email.com"
                 />
               </div>
@@ -297,7 +297,7 @@ export default function LoginPage(): React.JSX.Element {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   autoComplete="current-password"
-                  className="w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-10 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand focus:outline-none"
+                  className="w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-10 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand"
                   placeholder="••••••••"
                 />
                 <button
@@ -418,7 +418,7 @@ export default function LoginPage(): React.JSX.Element {
                         setOtpError(null);
                         setOtpCode('');
                       }}
-                      className="h-11 w-full rounded-md border border-line-subtle bg-surface pl-9 pr-3 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand focus:outline-none"
+                      className="h-11 w-full rounded-md border border-line-subtle bg-surface pl-9 pr-3 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand"
                       placeholder="08X-XXX-XXXX"
                     />
                   </div>
@@ -448,7 +448,7 @@ export default function LoginPage(): React.JSX.Element {
                         maxLength={6}
                         value={otpCode}
                         onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                        className="h-11 w-full rounded-md border border-line-subtle bg-surface px-3 text-center text-lg tracking-[0.3em] text-fg placeholder:text-fg-muted focus:border-line-brand focus:outline-none"
+                        className="h-11 w-full rounded-md border border-line-subtle bg-surface px-3 text-center text-lg tracking-[0.3em] text-fg placeholder:text-fg-muted focus:border-line-brand"
                         placeholder="••••••"
                       />
                     </div>

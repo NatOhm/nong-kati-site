@@ -50,7 +50,7 @@ export function LiveSalesPopup() {
   return (
     <div
       className={cn(
-        'fixed bottom-[5.5rem] left-4 z-50 max-w-[320px] transition-all duration-500',
+        'transition-smart fixed bottom-[5.5rem] left-4 z-50 max-w-[320px] duration-500',
         'sm:bottom-6 sm:left-6',
         isVisible ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-4 opacity-0',
       )}

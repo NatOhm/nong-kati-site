@@ -15,7 +15,7 @@ export function ThemeToggle(): React.JSX.Element {
       onClick={toggle}
       aria-label={isDark ? 'สลับเป็นโหมดสว่าง' : 'สลับเป็นโหมดมืด'}
       title={isDark ? 'โหมดสว่าง' : 'โหมดมืด'}
-      className="clay-btn flex h-10 w-10 items-center justify-center rounded-full bg-surface-elevated text-fg-secondary shadow-clay-xs transition-all duration-interactive ease-ease-out hover:-translate-y-0.5 hover:text-fg-brand hover:shadow-clay active:translate-y-0 active:scale-95 active:shadow-clay-press"
+      className="clay-btn transition-smart flex h-10 w-10 items-center justify-center rounded-full bg-surface-elevated text-fg-secondary shadow-clay-xs duration-interactive ease-ease-out hover:-translate-y-0.5 hover:text-fg-brand hover:shadow-clay active:translate-y-0 active:scale-95 active:shadow-clay-press"
     >
       <span
         key={theme}

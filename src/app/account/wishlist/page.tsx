@@ -60,7 +60,7 @@ export default function WishlistPage(): React.JSX.Element {
           </p>
           <Link
             href="/account/dashboard"
-            className="clay-btn inline-flex h-11 items-center rounded-full bg-surface-brand px-6 text-sm font-semibold text-fg-inverse shadow-clay-brand transition-all duration-interactive ease-ease-out hover:scale-[1.03] active:scale-[0.96]"
+            className="clay-btn transition-smart inline-flex h-11 items-center rounded-full bg-surface-brand px-6 text-sm font-semibold text-fg-inverse shadow-clay-brand duration-interactive ease-ease-out hover:scale-[1.03] active:scale-[0.96]"
           >
             เลือกซื้อสินค้า
           </Link>

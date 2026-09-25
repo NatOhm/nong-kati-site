@@ -134,7 +134,7 @@ export default function ResetPasswordPage(): React.JSX.Element {
                       required
                       minLength={8}
                       autoComplete="new-password"
-                      className="w-full rounded-md border border-line-subtle bg-surface py-2 pl-3 pr-10 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand focus:outline-none"
+                      className="w-full rounded-md border border-line-subtle bg-surface py-2 pl-3 pr-10 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand"
                       placeholder="อย่างน้อย 8 ตัวอักษร"
                     />
                     <button
@@ -160,7 +160,7 @@ export default function ResetPasswordPage(): React.JSX.Element {
                     onChange={(e) => setConfirm(e.target.value)}
                     required
                     autoComplete="new-password"
-                    className="w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand focus:outline-none"
+                    className="w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand"
                     placeholder="พิมพ์ซ้ำอีกครั้ง"
                   />
                 </div>

@@ -183,7 +183,7 @@ export default function SlowStockReportPage(): React.JSX.Element {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') void saveDays();
                 }}
-                className="w-14 rounded-lg border border-line bg-surface-base px-2 py-1 text-center text-sm font-semibold tabular-nums text-fg focus:border-peach-400 focus:outline-none"
+                className="w-14 rounded-lg border border-line bg-surface-base px-2 py-1 text-center text-sm font-semibold tabular-nums text-fg focus:border-peach-400"
               />
               <span className="whitespace-nowrap text-sm text-fg-muted">วัน</span>
               <button
@@ -264,7 +264,7 @@ export default function SlowStockReportPage(): React.JSX.Element {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="ค้นหาชื่อสินค้า ตัวเลือก หรือ SKU…"
-            className="w-full rounded-full border border-line bg-surface py-2.5 pl-10 pr-4 text-sm text-fg placeholder:text-fg-placeholder focus:border-peach-400 focus:outline-none"
+            className="w-full rounded-full border border-line bg-surface py-2.5 pl-10 pr-4 text-sm text-fg placeholder:text-fg-placeholder focus:border-peach-400"
           />
         </div>
 

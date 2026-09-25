@@ -49,16 +49,26 @@
     line-height: 1.8;
   }
 
-  /* 04-design-system.md §8.2 — global focus ring, keyboard only */
+  /* 04-design-system.md §8.2 — global focus ring, keyboard only.
+     Audit #3: a box-shadow ring loses to shadow utilities on cards/inputs;
+     OUTLINE never collides and stays visible everywhere. fg-brand resolves
+     to peach-700 (light) / peach-200 (dark) — ≥3:1 on both surfaces. */
   :focus-visible {
-    outline: none;
-    box-shadow: var(--shadow-focus-ring);
-    border-radius: inherit;
+    outline: 2px solid var(--fg-brand);
+    outline-offset: 2px;
   }
 
   :focus:not(:focus-visible) {
     outline: none;
     box-shadow: none;
+  }
+
+  /* Audit #6: explicit transition properties instead of transition-smart —
+     layout/unintended properties never animate. */
+  .transition-smart {
+    transition-property: color, background-color, border-color, opacity, box-shadow, transform;
+    transition-duration: var(--duration-interactive);
+    transition-timing-function: var(--ease-out-quart);
   }
 
   /* 04-design-system.md §8.5 — screen-reader-only utility */

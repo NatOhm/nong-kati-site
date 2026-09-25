@@ -201,7 +201,7 @@ export function HamsterGrassScene({ className }: { className?: string }): React.
           <SiteMascot
             size={64}
             className={cn(
-              'drop-shadow-[0_4px_6px_rgba(147,107,73,0.3)] transition-all duration-500',
+              'transition-smart drop-shadow-[0_4px_6px_rgba(147,107,73,0.3)] duration-500',
               squeaking ? 'rotate-0 saturate-100' : 'rotate-3 saturate-[0.55]',
             )}
           />

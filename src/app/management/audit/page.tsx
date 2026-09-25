@@ -92,14 +92,7 @@ export default function AdminAuditPage(): React.JSX.Element {
       );
       const header = 'timestamp,actorType,actorEmail,action,tableName,recordId';
       const rows = result.entries.map((e) =>
-        [
-          e.createdAt,
-          e.actorType,
-          e.actorEmail,
-          e.action,
-          e.tableName,
-          e.recordId,
-        ]
+        [e.createdAt, e.actorType, e.actorEmail, e.action, e.tableName, e.recordId]
           .map((v) => `"${String(v).replaceAll('"', '""')}"`)
           .join(','),
       );
@@ -142,7 +135,7 @@ export default function AdminAuditPage(): React.JSX.Element {
               <select
                 value={actionFilter}
                 onChange={(e) => setActionFilter(e.target.value)}
-                className="w-full rounded border border-line-subtle bg-surface px-2 py-1.5 text-sm text-fg-secondary focus:border-line-brand focus:outline-none"
+                className="w-full rounded border border-line-subtle bg-surface px-2 py-1.5 text-sm text-fg-secondary focus:border-line-brand"
               >
                 <option value="">ทั้งหมด</option>
                 {Object.entries(ACTION_LABELS).map(([key, label]) => (
@@ -159,7 +152,7 @@ export default function AdminAuditPage(): React.JSX.Element {
                 value={tableFilter}
                 onChange={(e) => setTableFilter(e.target.value)}
                 placeholder="store.orders"
-                className="w-full rounded border border-line-subtle bg-surface px-2 py-1.5 text-sm text-fg-secondary placeholder:text-clay-400 focus:border-line-brand focus:outline-none"
+                className="w-full rounded border border-line-subtle bg-surface px-2 py-1.5 text-sm text-fg-secondary placeholder:text-clay-400 focus:border-line-brand"
               />
             </div>
             <div>
@@ -167,7 +160,7 @@ export default function AdminAuditPage(): React.JSX.Element {
               <select
                 value={actorTypeFilter}
                 onChange={(e) => setActorTypeFilter(e.target.value)}
-                className="w-full rounded border border-line-subtle bg-surface px-2 py-1.5 text-sm text-fg-secondary focus:border-line-brand focus:outline-none"
+                className="w-full rounded border border-line-subtle bg-surface px-2 py-1.5 text-sm text-fg-secondary focus:border-line-brand"
               >
                 <option value="">ทั้งหมด</option>
                 <option value="admin">Admin</option>
@@ -181,7 +174,7 @@ export default function AdminAuditPage(): React.JSX.Element {
                 type="date"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
-                className="w-full rounded border border-line-subtle bg-surface px-2 py-1.5 text-sm text-fg-secondary focus:border-line-brand focus:outline-none"
+                className="w-full rounded border border-line-subtle bg-surface px-2 py-1.5 text-sm text-fg-secondary focus:border-line-brand"
               />
             </div>
             <div>
@@ -190,7 +183,7 @@ export default function AdminAuditPage(): React.JSX.Element {
                 type="date"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
-                className="w-full rounded border border-line-subtle bg-surface px-2 py-1.5 text-sm text-fg-secondary focus:border-line-brand focus:outline-none"
+                className="w-full rounded border border-line-subtle bg-surface px-2 py-1.5 text-sm text-fg-secondary focus:border-line-brand"
               />
             </div>
           </div>

@@ -111,7 +111,7 @@ export default function AdminPdpaPage(): React.JSX.Element {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as DataRequestStatus | '')}
-            className="rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg-secondary focus:border-line-brand focus:outline-none"
+            className="rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg-secondary focus:border-line-brand"
           >
             <option value="">ทุกสถานะ</option>
             <option value="pending">รอดำเนินการ</option>

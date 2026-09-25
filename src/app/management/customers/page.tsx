@@ -129,7 +129,11 @@ export default function AdminCustomersPage(): React.JSX.Element {
       const res = await adminFetch(`/api/v1/admin/customers/${customerId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'credit', amountThb: amount, note: creditNote || undefined }),
+        body: JSON.stringify({
+          action: 'credit',
+          amountThb: amount,
+          note: creditNote || undefined,
+        }),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string; balanceThb?: number };
       if (!res.ok) {
@@ -140,7 +144,9 @@ export default function AdminCustomersPage(): React.JSX.Element {
         );
         return;
       }
-      setActionMessage(`ปรับเครดิต ${formatThb(amount)} สำเร็จ — คงเหลือ ${formatThb(data.balanceThb ?? 0)}`);
+      setActionMessage(
+        `ปรับเครดิต ${formatThb(amount)} สำเร็จ — คงเหลือ ${formatThb(data.balanceThb ?? 0)}`,
+      );
       setCreditAmount('');
       setCreditNote('');
       void handleSearch();
@@ -191,13 +197,13 @@ export default function AdminCustomersPage(): React.JSX.Element {
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               placeholder="ค้นหาอีเมล หรือชื่อ..."
-              className="w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-3 text-sm text-fg placeholder:text-clay-400 focus:border-line-brand focus:outline-none"
+              className="w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-3 text-sm text-fg placeholder:text-clay-400 focus:border-line-brand"
             />
           </div>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg-secondary focus:border-line-brand focus:outline-none"
+            className="rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg-secondary focus:border-line-brand"
           >
             <option value="">ทุกสถานะ</option>
             <option value="active">ใช้งาน</option>
@@ -217,7 +223,9 @@ export default function AdminCustomersPage(): React.JSX.Element {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
             <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-line-subtle bg-surface-base p-6">
               <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-bold text-fg">{selectedCustomer.fullName || selectedCustomer.email}</h2>
+                <h2 className="text-lg font-bold text-fg">
+                  {selectedCustomer.fullName || selectedCustomer.email}
+                </h2>
                 <button
                   onClick={() => setSelectedCustomer(null)}
                   className="text-fg-placeholder hover:text-fg"
@@ -270,7 +278,9 @@ export default function AdminCustomersPage(): React.JSX.Element {
                   <p className="mb-1 flex items-center gap-1.5 text-sm font-medium text-fg-muted">
                     <Wallet size={14} /> เครดิต/เงินในกระเป๋า
                   </p>
-                  <p className="mb-2 text-lg font-bold text-fg">{formatThb(selectedCustomer.walletBalanceThb)}</p>
+                  <p className="mb-2 text-lg font-bold text-fg">
+                    {formatThb(selectedCustomer.walletBalanceThb)}
+                  </p>
                   <div className="flex flex-wrap gap-2">
                     <input
                       type="number"
@@ -278,14 +288,14 @@ export default function AdminCustomersPage(): React.JSX.Element {
                       value={creditAmount}
                       onChange={(e) => setCreditAmount(e.target.value)}
                       placeholder="+100 หรือ -50"
-                      className="w-28 rounded-md border border-line-subtle bg-surface px-2 py-1.5 text-sm text-fg placeholder:text-clay-400 focus:border-line-brand focus:outline-none"
+                      className="w-28 rounded-md border border-line-subtle bg-surface px-2 py-1.5 text-sm text-fg placeholder:text-clay-400 focus:border-line-brand"
                     />
                     <input
                       type="text"
                       value={creditNote}
                       onChange={(e) => setCreditNote(e.target.value)}
                       placeholder="หมายเหตุ (ไม่บังคับ)"
-                      className="min-w-36 flex-1 rounded-md border border-line-subtle bg-surface px-2 py-1.5 text-sm text-fg placeholder:text-clay-400 focus:border-line-brand focus:outline-none"
+                      className="min-w-36 flex-1 rounded-md border border-line-subtle bg-surface px-2 py-1.5 text-sm text-fg placeholder:text-clay-400 focus:border-line-brand"
                     />
                     <button
                       onClick={() => handleCredit(selectedCustomer.id)}

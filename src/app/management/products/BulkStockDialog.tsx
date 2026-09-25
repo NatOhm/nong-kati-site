@@ -48,7 +48,12 @@ const SEPARATORS: { value: ',' | ';' | 'tab'; label: string }[] = [
   { value: 'tab', label: 'Tab' },
 ];
 
-export function BulkStockDialog({ productId, productName, onClose, onSaved }: BulkStockDialogProps) {
+export function BulkStockDialog({
+  productId,
+  productName,
+  onClose,
+  onSaved,
+}: BulkStockDialogProps) {
   const [format, setFormat] = useState<'short' | 'long'>('short');
   const [separator, setSeparator] = useState<',' | ';' | 'tab'>(',');
   const [raw, setRaw] = useState('');
@@ -216,7 +221,10 @@ export function BulkStockDialog({ productId, productName, onClose, onSaved }: Bu
 
             {/* Input */}
             <div className="mb-4">
-              <label className="mb-1.5 block text-sm font-semibold text-fg" htmlFor="bulk-stock-input">
+              <label
+                className="mb-1.5 block text-sm font-semibold text-fg"
+                htmlFor="bulk-stock-input"
+              >
                 ข้อมูลไอดีและรหัสผ่าน *
               </label>
               <textarea
@@ -233,7 +241,7 @@ export function BulkStockDialog({ productId, productName, onClose, onSaved }: Bu
                     ? 'user1:pass1\nuser2:pass2\nuser3:pass3'
                     : '🍎 ➤ HBO MAX 4K  7 days 💜\n\n✅ Mail : mansdevt@gmail.com\n✅ pass : baby123456hii\n\nค ณ + เข้าครั้งแรกที่อื่น\n\n(บล็อกถัดไป คั่นด้วยบรรทัดว่าง)'
                 }
-                className="min-h-[220px] w-full resize-y rounded-lg border border-line-subtle bg-surface-elevated p-3 font-mono text-sm text-fg placeholder:text-fg-placeholder focus:border-line-brand focus:outline-none"
+                className="min-h-[220px] w-full resize-y rounded-lg border border-line-subtle bg-surface-elevated p-3 font-mono text-sm text-fg placeholder:text-fg-placeholder focus:border-line-brand"
               />
               <p className="mt-1 text-xs text-fg-placeholder">
                 ตอนนี้: {recordCount} รายการ
@@ -247,8 +255,7 @@ export function BulkStockDialog({ productId, productName, onClose, onSaved }: Bu
                 📁 สิ่งที่จะได้ในการเพิ่มบัญชี / Value
               </p>
               <p className="mb-2 text-xs text-fg-muted">
-                จำนวนไอดีที่จะสร้าง:{' '}
-                <span className="font-bold text-fg">{totalNew} ไอดี</span>
+                จำนวนไอดีที่จะสร้าง: <span className="font-bold text-fg">{totalNew} ไอดี</span>
                 {preview && preview.duplicates ? (
                   <span className="ml-2 text-fg-placeholder">
                     (ข้ามที่ซ้ำอยู่แล้ว {preview.duplicates})

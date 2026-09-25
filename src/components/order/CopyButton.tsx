@@ -53,7 +53,7 @@ export function CopyButton({
     <button
       onClick={handleCopy}
       className={cn(
-        'inline-flex items-center whitespace-nowrap rounded-md border border-line bg-surface font-medium text-fg-secondary transition-all hover:border-line-brand hover:text-fg',
+        'transition-smart inline-flex items-center whitespace-nowrap rounded-md border border-line bg-surface font-medium text-fg-secondary hover:border-line-brand hover:text-fg',
         copied && 'border-jade-700 bg-jade-500/15 text-jade-700',
         sizeClasses[size],
         className,

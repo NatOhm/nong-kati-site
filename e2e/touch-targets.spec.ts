@@ -16,7 +16,26 @@ import { setTheme } from './helpers';
 test.describe('touch targets (390×844)', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
+  /** Seed a stored consent so the banner stays closed and the taskbar shows. */
+  async function withConsent(page: import('@playwright/test').Page): Promise<void> {
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        'nk_cookie_consent',
+        JSON.stringify({
+          version: '1.0',
+          necessary: true,
+          analytics: false,
+          marketing: false,
+          timestamp: new Date().toISOString(),
+        }),
+      );
+    });
+  }
+
   test('mobile taskbar items are ≥44px tall', async ({ page }) => {
+    // Audit round 2 #5: while consent is open the taskbar steps aside —
+    // grant consent up front so the persistent taskbar is under test.
+    await withConsent(page);
     await page.goto('/');
     const taskbar = page.locator('nav.fixed.bottom-0');
     await expect(taskbar).toBeVisible();
@@ -89,15 +108,14 @@ test.describe('touch targets (390×844)', () => {
       ).toBeGreaterThanOrEqual(44);
     }
 
-    // Banner must not fully cover the taskbar (audit #7): they may stack,
-    // but the taskbar's top edge must remain below the banner's top edge.
-    const bannerBox = await banner.boundingBox();
+    // Audit round 2 #5: banner and taskbar are mutually exclusive on mobile —
+    // together they covered ~18% of the first viewport. Taskbar must yield.
     const taskbar = page.locator('nav.fixed.bottom-0');
-    const taskbarBox = await taskbar.boundingBox();
-    expect(bannerBox!.y).toBeLessThanOrEqual(taskbarBox!.y + 2);
+    await expect(taskbar).toBeHidden();
   });
 
   test('touch targets hold in both themes', async ({ page }) => {
+    await withConsent(page);
     await page.goto('/');
     for (const theme of ['light', 'dark'] as const) {
       await setTheme(page, theme);

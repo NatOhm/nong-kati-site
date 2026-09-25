@@ -61,7 +61,10 @@ export default function AccountSupportPage(): React.JSX.Element {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ subject, message }),
         });
-        const data = (await res.json().catch(() => ({}))) as { ticketNumber?: string; error?: string };
+        const data = (await res.json().catch(() => ({}))) as {
+          ticketNumber?: string;
+          error?: string;
+        };
         if (!res.ok || !data.ticketNumber) {
           setError(
             data.error === 'RATE_LIMITED'
@@ -115,7 +118,9 @@ export default function AccountSupportPage(): React.JSX.Element {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="ticket-subject" className="mb-1 block text-sm text-fg-muted">หัวข้อ</label>
+            <label htmlFor="ticket-subject" className="mb-1 block text-sm text-fg-muted">
+              หัวข้อ
+            </label>
             <input
               id="ticket-subject"
               type="text"
@@ -123,13 +128,15 @@ export default function AccountSupportPage(): React.JSX.Element {
               onChange={(e) => setSubject(e.target.value)}
               required
               maxLength={200}
-              className="w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand focus:outline-none"
+              className="w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand"
               placeholder="ปัญหาเกี่ยวกับ..."
             />
           </div>
 
           <div>
-            <label htmlFor="ticket-message" className="mb-1 block text-sm text-fg-muted">รายละเอียด</label>
+            <label htmlFor="ticket-message" className="mb-1 block text-sm text-fg-muted">
+              รายละเอียด
+            </label>
             <textarea
               id="ticket-message"
               value={message}
@@ -137,7 +144,7 @@ export default function AccountSupportPage(): React.JSX.Element {
               required
               maxLength={5000}
               rows={5}
-              className="w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand focus:outline-none"
+              className="w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand"
               placeholder="อธิบายปัญหาของคุณ..."
             />
           </div>
@@ -167,7 +174,7 @@ export default function AccountSupportPage(): React.JSX.Element {
                   <span
                     className={cn(
                       'rounded-full px-2 py-0.5 text-xs font-medium',
-                      t.status === 'answered' && 'bg-jade-500/15 text-jade-600',
+                      t.status === 'answered' && 'text-jade-600 bg-jade-500/15',
                       t.status === 'open' && 'bg-peach-500/15 text-peach-600',
                       t.status === 'closed' && 'bg-neutral-500/15 text-fg-muted',
                     )}
@@ -177,7 +184,7 @@ export default function AccountSupportPage(): React.JSX.Element {
                 </div>
                 <p className="mt-1 text-sm font-medium text-fg">{t.subject}</p>
                 {t.adminReply && (
-                  <div className="mt-2 rounded-md bg-surface-subtle p-3 text-sm text-fg-muted">
+                  <div className="bg-surface-subtle mt-2 rounded-md p-3 text-sm text-fg-muted">
                     <span className="font-semibold text-fg">ทีมงานตอบกลับ:</span> {t.adminReply}
                   </div>
                 )}

@@ -45,7 +45,7 @@ export function OrderLookupForm({
           onChange={(e) => setEmail(e.target.value)}
           required
           placeholder="kaem@example.com"
-          className="w-full rounded-md border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-fg-placeholder focus:outline-none focus:ring-2 focus:ring-peach-500"
+          className="w-full rounded-md border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-fg-placeholder focus:ring-2 focus:ring-peach-500"
         />
       </div>
 
@@ -61,7 +61,7 @@ export function OrderLookupForm({
           onChange={(e) => setOrderNumber(e.target.value)}
           required
           placeholder="NK-2026-XXXXXX"
-          className="w-full rounded-md border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-fg-placeholder focus:outline-none focus:ring-2 focus:ring-peach-500"
+          className="w-full rounded-md border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-fg-placeholder focus:ring-2 focus:ring-peach-500"
         />
         <p className="mt-1 text-xs text-fg-placeholder">พบในอีเมลยืนยันคำสั่งซื้อ</p>
       </div>

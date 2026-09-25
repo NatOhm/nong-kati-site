@@ -31,7 +31,7 @@ export function EmptyCart({ className }: EmptyCartProps): React.JSX.Element {
       </p>
       <Link
         href="/search"
-        className="inline-flex items-center justify-center rounded-full bg-peach-500 px-5 py-2.5 text-sm font-semibold text-white shadow-clay-brand transition-all hover:scale-[1.03] hover:bg-peach-400 hover:shadow-clay-lg active:scale-[0.96] active:shadow-clay-press"
+        className="transition-smart inline-flex items-center justify-center rounded-full bg-peach-500 px-5 py-2.5 text-sm font-semibold text-white shadow-clay-brand hover:scale-[1.03] hover:bg-peach-400 hover:shadow-clay-lg active:scale-[0.96] active:shadow-clay-press"
       >
         เลือกซื้อสินค้า
       </Link>
