@@ -68,7 +68,10 @@ export function OrderLookupForm({
 
       {/* Error */}
       {error && (
-        <div className="rounded-md border border-coral-300 bg-coral-50 px-3 py-2 text-sm text-coral-700">
+        <div
+          role="alert"
+          className="rounded-md border border-coral-300 bg-coral-50 px-3 py-2 text-sm text-coral-700"
+        >
           {error}
         </div>
       )}

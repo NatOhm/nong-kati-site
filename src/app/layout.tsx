@@ -45,14 +45,18 @@ export const metadata: Metadata = {
     default: 'ซื้อบัตรเกม Netflix Steam และอื่นๆ — Nong-Kati',
   },
   description:
-    'ซื้อ gift card ออนไลน์ ส่งโค้ดทันที ครอบคลุม เกม สตรีมมิ่ง และ อีคอมเมิร์ซ ราคาดี จ่ายผ่าน PromptPay และบัตรเครดิต',
+    'ซื้อ gift card ออนไลน์ ส่งโค้ดทันที ครอบคลุม เกม สตรีมมิ่ง และ อีคอมเมิร์ซ ราคาดี จ่ายผ่าน PromptPay หรือโอนเงิน',
   applicationName: 'Nong-Kati',
   robots: { index: true, follow: true },
 };
 
 /** No-FOUC: apply the stored/system theme — and the remembered motion choice — before first paint. */
 const themeInitScript = `(function(){try{var t=localStorage.getItem('nk-theme');if(t!=='dark'&&t!=='light'){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','light');}try{var m=localStorage.getItem('nk-motion');if(m==='on'||m==='off'){document.documentElement.setAttribute('data-motion',m);}}catch(e){}})();`; /** 14-seo.md §13.1 — single sitewide lang="th", no per-page override. */
-export default async function RootLayout({ children }: { children: React.ReactNode }): Promise<React.JSX.Element> {
+export default async function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}): Promise<React.JSX.Element> {
   return (
     <html
       lang="th"
@@ -65,17 +69,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className="text-thai font-ui">
         <ThemeVars />
         <MascotProvider mascotUrl={(await getAppearance()).mascotUrl}>
-        <ThemeProvider defaultTheme="light">
-          <CustomerProfileProvider>
-            <CartProvider>
-              {children}
-              {/* Sitewide mobile taskbar (hidden on /management by the component itself) */}
-              <MobileBottomNav />
-            </CartProvider>
-          </CustomerProfileProvider>
-          <ToastMount />
-          <CookieConsentBanner />
-        </ThemeProvider>
+          <ThemeProvider defaultTheme="light">
+            <CustomerProfileProvider>
+              <CartProvider>
+                {children}
+                {/* Sitewide mobile taskbar (hidden on /management by the component itself) */}
+                <MobileBottomNav />
+              </CartProvider>
+            </CustomerProfileProvider>
+            <ToastMount />
+            <CookieConsentBanner />
+          </ThemeProvider>
         </MascotProvider>
       </body>
     </html>

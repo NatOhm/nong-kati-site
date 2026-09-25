@@ -68,13 +68,16 @@ export default async function SearchPage({
   let products: Awaited<ReturnType<typeof getCatalogProducts>>['products'] = [];
   let total = 0;
   let categories: Awaited<ReturnType<typeof getCategoriesWithProductCounts>> = [];
+  let dbDown = false;
   try {
     const result = await getCatalogProducts(query, category, sort, page, limit);
     products = result.products;
     total = result.total;
     categories = await getCategoriesWithProductCounts();
   } catch {
-    // DB unavailable — render with empty results
+    // DB unavailable — audit #2: an outage must not masquerade as an empty
+    // store; the render below distinguishes the two states.
+    dbDown = true;
   }
   const totalPages = Math.ceil(total / limit);
 
@@ -185,6 +188,22 @@ export default async function SearchPage({
                 <p className="text-sm text-fg-placeholder">
                   น้องแฮมสเตอร์หาไม่เจอ — ลองค้นหาด้วยคำอื่น หรือเลือกหมวดหมู่อื่น
                 </p>
+              </section>
+            ) : dbDown ? (
+              <section className="py-16 text-center" role="alert">
+                <SiteMascot size={96} className="mascot-beg mx-auto mb-4" />
+                <h2 className="mb-2 text-lg font-semibold text-fg">ระบบขัดข้องชั่วคราว</h2>
+                <p className="mx-auto max-w-md text-sm text-fg-muted">
+                  ไม่สามารถโหลดสินค้าได้ในขณะนี้ (ไม่ใช่เพราะสินค้าหมด) — กรุณาลองใหม่อีกครั้ง
+                  หากยังมีปัญหาติดต่อฝ่ายสนับสนุนทาง LINE
+                </p>
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className="mt-5 inline-flex min-h-[44px] items-center justify-center rounded-full bg-peach-500 px-6 text-sm font-semibold text-white shadow-clay-sm transition-colors hover:bg-peach-400"
+                >
+                  ลองอีกครั้ง
+                </button>
               </section>
             ) : (
               <section className="py-16 text-center">

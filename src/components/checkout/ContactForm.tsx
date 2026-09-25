@@ -108,6 +108,8 @@ export function ContactForm({
           onChange={(e) => setEmail(e.target.value)}
           readOnly={readOnlyEmail}
           required
+          aria-invalid={errors.email ? true : undefined}
+          aria-describedby={errors.email ? 'checkout-email-error' : undefined}
           placeholder="kaem@example.com"
           className={cn(
             'w-full rounded-md border bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-fg-placeholder focus:outline-none focus:ring-2 focus:ring-peach-500',
@@ -115,7 +117,11 @@ export function ContactForm({
             readOnlyEmail && 'cursor-not-allowed opacity-70',
           )}
         />
-        {errors.email && <p className="mt-1 text-xs text-coral-600">{errors.email}</p>}
+        {errors.email && (
+          <p id="checkout-email-error" role="alert" className="mt-1 text-xs text-coral-600">
+            {errors.email}
+          </p>
+        )}
       </div>
 
       {/* Phone */}
@@ -161,10 +167,10 @@ export function ContactForm({
           id="tos"
           label={
             <>
-              ยอมรับ{' '}
+              ยอมรับ {/* /legal/… — the old /terms and /privacy paths 404ed (audit #1). */}
               <a
-                href="/terms"
-                className="text-fg-brand hover:underline"
+                href="/legal/terms-of-service"
+                className="text-fg-brand underline hover:no-underline"
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -172,8 +178,8 @@ export function ContactForm({
               </a>{' '}
               และ{' '}
               <a
-                href="/privacy"
-                className="text-fg-brand hover:underline"
+                href="/legal/privacy-policy"
+                className="text-fg-brand underline hover:no-underline"
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -185,8 +191,14 @@ export function ContactForm({
           checked={tosAccepted}
           onChange={setTosAccepted}
           required
+          invalid={Boolean(errors.tos)}
+          describedBy={errors.tos ? 'checkout-tos-error' : undefined}
         />
-        {errors.tos && <p className="text-xs text-coral-600">{errors.tos}</p>}
+        {errors.tos && (
+          <p id="checkout-tos-error" role="alert" className="text-xs text-coral-600">
+            {errors.tos}
+          </p>
+        )}
 
         <ConsentCheckbox
           id="marketing"

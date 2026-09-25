@@ -15,7 +15,6 @@ import { HeroCarousel } from '@/components/home/HeroCarousel';
 import { StatsCounter } from '@/components/home/StatsCounter';
 import { TrustBadges } from '@/components/home/TrustBadges';
 import { FAQAccordion } from '@/components/home/FAQAccordion';
-import { LiveSalesPopup } from '@/components/home/LiveSalesPopup';
 import { LINEChatButton } from '@/components/home/LINEChatButton';
 import { ScrollToTop } from '@/components/home/ScrollToTop';
 import { ScrollReveal } from '@/components/home/ScrollReveal';
@@ -32,10 +31,10 @@ export const metadata: Metadata = {
   // No manual brand suffix — the root template appends "— Nong-Kati" (audit #12).
   title: 'ซื้อบัตรเกม Netflix Steam และอีคอมเมิร์ซ',
   description:
-    'ซื้อ gift card ออนไลน์ ส่งโค้ดทันที ครอบคลุม เกม สตรีมมิ่ง และ อีคอมเมิร์ซ ราคาดี จ่ายผ่าน PromptPay และบัตรเครดิต',
+    'ซื้อ gift card ออนไลน์ ส่งโค้ดทันที ครอบคลุม เกม สตรีมมิ่ง และ อีคอมเมิร์ซ ราคาดี จ่ายผ่าน PromptPay หรือโอนเงิน',
   openGraph: {
     title: 'Nong-Kati — ซื้อบัตรเกม สตรีมมิ่ง และอีคอมเมิร์ซ',
-    description: 'ส่งโค้ดทันที ราคาดี จ่ายผ่าน PromptPay และบัตรเครดิต',
+    description: 'ส่งโค้ดทันที ราคาดี จ่ายผ่าน PromptPay หรือโอนเงิน',
     type: 'website',
     locale: 'th_TH',
   },
@@ -89,7 +88,7 @@ export default async function HomePage(): Promise<React.JSX.Element> {
             {/* clay-700 lands exactly 4.50 on the peach-50 card — use clay-800
                 for headroom (7.11). Dark keeps the muted token. */}
             <p className="mt-1.5 text-sm text-clay-800 dark:text-fg-muted">
-              จ่ายผ่าน PromptPay หรือบัตรเครดิต รหัสสินค้าถูกส่งอัตโนมัติ ไม่ต้องรอแอดมิน
+              จ่ายผ่าน PromptPay หรือโอนเงิน รหัสสินค้าถูกส่งอัตโนมัติ ไม่ต้องรอแอดมิน
             </p>
             <Link
               href="/search"
@@ -107,7 +106,7 @@ export default async function HomePage(): Promise<React.JSX.Element> {
             <div className="grid gap-4 md:grid-cols-3">
               {[
                 { step: '01', title: 'เลือกสินค้า', desc: 'เลือกประเภทบัตรและราคาที่ต้องการ' },
-                { step: '02', title: 'ชำระเงิน', desc: 'จ่ายผ่าน PromptPay หรือบัตรเครดิต' },
+                { step: '02', title: 'ชำระเงิน', desc: 'จ่ายผ่าน PromptPay หรือโอนเงิน' },
                 { step: '03', title: 'รับโค้ด', desc: 'รับโค้ดทันทีภายใน 60 วินาที' },
               ].map((item) => (
                 <div
@@ -235,7 +234,6 @@ export default async function HomePage(): Promise<React.JSX.Element> {
       <Footer />
 
       {/* Client-side overlays */}
-      <LiveSalesPopup />
       <LINEChatButton />
       <ScrollToTop />
     </>

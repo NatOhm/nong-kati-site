@@ -271,9 +271,19 @@ export default function LoginPage(): React.JSX.Element {
 
             {/* Password */}
             <div>
-              <label htmlFor="login-password" className="mb-1 block text-sm text-fg-muted">
-                รหัสผ่าน
-              </label>
+              <div className="mb-1 flex items-center justify-between">
+                <label htmlFor="login-password" className="block text-sm text-fg-muted">
+                  รหัสผ่าน
+                </label>
+                {/* audit #9: no password reset exists yet — route users to the
+                    passwordless email-link flow, which lands in the same place. */}
+                <a
+                  href={`/account/magic-link?next=${encodeURIComponent(safeNext(searchParams.get('next')))}`}
+                  className="text-sm text-fg-brand underline hover:no-underline"
+                >
+                  ลืมรหัสผ่าน?
+                </a>
+              </div>
               <div className="relative">
                 <Lock
                   size={16}
@@ -314,7 +324,10 @@ export default function LoginPage(): React.JSX.Element {
 
             {/* Error */}
             {error && (
-              <div className="rounded-md border border-coral-300 bg-coral-50 px-3 py-2 text-sm text-coral-600">
+              <div
+                role="alert"
+                className="rounded-md border border-coral-300 bg-coral-50 px-3 py-2 text-sm text-coral-600"
+              >
                 {error}
               </div>
             )}
@@ -451,7 +464,10 @@ export default function LoginPage(): React.JSX.Element {
 
                 {otpMessage && <p className="text-jade-600 text-xs">{otpMessage}</p>}
                 {otpError && (
-                  <div className="rounded-md border border-coral-300 bg-coral-50 px-3 py-2 text-sm text-coral-600">
+                  <div
+                    role="alert"
+                    className="rounded-md border border-coral-300 bg-coral-50 px-3 py-2 text-sm text-coral-600"
+                  >
                     {otpError}
                   </div>
                 )}
@@ -461,7 +477,10 @@ export default function LoginPage(): React.JSX.Element {
 
           {/* Social sign-in error (redirected back from /oauth/[provider]/callback) */}
           {oauthError && (
-            <div className="mt-4 rounded-md border border-coral-300 bg-coral-50 px-3 py-2 text-sm text-coral-600">
+            <div
+              role="alert"
+              className="mt-4 rounded-md border border-coral-300 bg-coral-50 px-3 py-2 text-sm text-coral-600"
+            >
               {oauthError === 'blocked'
                 ? 'บัญชีนี้ถูกบล็อค กรุณาติดต่อฝ่ายสนับสนุน'
                 : oauthError === 'denied'

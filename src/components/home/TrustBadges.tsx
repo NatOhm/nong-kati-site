@@ -1,6 +1,6 @@
 'use client';
 
-import { Shield, Zap, Headphones, CreditCard, Star } from 'lucide-react';
+import { Shield, Zap, Headphones, Wallet } from 'lucide-react';
 
 const BADGES = [
   {
@@ -22,16 +22,10 @@ const BADGES = [
     color: 'bg-coral-100 text-coral-600',
   },
   {
-    icon: <CreditCard size={24} className="text-fg-brand" />,
-    title: 'PromptPay + บัตรเครดิต',
+    icon: <Wallet size={24} className="text-fg-brand" />,
+    title: 'PromptPay + โอนเงิน',
     desc: 'ชำระเงินได้หลายช่องทาง',
     color: 'bg-peach-50 text-peach-800',
-  },
-  {
-    icon: <Star size={24} className="text-peach-500" />,
-    title: 'ขายแล้ว 567+ โค้ด',
-    desc: 'ลูกค้าไว้วางใจ 4.9/5 ดาว',
-    color: 'bg-peach-100 text-fg-brand',
   },
 ];
 

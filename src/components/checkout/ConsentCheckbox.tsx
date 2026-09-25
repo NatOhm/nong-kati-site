@@ -9,6 +9,10 @@ export interface ConsentCheckboxProps {
   onChange: (checked: boolean) => void;
   required?: boolean;
   className?: string;
+  /** Marks the control invalid for assistive tech (audit #7). */
+  invalid?: boolean;
+  /** Element id of the associated error message. */
+  describedBy?: string | undefined;
 }
 
 /**
@@ -22,6 +26,8 @@ export function ConsentCheckbox({
   onChange,
   required = false,
   className,
+  invalid = false,
+  describedBy,
 }: ConsentCheckboxProps): React.JSX.Element {
   return (
     <label
@@ -38,6 +44,8 @@ export function ConsentCheckbox({
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
         required={required}
+        aria-invalid={invalid ? true : undefined}
+        aria-describedby={describedBy}
         className="mt-0.5 h-4 w-4 shrink-0 rounded border-line bg-clay-300 text-fg-brand focus:ring-peach-500"
       />
       <span className="text-sm text-fg-secondary">{label}</span>

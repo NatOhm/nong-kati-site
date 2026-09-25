@@ -157,6 +157,60 @@ export function FacebookSidebar({
   const prevOpenRef = useRef(isOpen);
   const shown = isOpen || closing;
 
+  // Accessible-modal behavior (audit #3): focus lands on the dialog itself,
+  // Tab is contained inside, Escape closes, background scroll is locked and
+  // focus returns to the opener (the hamburger) on close.
+  const panelRef = useRef<HTMLDivElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    openerRef.current = document.activeElement as HTMLElement | null;
+    const raf = requestAnimationFrame(() => panelRef.current?.focus());
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      cancelAnimationFrame(raf);
+      document.body.style.overflow = prevOverflow;
+      openerRef.current?.focus?.();
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose?.();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
+
+  // Keep Tab cycling inside the drawer while it is open.
+  const handleTab = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'Tab') return;
+    const panel = panelRef.current;
+    if (!panel) return;
+    const focusables = Array.from(
+      panel.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      ),
+    ).filter((el) => el.offsetParent !== null);
+    if (focusables.length === 0) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    if (!first || !last) return;
+    const active = document.activeElement;
+    if (e.shiftKey) {
+      if (active === first || active === panel) {
+        e.preventDefault();
+        last.focus();
+      }
+    } else if (active === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  };
+
   // Start the exit animation when isOpen flips true→false.
   useEffect(() => {
     const wasOpen = prevOpenRef.current;
@@ -205,7 +259,11 @@ export function FacebookSidebar({
               z-[70] paints the panel over the navbar icons, not beside them. */}
           <div
             role="dialog"
+            aria-modal="true"
             aria-label="เมนูนำทาง"
+            ref={panelRef}
+            tabIndex={-1}
+            onKeyDown={handleTab}
             onAnimationEnd={handleAnimationEnd}
             className={cn(
               'drawer-scroll fixed left-0 top-0 z-[70] h-full w-[300px] overflow-y-auto rounded-r-[28px] bg-surface-base shadow-[6px_0_24px_rgba(78,56,32,0.35)] lg:hidden',

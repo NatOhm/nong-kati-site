@@ -380,7 +380,10 @@ export default function CheckoutPage(): React.JSX.Element {
 
       {/* Error */}
       {error && (
-        <div className="mb-6 rounded-md border border-coral-300 bg-coral-50 px-4 py-3 text-sm text-coral-700">
+        <div
+          role="alert"
+          className="mb-6 rounded-md border border-coral-300 bg-coral-50 px-4 py-3 text-sm text-coral-700"
+        >
           {error}
         </div>
       )}
