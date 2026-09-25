@@ -23,6 +23,8 @@ import { cn } from '@/utils/cn';
 function friendlyOrderError(err: unknown): string {
   const code = err instanceof Error ? err.message : '';
   switch (code) {
+    case 'NO_PAYMENT_CHANNEL':
+      return 'ช่องทางชำระเงินยังไม่เปิดให้ใช้งาน — ร้านปิดรับออเดอร์ชั่วคราว กรุณากลับมาใหม่ภายหลัง';
     case 'OUT_OF_STOCK':
       return 'สินค้าบางรายการหมดสต๊อกพอดี — กรุณาลบรายการนั้นออกแล้วลองอีกครั้ง';
     case 'CART_EMPTY':
@@ -433,6 +435,20 @@ export default function CheckoutPage(): React.JSX.Element {
 
           {step === 2 && (
             <div className="rounded-md border border-line-subtle bg-white p-6">
+              {/* Security review [High]: no actionable payment channel → say
+                  so honestly instead of stranding the customer on step 2. */}
+              {paymentMethod === 'promptpay' && !paymentState?.qrImageUrl && !manualInfo && (
+                <div
+                  role="alert"
+                  className="mb-6 rounded-md border border-coral-300 bg-coral-50 px-4 py-3 text-sm text-coral-700"
+                >
+                  <p className="font-semibold">ยังไม่มีช่องทางชำระเงินที่ใช้ได้ในขณะนี้</p>
+                  <p className="mt-1">
+                    ออเดอร์ของคุณถูกบันทึกไว้แล้ว แต่ร้านยังไม่เปิดช่องทางชำระเงิน —
+                    ทีมงานจะติดต่อกลับทางอีเมล หรือกลับมาที่หน้านี้ใหม่ภายหลัง
+                  </p>
+                </div>
+              )}
               {/* Payment method selector */}
               <PaymentMethodSelector
                 selected={paymentMethod}

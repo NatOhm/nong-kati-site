@@ -8,6 +8,7 @@ import {
   isProviderConfigured,
   verifyState,
 } from '@/lib/oauth';
+import { safeRedirect } from '@/lib/safeRedirect';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,7 +31,10 @@ export async function GET(
   if (!isOAuthProvider(provider) || !isProviderConfigured(provider)) return fail('unavailable');
 
   const stateCookie = req.cookies.get(OAUTH_STATE_COOKIE)?.value ?? null;
-  const [stateValue, next = '/account/dashboard'] = (stateCookie ?? '').split('|');
+  const [stateValue, storedNext = '/account/dashboard'] = (stateCookie ?? '').split('|');
+  // The stored target re-passes the shared same-origin rule (audit [Low]) —
+  // defense in depth even though the start route already sanitized it.
+  const next = safeRedirect(storedNext, '/account/dashboard');
   const code = req.nextUrl.searchParams.get('code');
   const state = req.nextUrl.searchParams.get('state');
 

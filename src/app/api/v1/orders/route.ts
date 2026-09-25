@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { createOrder } from '@/api/orders';
+import { getManualTransferInfo } from '@/lib/data';
 import { getCustomerFromToken } from '@/api/customerAuth';
 import { prisma } from '@/lib/db';
 
@@ -74,6 +75,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: { code: 'INVALID_JSON' } }, { status: 400 });
   }
   const b = (body ?? {}) as Record<string, unknown>;
+
+  // Release capability check (security review 2026-09-26 [High]): never
+  // accept an order the storefront cannot let the customer pay for. With
+  // the real gateway unimplemented, manual transfer is the production
+  // channel — if it is not configured, refuse with an honest code instead
+  // of minting another abandoned pending order. Wallet-only customers and
+  // the future real gateway are unaffected (the check is only against the
+  // channel that exists today).
+  const manualInfo = await getManualTransferInfo();
+  if (!manualInfo.enabled || !manualInfo.accountName || !manualInfo.accountNumber) {
+    return NextResponse.json({ error: { code: 'NO_PAYMENT_CHANNEL' } }, { status: 503 });
+  }
 
   // Attach customer id when logged in (session cookie).
   let customerId: string | null = null;

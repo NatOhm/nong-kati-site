@@ -24,11 +24,14 @@ import {
   Send,
   ShieldAlert,
 } from 'lucide-react';
+import { safeRedirect } from '@/lib/safeRedirect';
 
-/** Only allow same-site relative paths in ?next= (no open redirect). */
+/**
+ * Only allow same-site relative paths in ?next= (no open redirect).
+ * Shared sanitizer (audit [Low]: backslash/control-char hardening).
+ */
 function safeNext(raw: string | null): string {
-  if (raw && raw.startsWith('/') && !raw.startsWith('//')) return raw;
-  return '/account/dashboard';
+  return safeRedirect(raw, '/account/dashboard');
 }
 
 type Phase = 'request' | 'sent';

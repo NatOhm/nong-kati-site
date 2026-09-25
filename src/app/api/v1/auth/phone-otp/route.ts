@@ -50,6 +50,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!rl.allowed) {
     return NextResponse.json({ error: 'RATE_LIMITED' }, { status: 429 });
   }
+  // Audit [High]: shared per-IP budget — one sender can't rotate numbers to
+  // mint unlimited SMS challenges.
+  const ip = getClientIp(req);
+  const ipRl = await checkRateLimit(`_phone_otp_ip:${ip}`, '_global', {
+    route: `_phone_otp_ip:${ip}`,
+    maxRequests: 10,
+    windowMs: 15 * 60_000,
+    keyBy: 'email',
+  });
+  if (!ipRl.allowed) {
+    return NextResponse.json({ error: 'RATE_LIMITED' }, { status: 429 });
+  }
 
   const result = await createPhoneOtp({ phoneE164: phone, ipAddress: getClientIp(req) });
   if (!result.ok) {

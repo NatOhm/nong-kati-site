@@ -21,7 +21,7 @@
  *   password resets and never matches a real mailbox.
  */
 
-import { createHash, randomInt } from 'node:crypto';
+import { createHash, randomInt, timingSafeEqual } from 'node:crypto';
 
 import { prisma } from '@/lib/db';
 import { signJwt } from '@/lib/jwt';
@@ -122,6 +122,14 @@ export async function createPhoneOtp(params: {
 
   const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
   const expiresAt = new Date(Date.now() + OTP_TTL_MS);
+  const now = new Date();
+
+  // Audit [High]: issuing a new code invalidates previous challenges for the
+  // number — only the newest code can ever verify.
+  await prisma.phoneOtpToken.updateMany({
+    where: { destinationPhone: phone, usedAt: null },
+    data: { usedAt: now },
+  });
 
   await prisma.phoneOtpToken.create({
     data: {
@@ -152,24 +160,37 @@ export async function verifyPhoneOtp(params: {
   if (!CODE_RE.test(code)) return { ok: false, error: 'INVALID_CODE' };
 
   const now = new Date();
-  const codeHash = hashCode(phone, code);
 
-  const row = await prisma.phoneOtpToken.findUnique({ where: { codeHash } });
-  if (!row || row.destinationPhone !== phone) return { ok: false, error: 'INVALID_CODE' };
+  // Audit [High]: locate the ACTIVE challenge by number, not by candidate
+  // hash. Looking the token up by codeHash made wrong guesses invisible
+  // (no row → no attempt counted → unlimited guessing) and made the
+  // codeHash comparison branch unreachable. findFirst on the newest
+  // unclaimed challenge fixes both; the stored hash is compared
+  // constant-time below.
+  const row = await prisma.phoneOtpToken.findFirst({
+    where: { destinationPhone: phone, usedAt: null },
+    orderBy: { createdAt: 'desc' },
+  });
+  if (!row) return { ok: false, error: 'INVALID_CODE' };
 
-  // Attempt cap: the 6th verify attempt against this code is refused even
-  // if correct (the code is burned — re-request a new one).
+  // Attempt cap: the 6th verify attempt against this challenge is refused
+  // even if the code would be correct (re-request a new one).
   if (row.attempts >= MAX_ATTEMPTS) {
     return { ok: false, error: 'TOO_MANY_ATTEMPTS' };
   }
 
-  if (row.usedAt) return { ok: false, error: 'CODE_USED' };
   if (row.expiresAt <= now) return { ok: false, error: 'CODE_EXPIRED' };
 
-  // Count every verify attempt (the 6th try against a code is refused even
-  // if it would be correct), then claim single-use atomically.
+  // Constant-time comparison of the candidate against the stored hash.
+  const candidateHash = Buffer.from(hashCode(phone, code), 'hex');
+  const storedHash = Buffer.from(row.codeHash, 'hex');
+  const codeMatches =
+    candidateHash.length === storedHash.length && timingSafeEqual(candidateHash, storedHash);
+
+  // Count EVERY verify attempt against the challenge (wrong guesses burn
+  // the allowance too), then claim single-use atomically when correct.
   const attemptCount = row.attempts + 1;
-  if (row.codeHash !== codeHash) {
+  if (!codeMatches) {
     await prisma.phoneOtpToken.update({
       where: { id: row.id },
       data: { attemptedAt: now, attempts: attemptCount },

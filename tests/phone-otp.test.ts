@@ -118,25 +118,28 @@ describe('verifyPhoneOtp', () => {
   it('rejects malformed codes without touching the DB', async () => {
     const result = await verifyPhoneOtp({ phoneE164: phone, code: '12ab' });
     expect(result).toEqual({ ok: false, error: 'INVALID_CODE' });
-    expect(prisma.phoneOtpToken.findUnique).not.toHaveBeenCalled();
+    expect(prisma.phoneOtpToken.findFirst).not.toHaveBeenCalled();
   });
 
-  it('rejects a code that hashes to nothing stored (or wrong number binding)', async () => {
-    vi.mocked(prisma.phoneOtpToken.findUnique).mockResolvedValue(null as never);
+  it('rejects when the number has no active challenge', async () => {
+    vi.mocked(prisma.phoneOtpToken.findFirst).mockResolvedValue(null as never);
     expect(await verifyPhoneOtp({ phoneE164: phone, code })).toEqual({
       ok: false,
       error: 'INVALID_CODE',
     });
   });
 
-  it('rejects a valid code submitted for a different number', async () => {
-    vi.mocked(prisma.phoneOtpToken.findUnique).mockResolvedValue(mockRow() as never);
-    const result = await verifyPhoneOtp({ phoneE164: '+66999999999', code });
-    expect(result).toEqual({ ok: false, error: 'INVALID_CODE' });
+  it('locates the active challenge by NUMBER, not candidate hash (audit [High])', async () => {
+    vi.mocked(prisma.phoneOtpToken.findFirst).mockResolvedValue(mockRow() as never);
+    await verifyPhoneOtp({ phoneE164: phone, code });
+    expect(prisma.phoneOtpToken.findFirst).toHaveBeenCalledWith({
+      where: { destinationPhone: phone, usedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
   });
 
-  it('rejects wrong codes and counts the attempt', async () => {
-    vi.mocked(prisma.phoneOtpToken.findUnique).mockResolvedValue(mockRow() as never);
+  it('rejects wrong codes and counts the attempt against the challenge', async () => {
+    vi.mocked(prisma.phoneOtpToken.findFirst).mockResolvedValue(mockRow() as never);
     const result = await verifyPhoneOtp({ phoneE164: phone, code: '654321' });
     expect(result).toEqual({ ok: false, error: 'INVALID_CODE' });
     expect(prisma.phoneOtpToken.update).toHaveBeenCalledWith({
@@ -145,30 +148,38 @@ describe('verifyPhoneOtp', () => {
     });
   });
 
-  it('refuses the 6th attempt even with the correct code', async () => {
-    vi.mocked(prisma.phoneOtpToken.findUnique).mockResolvedValue(mockRow({ attempts: 5 }) as never);
-    const result = await verifyPhoneOtp({ phoneE164: phone, code });
-    expect(result).toEqual({ ok: false, error: 'TOO_MANY_ATTEMPTS' });
+  it('counts five distinct wrong codes → the 6th attempt (even correct) is refused', async () => {
+    // The audit's core scenario: attempts must accumulate on ONE challenge.
+    for (let attempts = 0; attempts < 5; attempts++) {
+      vi.mocked(prisma.phoneOtpToken.findFirst).mockResolvedValue(mockRow({ attempts }) as never);
+      const wrong = await verifyPhoneOtp({
+        phoneE164: phone,
+        code: '00000'.replace('0', String(attempts)) + '00',
+      });
+      expect(wrong).toEqual({ ok: false, error: 'INVALID_CODE' });
+    }
+    vi.mocked(prisma.phoneOtpToken.findFirst).mockResolvedValue(mockRow({ attempts: 5 }) as never);
+    const sixth = await verifyPhoneOtp({ phoneE164: phone, code }); // even correct
+    expect(sixth).toEqual({ ok: false, error: 'TOO_MANY_ATTEMPTS' });
   });
 
-  it('rejects used codes', async () => {
-    vi.mocked(prisma.phoneOtpToken.findUnique).mockResolvedValue(
-      mockRow({ usedAt: new Date() }) as never,
-    );
-    const result = await verifyPhoneOtp({ phoneE164: phone, code });
-    expect(result).toEqual({ ok: false, error: 'CODE_USED' });
-  });
-
-  it('rejects expired codes', async () => {
-    vi.mocked(prisma.phoneOtpToken.findUnique).mockResolvedValue(
+  it('rejects expired challenges by expiry, not by absence', async () => {
+    vi.mocked(prisma.phoneOtpToken.findFirst).mockResolvedValue(
       mockRow({ expiresAt: new Date(Date.now() - 1000) }) as never,
     );
     const result = await verifyPhoneOtp({ phoneE164: phone, code });
     expect(result).toEqual({ ok: false, error: 'CODE_EXPIRED' });
   });
 
+  it('rejects a challenge consumed concurrently (claimed between reads)', async () => {
+    vi.mocked(prisma.phoneOtpToken.findFirst).mockResolvedValue(mockRow() as never);
+    vi.mocked(prisma.phoneOtpToken.updateMany).mockResolvedValue({ count: 0 });
+    const result = await verifyPhoneOtp({ phoneE164: phone, code });
+    expect(result).toEqual({ ok: false, error: 'CODE_USED' });
+  });
+
   it('signs in an existing customer and marks phoneVerified', async () => {
-    vi.mocked(prisma.phoneOtpToken.findUnique).mockResolvedValue(mockRow() as never);
+    vi.mocked(prisma.phoneOtpToken.findFirst).mockResolvedValue(mockRow() as never);
     vi.mocked(prisma.customer.findFirst).mockResolvedValue({
       id: 'c_1',
       email: 'real@mail.com',
@@ -190,7 +201,7 @@ describe('verifyPhoneOtp', () => {
   });
 
   it('creates a phone-only account with a placeholder email when none matches', async () => {
-    vi.mocked(prisma.phoneOtpToken.findUnique).mockResolvedValue(mockRow() as never);
+    vi.mocked(prisma.phoneOtpToken.findFirst).mockResolvedValue(mockRow() as never);
     vi.mocked(prisma.customer.findFirst).mockResolvedValue(null);
     vi.mocked(prisma.customer.create).mockResolvedValue({
       id: 'c_new',
@@ -215,7 +226,7 @@ describe('verifyPhoneOtp', () => {
   });
 
   it('refuses blocked accounts at verification', async () => {
-    vi.mocked(prisma.phoneOtpToken.findUnique).mockResolvedValue(mockRow() as never);
+    vi.mocked(prisma.phoneOtpToken.findFirst).mockResolvedValue(mockRow() as never);
     vi.mocked(prisma.customer.findFirst).mockResolvedValue({ status: 'blocked' } as never);
     const result = await verifyPhoneOtp({ phoneE164: phone, code });
     expect(result).toEqual({ ok: false, error: 'ACCOUNT_BLOCKED' });

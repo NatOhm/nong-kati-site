@@ -5,6 +5,8 @@ import {
   getCustomerProfile,
   updateCustomerProfile,
 } from '@/api/customerAuth';
+import { normalizeThaiPhone } from '@/api/phoneOtp';
+import { prisma } from '@/lib/db';
 
 const COOKIE = 'nk_session';
 
@@ -46,15 +48,30 @@ export async function PATCH(req: NextRequest): Promise<NextResponse> {
 
   const fullName =
     typeof body.fullName === 'string' ? body.fullName.trim().slice(0, 120) : undefined;
+  // Canonical phone identity (audit [Medium]): whatever format the customer
+  // types (08x…, +668x…, spaced), the profile stores E.164 — the SAME value
+  // OTP sign-in matches against. Empty string clears the number.
+  const phoneRaw = typeof body.phoneNumber === 'string' ? body.phoneNumber.trim() : undefined;
   const phoneNumber =
-    typeof body.phoneNumber === 'string' ? body.phoneNumber.trim().slice(0, 20) : undefined;
+    phoneRaw === undefined ? undefined : phoneRaw === '' ? '' : normalizeThaiPhone(phoneRaw);
   const marketingOptIn = typeof body.marketingOptIn === 'boolean' ? body.marketingOptIn : undefined;
 
   if (fullName !== undefined && fullName.length === 0) {
     return NextResponse.json({ error: 'NAME_REQUIRED' }, { status: 400 });
   }
-  if (phoneNumber !== undefined && phoneNumber.length > 0 && !/^0\d{8,9}$/.test(phoneNumber)) {
+  if (phoneNumber === null) {
     return NextResponse.json({ error: 'INVALID_PHONE' }, { status: 400 });
+  }
+  if (phoneNumber && phoneNumber !== '') {
+    // One number belongs to one customer — OTP sign-in resolves by this
+    // value, so a clash would silently merge/steal identities.
+    const clash = await prisma.customer.findFirst({
+      where: { phoneNumber, id: { not: session.id } },
+      select: { id: true },
+    });
+    if (clash) {
+      return NextResponse.json({ error: 'PHONE_ALREADY_IN_USE' }, { status: 409 });
+    }
   }
 
   const result = await updateCustomerProfile(session.id, {

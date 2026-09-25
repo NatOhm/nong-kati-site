@@ -16,6 +16,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, LogIn, Mail, Lock, Eye, EyeOff, Phone } from 'lucide-react';
 import { cn } from '@/utils/cn';
+import { safeRedirect } from '@/lib/safeRedirect';
 
 /** Brand marks for the social buttons (simple, current-color paths). */
 function GoogleMark(): React.JSX.Element {
@@ -67,10 +68,12 @@ function FacebookMark(): React.JSX.Element {
   );
 }
 
-/** Only allow same-site relative paths in ?next= (no open redirect). */
+/**
+ * Only allow same-site relative paths in ?next= (no open redirect).
+ * Shared sanitizer (audit [Low]: backslash/control-char hardening).
+ */
 function safeNext(raw: string | null): string {
-  if (raw && raw.startsWith('/') && !raw.startsWith('//')) return raw;
-  return '/account/dashboard';
+  return safeRedirect(raw, '/account/dashboard');
 }
 
 /** Thai copy for phone OTP API errors. */

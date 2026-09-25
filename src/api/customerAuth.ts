@@ -340,7 +340,13 @@ export async function updateCustomerProfile(
     where: { id: customerId },
     data: {
       ...(params.fullName !== undefined && { fullName: params.fullName }),
-      ...(params.phoneNumber !== undefined && { phoneNumber: params.phoneNumber }),
+      // Number changed (or cleared) → the stored verification no longer
+      // applies; the new number must pass an OTP challenge before OTP
+      // sign-in accepts it (audit [Medium]).
+      ...(params.phoneNumber !== undefined && {
+        phoneNumber: params.phoneNumber,
+        ...(params.phoneNumber !== customer.phoneNumber && { phoneVerified: false }),
+      }),
       ...(params.marketingOptIn !== undefined && { marketingOptIn: params.marketingOptIn }),
     },
   });

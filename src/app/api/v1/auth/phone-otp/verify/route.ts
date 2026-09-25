@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { normalizeThaiPhone, verifyPhoneOtp } from '@/api/phoneOtp';
-import { getClientIp } from '@/lib/rateLimit';
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,7 +29,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'INVALID_PHONE' }, { status: 400 });
   }
 
-  const result = await verifyPhoneOtp({ phoneE164: phone, code, ipAddress: getClientIp(req) });
+  // Audit [High]: per-IP verify budget — a distributed guesser burns its
+  // allowance here even before the 5-attempt cap on the challenge itself.
+  const ip = getClientIp(req);
+  const ipRl = await checkRateLimit(`_phone_otp_verify_ip:${ip}`, '_global', {
+    route: `_phone_otp_verify_ip:${ip}`,
+    maxRequests: 20,
+    windowMs: 15 * 60_000,
+    keyBy: 'email',
+  });
+  if (!ipRl.allowed) {
+    return NextResponse.json({ error: 'RATE_LIMITED' }, { status: 429 });
+  }
+
+  const result = await verifyPhoneOtp({ phoneE164: phone, code, ipAddress: ip });
   if (!result.ok) {
     const status =
       result.error === 'ACCOUNT_BLOCKED' ? 423 : result.error === 'TOO_MANY_ATTEMPTS' ? 429 : 401;

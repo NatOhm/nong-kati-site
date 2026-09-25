@@ -8,6 +8,7 @@ import {
   isOAuthProvider,
   isProviderConfigured,
 } from '@/lib/oauth';
+import { safeRedirect } from '@/lib/safeRedirect';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,10 +27,9 @@ export async function GET(
     return NextResponse.json({ error: 'PROVIDER_UNAVAILABLE' }, { status: 503 });
   }
 
-  // Only same-site relative next paths (no open redirect), matching the
-  // password login's safeNext().
-  const nextParam = req.nextUrl.searchParams.get('next') ?? '/account/dashboard';
-  const next = nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '/account/dashboard';
+  // Shared same-origin rule (audit [Low]): rejects backslashes/control
+  // characters and any non-relative URL — one sanitizer for every flow.
+  const next = safeRedirect(req.nextUrl.searchParams.get('next'), '/account/dashboard');
 
   const state = createState();
   const authorizeUrl = buildAuthorizeUrl({ provider, req, state });
