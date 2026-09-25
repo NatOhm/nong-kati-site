@@ -10,6 +10,6 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(): Promise<NextResponse> {
   return NextResponse.json({
-    providers: (['google', 'line'] as const).filter((p) => isProviderConfigured(p)),
+    providers: (['google', 'line', 'facebook'] as const).filter((p) => isProviderConfigured(p)),
   });
 }

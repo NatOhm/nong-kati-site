@@ -18,6 +18,8 @@ export interface ContrastIssue {
   text: string;
   ratio: number;
   cls: string;
+  fg: string;
+  bg: string;
 }
 
 export const SCAN_CONTRAST_FN = /* js */ `
@@ -84,10 +86,13 @@ export const SCAN_CONTRAST_FN = /* js */ `
       if (!bg) bg = isDark ? { r: 78, g: 56, b: 32, a: 1 } : { r: 255, g: 247, b: 237, a: 1 };
       const r = ratio(fg, bg);
       if (r < 4.5) {
+        const hex = (c) => '#' + [c.r, c.g, c.b].map((v) => v.toString(16).padStart(2, '0')).join('');
         issues.push({
           text: (el.textContent || '').trim().slice(0, 30),
           ratio: r,
           cls: (el.className || '').toString().slice(0, 70),
+          fg: hex(fg),
+          bg: hex(bg),
         });
       }
     }
@@ -105,13 +110,19 @@ export async function scanContrast(page: Page): Promise<ContrastIssue[]> {
   return page.evaluate(`(${SCAN_CONTRAST_FN})()`) as Promise<ContrastIssue[]>;
 }
 
-/** Set the app theme via the no-FOUC localStorage key and reload. */
+/**
+ * Set the app theme via the no-FOUC localStorage key and reload.
+ * The settle wait covers post-reload CSS transitions (theme color swaps and
+ * the 550ms page-transition fade) — scanning mid-transition measures an
+ * intermediate blended background and reports phantom violations.
+ */
 export async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
   await page.evaluate((t) => {
     localStorage.setItem('nk-theme', t);
   }, theme);
   await page.reload();
   await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(700);
 }
 
 /**

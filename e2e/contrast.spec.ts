@@ -19,7 +19,9 @@ for (const theme of ['light', 'dark'] as const) {
         expect(
           issues,
           `${theme} ${path}: text contrast below 4.5:1:\n` +
-            issues.map((i) => `  ${i.ratio}:1 "${i.text}" (${i.cls})`).join('\n'),
+            issues
+              .map((i) => `  ${i.ratio}:1 "${i.text}" fg=${i.fg} bg=${i.bg} (${i.cls})`)
+              .join('\n'),
         ).toEqual([]);
       });
     }

@@ -181,12 +181,14 @@ model CartItem {
 model Customer {
   id                  String    @id @default(cuid())
   email               String    @unique
-  // Nullable for OAuth-only accounts (Google/LINE sign-in has no local password).
+  // Nullable for OAuth-only accounts (Google/LINE/Facebook sign-in has no local password).
   passwordHash        String?
   fullName            String?
   phoneNumber         String?
   status              String    @default("active") // active | blocked | anonymised
   emailVerified       Boolean   @default(false)
+  // Set when the customer proves control of the number via sign-in OTP.
+  phoneVerified       Boolean   @default(false)
   marketingOptIn      Boolean   @default(false)
   failedLoginAttempts Int       @default(0)
   lockedUntil         DateTime?
@@ -684,5 +686,23 @@ model MagicLinkToken {
   createdAt   DateTime  @default(now())
 
   @@index([email])
+  @@index([expiresAt])
+}
+
+// Phone (SMS OTP) sign-in: mirrors MagicLinkToken — only the SHA-256 hash of
+// the 6-digit code is stored, with expiry, single-use consumption and attempt
+// tracking for the audit trail. destinationPhone is E.164 (+66...).
+model PhoneOtpToken {
+  id               String    @id @default(cuid())
+  destinationPhone String
+  codeHash         String    @unique
+  expiresAt        DateTime
+  usedAt           DateTime?
+  attemptedAt      DateTime?
+  attempts         Int       @default(0)
+  ipAddress        String?
+  createdAt        DateTime  @default(now())
+
+  @@index([destinationPhone])
   @@index([expiresAt])
 }

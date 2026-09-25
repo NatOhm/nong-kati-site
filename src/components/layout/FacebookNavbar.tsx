@@ -99,7 +99,10 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
                 it (audit #9: one search control per viewport). */}
             <form
               onSubmit={handleSearch}
-              className={cn('relative hidden md:block', pathname?.startsWith('/search') && 'md:hidden')}
+              className={cn(
+                'relative hidden md:block',
+                pathname?.startsWith('/search') && 'md:hidden',
+              )}
             >
               <div
                 className={cn(
@@ -186,7 +189,10 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
                   className={cn(
                     'relative rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-interactive ease-ease-out',
                     isActive
-                      ? 'bg-peach-100 text-fg-brand-strong'
+                      ? // Same active treatment as the sidebar: the fixed peach-100
+                        // needs dark overrides — text-fg-brand-strong flips light in
+                        // dark mode and lands ~1.2:1 on the unchanged light chip.
+                        'bg-peach-100 text-peach-800 dark:bg-peach-900/40 dark:text-peach-200'
                       : 'text-fg-secondary hover:-translate-y-0.5 hover:bg-surface-sunken hover:text-fg active:translate-y-0 active:scale-95',
                   )}
                   aria-current={isActive ? 'page' : undefined}

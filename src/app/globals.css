@@ -518,6 +518,13 @@ body {
 [data-theme='dark'] .bg-peach-200.text-peach-800 {
   color: var(--peach-800);
 }
+/* Active nav pills (navbar + sidebar): dark:bg-peach-900/40 turns the chip
+   translucent-dark, where peach-800 lands ~1.4 and peach-200 ~6.2. The
+   forced-peach-800 rule above (0,3,0) out-specifies the dark:* utility, so
+   this combo (0,4,0) re-flips the text — same pattern as the topaz chip. */
+[data-theme='dark'] .bg-peach-100.dark\:bg-peach-900\/40.text-peach-800 {
+  color: var(--peach-200);
+}
 /* Brand text on solid pale-peach fills keeps a dark peach in dark mode too
    (peach-300 on peach-50 would be ~1.6). */
 [data-theme='dark'] .bg-peach-50 .text-fg-brand,
@@ -532,39 +539,39 @@ body {
 [data-theme='dark'] .bg-clay-200.text-fg-placeholder {
   color: var(--clay-800);
 }
-  /* Storefront navbar bg is peach-50 (#FDEBD3) — slightly darker than the
+/* Storefront navbar bg is peach-50 (#FDEBD3) — slightly darker than the
    cream page base, so the raised secondary/muted step (clay-700) falls to
    4.10 there. Inside the nav, step the neutral text to clay-800 (6.47 on
    peach-50; dark nav bg keeps its dark-tuned tokens). */
-  [data-theme='light'] .bg-surface-nav {
-    --fg-secondary: var(--clay-800);
-    --fg-muted: var(--clay-800);
-    --fg-placeholder: var(--clay-800);
-  }
-  /* Brand text pairs with --fg-brand (peach-600 = 3.35 on cream), which
+[data-theme='light'] .bg-surface-nav {
+  --fg-secondary: var(--clay-800);
+  --fg-muted: var(--clay-800);
+  --fg-placeholder: var(--clay-800);
+}
+/* Brand text pairs with --fg-brand (peach-600 = 3.35 on cream), which
    fails 4.5:1 across light surfaces. The token itself is remapped to
    peach-700 in tokens.css (4.88 cream / 4.52 peach-100 / 5.18 white).
    Two families sit on fills where peach-700 still lands at 4.44, so they
    step up to peach-800: brand text on peach-tint chips, and hover/active
    brand text inside the peach-50 navbar. */
-  [data-theme='light'] .bg-peach-500\/20 .text-fg-brand,
-  [data-theme='light'] .bg-peach-500\/15 .text-fg-brand,
-  [data-theme='light'] .bg-peach-500\/10 .text-fg-brand,
-  [data-theme='light'] .bg-peach-100 .text-fg-brand {
-    color: var(--peach-800);
-  }
-  /* Solid pale-peach fills: peach-700 is 4.44 on peach-50, and dark mode's
+[data-theme='light'] .bg-peach-500\/20 .text-fg-brand,
+[data-theme='light'] .bg-peach-500\/15 .text-fg-brand,
+[data-theme='light'] .bg-peach-500\/10 .text-fg-brand,
+[data-theme='light'] .bg-peach-100 .text-fg-brand {
+  color: var(--peach-800);
+}
+/* Solid pale-peach fills: peach-700 is 4.44 on peach-50, and dark mode's
      peach-300 brand text would sit at ~1.6 on them. peach-800 passes both
      (6.2 on peach-50). */
-  [data-theme='light'] .bg-peach-50 .text-fg-brand,
-  [data-theme='light'] .bg-peach-50.text-fg-brand {
-    color: var(--peach-800);
-  }
-  [data-theme='light'] .bg-surface-nav .text-fg-brand,
-  [data-theme='light'] .bg-surface-nav.text-fg-brand {
-    color: var(--peach-800);
-  }
-  /* Dark clay-card fill is --clay-800 (lighter than the page base), so the
+[data-theme='light'] .bg-peach-50 .text-fg-brand,
+[data-theme='light'] .bg-peach-50.text-fg-brand {
+  color: var(--peach-800);
+}
+[data-theme='light'] .bg-surface-nav .text-fg-brand,
+[data-theme='light'] .bg-surface-nav.text-fg-brand {
+  color: var(--peach-800);
+}
+/* Dark clay-card fill is --clay-800 (lighter than the page base), so the
    dark-tuned muted tokens fall short on it: placeholder 3.23, muted 4.45.
    Lift both inside cards: clay-300 = 5.58, clay-200 = 6.38 on clay-800. */
 [data-theme='dark'] .clay-card .text-fg-placeholder {

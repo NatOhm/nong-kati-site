@@ -14,9 +14,19 @@
  *   simply not offered in the UI and its authorize route returns 503.
  */
 
+import {
+  FB_AUTHORIZE_URL,
+  FB_PROFILE_URL,
+  FB_TOKEN_URL,
+  buildFacebookAuthorizeUrl,
+  exchangeFacebookCodeForProfile,
+  fbAppId,
+  fbAppSecret,
+} from './oauthFacebook';
+
 // ─── Provider configuration ─────────────────────────────
 
-export type OAuthProvider = 'google' | 'line';
+export type OAuthProvider = 'google' | 'line' | 'facebook';
 
 export interface OAuthProviderConfig {
   authorizeUrl: string;
@@ -46,6 +56,17 @@ const PROVIDERS: Record<OAuthProvider, OAuthProviderConfig> = {
     clientId: process.env['LINE_CHANNEL_ID'] ?? process.env['LINE_CLIENT_ID'],
     clientSecret: process.env['LINE_CHANNEL_SECRET'] ?? process.env['LINE_CLIENT_SECRET'],
   },
+  // Facebook token exchange is query-string GET (not form POST) and the
+  // profile comes from Graph /me — the provider-specific branches below
+  // delegate to lib/oauthFacebook.ts.
+  facebook: {
+    authorizeUrl: FB_AUTHORIZE_URL,
+    tokenUrl: FB_TOKEN_URL,
+    userinfoUrl: FB_PROFILE_URL,
+    scope: 'email',
+    clientId: fbAppId(),
+    clientSecret: fbAppSecret(),
+  },
 };
 
 export function isProviderConfigured(provider: OAuthProvider): boolean {
@@ -58,7 +79,7 @@ export function getProviderConfig(provider: OAuthProvider): OAuthProviderConfig 
 }
 
 export function isOAuthProvider(value: string): value is OAuthProvider {
-  return value === 'google' || value === 'line';
+  return value === 'google' || value === 'line' || value === 'facebook';
 }
 
 // ─── URLs ───────────────────────────────────────────────
@@ -84,6 +105,13 @@ export function buildAuthorizeUrl(params: {
   state: string;
 }): string {
   const p = PROVIDERS[params.provider];
+  if (params.provider === 'facebook') {
+    return buildFacebookAuthorizeUrl({
+      req: params.req,
+      state: params.state,
+      redirectUri: redirectUri(params.req, 'facebook'),
+    });
+  }
   const url = new URL(p.authorizeUrl);
   url.searchParams.set('response_type', 'code');
   url.searchParams.set('client_id', p.clientId ?? '');
@@ -163,6 +191,14 @@ export async function exchangeCodeForProfile(params: {
 }): Promise<OAuthProfile | null> {
   const p = PROVIDERS[params.provider];
   if (!p.clientId || !p.clientSecret) return null;
+
+  // Facebook: query-string GET token exchange + Graph /me profile.
+  if (params.provider === 'facebook') {
+    return exchangeFacebookCodeForProfile({
+      code: params.code,
+      redirectUri: redirectUri(params.req, 'facebook'),
+    });
+  }
 
   const body = new URLSearchParams({
     grant_type: 'authorization_code',
