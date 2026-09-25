@@ -1,6 +1,6 @@
 'use client';
 
-import { CreditCard, QrCode, Wallet } from 'lucide-react';
+import { Banknote, QrCode, Wallet } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { formatThb } from '@/lib/pricing';
 
@@ -17,8 +17,10 @@ export interface PaymentMethodSelectorProps {
 
 /**
  * 05-components.md §5.4 — Payment Method Selector.
- * Radio group for Wallet / PromptPay vs Card selection. The wallet option
- * only renders when the customer is logged in with credit available.
+ * Radio group for Wallet / PromptPay. The wallet option only renders when
+ * the customer is logged in with credit available. Card is hidden while the
+ * real Omise gateway is not implemented (review High #2) — the PromptPay
+ * option carries the manual transfer + slip upload flow instead.
  */
 export function PaymentMethodSelector({
   selected,
@@ -90,31 +92,25 @@ export function PaymentMethodSelector({
           </div>
         </label>
 
-        {/* Card */}
-        <label
+        {/* Manual bank transfer — production path while the real Omise
+            gateway is not implemented (review High #2). Plain hint, not
+            selectable: the PromptPay option shows the store account + slip
+            upload whenever the gateway QR is unavailable. */}
+        <div
           className={cn(
-            'flex cursor-pointer items-center gap-3 rounded-md border p-3 transition-colors',
-            selected === 'card'
-              ? 'border-peach-500 bg-peach-50'
-              : 'border-line bg-surface hover:border-line-brand',
-            disabled && 'cursor-not-allowed opacity-50',
+            'flex items-center gap-3 rounded-md border border-line bg-surface p-3 opacity-60',
+            disabled && 'opacity-40',
           )}
+          aria-disabled="true"
         >
-          <input
-            type="radio"
-            name="payment-method"
-            value="card"
-            checked={selected === 'card'}
-            onChange={() => onChange('card')}
-            disabled={disabled}
-            className="h-4 w-4 text-fg-brand focus:ring-peach-500"
-          />
-          <CreditCard size={20} className="text-fg-muted" strokeWidth={1.5} />
+          <Banknote size={20} className="shrink-0 text-fg-muted" strokeWidth={1.5} />
           <div>
-            <p className="text-sm font-medium text-fg">บัตรเครดิต / เดบิต</p>
-            <p className="text-xs text-fg-placeholder">Visa, Mastercard (3DS2)</p>
+            <p className="text-sm font-medium text-fg">โอนเงินผ่านบัญชีร้าน</p>
+            <p className="text-xs text-fg-placeholder">
+              โอนแล้วอัปโหลดสลิป — เลือก “PromptPay / Thai QR” เพื่อดูบัญชีและส่งสลิป
+            </p>
           </div>
-        </label>
+        </div>
       </div>
     </div>
   );

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Clock, Construction } from 'lucide-react';
+import { ArrowLeft, Banknote, Clock, Construction } from 'lucide-react';
 
 import { PageShell } from '@/components/layout/PageShell';
 import { SiteMascot } from '@/components/ui/SiteMascot';
@@ -37,7 +37,7 @@ function friendlyOrderError(err: unknown): string {
       return 'สร้างรายการชำระเงินไม่สำเร็จ กรุณาลองอีกครั้ง';
     case 'PAYMENT_UNAVAILABLE':
     case 'SERVICE_UNAVAILABLE':
-      return 'ระบบชำระเงินผ่าน QR ยังไม่พร้อมใช้งาน — กรุณาโอนเงินแล้วส่งสลิปให้แอดมินยืนยัน หรือใช้เครดิตในกระเป๋า';
+      return 'ระบบ QR ยังไม่พร้อมใช้งาน — กรุณาใช้ช่องทางโอนเงินแล้วส่งสลิป หรือใช้เครดิตในกระเป๋า';
     default:
       return 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง หากยังมีปัญหาติดต่อฝ่ายสนับสนุน';
   }
@@ -54,9 +54,11 @@ const COUPON_ERRORS: Record<string, string> = {
 };
 
 /**
- * Checkout page — 2-step flow with real payment initiation.
+ * Checkout page — 2-step flow.
  * Step 1: Contact Info → creates order (pending_payment)
- * Step 2: Payment — PromptPay QR or Card placeholder
+ * Step 2: Payment — manual bank transfer + slip upload (the production path
+ * while the real Omise gateway is unimplemented — review High #2),
+ * PromptPay QR when the gateway is available, or wallet credit.
  */
 export default function CheckoutPage(): React.JSX.Element {
   const { cart, isLoaded, itemCount, clearCart } = useCart();
@@ -76,6 +78,13 @@ export default function CheckoutPage(): React.JSX.Element {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [slipEnabled, setSlipEnabled] = useState(false);
+  const [manualInfo, setManualInfo] = useState<{
+    enabled: boolean;
+    accountName: string | null;
+    accountNumber: string | null;
+    accountType: 'promptpay' | 'bank';
+    bankName: string | null;
+  } | null>(null);
   const [couponInput, setCouponInput] = useState('');
   const [couponApplied, setCouponApplied] = useState<{ code: string; discountThb: number } | null>(
     null,
@@ -121,6 +130,30 @@ export default function CheckoutPage(): React.JSX.Element {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  // Manual transfer instructions (admin-configured) — the fallback payment
+  // path shown while the real Omise gateway is not implemented.
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/v1/payments/manual-info')
+      .then((r) => (r.ok ? r.json() : null))
+      .then(
+        (
+          d: {
+            enabled: boolean;
+            accountName: string | null;
+            accountNumber: string | null;
+            accountType: 'promptpay' | 'bank';
+            bankName: string | null;
+          } | null,
+        ) => {
+          if (!cancelled) setManualInfo(d && d.enabled ? d : null);
+        },
+      )
+      .catch(() => {
+        if (!cancelled) setManualInfo(null);
+      });
   }, []);
 
   // Validate + stage a coupon code (server check; applied on order create).
@@ -179,9 +212,6 @@ export default function CheckoutPage(): React.JSX.Element {
         setSlipUploadToken(result.slipUploadToken ?? null);
         setCompletedSteps([1]);
         setStep(2);
-
-        // Auto-initiate payment
-        await handleInitiatePayment(result.order.id);
       } catch (err) {
         setError(friendlyOrderError(err));
       } finally {
@@ -416,8 +446,8 @@ export default function CheckoutPage(): React.JSX.Element {
                 <div className="mt-6">
                   <div className="rounded-md border border-line-brand bg-peach-50 p-4">
                     <p className="text-sm text-fg-brand">
-                      ยอดชำระ {formatThb(order?.totalAmountThb ?? 0)} จะถูกหักจากเครดิต
-                      ({formatThb(walletBalanceThb ?? 0)}) ทันที — โค้ดส่งถึงหน้าถัดไปเลย
+                      ยอดชำระ {formatThb(order?.totalAmountThb ?? 0)} จะถูกหักจากเครดิต (
+                      {formatThb(walletBalanceThb ?? 0)}) ทันที — โค้ดส่งถึงหน้าถัดไปเลย
                     </p>
                     {walletMsg && (
                       <p className="mt-2 rounded-md border border-coral-300 bg-coral-50 px-3 py-2 text-xs text-coral-700">
@@ -432,6 +462,61 @@ export default function CheckoutPage(): React.JSX.Element {
                       {walletBusy ? 'กำลังตัดเครดิต...' : 'ยืนยันชำระด้วยเครดิต'}
                     </button>
                   </div>
+                </div>
+              )}
+
+              {/* Manual transfer — production path while the real Omise
+                  gateway is not implemented (review High #2): the customer
+                  transfers to the store account and uploads the slip; the
+                  admin (or SlipOK) confirms. */}
+              {paymentMethod === 'promptpay' && !paymentState?.qrImageUrl && manualInfo && (
+                <div className="mt-6 space-y-4">
+                  <div className="rounded-md border border-line-brand bg-peach-50 p-4">
+                    <div className="flex items-start gap-3">
+                      <Banknote size={20} className="mt-0.5 shrink-0 text-fg-brand" />
+                      <div className="text-sm">
+                        <p className="font-semibold text-fg">
+                          {manualInfo.accountType === 'bank'
+                            ? 'โอนเงินผ่านธนาคาร'
+                            : 'โอนเงินผ่านพร้อมเพย์'}
+                        </p>
+                        <p className="mt-1 text-fg-muted">
+                          โอนยอด <strong>{formatThb(order?.totalAmountThb ?? 0)}</strong>{' '}
+                          ไปยังบัญชีด้านล่าง แล้วอัปโหลดสลิปเพื่อยืนยันการชำระเงิน
+                        </p>
+                        <dl className="mt-3 space-y-1">
+                          <div className="flex gap-2">
+                            <dt className="text-fg-muted">ชื่อบัญชี:</dt>
+                            <dd className="font-medium text-fg">{manualInfo.accountName}</dd>
+                          </div>
+                          <div className="flex gap-2">
+                            <dt className="text-fg-muted">
+                              {manualInfo.accountType === 'bank'
+                                ? 'เลขบัญชี:'
+                                : 'เบอร์พร้อมเพย์ / เลขบัตร:'}
+                            </dt>
+                            <dd className="font-mono font-medium text-fg">
+                              {manualInfo.accountNumber}
+                            </dd>
+                          </div>
+                          {manualInfo.accountType === 'bank' && manualInfo.bankName && (
+                            <div className="flex gap-2">
+                              <dt className="text-fg-muted">ธนาคาร:</dt>
+                              <dd className="font-medium text-fg">{manualInfo.bankName}</dd>
+                            </div>
+                          )}
+                        </dl>
+                      </div>
+                    </div>
+                  </div>
+
+                  {order && paymentState?.status !== 'succeeded' && (
+                    <SlipUploadPanel
+                      orderId={order.id}
+                      slipUploadToken={slipUploadToken}
+                      slipVerifyEnabled={slipEnabled}
+                    />
+                  )}
                 </div>
               )}
 

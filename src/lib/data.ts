@@ -682,6 +682,48 @@ export async function getAnnouncement(): Promise<AnnouncementContent> {
   }
 }
 
+export interface ManualTransferInfo {
+  enabled: boolean;
+  /** Name on the receiving account — shown as-is. */
+  accountName: string | null;
+  accountNumber: string | null;
+  /** 'promptpay' | 'bank' — controls the icon/label in checkout. */
+  accountType: 'promptpay' | 'bank';
+  bankName: string | null;
+}
+
+/**
+ * Manual bank-transfer instructions shown in checkout when the real Omise
+ * gateway is not implemented yet (customers transfer and upload a slip;
+ * the admin confirms). Read from the SiteSetting key 'manual-transfer'
+ * (admin-editable via /api/v1/admin/settings/manual-transfer); unset or
+ * malformed rows render nothing rather than breaking checkout.
+ */
+export async function getManualTransferInfo(): Promise<ManualTransferInfo> {
+  const empty: ManualTransferInfo = {
+    enabled: false,
+    accountName: null,
+    accountNumber: null,
+    accountType: 'promptpay',
+    bankName: null,
+  };
+  try {
+    const row = await prisma.siteSetting.findUnique({ where: { key: 'manual-transfer' } });
+    if (!row) return empty;
+    const parsed = JSON.parse(row.value) as Partial<ManualTransferInfo>;
+    const type = parsed.accountType === 'bank' ? 'bank' : 'promptpay';
+    return {
+      enabled: parsed.enabled === true,
+      accountName: typeof parsed.accountName === 'string' ? parsed.accountName : null,
+      accountNumber: typeof parsed.accountNumber === 'string' ? parsed.accountNumber : null,
+      accountType: type,
+      bankName: typeof parsed.bankName === 'string' ? parsed.bankName : null,
+    };
+  } catch {
+    return empty;
+  }
+}
+
 // ─── Storefront stats (homepage StatsCounter) ───────────
 
 export interface StorefrontStats {

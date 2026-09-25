@@ -9,6 +9,7 @@ import {
   Bell,
   Megaphone,
   Palette,
+  Banknote,
   Save,
   Eye,
   EyeOff,
@@ -152,7 +153,12 @@ export default function AdminSettingsPage(): React.JSX.Element {
             {activeTab === 'banner' && <BannerSettings />}
             {activeTab === 'appearance' && <AppearanceSettings registerSaver={registerSaver} />}
             {activeTab === 'store' && <StoreSettings registerSaver={registerSaver} />}
-            {activeTab === 'payment' && <PaymentSettings />}
+            {activeTab === 'payment' && (
+              <>
+                <ManualTransferSettings />
+                <PaymentSettings />
+              </>
+            )}
             {activeTab === 'email' && <EmailSettings />}
             {activeTab === 'security' && <SecuritySettings />}
             {activeTab === 'notifications' && (
@@ -358,7 +364,11 @@ function AppearanceSettings({
     adminFetch('/api/v1/admin/settings/appearance')
       .then(async (r) => {
         if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? `HTTP ${r.status}`);
-        return r.json() as Promise<{ accent?: string | null; speed?: string; mascotUrl?: string | null }>;
+        return r.json() as Promise<{
+          accent?: string | null;
+          speed?: string;
+          mascotUrl?: string | null;
+        }>;
       })
       .then((data) => {
         if (cancelled) return;
@@ -837,6 +847,201 @@ function StoreSettings({
 }
 
 // ─── Payment Settings ─────────────────────────────────────
+interface ManualTransferForm {
+  enabled: boolean;
+  accountType: 'promptpay' | 'bank';
+  accountName: string;
+  accountNumber: string;
+  bankName: string;
+}
+
+/**
+ * Manual transfer instructions shown in checkout while the real Omise
+ * gateway is not implemented (review High #2). Persisted via
+ * /api/v1/admin/settings/manual-transfer (SiteSetting 'manual-transfer').
+ */
+function ManualTransferSettings(): React.JSX.Element {
+  const [form, setForm] = useState<ManualTransferForm>({
+    enabled: false,
+    accountType: 'promptpay',
+    accountName: '',
+    accountNumber: '',
+    bankName: '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    adminFetch('/api/v1/admin/settings/manual-transfer')
+      .then(async (r) => {
+        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? `HTTP ${r.status}`);
+        return r.json() as Promise<Partial<ManualTransferForm>>;
+      })
+      .then((data) => {
+        if (cancelled) return;
+        setForm((f) => ({
+          ...f,
+          enabled: data.enabled ?? f.enabled,
+          accountType: data.accountType === 'bank' ? 'bank' : f.accountType,
+          accountName: data.accountName ?? f.accountName,
+          accountNumber: data.accountNumber ?? f.accountNumber,
+          bankName: data.bankName ?? f.bankName,
+        }));
+      })
+      .catch((e: Error) => {
+        if (!cancelled) setError(e.message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function set<K extends keyof ManualTransferForm>(field: K, value: ManualTransferForm[K]): void {
+    setForm((f) => ({ ...f, [field]: value }));
+  }
+
+  async function saveToApi(): Promise<void> {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await adminFetch('/api/v1/admin/settings/manual-transfer', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enabled: form.enabled,
+          accountType: form.accountType,
+          accountName: form.accountName,
+          accountNumber: form.accountNumber,
+          bankName: form.bankName,
+        }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error ?? `HTTP ${res.status}`);
+      }
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Section
+      title="โอนเงินแมนนวล"
+      subtitle="บัญชีที่ลูกค้าใช้โอนเงินในหน้าชำระเงิน — เปิดใช้งานเพื่อแสดงบัญชีและช่องอัปโหลดสลิป"
+    >
+      <div className="rounded-lg border border-line-subtle bg-surface p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-jade-500/15 text-jade-700">
+              <Banknote size={20} />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-fg">โอนเงินแล้วส่งสลิป</p>
+              <p className="text-xs text-fg-placeholder">
+                ลูกค้าเห็นเลขบัญชีในขั้นตอนชำระเงิน โอนแล้วอัปโหลดสลิปให้แอดมินยืนยัน
+              </p>
+            </div>
+          </div>
+          <ToggleSwitch enabled={form.enabled} onChange={(v) => set('enabled', v)} />
+        </div>
+
+        {form.enabled && (
+          <div className="mt-4 space-y-3">
+            <Field label="ประเภทบัญชี">
+              <div className="flex gap-2" role="radiogroup" aria-label="ประเภทบัญชี">
+                {(
+                  [
+                    { value: 'promptpay', label: 'พร้อมเพย์' },
+                    { value: 'bank', label: 'เลขบัญชีธนาคาร' },
+                  ] as const
+                ).map((opt) => (
+                  <label
+                    key={opt.value}
+                    className={cn(
+                      'flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors',
+                      form.accountType === opt.value
+                        ? 'border-peach-500 bg-peach-50 text-fg'
+                        : 'border-line bg-surface text-fg-muted hover:border-line-brand',
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="manual-transfer-type"
+                      value={opt.value}
+                      checked={form.accountType === opt.value}
+                      onChange={() => set('accountType', opt.value)}
+                      className="h-4 w-4 text-fg-brand focus:ring-peach-500"
+                    />
+                    {opt.label}
+                  </label>
+                ))}
+              </div>
+            </Field>
+            <Field label="ชื่อบัญชี">
+              <input
+                value={form.accountName}
+                onChange={(e) => set('accountName', e.target.value)}
+                placeholder="ชื่อ-นามสกุล เจ้าของบัญชี"
+                className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+              />
+            </Field>
+            <Field
+              label={
+                form.accountType === 'bank' ? 'เลขบัญชีธนาคาร' : 'เบอร์พร้อมเพย์ / เลขบัตรประชาชน'
+              }
+            >
+              <input
+                value={form.accountNumber}
+                onChange={(e) => set('accountNumber', e.target.value)}
+                placeholder={form.accountType === 'bank' ? '000-0-00000-0' : '0800000000'}
+                inputMode="numeric"
+                className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 font-mono text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+              />
+            </Field>
+            {form.accountType === 'bank' && (
+              <Field label="ชื่อธนาคาร">
+                <input
+                  value={form.bankName}
+                  onChange={(e) => set('bankName', e.target.value)}
+                  placeholder="เช่น ธนาคารกสิกรไทย"
+                  className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:outline-none focus:ring-2 focus:ring-peach-500"
+                />
+              </Field>
+            )}
+            <div className="rounded-md bg-surface p-3 text-xs text-fg-placeholder">
+              ข้อมูลนี้จะแสดงในขั้นตอนชำระเงินของลูกค้า (ช่อง “PromptPay / Thai QR”)
+              พร้อมปุ่มอัปโหลดสลิป
+            </div>
+          </div>
+        )}
+      </div>
+
+      {error && (
+        <div className="mt-3 flex items-center gap-2 rounded-lg border border-coral-300 bg-coral-50 px-4 py-3 text-sm text-coral-700">
+          <AlertTriangle size={16} /> {error}
+        </div>
+      )}
+      <div className="mt-4 flex justify-end">
+        <button
+          onClick={() => void saveToApi()}
+          disabled={saving}
+          className="flex items-center gap-2 rounded-lg bg-peach-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-peach-400 disabled:opacity-50"
+        >
+          {saved ? <CheckCircle2 size={14} /> : <Save size={14} />}
+          {saving ? 'กำลังบันทึก…' : saved ? 'บันทึกแล้ว!' : 'บันทึกข้อมูลโอนเงิน'}
+        </button>
+      </div>
+    </Section>
+  );
+}
+
+// ─── Payment Gateway Settings (mock UI — ยังไม่เชื่อม API จริง) ──────────
 function PaymentSettings(): React.JSX.Element {
   const [promptpayEnabled, setPromptpayEnabled] = useState(true);
   const [promptpayId, setPromptpayId] = useState('0123456789012');

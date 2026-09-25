@@ -5,7 +5,7 @@ import { checkPermission } from '@/lib/rbac';
 
 export const dynamic = 'force-dynamic';
 
-const VALID_KEYS = new Set(['appearance', 'store-info', 'notifications']);
+const VALID_KEYS = new Set(['appearance', 'store-info', 'notifications', 'manual-transfer']);
 
 function bearer(req: NextRequest): string | null {
   const header = req.headers.get('authorization');
@@ -105,10 +105,7 @@ export async function PUT(
         : typeof b['mascotUrl'] === 'string'
           ? b['mascotUrl']
           : currentObj['mascotUrl'];
-    if (
-      typeof mascotUrl === 'string' &&
-      !/^\/api\/v1\/images\/[0-9a-z-]+$/i.test(mascotUrl)
-    ) {
+    if (typeof mascotUrl === 'string' && !/^\/api\/v1\/images\/[0-9a-z-]+$/i.test(mascotUrl)) {
       return NextResponse.json({ error: 'INVALID_MASCOT_URL' }, { status: 400 });
     }
     next = {};
@@ -137,6 +134,31 @@ export async function PUT(
         return NextResponse.json({ error: 'INVALID_THRESHOLD' }, { status: 400 });
       }
       next['lowStockThreshold'] = t;
+    }
+  } else if (key === 'manual-transfer') {
+    // Manual transfer instructions shown in checkout while the real Omise
+    // gateway is not implemented (review High #2). Null clears a field.
+    next = {};
+    if (typeof b['enabled'] === 'boolean') next['enabled'] = b['enabled'];
+    if (b['accountType'] === 'promptpay' || b['accountType'] === 'bank') {
+      next['accountType'] = b['accountType'];
+    }
+    for (const field of ['accountName', 'bankName'] as const) {
+      if (b[field] === null) {
+        next[field] = null;
+      } else if (typeof b[field] === 'string') {
+        const v = (b[field] as string).trim().slice(0, 120);
+        next[field] = v === '' ? null : v;
+      }
+    }
+    if (b['accountNumber'] === null) {
+      next['accountNumber'] = null;
+    } else if (typeof b['accountNumber'] === 'string') {
+      const v = (b['accountNumber'] as string).trim();
+      if (v !== '' && !/^[0-9][0-9 \-]{5,29}$/.test(v)) {
+        return NextResponse.json({ error: 'INVALID_ACCOUNT_NUMBER' }, { status: 400 });
+      }
+      next['accountNumber'] = v === '' ? null : v;
     }
   } else {
     // store-info: whitelist string fields.
