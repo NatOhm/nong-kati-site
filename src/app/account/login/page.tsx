@@ -275,10 +275,11 @@ export default function LoginPage(): React.JSX.Element {
                 <label htmlFor="login-password" className="block text-sm text-fg-muted">
                   รหัสผ่าน
                 </label>
-                {/* audit #9: no password reset exists yet — route users to the
-                    passwordless email-link flow, which lands in the same place. */}
+                {/* Real password recovery: single-use reset link →
+                    /account/reset-password sets the new password and
+                    revokes pre-reset sessions. */}
                 <a
-                  href={`/account/magic-link?next=${encodeURIComponent(safeNext(searchParams.get('next')))}`}
+                  href={`/account/forgot-password?next=${encodeURIComponent(safeNext(searchParams.get('next')))}`}
                   className="text-sm text-fg-brand underline hover:no-underline"
                 >
                   ลืมรหัสผ่าน?

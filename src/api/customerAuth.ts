@@ -279,12 +279,23 @@ export async function loginOrCreateCustomerViaOAuth(params: {
 export async function getCustomerFromToken(token: string) {
   try {
     const { verifyJwt } = await import('@/lib/jwt');
-    const payload = await verifyJwt<{ sub: string; typ: string }>(token);
+    const payload = await verifyJwt<{ sub: string; typ: string; iat?: number }>(token);
     if (!payload || payload.typ !== 'customer') return null;
     const customer = await prisma.customer.findUnique({
       where: { id: payload.sub },
     });
     if (!customer || customer.status === 'blocked') return null;
+    // Password reset revocation: JWTs minted before the reset instant stop
+    // resolving (the 5s slack matches the minted-in-the-same-second grace
+    // applied when the marker was written). Fresh logins always carry a
+    // later iat, so only pre-reset sessions are affected.
+    if (
+      customer.sessionsInvalidBefore &&
+      typeof payload.iat === 'number' &&
+      payload.iat * 1000 < customer.sessionsInvalidBefore.getTime() + 5000
+    ) {
+      return null;
+    }
     return customer;
   } catch {
     return null;
