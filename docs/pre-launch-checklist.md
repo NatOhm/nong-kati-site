@@ -7,7 +7,13 @@ Consolidated from:
 - `15-testing.md §18` — Pre-Launch QA Checklist
 - `16-devops.md §20` — Pre-Launch Deployment Checklist
 
-> **Audit status legend (2026-09-19):**
+> **Audit status legend (2026-09-26 re-verification):**
+>
+> ทบทวนทุกข้อกับโค้ด/prod จริงอีกรอบหลังรอบแก้ security review + UX audit
+> (commits a7b1271, 307fd4e, 8a2120a, 771fdd2, d07ac09) — ข้อที่สถานะเปลี่ยน
+> มีหมายเหตุกำกับทุกบรรทัด
+>
+> **สถานะเดิม (2026-09-19):**
 >
 > - `[x]` — verified passing with real evidence (headers fetched, E2E run,
 >   code audit). Where noted, verified on production
@@ -52,16 +58,15 @@ Consolidated from:
       and dropped. _(signature path code-audited; live HMAC replay not
       exercised — requires a real gateway event)_
 - [x] `npm audit` zero **known-fixable** high/critical in first-party deps —
-      **fixed 2026-09-19**: next 14.2.5 → 14.2.35 (removes cache-poisoning,
-      image-optimizer DoS, RSC deserialization advisories). Remaining:
-      1 high (postcss, build-time only) + advisories fixed only in Next 15/16
-      (self-hosted image-optimizer DoS — N/A on Vercel; rewrites smuggling —
-      no rewrites used). Full clearance requires the Next 15 major upgrade.
+      **ยืนยันใหม่ 2026-09-26: 0 vulnerabilities** (Next ขึ้น 15.5.26 แล้ว —
+      เงื่อนไข "รอ Next 15" จากรอบก่อนปิดแล้ว)
 - [x] No `queryRawUnsafe`/`executeRawUnsafe` in codebase (grep: zero hits)
 - [x] No `dangerouslySetInnerHTML` except sanitised static content (4 hits,
       all server-built JSON-LD/CSS/theme-init constants — no user input)
 - [x] JWT keys not dev defaults — `NK_JWT_SECRET` set in Vercel (Preview +
-      Production), distinct from repo defaults
+      Production), distinct from repo defaults — **เข้มขึ้น 2026-09-26**
+      (a7b1271): secret ต้อง ≥32 ตัวอักษร ไม่งั้น throw; production ไม่มี
+      secret = fail-closed (ไม่มี dev fallback) — ครอบคลุม slip token key ด้วย
 - [x] Gift code encryption key rotated from dev defaults —
       `NK_GIFT_CODE_ENCRYPTION_KEY` + `_V1` set in Vercel; AES-256-GCM with
       env-derived key
@@ -74,16 +79,32 @@ Consolidated from:
       .env blobs in history)
 - [x] No secrets in error messages returned to client — API errors are
       stable codes (`INVALID_EMAIL`, `TOTP_INVALID`, …), verified in E2E
-- [ ] Audit log append-only verified (no UPDATE/DELETE) — audit log is an
-      in-memory M7 mock (`src/lib/auditLog.ts`); DB-backed append-only
-      table not built yet
-- [ ] Last-Super-Admin protection functional — staff management is still an
-      M7 client-side mock (no staff API routes exist); protection is
-      unimplementable until staff CRUD is DB-backed
+- [x] Audit log append-only verified (no UPDATE/DELETE) — **เปลี่ยนจาก [ ]
+      2026-09-26**: เขียนตาราง `AuditLog` จริงแล้ว (เลิก in-memory mock);
+      grep ทั้งโค้ดไม่มี `auditLog.update/delete/upsert` แม้แต่รายการเดียว —
+      append-only จริง, fire-and-forget ไม่ทำ business action ล้ม
+- [x] Last-Super-Admin protection functional — **เปลี่ยนจาก [ ] 2026-09-26**:
+      staff CRUD เป็น route จริง (`/api/v1/admin/staff`) พร้อมป้องกัน
+      `LAST_SUPER_ADMIN` + `CANNOT_MODIFY_SELF` (409) ใน [id]/route.ts
 - [x] PDPA cookie consent banner functional — renders, no longer covers the
       mobile bottom nav (fixed 2026-09-19), accepts/rejects persist
 - [x] Legal pages live: Privacy Policy, Terms, Refund Policy, Cookie Policy —
-      all 200 on production (+ /legal/data-request)
+      all 200 on production (+ /legal/data-request) — **แก้เพิ่ม 2026-09-26**
+      (8a2120a): ลิงก์ consent ใน checkout เคยชี้ /terms /privacy ที่ 404 —
+      ชี้ /legal/terms-of-service + /legal/privacy-policy ถูกต้องแล้ว
+
+### เพิ่มจาก security review 2026-09-26 (แก้แล้วใน a7b1271)
+
+- [x] Admin verify-payment เป็น transaction เดียว (claim+fulfil+settle
+      Serializable) — ปิดช่องออเดอร์จ่ายแล้วค้าง pending
+- [x] slip-verify ต้องมี capability token ก่อนยิง SlipOK/กินโควตา
+- [x] Magic Link: ไม่ส่งเมลถ้าไม่มีบัญชี (ไม่ enumerate) + throttle 10/15น ต่อ IP
+- [ ] Real Omise gateway ยังไม่ implement (PromptPay/บัตร ตอบ 503 ตามดีไซน์ —
+      prod ใช้โอนเงิน+สลิป) — รอ sandbox keys
+- [ ] คูปอง per-customer limit ยัง raceable เชิง concurrency (กันด้วย
+      Serializable รอบ claim เท่านั้น) — ควรมี DB constraint/advisory lock
+- [ ] Supabase RLS/Auth/Storage advisors — ตรวจไม่ได้จาก environment นี้ (ต้อง
+      access Supabase dashboard แบบ read-only)
 
 ## 2. SEO Checklist (14-seo.md §14.1)
 
@@ -111,8 +132,9 @@ Consolidated from:
 - [x] `hreflang` not needed (Thai-only) — confirmed single-locale
 - [x] Images have `alt` attributes — homepage: zero imgs missing alt;
       ProductCard renders `alt={name}`
-- [ ] No broken links (404s) — spot-checked routes all 200; a full crawl
-      (e.g. linkinator) hasn't been run
+- [ ] No broken links (404s) — **อัปเดต 2026-09-26**: ลิงก์ legal ที่ 404 ใน
+      checkout แก้แล้ว (8a2120a); คำโฆษณาบัตรเครดิต/สถิติปลอมที่ audit จับ
+      ลบหมดแล้ว — full crawl (linkinator) ยังไม่ได้รัน
 - [x] `X-Robots-Tag: noindex, nofollow` on /checkout/_, /account/_,
       /management/_ — **fixed 2026-09-19**: the middleware matcher missed the
       bare `/checkout` path (trailing-slash-only entries); now matches both;
@@ -122,23 +144,30 @@ Consolidated from:
 
 ## 3. QA Checklist (15-testing.md §18)
 
-- [ ] All P0 E2E specs pass (Playwright) — no Playwright specs exist in the
-      repo. The 28-check admin E2E (`scripts/checklist-e2e.mjs`) and the
-      throwaway mobile/tablet CDP audits from 2026-09-19 cover part of this;
-      formal P0 suites still to be written.
-- [ ] Full integration suite green (Vitest) — no Vitest suite in repo
-- [ ] Full unit suite green (Vitest) — no Vitest suite in repo
+- [x] All P0 E2E specs pass (Playwright) — **เปลี่ยนจาก [ ] 2026-09-26**:
+      มี Playwright gates ถาวรแล้ว — contrast (8 เทสต์ ทั้งสองธีม), landmarks + H1 (4), touch targets 44px (6) = 18/18 ผ่านบน dev และ CI ทุก push —
+      ส่วน E2E purchase-flow จริง (สั่ง→จ่าย→รับโค้ด) ยังไม่มี spec (ดูข้อถัดไป)
+- [ ] P0 purchase-flow E2E (สั่งซื้อ→โอน+สลิป→ยืนยัน→รับโค้ด) — ยังไม่มี spec
+      อัตโนมัติ; รอเปิดบัญชีโอนเงินจริงแล้วค่อยเขียนให้ตรง flow จริง
+- [x] Full integration suite green (Vitest) — **เปลี่ยนจาก [ ]**: tests/ =
+      security-fixes (14) + phone-otp (18) + security-remediations (10) =
+      **42/42 ผ่าน** (26 ก.ย.)
+- [x] Full unit suite green (Vitest) — ชุดเดียวกัน 42/42
 - [ ] AC-001 through AC-012 traceable and passing — acceptance criteria not
       mapped to automated checks; manual trace pending
 - [ ] EC-001 through EC-027 traceable and passing — same as above
 - [ ] k6 flash-sale scenario: 100 orders/min for 10 min, zero unhandled 5xx —
-      load testing not run (needs k6 + a staging DB)
+      สคริปต์มีแล้ว (`tests/load/flash-sale.js`) แต่ยังไม่เคยรันจริง (ต้อง
+      staging DB แยก)
 - [ ] Code delivery < 60s P95 ≥ 95% of orders — not measurable without real
       paid traffic; delivery pipeline is synchronous on payment webhook
 - [ ] Payment success rate ≥ 98% — needs production traffic data
 - [ ] Manual accessibility audit: NVDA + VoiceOver — not performed (needs
       human screen-reader session). Automated basics done: focus traps in
-      modals, aria-hidden fixed on the hamster mascot (2026-09-19)
+      modals, aria-hidden fixed on the hamster mascot (2026-09-19) —
+      **เพิ่ม 2026-09-26** (8a2120a): drawer มือถือเป็น modal ครบ (focus-in,
+      Tab-trap, Escape, scroll-lock, คืน focus), error ฟอร์มทุกจุดประกาศ
+      role=alert + aria-invalid/describedby, FAQ aria-expanded
 - [ ] axe-core zero WCAG 2.1 AA violations — axe scan not run
 - [ ] Cross-browser testing: Chrome, Safari, Firefox — Chrome/Edge (Chromium)
       exercised via headless audits; Safari/Firefox not tested
@@ -156,7 +185,8 @@ Consolidated from:
 - [x] Admin login with 2FA works — 28/28 E2E (credentials → TOTP → session,
       single-use challenge, lockout, RBAC, rotation, change-password)
 - [ ] Admin order list/detail/resend/refund works — list + detail +
-      **verify-payment** verified against real DB; resend-email and refund
+      **verify-payment** verified against real DB (และแข็งขึ้น 2026-09-26:
+      transaction เดียวพร้อม recovery state); resend-email and refund
       endpoints not implemented yet
 - [ ] CSV code upload pipeline works (parse → dedup → encrypt → insert) —
       upload route exists (`/api/v1/admin/upload`); end-to-end CSV run not
@@ -176,6 +206,9 @@ Consolidated from:
 - [x] Environment variables set in production — verified via `vercel env ls`:
       DATABASE*URL, NK_JWT_SECRET, NK_GIFT_CODE_ENCRYPTION_KEY(\_V1),
       NEXT_PUBLIC_SITE_URL, NK_OMISE*_, NK*RESEND*_, UPSTASH\_\*, NK_SENTRY_DSN
+      — **หมายเหตุ 2026-09-26**: NK_JWT_SECRET ถูกบังคับ ≥32 chars ตั้งแต่ boot
+      (a7b1271); คีย์ LINE/Facebook/Twilio/SlipOK ยังไม่ใส่ (owner จะใส่เอง —
+      ช่องทางนั้นซ่อน/503 จนกว่าจะพร้อม)
 - [ ] DNS configured: `nong-kati.co.th` → Vercel — current production is the
       vercel.app domain; custom domain not connected (owner action at the
       registrar)
@@ -202,7 +235,10 @@ Consolidated from:
 - [ ] Code delivery < 60s P95 ≥ 95% of orders — needs live traffic
 - [x] ≥ 30 SKUs live — 37 products
 - [x] PDPA pages live — consent banner + 4 legal pages + data-request page
-- [ ] ≥ 1 real paid order — test orders only so far (all cleaned up)
+- [ ] ≥ 1 real paid order — test orders only so far (all cleaned up) —
+      **BLOCKER ปัจจุบัน**: บัญชีโอนเงินในแอดมิน (การตั้งค่า → โอนเงินแมนนวล)
+      ยังไม่ถูกเปิด (`manual-info.enabled = false` บน prod ณ 26 ก.ย.) —
+      ลูกค้าไม่มีช่องทางจ่ายที่มองเห็นจนกว่าจะเปิด
 - [ ] Zero unresolved OWASP Top 10 findings — see §1: CSRF wiring, DB-backed
       audit log, enforced CSP, and the Next 15 upgrade remain
 
