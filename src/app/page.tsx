@@ -81,9 +81,11 @@ export default async function HomePage(): Promise<React.JSX.Element> {
         {/* Announcement board — the headline framed as a notice board (client ask) */}
         <section className="px-4 pt-8 md:px-8">
           <div className="mx-auto max-w-3xl rounded-2xl border-2 border-dashed border-peach-300 bg-peach-50 px-6 py-5 text-center shadow-clay-sm dark:border-peach-700/60 dark:bg-peach-900/20">
-            <p className="font-display text-xl font-bold leading-snug text-fg-brand-strong sm:text-2xl">
+            {/* Site-wide h1 (landmark spec): the notice-board headline is the
+                page's main heading — p→h1 keeps the identical clay styling. */}
+            <h1 className="font-display text-xl font-bold leading-snug text-fg-brand-strong sm:text-2xl">
               📢 โค้ดเกม สตรีมมิ่ง และอีคอมเมิร์ซ ส่งถึงอีเมลใน 60 วินาที
-            </p>
+            </h1>
             {/* clay-700 lands exactly 4.50 on the peach-50 card — use clay-800
                 for headroom (7.11). Dark keeps the muted token. */}
             <p className="mt-1.5 text-sm text-clay-800 dark:text-fg-muted">
@@ -112,7 +114,9 @@ export default async function HomePage(): Promise<React.JSX.Element> {
                   key={item.step}
                   className="clay-card flex items-center gap-4 rounded-xl p-4 transition-transform duration-fast ease-out-quart hover:-translate-y-0.5"
                 >
-                  <span className="text-2xl font-bold text-peach-700 dark:text-peach-200">{item.step}</span>
+                  <span className="text-2xl font-bold text-peach-700 dark:text-peach-200">
+                    {item.step}
+                  </span>
                   <div>
                     <h3 className="text-sm font-semibold text-fg">{item.title}</h3>
                     <p className="text-xs text-fg-muted">{item.desc}</p>

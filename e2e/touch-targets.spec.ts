@@ -1,0 +1,111 @@
+import { test, expect } from '@playwright/test';
+
+import { setTheme } from './helpers';
+
+/**
+ * 44px minimum touch targets (WCAG 2.5.8 AAA / Apple HIG, audit #6).
+ * Runs at 390×844 (iPhone 14-ish) where the fixed taskbar, header cart and
+ * consent actions are the primary tap surfaces.
+ *
+ * Buttons rendered smaller than 44px are still compliant when their
+ * effective hit area reaches 44px (padding expands the target); we measure
+ * the ELEMENT box here and require ≥40px, while dedicated controls that
+ * were explicitly sized in the audit remediation (taskbar, cart, password
+ * toggle, consent actions) must be ≥44px.
+ */
+test.describe('touch targets (390×844)', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test('mobile taskbar items are ≥44px tall', async ({ page }) => {
+    await page.goto('/');
+    const taskbar = page.locator('nav.fixed.bottom-0');
+    await expect(taskbar).toBeVisible();
+    const items = taskbar.locator('a, button');
+    const count = await items.count();
+    expect(count).toBeGreaterThanOrEqual(3);
+    for (let i = 0; i < count; i++) {
+      const box = await items.nth(i).boundingBox();
+      expect(box, `taskbar item ${i} missing`).not.toBeNull();
+      expect(
+        box!.height,
+        `taskbar item ${i} ("${await items.nth(i).textContent()}") is ${box!.height}px`,
+      ).toBeGreaterThanOrEqual(44);
+    }
+  });
+
+  test('header cart button is ≥44px on mobile', async ({ page }) => {
+    await page.goto('/');
+    // Cart trigger in the top navbar (CartIcon renders a <button> with an
+    // aria-label like "ตะกร้าสินค้า (N รายการ)").
+    const cart = page.getByRole('button', { name: /ตะกร้าสินค้า/ }).first();
+    await expect(cart).toBeVisible();
+    const box = await cart.boundingBox();
+    expect(box, 'header cart button missing').not.toBeNull();
+    expect(box!.height).toBeGreaterThanOrEqual(44);
+  });
+
+  test('login password toggle is ≥44px with accessible name', async ({ page }) => {
+    await page.goto('/account/login');
+    const toggle = page.getByRole('button', { name: /แสดงรหัสผ่าน|ซ่อนรหัสผ่าน/ });
+    await expect(toggle).toHaveCount(1);
+    await expect(toggle).toHaveAttribute('aria-pressed', /^(true|false)$/);
+    const box = await toggle.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.height).toBeGreaterThanOrEqual(44);
+    expect(box!.width).toBeGreaterThanOrEqual(44);
+  });
+
+  test('login inputs have associated labels', async ({ page }) => {
+    await page.goto('/account/login');
+    for (const id of ['login-email', 'login-password']) {
+      const input = page.locator(`#${id}`);
+      await expect(input).toHaveCount(1);
+      // htmlFor association (audit #2).
+      const labelled = await page.locator(`label[for="${id}"]`).count();
+      expect(labelled, `#${id} has no <label for="${id}">`).toBe(1);
+    }
+  });
+
+  test('cookie consent actions are ≥44px when visible (mobile)', async ({ page }) => {
+    await page.goto('/');
+    // Fresh consent state so the banner renders.
+    await page.evaluate(() => localStorage.removeItem('nk_cookie_consent'));
+    await page.reload();
+    await page.waitForLoadState('domcontentloaded');
+
+    const banner = page.locator('div.fixed', { hasText: 'การใช้คุกกี้' }).first();
+    const visible = await banner.isVisible().catch(() => false);
+    test.skip(!visible, 'consent banner not rendered (already accepted or feature off)');
+
+    const buttons = banner.locator('button');
+    const count = await buttons.count();
+    expect(count).toBeGreaterThanOrEqual(2);
+    for (let i = 0; i < count; i++) {
+      const box = await buttons.nth(i).boundingBox();
+      expect(box, `consent button ${i} missing`).not.toBeNull();
+      expect(
+        box!.height,
+        `consent button ${i} ("${(await buttons.nth(i).textContent())?.trim()}") is ${box!.height}px`,
+      ).toBeGreaterThanOrEqual(44);
+    }
+
+    // Banner must not fully cover the taskbar (audit #7): they may stack,
+    // but the taskbar's top edge must remain below the banner's top edge.
+    const bannerBox = await banner.boundingBox();
+    const taskbar = page.locator('nav.fixed.bottom-0');
+    const taskbarBox = await taskbar.boundingBox();
+    expect(bannerBox!.y).toBeLessThanOrEqual(taskbarBox!.y + 2);
+  });
+
+  test('touch targets hold in both themes', async ({ page }) => {
+    await page.goto('/');
+    for (const theme of ['light', 'dark'] as const) {
+      await setTheme(page, theme);
+      const taskbar = page.locator('nav.fixed.bottom-0');
+      const first = taskbar.locator('a, button').first();
+      const box = await first.boundingBox();
+      expect(box, `${theme}: taskbar first item missing`).not.toBeNull();
+      expect(box!.height).toBeGreaterThanOrEqual(44);
+    }
+  });
+});

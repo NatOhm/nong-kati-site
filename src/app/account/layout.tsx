@@ -76,82 +76,108 @@ function AccountLayoutInner({
     router.refresh();
   };
 
-  // Auth pages (login, register) render without sidebar or guard
+  // Auth pages (login, register, magic-link) render without sidebar or
+  // guard — but still meet the landmark spec: a skip link as the first
+  // focusable element and a single <main id="main-content"> target
+  // (children provide the page heading).
   if (isPublicPage) {
-    return <>{children}</>;
+    return (
+      <>
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-peach-700 focus:px-4 focus:py-2.5 focus:text-sm focus:font-semibold focus:text-white focus:shadow-clay"
+        >
+          ข้ามไปยังเนื้อหาหลัก
+        </a>
+        <main id="main-content">{children}</main>
+      </>
+    );
   }
 
   // Private pages: block render until the session check resolves so a guest
   // never sees dashboard content flash (and crawlers/no-JS get nothing private).
   if (state !== 'authed') {
+    // Even the transient loading state owns the main landmark so the
+    // "exactly one main per page" invariant holds in every branch.
     return (
-      <div
-        className="flex min-h-[60vh] items-center justify-center"
-        role="status"
-        aria-label="กำลังตรวจสอบการเข้าสู่ระบบ"
-      >
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-peach-200 border-t-peach-500" />
-      </div>
+      <main id="main-content" className="flex min-h-[60vh] items-center justify-center">
+        <div
+          className="h-10 w-10 animate-spin rounded-full border-4 border-peach-200 border-t-peach-500"
+          role="status"
+          aria-label="กำลังตรวจสอบการเข้าสู่ระบบ"
+        />
+      </main>
     );
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
-      <div className="flex flex-col gap-6 md:flex-row">
-        {/* Sidebar */}
-        <aside className="w-full shrink-0 md:w-56">
-          <nav className="sticky top-4">
-            <ul className="space-y-1">
-              {NAV_ITEMS.map((item) => {
-                const isActive = pathname?.startsWith(item.match ?? item.href);
-                const Icon = item.icon;
+    <>
+      {/* Skip link — first focusable element (same spec as the storefront). */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-peach-700 focus:px-4 focus:py-2.5 focus:text-sm focus:font-semibold focus:text-white focus:shadow-clay"
+      >
+        ข้ามไปยังเนื้อหาหลัก
+      </a>
+      <div className="mx-auto max-w-6xl px-4 py-8">
+        <div className="flex flex-col gap-6 md:flex-row">
+          {/* Sidebar */}
+          <aside className="w-full shrink-0 md:w-56">
+            <nav className="sticky top-4">
+              <ul className="space-y-1">
+                {NAV_ITEMS.map((item) => {
+                  const isActive = pathname?.startsWith(item.match ?? item.href);
+                  const Icon = item.icon;
 
-                return (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      className={cn(
-                        'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                        isActive
-                          ? 'bg-peach-100 text-peach-800'
-                          : 'text-fg-muted hover:bg-surface hover:text-fg',
-                      )}
-                    >
-                      <Icon size={16} />
-                      {item.label}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
+                  return (
+                    <li key={item.href}>
+                      <Link
+                        href={item.href}
+                        className={cn(
+                          'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                          isActive
+                            ? 'bg-peach-100 text-peach-800'
+                            : 'text-fg-muted hover:bg-surface hover:text-fg',
+                        )}
+                      >
+                        <Icon size={16} />
+                        {item.label}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
 
-            <div className="mt-4 border-t border-line-subtle pt-4">
-              {/* Client ask: explicit back-to-storefront button on the profile. */}
-              <Link
-                href="/"
-                className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-fg-muted transition-colors hover:bg-surface hover:text-fg"
-              >
-                <Home size={16} />
-                กลับหน้าแรก
-              </Link>
-              <button
-                type="button"
-                onClick={() => {
-                  void handleLogout();
-                }}
-                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-fg-placeholder transition-colors hover:bg-surface hover:text-coral-600"
-              >
-                <LogOut size={16} />
-                ออกจากระบบ
-              </button>
-            </div>
-          </nav>
-        </aside>
+              <div className="mt-4 border-t border-line-subtle pt-4">
+                {/* Client ask: explicit back-to-storefront button on the profile. */}
+                <Link
+                  href="/"
+                  className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-fg-muted transition-colors hover:bg-surface hover:text-fg"
+                >
+                  <Home size={16} />
+                  กลับหน้าแรก
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleLogout();
+                  }}
+                  className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-fg-placeholder transition-colors hover:bg-surface hover:text-coral-600"
+                >
+                  <LogOut size={16} />
+                  ออกจากระบบ
+                </button>
+              </div>
+            </nav>
+          </aside>
 
-        {/* Main Content */}
-        <main className="flex-1">{children}</main>
+          {/* Main Content */}
+          <main id="main-content" className="flex-1">
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 

@@ -9,6 +9,10 @@ node_modules/
 # TypeScript incremental build artifact
 tsconfig.tsbuildinfo
 
+# Playwright artifacts
+test-results/
+playwright-report/
+
 # Git worktrees
 .worktrees/
 .nk-totp-qr.*
