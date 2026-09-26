@@ -189,23 +189,36 @@ export async function verifyPhoneOtp(params: {
 
   // Count EVERY verify attempt against the challenge (wrong guesses burn
   // the allowance too), then claim single-use atomically when correct.
-  const attemptCount = row.attempts + 1;
-  if (!codeMatches) {
-    await prisma.phoneOtpToken.update({
-      where: { id: row.id },
-      data: { attemptedAt: now, attempts: attemptCount },
+  // CAS-with-increment (review 2026-09-26): the where-clause pins the
+  // previously observed attempts value, so two simultaneous guesses each
+  // move the counter exactly once; the loser retries with fresh state.
+  for (;;) {
+    const bumped = await prisma.phoneOtpToken.updateMany({
+      where: { id: row.id, usedAt: null, attempts: row.attempts },
+      data: { attemptedAt: now, attempts: { increment: 1 } },
     });
-    return {
-      ok: false,
-      error: attemptCount >= MAX_ATTEMPTS ? 'TOO_MANY_ATTEMPTS' : 'INVALID_CODE',
-    };
-  }
+    if (bumped.count === 0) {
+      // Another concurrent verify won the race — reload once and re-decide.
+      const fresh = await prisma.phoneOtpToken.findUnique({ where: { id: row.id } });
+      if (!fresh || fresh.usedAt) return { ok: false, error: 'CODE_USED' };
+      if (fresh.attempts >= MAX_ATTEMPTS) return { ok: false, error: 'TOO_MANY_ATTEMPTS' };
+      return { ok: false, error: 'INVALID_CODE' };
+    }
+    const attemptCount = row.attempts + 1;
+    if (!codeMatches) {
+      return {
+        ok: false,
+        error: attemptCount >= MAX_ATTEMPTS ? 'TOO_MANY_ATTEMPTS' : 'INVALID_CODE',
+      };
+    }
 
-  const claimed = await prisma.phoneOtpToken.updateMany({
-    where: { id: row.id, usedAt: null, expiresAt: { gt: now } },
-    data: { usedAt: now, attemptedAt: now, attempts: attemptCount },
-  });
-  if (claimed.count === 0) return { ok: false, error: 'CODE_USED' };
+    const claimed = await prisma.phoneOtpToken.updateMany({
+      where: { id: row.id, usedAt: null, expiresAt: { gt: now } },
+      data: { usedAt: now },
+    });
+    if (claimed.count === 1) break;
+    return { ok: false, error: 'CODE_USED' };
+  }
 
   // Find or create the customer by phone number.
   let customer = await prisma.customer.findFirst({ where: { phoneNumber: phone } });

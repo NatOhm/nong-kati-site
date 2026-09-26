@@ -184,7 +184,7 @@ model Customer {
   // Nullable for OAuth-only accounts (Google/LINE/Facebook sign-in has no local password).
   passwordHash        String?
   fullName            String?
-  phoneNumber         String?
+  phoneNumber         String? @unique
   status              String    @default("active") // active | blocked | anonymised
   emailVerified       Boolean   @default(false)
   // Set when the customer proves control of the number via sign-in OTP.
@@ -517,6 +517,28 @@ model SiteSetting {
 }
 
 // ─── Admin Users & Sessions (08-auth.md §4) ────────────────
+/// PDPA data-subject requests (access / correction / erasure / portability /
+/// objection) — persisted so a submitted request survives restarts and is
+/// visible to pdpa:read admins in /management/pdpa.
+model DataSubjectRequest {
+  id          String    @id @default(cuid())
+  requestId   String    @unique
+  requestType String // access | correction | erasure | portability | objection
+  fullName    String
+  email       String
+  phone       String?
+  details     String?
+  status      String    @default("pending") // pending | in_progress | completed | rejected
+  adminNote   String?
+  handledById String?
+  handledAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status, createdAt])
+  @@index([email])
+}
+
 // DB-backed admin auth: scrypt password hashes, per-user lockout,
 // TOTP secrets and server-side refresh-token sessions.
 
@@ -532,6 +554,10 @@ model AdminUser {
   mustChangePassword    Boolean   @default(false)
   failedLoginAttempts   Int       @default(0)
   lockedUntil           DateTime?
+  // Separate persistent counter for step-2 TOTP failures (never touched by
+  // password failures): 5 strikes locks the account for TOTP_TOTP_LOCKOUT_MS.
+  failedTotpAttempts    Int       @default(0)
+  totpLockedUntil       DateTime?
   // Sessions issued before this instant are invalid (set by changeAdminPassword
   // so a concurrent refresh cannot mint a post-revocation session).
   sessionsInvalidBefore DateTime?

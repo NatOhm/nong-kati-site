@@ -129,6 +129,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const documentNumber =
     type === 'tax_invoice' ? `TAX-${order.orderNumber}` : `RCPT-${order.orderNumber}`;
 
+  // Seller tax identity comes from validated admin settings (review
+  // 2026-09-26: the template previously fell back to placeholder tax data).
+  // Buyer identity comes from the order's tax-invoice fields when the
+  // customer requested one.
+  const [sellerName, sellerTaxId, sellerAddress, sellerEmail] = await Promise.all([
+    prisma.siteSetting.findUnique({ where: { key: 'seller_tax_name' } }),
+    prisma.siteSetting.findUnique({ where: { key: 'seller_tax_id' } }),
+    prisma.siteSetting.findUnique({ where: { key: 'seller_tax_address' } }),
+    prisma.siteSetting.findUnique({ where: { key: 'seller_tax_email' } }),
+  ]);
+
   // Reuse the shared document generator (same HTML the PDF pipeline renders).
   const { generateReceiptPdf, generateTaxInvoicePdf } = await import('@/lib/pdf/receipt');
   const data = {
@@ -137,6 +148,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     invoiceNumber: documentNumber,
     invoiceType: type as 'receipt' | 'tax_invoice',
     customerEmail: order.customerEmail,
+    ...(order.taxInvoiceName ? { buyerName: order.taxInvoiceName } : {}),
+    ...(order.taxInvoiceTaxId ? { buyerTaxId: order.taxInvoiceTaxId } : {}),
+    ...(sellerName?.value ? { sellerName: sellerName.value } : {}),
+    ...(sellerTaxId?.value ? { sellerTaxId: sellerTaxId.value } : {}),
+    ...(sellerAddress?.value ? { sellerAddress: sellerAddress.value } : {}),
+    ...(sellerEmail?.value ? { sellerEmail: sellerEmail.value } : {}),
     items: order.items.map((i) => ({
       productNameTh: i.productNameTh,
       skuCode: i.skuCode,

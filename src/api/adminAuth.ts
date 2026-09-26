@@ -18,6 +18,7 @@ import { createHash } from 'crypto';
 import QRCode from 'qrcode';
 
 import { prisma } from '@/lib/db';
+import { writeAuditLog } from '@/lib/auditLog';
 import { hashPassword, verifyPassword } from '@/lib/password';
 import {
   generateBackupCodes,
@@ -52,6 +53,10 @@ export interface AdminSession {
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_MINUTES = 15;
+// Step-2 TOTP guessing: same 5-strike discipline as the password step, but a
+// separate persistent counter so password failures never seed/burn it.
+const ADMIN_TOTP_MAX_ATTEMPTS = 5;
+const ADMIN_TOTP_LOCKOUT_MS = 15 * 60 * 1000;
 const CHALLENGE_TTL_SECONDS = 5 * 60;
 
 interface ChallengePayload {
@@ -158,16 +163,31 @@ export async function adminLogin(
 
   const passwordOk = await verifyPassword(password, user.passwordHash);
   if (!passwordOk) {
-    const attempts = user.failedLoginAttempts + 1;
-    const lock = attempts >= MAX_FAILED_ATTEMPTS;
-    await prisma.adminUser.update({
-      where: { id: user.id },
-      data: {
-        failedLoginAttempts: lock ? 0 : attempts,
-        status: lock ? 'locked' : user.status,
-        lockedUntil: lock ? new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000) : null,
-      },
+    // Atomic increment with a CAS-style guard (review 2026-09-26): the old
+    // read-modify-write let N concurrent failures all write N=1.
+    const bumped = await prisma.adminUser.updateMany({
+      where: { id: user.id, lockedUntil: null },
+      data: { failedLoginAttempts: { increment: 1 } },
     });
+    const fresh =
+      bumped.count === 1
+        ? await prisma.adminUser.findUnique({
+            where: { id: user.id },
+            select: { failedLoginAttempts: true },
+          })
+        : null;
+    const attempts = fresh?.failedLoginAttempts ?? 1;
+    const lock = attempts >= MAX_FAILED_ATTEMPTS;
+    if (lock) {
+      await prisma.adminUser.update({
+        where: { id: user.id },
+        data: {
+          failedLoginAttempts: 0,
+          status: 'locked',
+          lockedUntil: new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000),
+        },
+      });
+    }
     return { success: false, error: 'INVALID_CREDENTIALS' };
   }
 
@@ -191,6 +211,16 @@ export async function adminLogin(
     where: { id: user.id },
     data: { failedLoginAttempts: 0, lockedUntil: null },
   });
+
+  // TOTP lock blocks the WHOLE login (challenge issuance included): with the
+  // password in hand there would otherwise be unlimited fresh challenges.
+  if (user.totpLockedUntil && user.totpLockedUntil > new Date()) {
+    return {
+      success: false,
+      error: 'TOTP_LOCKED',
+      retryAfter: Math.ceil((user.totpLockedUntil.getTime() - Date.now()) / 1000),
+    };
+  }
 
   const challengeToken = await issueChallengeToken(user.id, remember);
   void pruneConsumedChallenges();
@@ -275,6 +305,7 @@ export async function confirm2fa(
   expiresIn?: number;
   mustChangePassword?: boolean;
   error?: string;
+  retryAfter?: number;
 }> {
   // Single-use: the challenge is consumed here, at the only step that mints
   // a session. (setup2fa stays read-only because the login UI legitimately
@@ -288,12 +319,59 @@ export async function confirm2fa(
   if (!user) return { success: false, error: 'USER_NOT_FOUND' };
   if (!user.totpSecret) return { success: false, error: 'TOTP_NOT_SETUP' };
 
+  // Persistent per-account TOTP lockout (review 2026-09-26): the IP limiter
+  // alone cannot stop distributed guessing with a stolen password.
+  if (user.totpLockedUntil && user.totpLockedUntil > new Date()) {
+    return {
+      success: false,
+      error: 'TOTP_LOCKED',
+      retryAfter: Math.ceil((user.totpLockedUntil.getTime() - Date.now()) / 1000),
+    };
+  }
+
   const codeOk = await verifyTotpCode(user.totpSecret, totpCode);
-  if (!codeOk) return { success: false, error: 'TOTP_INVALID' };
+  if (!codeOk) {
+    // Atomic increment — concurrent wrong codes must accumulate, not overwrite.
+    const updated = await prisma.adminUser.updateMany({
+      where: { id: user.id, totpLockedUntil: null },
+      data: { failedTotpAttempts: { increment: 1 } },
+    });
+    const fresh =
+      updated.count === 1
+        ? await prisma.adminUser.findUnique({
+            where: { id: user.id },
+            select: { failedTotpAttempts: true },
+          })
+        : null;
+    if (fresh && fresh.failedTotpAttempts >= ADMIN_TOTP_MAX_ATTEMPTS) {
+      await prisma.adminUser.updateMany({
+        where: { id: user.id, totpLockedUntil: null },
+        data: {
+          totpLockedUntil: new Date(Date.now() + ADMIN_TOTP_LOCKOUT_MS),
+          failedTotpAttempts: 0,
+          status: 'locked',
+        },
+      });
+      writeAuditLog({
+        actorType: 'admin',
+        actorId: user.id,
+        actorEmail: user.email,
+        action: 'admin_totp_lockout',
+        tableName: 'AdminUser',
+        recordId: user.id,
+      });
+    }
+    return { success: false, error: 'TOTP_INVALID' };
+  }
 
   await prisma.adminUser.update({
     where: { id: user.id },
-    data: { totpConfirmed: true, lastLoginAt: new Date() },
+    data: {
+      totpConfirmed: true,
+      lastLoginAt: new Date(),
+      failedTotpAttempts: 0,
+      totpLockedUntil: null,
+    },
   });
 
   const session = await issueAdminSession(user, challenge.rem === true);
@@ -382,10 +460,17 @@ export async function refreshAdminSession(refreshToken: string): Promise<{
     return { success: false, error: 'TOKEN_INVALID' };
   }
 
-  await prisma.adminSession.update({
-    where: { id: session.id },
+  // First-writer-wins claim (review 2026-09-26): revocation is a guarded
+  // updateMany, not an unconditional write. Two concurrent refreshes with the
+  // same token — exactly one gets count===1 and mints a replacement; the
+  // other sees 0 rows and fails. No second durable session can exist.
+  const claimed = await prisma.adminSession.updateMany({
+    where: { id: session.id, revokedAt: null, expiresAt: { gt: new Date() } },
     data: { revokedAt: new Date() },
   });
+  if (claimed.count !== 1) {
+    return { success: false, error: 'TOKEN_INVALID' };
+  }
 
   // Preserve the remembered-ness of the session being rotated: the new row
   // keeps the original's expiry class (30 days vs 12 hours).

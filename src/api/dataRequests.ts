@@ -1,9 +1,13 @@
 /**
  * PDPA Data Request API — 07-api.md §18, 02-user-flow.md UF-17.
- * Handles data subject requests: access, correct, delete, port.
- * 30-day SLA per PDPA B.E. 2562.
+ * SERVER-ONLY: persisted in the DataSubjectRequest table (security review
+ * 2026-09-26 — the previous in-memory array lost every request on restart
+ * and never reached the admin console). 30-day SLA per PDPA B.E. 2562.
  */
 
+import { randomBytes } from 'node:crypto';
+
+import { prisma } from '@/lib/db';
 import { writeAuditLog } from '@/lib/auditLog';
 
 // ─── Types ──────────────────────────────────────────────
@@ -23,84 +27,106 @@ export type DataRequest = {
   completedAt: Date | null;
 };
 
-// ─── Mock Store ──────────────────────────────────────────
+const VALID_TYPES: DataRequestType[] = ['access', 'correct', 'delete', 'port'];
+const VALID_STATUSES: DataRequestStatus[] = ['pending', 'processing', 'completed', 'rejected'];
 
-const mockRequests: DataRequest[] = [];
+function toDto(row: {
+  requestId: string;
+  requestType: string;
+  email: string;
+  details: string | null;
+  status: string;
+  adminNote: string | null;
+  createdAt: Date;
+  handledAt: Date | null;
+}): DataRequest {
+  return {
+    id: row.requestId,
+    type: row.requestType as DataRequestType,
+    email: row.email,
+    details: row.details ?? '',
+    status: row.status as DataRequestStatus,
+    adminNotes: row.adminNote,
+    createdAt: row.createdAt,
+    completedAt: row.handledAt,
+  };
+}
 
 // ─── API Functions ───────────────────────────────────────
 
 /**
  * Submit a new data subject request.
- * 07-api.md §18 — POST /legal/data-requests
+ * 07-api.md §18 — POST /api/v1/pdpa/data-requests
  */
 export async function submitDataRequest(params: {
   type: DataRequestType;
   email: string;
   details: string;
+  fullName?: string;
+  phone?: string;
 }): Promise<{ success: boolean; data?: DataRequest; error?: string }> {
-  // Validate
+  if (!VALID_TYPES.includes(params.type)) {
+    return { success: false, error: 'INVALID_TYPE' };
+  }
   if (!params.email || !params.email.includes('@')) {
     return { success: false, error: 'INVALID_EMAIL' };
   }
-
   if (!params.details || params.details.length < 10) {
     return { success: false, error: 'DETAILS_TOO_SHORT' };
   }
 
-  const request: DataRequest = {
-    id: `dpr_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-    type: params.type,
-    email: params.email,
-    details: params.details,
-    status: 'pending',
-    adminNotes: null,
-    createdAt: new Date(),
-    completedAt: null,
-  };
-
-  mockRequests.push(request);
-
-  writeAuditLog({
-    actorType: 'customer',
-    actorId: params.email,
-    actorEmail: params.email,
-    action: `pdpa_${params.type}_request`,
-    tableName: 'store.data_subject_requests',
-    recordId: request.id,
-    metadata: {
-      type: params.type,
-      email: params.email,
+  const requestId = `dpr_${Date.now()}_${randomBytes(4).toString('hex')}`;
+  const row = await prisma.dataSubjectRequest.create({
+    data: {
+      requestId,
+      requestType: params.type,
+      fullName: params.fullName?.trim() || params.email.split('@')[0]!,
+      email: params.email.trim().toLowerCase(),
+      phone: params.phone?.trim() || null,
+      details: params.details.trim(),
+      status: 'pending',
     },
   });
 
-  return { success: true, data: request };
+  writeAuditLog({
+    actorType: 'customer',
+    actorId: row.email,
+    actorEmail: row.email,
+    action: `pdpa_${params.type}_request`,
+    tableName: 'DataSubjectRequest',
+    recordId: row.id,
+    metadata: { type: params.type, email: row.email },
+  });
+
+  return { success: true, data: toDto(row) };
 }
 
 /**
- * List all data requests (admin view).
- * 07-api.md §18 — GET /admin/data-requests
+ * List data requests (admin view) — call from the pdpa:read-gated route.
  */
 export async function listDataRequests(params: {
   status?: DataRequestStatus;
   page?: number;
   pageSize?: number;
 }): Promise<{ data: DataRequest[]; total: number }> {
-  const { status, page = 1, pageSize = 20 } = params;
+  const { status, page = 1, pageSize = 50 } = params;
 
-  let filtered = [...mockRequests];
-  if (status) {
-    filtered = filtered.filter((r) => r.status === status);
-  }
+  const where = status ? { status } : {};
+  const [rows, total] = await Promise.all([
+    prisma.dataSubjectRequest.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+    prisma.dataSubjectRequest.count({ where }),
+  ]);
 
-  const total = filtered.length;
-  const offset = (page - 1) * pageSize;
-  const data = filtered.slice(offset, offset + pageSize);
-
-  return { data, total };
+  return { data: rows.map(toDto), total };
 }
 
 /**
- * Update a data request status (admin action).
+ * Update a data request status (admin action) — pdpa:action gate.
  */
 export async function updateDataRequest(
   requestId: string,
@@ -109,29 +135,35 @@ export async function updateDataRequest(
     adminNotes?: string;
   },
   adminId: string,
-  adminEmail: string
+  adminEmail: string,
 ): Promise<{ success: boolean; error?: string }> {
-  const request = mockRequests.find((r) => r.id === requestId);
-  if (!request) {
-    return { success: false, error: 'REQUEST_NOT_FOUND' };
+  if (!VALID_STATUSES.includes(params.status)) {
+    return { success: false, error: 'INVALID_STATUS' };
   }
 
-  const previousStatus = request.status;
-  request.status = params.status;
-  if (params.adminNotes) request.adminNotes = params.adminNotes;
-  if (params.status === 'completed') request.completedAt = new Date();
+  const existing = await prisma.dataSubjectRequest.findUnique({
+    where: { requestId },
+  });
+  if (!existing) return { success: false, error: 'REQUEST_NOT_FOUND' };
+
+  const row = await prisma.dataSubjectRequest.update({
+    where: { requestId },
+    data: {
+      status: params.status,
+      adminNote: params.adminNotes ?? existing.adminNote,
+      handledById: adminId,
+      handledAt: params.status === 'completed' ? new Date() : existing.handledAt,
+    },
+  });
 
   writeAuditLog({
     actorType: 'admin',
     actorId: adminId,
     actorEmail: adminEmail,
     action: `pdpa_request_${params.status}`,
-    tableName: 'store.data_subject_requests',
-    recordId: requestId,
-    diff: {
-      before: { status: previousStatus },
-      after: { status: params.status },
-    },
+    tableName: 'DataSubjectRequest',
+    recordId: row.id,
+    diff: { before: { status: existing.status }, after: { status: params.status } },
   });
 
   return { success: true };

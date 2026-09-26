@@ -8,7 +8,7 @@
 import { useState } from 'react';
 import { Send, CheckCircle } from 'lucide-react';
 import { cn } from '@/utils/cn';
-import { submitDataRequest, type DataRequestType } from '@/api/dataRequests';
+import type { DataRequestType } from '@/api/dataRequests';
 
 const REQUEST_TYPES: { value: DataRequestType; label: string; description: string }[] = [
   { value: 'access', label: 'ขอเข้าถึงข้อมูล', description: 'ขอรับสำเนาข้อมูลส่วนบุคคลของคุณ' },
@@ -34,24 +34,34 @@ export function DataRequestForm(): React.JSX.Element {
     setLoading(true);
     setError(null);
 
-    const result = await submitDataRequest({
-      type: requestType,
-      email,
-      details,
-    });
-
-    if (result.success) {
-      setSubmitted(true);
-    } else {
-      setError(
-        result.error === 'INVALID_EMAIL'
-          ? 'กรุณากรอกอีเมลที่ถูกต้อง'
-          : result.error === 'DETAILS_TOO_SHORT'
-            ? 'กรุณาระบุรายละเอียดอย่างน้อย 10 ตัวอักษร'
-            : 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง',
-      );
+    // Persisted server-side (DataSubjectRequest table) — success only after
+    // the DB commit; visible to pdpa:read admins immediately.
+    let ok = false;
+    try {
+      const res = await fetch('/api/v1/pdpa/data-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: requestType, email, details }),
+      });
+      if (res.status === 200) {
+        ok = true;
+      } else if (res.status === 429) {
+        setError('ส่งคำขอบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่');
+      } else {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(
+          body.error === 'INVALID_EMAIL'
+            ? 'กรุณากรอกอีเมลที่ถูกต้อง'
+            : body.error === 'DETAILS_TOO_SHORT'
+              ? 'กรุณาระบุรายละเอียดอย่างน้อย 10 ตัวอักษร'
+              : 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง',
+        );
+      }
+    } catch {
+      setError('เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
     }
 
+    if (ok) setSubmitted(true);
     setLoading(false);
   };
 

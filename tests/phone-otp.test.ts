@@ -138,13 +138,16 @@ describe('verifyPhoneOtp', () => {
     });
   });
 
-  it('rejects wrong codes and counts the attempt against the challenge', async () => {
+  it('rejects wrong codes and counts the attempt against the challenge (atomic CAS)', async () => {
     vi.mocked(prisma.phoneOtpToken.findFirst).mockResolvedValue(mockRow() as never);
+    vi.mocked(prisma.phoneOtpToken.updateMany).mockResolvedValue({ count: 1 } as never);
     const result = await verifyPhoneOtp({ phoneE164: phone, code: '654321' });
     expect(result).toEqual({ ok: false, error: 'INVALID_CODE' });
-    expect(prisma.phoneOtpToken.update).toHaveBeenCalledWith({
-      where: { id: 'otp-1' },
-      data: expect.objectContaining({ attempts: 1 }),
+    // CAS: the where-clause pins the previously observed attempts value and
+    // the write is an atomic increment — concurrent guesses cannot overwrite.
+    expect(prisma.phoneOtpToken.updateMany).toHaveBeenCalledWith({
+      where: { id: 'otp-1', usedAt: null, attempts: 0 },
+      data: { attemptedAt: expect.any(Date), attempts: { increment: 1 } },
     });
   });
 

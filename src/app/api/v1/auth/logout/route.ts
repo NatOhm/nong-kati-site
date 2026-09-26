@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
   const token = req.cookies.get(COOKIE)?.value;
   if (token) {
     const customer = await getCustomerFromToken(token);
-    if (customer) await logoutCustomer(customer.id);
+    if (customer) await logoutCustomer(customer.id, token);
   }
   const res = NextResponse.json({ success: true });
   res.cookies.set(COOKIE, '', { httpOnly: true, maxAge: 0, path: '/' });

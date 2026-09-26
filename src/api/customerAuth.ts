@@ -15,7 +15,7 @@
 
 import { prisma } from '@/lib/db';
 import { hashPassword, verifyPassword } from '@/lib/password';
-import { signJwt } from '@/lib/jwt';
+import { signJwt, verifyJwt } from '@/lib/jwt';
 import { normalizeTier } from '@/lib/pricing';
 import { writeAuditLog } from '@/lib/auditLog';
 
@@ -133,14 +133,29 @@ export async function loginCustomer(params: {
   const passwordValid = await verifyPassword(params.password, customer.passwordHash);
 
   if (!passwordValid) {
-    const attempts = customer.failedLoginAttempts + 1;
-    await prisma.customer.update({
-      where: { id: customer.id },
-      data: {
-        failedLoginAttempts: attempts,
-        lockedUntil: attempts >= MAX_FAILED_ATTEMPTS ? new Date(Date.now() + LOCKOUT_MS) : null,
-      },
+    // Atomic increment with CAS guard (review 2026-09-26): the old
+    // read-modify-write lost concurrent increments (N failures → count 1).
+    const bumped = await prisma.customer.updateMany({
+      where: { id: customer.id, lockedUntil: null },
+      data: { failedLoginAttempts: { increment: 1 } },
     });
+    const fresh =
+      bumped.count === 1
+        ? await prisma.customer.findUnique({
+            where: { id: customer.id },
+            select: { failedLoginAttempts: true },
+          })
+        : null;
+    const attempts = fresh?.failedLoginAttempts ?? 1;
+    if (attempts >= MAX_FAILED_ATTEMPTS) {
+      await prisma.customer.update({
+        where: { id: customer.id },
+        data: {
+          failedLoginAttempts: 0,
+          lockedUntil: new Date(Date.now() + LOCKOUT_MS),
+        },
+      });
+    }
     return { success: false, error: 'INVALID_CREDENTIALS' };
   }
 
@@ -183,18 +198,46 @@ export async function loginCustomer(params: {
 }
 
 /**
- * Logout — revoke session client-side (stateless JWT).
- * 08-auth.md §4.1 — POST /auth/logout
+ * Logout — cut every session token issued before NOW (review 2026-09-26):
+ * a copied/exfiltrated remember-me JWT becomes unusable the moment the
+ * customer logs out, on every device, not just the calling browser.
+ * Stateful-enough: getCustomerFromToken already enforces
+ * sessionsInvalidBefore, so no table round-trip is added on hot paths.
  */
-export async function logoutCustomer(customerId: string): Promise<{ success: boolean }> {
-  writeAuditLog({
-    actorType: 'customer',
-    actorId: customerId,
-    actorEmail: '',
-    action: 'logout',
-    tableName: 'store.customers',
-    recordId: customerId,
+export async function logoutCustomer(
+  customerId: string,
+  token?: string,
+): Promise<{ success: boolean }> {
+  const customer = await prisma.customer.findUnique({
+    where: { id: customerId },
+    select: { email: true, sessionsInvalidBefore: true },
   });
+  if (customer) {
+    // Only bump when the presented token is still valid relative to the
+    // current marker (avoids needlessly invalidating newer sessions after a
+    // password reset already cut everything).
+    let mustInvalidate = true;
+    if (token) {
+      const payload = (await verifyJwt(token)) as { iat?: number } | null;
+      if (payload?.iat && customer.sessionsInvalidBefore) {
+        mustInvalidate = payload.iat * 1000 >= customer.sessionsInvalidBefore.getTime() + 5000;
+      }
+    }
+    if (mustInvalidate) {
+      await prisma.customer.update({
+        where: { id: customerId },
+        data: { sessionsInvalidBefore: new Date() },
+      });
+    }
+    writeAuditLog({
+      actorType: 'customer',
+      actorId: customerId,
+      actorEmail: customer.email,
+      action: 'logout',
+      tableName: 'store.customers',
+      recordId: customerId,
+    });
+  }
   return { success: true };
 }
 

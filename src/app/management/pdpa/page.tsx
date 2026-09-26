@@ -5,17 +5,13 @@
  * Super Admin only — manages data subject requests.
  */
 
-import { useState } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { CheckCircle, XCircle, Clock } from 'lucide-react';
 
 import { AdminShell } from '@/components/layout/AdminShell';
+import { adminFetch } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
-import {
-  listDataRequests,
-  updateDataRequest,
-  type DataRequest,
-  type DataRequestStatus,
-} from '@/api/dataRequests';
+import type { DataRequest, DataRequestStatus } from '@/api/dataRequests';
 
 const STATUS_LABELS: Record<
   DataRequestStatus,
@@ -57,37 +53,49 @@ export default function AdminPdpaPage(): React.JSX.Element {
   const [statusFilter, setStatusFilter] = useState<DataRequestStatus | ''>('');
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
-  const handleLoad = async (status?: DataRequestStatus) => {
-    setLoading(true);
-    setActionMessage(null);
-    try {
-      const filter = status ?? (statusFilter as DataRequestStatus | '');
-      const params: Parameters<typeof listDataRequests>[0] = {};
-      if (filter) params.status = filter;
-      const result = await listDataRequests(params);
-      setRequests(result.data);
-      setTotal(result.total);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const handleLoad = useCallback(
+    async (status?: DataRequestStatus) => {
+      setLoading(true);
+      setActionMessage(null);
+      try {
+        const filter = status ?? (statusFilter as DataRequestStatus | '');
+        const qs = filter ? `?status=${encodeURIComponent(filter)}` : '';
+        const res = await adminFetch(`/api/v1/pdpa/data-requests${qs}`);
+        const result = (await res.json().catch(() => ({}))) as {
+          data?: DataRequest[];
+          total?: number;
+        };
+        if (!res.ok) throw new Error('load failed');
+        setRequests(result.data ?? []);
+        setTotal(result.total ?? 0);
+      } catch {
+        setActionMessage('โหลดคำขอไม่สำเร็จ');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [statusFilter],
+  );
+
+  useEffect(() => {
+    void handleLoad();
+  }, [handleLoad]);
 
   const handleUpdateStatus = async (
     requestId: string,
     status: DataRequestStatus,
     notes?: string,
   ) => {
-    const updateParams: Parameters<typeof updateDataRequest>[1] = { status };
-    if (notes) updateParams.adminNotes = notes;
-    const result = await updateDataRequest(
-      requestId,
-      updateParams,
-      'staff-001',
-      'founder@nong-kati.co.th',
-    );
-    if (result.success) {
+    try {
+      await adminFetch(`/api/v1/pdpa/data-requests/${encodeURIComponent(requestId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, adminNotes: notes }),
+      });
       setActionMessage('อัปเดตสถานะสำเร็จ');
-      handleLoad();
+      void handleLoad();
+    } catch (e) {
+      setActionMessage(e instanceof Error ? e.message : 'อัปเดตไม่สำเร็จ');
     }
   };
 

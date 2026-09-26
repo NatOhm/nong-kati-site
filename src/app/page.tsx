@@ -31,10 +31,10 @@ export const metadata: Metadata = {
   // No manual brand suffix — the root template appends "— Nong-Kati" (audit #12).
   title: 'ซื้อบัตรเกม Netflix Steam และอีคอมเมิร์ซ',
   description:
-    'ซื้อ gift card ออนไลน์ ส่งโค้ดทันที ครอบคลุม เกม สตรีมมิ่ง และ อีคอมเมิร์ซ ราคาดี จ่ายผ่าน PromptPay หรือโอนเงิน',
+    'ซื้อ gift card ออนไลน์ ส่งโค้ดทันที ครอบคลุม เกม สตรีมมิ่ง และ อีคอมเมิร์ซ ราคาดี โอนเงินพร้อมส่งสลิปยืนยัน',
   openGraph: {
     title: 'Nong-Kati — ซื้อบัตรเกม สตรีมมิ่ง และอีคอมเมิร์ซ',
-    description: 'ส่งโค้ดทันที ราคาดี จ่ายผ่าน PromptPay หรือโอนเงิน',
+    description: 'ส่งโค้ดทันที ราคาดี โอนเงินพร้อมส่งสลิปยืนยัน',
     type: 'website',
     locale: 'th_TH',
   },
@@ -85,12 +85,12 @@ export default async function HomePage(): Promise<React.JSX.Element> {
             {/* Site-wide h1 (landmark spec): the notice-board headline is the
                 page's main heading — p→h1 keeps the identical clay styling. */}
             <h1 className="font-display text-xl font-bold leading-snug text-fg-brand-strong sm:text-2xl">
-              โค้ดเกม สตรีมมิ่ง และอีคอมเมิร์ซ ส่งถึงอีเมลใน 60 วินาที
+              โค้ดเกม สตรีมมิ่ง และอีคอมเมิร์ซ ส่งถึงอีเมลหลังยืนยันการชำระเงิน
             </h1>
             {/* clay-700 lands exactly 4.50 on the peach-50 card — use clay-800
                 for headroom (7.11). Dark keeps the muted token. */}
             <p className="mt-1.5 text-sm text-clay-800 dark:text-fg-muted">
-              จ่ายผ่าน PromptPay หรือโอนเงิน รหัสสินค้าถูกส่งอัตโนมัติ ไม่ต้องรอแอดมิน
+              โอนเงินแล้วอัปโหลดสลิป ทีมงานยืนยันและส่งโค้ดให้ทันที
             </p>
             <Link
               href="/search"
@@ -108,8 +108,8 @@ export default async function HomePage(): Promise<React.JSX.Element> {
             <div className="grid gap-4 md:grid-cols-3">
               {[
                 { step: '01', title: 'เลือกสินค้า', desc: 'เลือกประเภทบัตรและราคาที่ต้องการ' },
-                { step: '02', title: 'ชำระเงิน', desc: 'จ่ายผ่าน PromptPay หรือโอนเงิน' },
-                { step: '03', title: 'รับโค้ด', desc: 'รับโค้ดทันทีภายใน 60 วินาที' },
+                { step: '02', title: 'ชำระเงิน', desc: 'โอนเงินแล้วส่งสลิปยืนยัน' },
+                { step: '03', title: 'รับโค้ด', desc: 'รับโค้ดหลังยืนยันการชำระเงิน' },
               ].map((item) => (
                 <div
                   key={item.step}
