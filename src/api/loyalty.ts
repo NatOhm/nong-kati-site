@@ -108,7 +108,7 @@ export function getLoyaltyBalance(customerId: string): CustomerLoyaltyBalance {
 export function getLoyaltyTransactions(
   customerId: string,
   page: number = 1,
-  pageSize: number = 20
+  pageSize: number = 20,
 ): { data: LoyaltyTransaction[]; total: number } {
   const transactions = mockTransactions
     .filter((t) => t.customerId === customerId)
@@ -141,7 +141,7 @@ export function calculateRedemptionDiscount(points: number): number {
 export function recordPointsEarned(
   customerId: string,
   orderId: string,
-  orderTotal: number
+  orderTotal: number,
 ): LoyaltyTransaction {
   const points = calculatePointsToEarn(orderTotal);
   const expiresAt = new Date();
@@ -168,7 +168,7 @@ export function recordPointsEarned(
 export function recordPointsRedeemed(
   customerId: string,
   points: number,
-  orderId: string
+  orderId: string,
 ): LoyaltyTransaction | { error: string } {
   const balance = getLoyaltyBalance(customerId);
   if (balance.availablePoints < points) {

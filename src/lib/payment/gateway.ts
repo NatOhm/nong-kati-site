@@ -73,11 +73,7 @@ export interface PaymentGateway {
   createPromptPayCharge(request: ChargeRequest): Promise<ChargeResult>;
 
   /** Create a card charge (may trigger 3DS2) */
-  createCardCharge(
-    request: ChargeRequest,
-    token: string,
-    returnUrl: string,
-  ): Promise<ChargeResult>;
+  createCardCharge(request: ChargeRequest, token: string, returnUrl: string): Promise<ChargeResult>;
 
   /** Verify webhook signature */
   verifyWebhookSignature(rawBody: Buffer, signatureHeader: string): boolean;

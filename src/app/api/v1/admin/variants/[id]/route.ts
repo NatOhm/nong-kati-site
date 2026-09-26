@@ -20,7 +20,10 @@ function bearer(req: NextRequest): string | null {
  * - stock: absolute value → delta lands in StockMove (adjust) like the editor.
  * - memberPrice/dealerPrice: number | null (null = inherit base price).
  */
-export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }): Promise<NextResponse> {
+export async function PATCH(
+  req: NextRequest,
+  ctx: { params: Promise<{ id: string }> },
+): Promise<NextResponse> {
   const token = bearer(req);
   if (!token) return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 });
   const check = await checkPermission(token, 'products:write');
@@ -57,7 +60,8 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 
   if (b['price'] !== undefined) {
     const r = num(b['price']);
-    if (!r.ok || r.v === null) return NextResponse.json({ error: 'INVALID_PRICE' }, { status: 400 });
+    if (!r.ok || r.v === null)
+      return NextResponse.json({ error: 'INVALID_PRICE' }, { status: 400 });
     data.price = r.v;
   }
   if (b['cost'] !== undefined) {

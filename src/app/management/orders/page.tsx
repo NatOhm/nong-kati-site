@@ -44,7 +44,11 @@ interface OrderDetail {
   totalAmountThb: number;
   manualFulfilmentReason: string | null;
   /** Present when the customer's slip was auto-verified (SlipOK). */
-  slipVerification: { ref: string; verifiedAt: string | null; receiverAccount: string | null } | null;
+  slipVerification: {
+    ref: string;
+    verifiedAt: string | null;
+    receiverAccount: string | null;
+  } | null;
   /** Customer-uploaded slip image (manual check). */
   slipImageUrl: string | null;
   slipUploadedAt: string | null;
@@ -65,8 +69,8 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   payment_confirmed: { label: 'ชำระแล้ว', color: 'text-sapphire-700' },
   pending_manual_fulfilment: { label: 'รอส่งโค้ด', color: 'text-fg-brand' },
   completed: { label: 'สำเร็จ', color: 'text-jade-600' },
-  refunded: { label: 'คืนเงิน', color: 'text-coral-600' },
-  failed: { label: 'ล้มเหลว', color: 'text-coral-600' },
+  refunded: { label: 'คืนเงิน', color: 'text-fg-error' },
+  failed: { label: 'ล้มเหลว', color: 'text-fg-error' },
   expired: { label: 'หมดอายุ', color: 'text-fg-muted' },
   abandoned: { label: 'ถูกทิ้ง', color: 'text-fg-muted' },
 };
@@ -168,7 +172,7 @@ export default function AdminOrdersPage(): React.JSX.Element {
           </div>
         )}
         {actionError && (
-          <div className="rounded-md border border-coral-300 bg-coral-50 px-4 py-3 text-sm text-coral-700">
+          <div className="border-error bg-error rounded-md border px-4 py-3 text-sm text-fg-error">
             {actionError}
           </div>
         )}
@@ -257,7 +261,7 @@ export default function AdminOrdersPage(): React.JSX.Element {
                     <td className="px-4 py-3 text-left text-xs">
                       {order.slip ? (
                         <span
-                          className="inline-flex max-w-[200px] items-center gap-1 text-jade-600 dark:text-jade-400"
+                          className="text-jade-600 inline-flex max-w-[200px] items-center gap-1 dark:text-jade-400"
                           title={`ตรวจสลิปอัตโนมัติ (SlipOK)${order.slip.verifiedAt ? ` เมื่อ ${new Date(order.slip.verifiedAt).toLocaleString('th-TH')}` : ''}`}
                         >
                           <ShieldCheck size={13} className="shrink-0" />
@@ -403,7 +407,9 @@ export default function AdminOrdersPage(): React.JSX.Element {
                     )}
                   </p>
                   <SlipImageView url={selectedOrder.slipImageUrl} />
-                  <p className="mt-1 text-xs text-fg-muted">สลิปถูกเก็บแบบส่วนตัว — เปิดได้เฉพาะแอดมินที่ล็อกอิน</p>
+                  <p className="mt-1 text-xs text-fg-muted">
+                    สลิปถูกเก็บแบบส่วนตัว — เปิดได้เฉพาะแอดมินที่ล็อกอิน
+                  </p>
                 </div>
               )}
 
@@ -465,13 +471,19 @@ function SlipImageView({ url }: { url: string }): React.JSX.Element {
   }, [url]);
 
   if (failed) {
-    return <p className="mt-2 text-xs text-coral-600">เปิดสลิปไม่สำเร็จ — ลองปิดแล้วเปิดรายการใหม่</p>;
+    return (
+      <p className="mt-2 text-xs text-fg-error">เปิดสลิปไม่สำเร็จ — ลองปิดแล้วเปิดรายการใหม่</p>
+    );
   }
   if (!src) {
-    return <p className="mt-2 text-xs text-fg-muted">กำลังโหลดสลิป...</p>
+    return <p className="mt-2 text-xs text-fg-muted">กำลังโหลดสลิป...</p>;
   }
   return (
     // eslint-disable-next-line @next/next/no-img-element -- fetched privately as a blob
-    <img src={src} alt="สลิปการโอนเงิน" className="mt-2 max-h-72 rounded border border-line-subtle object-contain" />
+    <img
+      src={src}
+      alt="สลิปการโอนเงิน"
+      className="mt-2 max-h-72 rounded border border-line-subtle object-contain"
+    />
   );
 }

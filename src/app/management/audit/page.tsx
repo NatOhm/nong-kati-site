@@ -239,7 +239,7 @@ export default function AdminAuditPage(): React.JSX.Element {
                         className={cn(
                           'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
                           entry.action.includes('refund')
-                            ? 'bg-coral-500/15 text-coral-700'
+                            ? 'bg-coral-500/15 text-fg-error'
                             : entry.action.includes('block')
                               ? 'bg-peach-100 text-fg-brand'
                               : 'bg-surface text-fg-muted',
@@ -257,7 +257,7 @@ export default function AdminAuditPage(): React.JSX.Element {
                     <td className="px-4 py-3 text-xs text-fg-placeholder">
                       {entry.diff ? (
                         <span>
-                          {entry.diff.before && <span className="text-coral-600/70">-</span>}
+                          {entry.diff.before && <span className="text-fg-error/70">-</span>}
                           {entry.diff.after && <span className="text-jade-600/70">+</span>}
                         </span>
                       ) : entry.metadata ? (

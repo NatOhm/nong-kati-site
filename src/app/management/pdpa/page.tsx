@@ -35,7 +35,7 @@ const STATUS_LABELS: Record<
   rejected: {
     label: 'ปฏิเสธ',
     icon: <XCircle size={14} />,
-    color: 'text-coral-700 bg-coral-500/15',
+    color: 'text-fg-error bg-error0/15',
   },
 };
 
@@ -197,7 +197,7 @@ export default function AdminPdpaPage(): React.JSX.Element {
                           </button>
                           <button
                             onClick={() => handleUpdateStatus(req.id, 'rejected')}
-                            className="rounded bg-coral-500/15 px-2 py-1 text-xs text-coral-600 hover:bg-coral-100"
+                            className="rounded bg-coral-500/15 px-2 py-1 text-xs text-fg-error hover:bg-coral-500/25"
                           >
                             ปฏิเสธ
                           </button>

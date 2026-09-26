@@ -32,9 +32,9 @@ const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   payment_confirmed: { label: 'ชำระแล้ว', className: 'text-jade-700 bg-jade-500/15' },
   pending_payment: { label: 'รอชำระเงิน', className: 'text-fawn-700 bg-peach-100' },
   pending_manual_fulfilment: { label: 'รอดำเนินการ', className: 'text-fawn-700 bg-peach-100' },
-  failed: { label: 'ไม่สำเร็จ', className: 'text-coral-700 bg-coral-50' },
+  failed: { label: 'ไม่สำเร็จ', className: 'text-fg-error bg-error' },
   expired: { label: 'หมดอายุ', className: 'text-fg-placeholder bg-surface' },
-  refunded: { label: 'คืนเงิน', className: 'text-coral-700 bg-coral-50' },
+  refunded: { label: 'คืนเงิน', className: 'text-fg-error bg-error' },
 };
 
 export default function AccountOrdersPage(): React.JSX.Element {

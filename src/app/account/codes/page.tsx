@@ -84,7 +84,7 @@ export default function AccountCodesPage(): React.JSX.Element {
       </div>
 
       {error && (
-        <p className="rounded-lg bg-coral-50 px-3 py-2 text-sm text-coral-700 dark:bg-coral-900/20 dark:text-coral-300">
+        <p className="bg-error rounded-lg px-3 py-2 text-sm text-fg-error dark:bg-coral-900/20 dark:text-coral-300">
           {error}
         </p>
       )}

@@ -99,7 +99,12 @@ export default function WalletPage(): React.JSX.Element {
                 className="flex items-center justify-between rounded-xl border border-line-subtle px-4 py-3"
               >
                 <div>
-                  <p className={cn('text-sm font-semibold', t.amountThb < 0 ? 'text-coral-600' : 'text-fg')}>
+                  <p
+                    className={cn(
+                      'text-sm font-semibold',
+                      t.amountThb < 0 ? 'text-fg-error' : 'text-fg',
+                    )}
+                  >
                     {t.amountThb < 0 ? '' : '+'}
                     {formatThb(t.amountThb)}
                   </p>

@@ -60,7 +60,7 @@ export function CartItem({ item, onUpdateQty, onRemove }: CartItemProps): React.
           </div>
           <button
             onClick={onRemove}
-            className="shrink-0 rounded p-1 text-fg-placeholder transition-colors hover:bg-coral-50 hover:text-coral-600"
+            className="hover:bg-error shrink-0 rounded p-1 text-fg-placeholder transition-colors hover:text-fg-error"
             aria-label={`ลบ ${item.productNameTh}`}
           >
             <Trash2 size={16} strokeWidth={1.5} />
@@ -69,7 +69,7 @@ export function CartItem({ item, onUpdateQty, onRemove }: CartItemProps): React.
 
         {/* Out of stock warning */}
         {!item.inStock && (
-          <div className="mt-1 flex items-center gap-1 text-xs text-coral-600">
+          <div className="mt-1 flex items-center gap-1 text-xs text-fg-error">
             <AlertTriangle size={12} />
             <span>สินค้าหมดแล้ว</span>
           </div>

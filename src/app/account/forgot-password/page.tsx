@@ -120,7 +120,7 @@ export default function ForgotPasswordPage(): React.JSX.Element {
                 </div>
 
                 {error && (
-                  <p className="text-xs text-coral-600" role="alert">
+                  <p className="text-xs text-fg-error" role="alert">
                     {error}
                   </p>
                 )}

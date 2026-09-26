@@ -21,10 +21,7 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiFetch<T>(
-  endpoint: string,
-  options: FetchOptions = {}
-): Promise<T> {
+export async function apiFetch<T>(endpoint: string, options: FetchOptions = {}): Promise<T> {
   const { params, ...init } = options;
 
   // Build query string
@@ -51,11 +48,7 @@ export async function apiFetch<T>(
 
   if (!res.ok) {
     const data = await res.json().catch(() => null);
-    throw new ApiError(
-      res.status,
-      `API error: ${res.status} ${res.statusText}`,
-      data
-    );
+    throw new ApiError(res.status, `API error: ${res.status} ${res.statusText}`, data);
   }
 
   return res.json() as Promise<T>;

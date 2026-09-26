@@ -330,8 +330,24 @@ export default function CheckoutPage(): React.JSX.Element {
     }
   }, []);
 
+  // Cart still hydrating (review 2026-09-26 #5): render a stable loading
+  // shell — NEVER flash the contact form/stepper before we know the cart
+  // state, which caused a layout jump and bogus form exposure on slow loads.
+  if (!isLoaded) {
+    return (
+      <PageShell>
+        <div className="mx-auto max-w-2xl space-y-4 py-12" aria-busy="true" aria-live="polite">
+          <span className="sr-only">กำลังโหลดตะกร้า…</span>
+          <div className="h-8 w-1/3 animate-pulse rounded-lg bg-surface-elevated" />
+          <div className="h-40 animate-pulse rounded-xl bg-surface-elevated" />
+          <div className="h-64 animate-pulse rounded-xl bg-surface-elevated" />
+        </div>
+      </PageShell>
+    );
+  }
+
   // Redirect if cart is empty
-  if (isLoaded && (!cart || cart.items.length === 0)) {
+  if (!cart || cart.items.length === 0) {
     return (
       <PageShell>
         <div className="flex flex-col items-center justify-center py-24 text-center">
@@ -381,7 +397,7 @@ export default function CheckoutPage(): React.JSX.Element {
       {error && (
         <div
           role="alert"
-          className="mb-6 rounded-md border border-coral-300 bg-coral-50 px-4 py-3 text-sm text-coral-700"
+          className="border-error bg-error mb-6 rounded-md border px-4 py-3 text-sm text-fg-error"
         >
           {error}
         </div>
@@ -423,7 +439,7 @@ export default function CheckoutPage(): React.JSX.Element {
                   <p
                     className={cn(
                       'mt-1.5 text-xs',
-                      couponApplied ? 'text-jade-600' : 'text-coral-600',
+                      couponApplied ? 'text-jade-600' : 'text-fg-error',
                     )}
                   >
                     {couponMsg}
@@ -440,7 +456,7 @@ export default function CheckoutPage(): React.JSX.Element {
               {paymentMethod === 'promptpay' && !paymentState?.qrImageUrl && !manualInfo && (
                 <div
                   role="alert"
-                  className="mb-6 rounded-md border border-coral-300 bg-coral-50 px-4 py-3 text-sm text-coral-700"
+                  className="border-error bg-error mb-6 rounded-md border px-4 py-3 text-sm text-fg-error"
                 >
                   <p className="font-semibold">ยังไม่มีช่องทางชำระเงินที่ใช้ได้ในขณะนี้</p>
                   <p className="mt-1">
@@ -466,7 +482,7 @@ export default function CheckoutPage(): React.JSX.Element {
                       {formatThb(walletBalanceThb ?? 0)}) ทันที — โค้ดส่งถึงหน้าถัดไปเลย
                     </p>
                     {walletMsg && (
-                      <p className="mt-2 rounded-md border border-coral-300 bg-coral-50 px-3 py-2 text-xs text-coral-700">
+                      <p className="border-error bg-error mt-2 rounded-md border px-3 py-2 text-xs text-fg-error">
                         {walletMsg}
                       </p>
                     )}
@@ -567,7 +583,7 @@ export default function CheckoutPage(): React.JSX.Element {
                     )}
                     {paymentState.status === 'expired' && (
                       <div className="mt-4 space-y-3">
-                        <div className="rounded-md border border-coral-300 bg-coral-50 px-4 py-3 text-sm text-coral-700">
+                        <div className="border-error bg-error rounded-md border px-4 py-3 text-sm text-fg-error">
                           QR หมดอายุ — กรุณาสร้าง QR ใหม่
                         </div>
                         <button

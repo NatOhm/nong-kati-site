@@ -39,12 +39,12 @@ const STATUS_MAP: Record<string, { label: string; color: string }> = {
     label: 'รอชำระเงิน',
     color: 'bg-sapphire-400/15 text-sapphire-200 border-sapphire-700/50',
   },
-  refunded: { label: 'คืนเงิน', color: 'bg-coral-500/15 text-coral-700 border-coral-300' },
+  refunded: { label: 'คืนเงิน', color: 'bg-coral-500/15 text-fg-error border-coral-300' },
   expired: { label: 'หมดอายุ', color: 'bg-surface text-fg-placeholder border-line-subtle' },
   cancelled: { label: 'ยกเลิก', color: 'bg-surface text-clay-400 border-line-subtle' },
   payment_failed: {
     label: 'ชำระล้มเหลว',
-    color: 'bg-coral-500/15 text-coral-700 border-coral-300',
+    color: 'bg-coral-500/15 text-fg-error border-coral-300',
   },
   paid: { label: 'ชำระแล้ว', color: 'bg-jade-500/15 text-jade-700 border-jade-500/40' },
   delivering: { label: 'กำลังส่ง', color: 'bg-topaz-400/20 text-peach-800 border-topaz-400' },
@@ -382,7 +382,7 @@ export default function AdminDashboardPage(): React.JSX.Element {
               label="คืนเงิน"
               value={formatThb(revenue.refundAmount)}
               icon={RotateCcw}
-              color="text-coral-600"
+              color="text-fg-error"
             />
           </div>
         </div>
@@ -689,7 +689,7 @@ export default function AdminDashboardPage(): React.JSX.Element {
                         <p
                           className={cn(
                             'text-sm font-bold',
-                            item.stock <= 3 ? 'text-coral-600' : 'text-fg-brand',
+                            item.stock <= 3 ? 'text-fg-error' : 'text-fg-brand',
                           )}
                         >
                           {item.stock}
@@ -780,7 +780,7 @@ function KPICard({
           <span
             className={cn(
               'flex items-center gap-0.5 text-xs font-medium',
-              isPositive ? 'text-jade-600' : 'text-coral-600',
+              isPositive ? 'text-jade-600' : 'text-fg-error',
             )}
           >
             {isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}

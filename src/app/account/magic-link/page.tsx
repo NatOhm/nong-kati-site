@@ -181,7 +181,7 @@ export default function MagicLinkPage(): React.JSX.Element {
 
             {(consume === 'invalid' || consume === 'blocked') && (
               <>
-                <ShieldAlert size={48} className="mx-auto mb-4 text-coral-600" />
+                <ShieldAlert size={48} className="mx-auto mb-4 text-fg-error" />
                 <h1 className="text-xl font-bold text-fg">
                   {consume === 'blocked' ? 'บัญชีนี้เข้าสู่ระบบไม่ได้' : 'ลิงก์ไม่ถูกต้อง'}
                 </h1>
@@ -238,7 +238,7 @@ export default function MagicLinkPage(): React.JSX.Element {
                   </div>
 
                   {requestError && (
-                    <p className="text-xs text-coral-600" role="alert">
+                    <p className="text-xs text-fg-error" role="alert">
                       {requestError}
                     </p>
                   )}

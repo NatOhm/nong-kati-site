@@ -79,9 +79,11 @@ export default async function HomePage(): Promise<React.JSX.Element> {
         {/* Hero carousel — admin-managed promo banners (hidden until configured) */}
         {heroSlides.length > 0 && <HeroCarousel slides={heroSlides} />}
 
-        {/* Announcement board — the headline framed as a notice board (client ask) */}
-        <section className="px-4 pt-8 md:px-8">
-          <div className="mx-auto max-w-3xl rounded-2xl border-2 border-dashed border-peach-300 bg-peach-50 px-6 py-5 text-center shadow-clay-sm dark:border-peach-700/60 dark:bg-peach-900/20">
+        {/* Announcement board — the headline framed as a notice board (client ask).
+            Audit #9: tightened vertical rhythm on mobile so the category/app
+            grid enters the first viewport (pt-8→pt-4, py-5→py-3 on mobile). */}
+        <section className="px-4 pt-4 md:px-8 md:pt-8">
+          <div className="mx-auto max-w-3xl rounded-2xl border-2 border-dashed border-peach-300 bg-peach-50 px-4 py-3 text-center shadow-clay-sm sm:px-6 sm:py-5 dark:border-peach-700/60 dark:bg-peach-900/20">
             {/* Site-wide h1 (landmark spec): the notice-board headline is the
                 page's main heading — p→h1 keeps the identical clay styling. */}
             <h1 className="font-display text-xl font-bold leading-snug text-fg-brand-strong sm:text-2xl">
@@ -101,11 +103,15 @@ export default async function HomePage(): Promise<React.JSX.Element> {
           </div>
         </section>
 
-        {/* How It Works — วิธีการซื้อ moved to the very top (client ask) */}
+        {/* How It Works — วิธีการซื้อ moved to the very top (client ask).
+            Audit #9: compact single-row cards on mobile (~100px total),
+            full three-column grid from sm up. */}
         <ScrollReveal>
-          <section className="px-4 py-8 md:px-8">
-            <h2 className="mb-6 text-center text-lg font-bold text-fg">วิธีการซื้อ</h2>
-            <div className="grid gap-4 md:grid-cols-3">
+          <section className="px-4 py-4 md:px-8 md:py-8">
+            <h2 className="mb-3 text-center text-base font-bold text-fg sm:mb-6 sm:text-lg">
+              วิธีการซื้อ
+            </h2>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-4">
               {[
                 { step: '01', title: 'เลือกสินค้า', desc: 'เลือกประเภทบัตรและราคาที่ต้องการ' },
                 { step: '02', title: 'ชำระเงิน', desc: 'โอนเงินแล้วส่งสลิปยืนยัน' },
@@ -134,7 +140,8 @@ export default async function HomePage(): Promise<React.JSX.Element> {
             only (no client handlers in this tree). */}
         {dbDown && (
           <section role="alert" className="px-4 pb-4 md:px-8">
-            <div className="mx-auto flex max-w-2xl flex-col items-center gap-3 rounded-2xl border border-coral-300 bg-coral-50 px-6 py-6 text-center">
+            {' '}
+            <div className="border-error bg-error mx-auto flex max-w-2xl flex-col items-center gap-3 rounded-2xl border px-6 py-6 text-center">
               <p className="text-lg font-bold text-fg">โหลดสินค้าไม่สำเร็จ</p>
               <p className="text-base text-fg-muted">
                 ช่วงนี้ระบบขัดข้องชั่วคราว (ไม่ใช่เพราะสินค้าหมด) — ลองรีเฟรชอีกครั้ง

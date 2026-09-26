@@ -118,7 +118,7 @@ export function ContactForm({
           )}
         />
         {errors.email && (
-          <p id="checkout-email-error" role="alert" className="mt-1 text-xs text-coral-600">
+          <p id="checkout-email-error" role="alert" className="mt-1 text-xs text-fg-error">
             {errors.email}
           </p>
         )}
@@ -195,7 +195,7 @@ export function ContactForm({
           describedBy={errors.tos ? 'checkout-tos-error' : undefined}
         />
         {errors.tos && (
-          <p id="checkout-tos-error" role="alert" className="text-xs text-coral-600">
+          <p id="checkout-tos-error" role="alert" className="text-xs text-fg-error">
             {errors.tos}
           </p>
         )}

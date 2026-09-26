@@ -264,7 +264,7 @@ export function BulkStockDialog({
                 {format === 'long' && ' (แยกบล็อกด้วยบรรทัดว่าง 2 บรรทัดติดกัน)'}
               </p>
               {format === 'long' && accountGuess > recordCount && recordCount > 0 && (
-                <p className="mt-1 text-xs font-medium text-coral-700" role="alert">
+                <p className="mt-1 text-xs font-medium text-fg-error" role="alert">
                   ⚠️ ดูเหมือนมีราวๆ {accountGuess} บัญชี แต่จะถูกรวมเป็น {recordCount} ก้อน —
                   คั่นแต่ละบัญชีด้วยบรรทัดว่าง 2 บรรทัดติดกัน
                   (บรรทัดว่างเดียวถือว่าอยู่ในบัญชีเดียวกัน)
@@ -291,7 +291,7 @@ export function BulkStockDialog({
                     วางข้อมูลแล้วกด &quot;แยกข้อมูล&quot; เพื่อดูตัวอย่างก่อนบันทึก
                   </p>
                 ) : totalNew === 0 ? (
-                  <p className="text-sm text-coral-700">ไม่พบบัญชีที่แยกได้ — ตรวจรูปแบบอีกครั้ง</p>
+                  <p className="text-sm text-fg-error">ไม่พบบัญชีที่แยกได้ — ตรวจรูปแบบอีกครั้ง</p>
                 ) : (
                   <div className="space-y-2.5">
                     {preview.plans.flatMap((plan, pi) =>
@@ -320,7 +320,7 @@ export function BulkStockDialog({
             </div>
 
             {error && (
-              <div className="mt-3 rounded-lg border border-coral-300 bg-coral-50 px-4 py-2.5 text-sm text-coral-700">
+              <div className="border-error bg-error mt-3 rounded-lg border px-4 py-2.5 text-sm text-fg-error">
                 {error}
               </div>
             )}

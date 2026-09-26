@@ -59,9 +59,11 @@ export function AnnouncementBar(): React.JSX.Element | null {
             </>
           )}
         </p>
+        {/* Audit #8: close is a bare control at the screen edge — 44×44 hit
+            area (icon unchanged). */}
         <button
           onClick={() => setIsVisible(false)}
-          className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full p-2.5 transition-colors hover:bg-clay-500/20 hover:text-fg"
+          className="absolute right-0.5 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full transition-colors hover:bg-clay-500/20 hover:text-fg"
           aria-label="ปิดประกาศ"
         >
           <X size={16} />

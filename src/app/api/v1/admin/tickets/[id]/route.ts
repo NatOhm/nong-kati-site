@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import {
-  adminGetTicket,
-  adminUpdateTicket,
-  type TicketAction,
-} from '@/api/supportTickets';
+import { adminGetTicket, adminUpdateTicket, type TicketAction } from '@/api/supportTickets';
 import { checkPermission } from '@/lib/rbac';
 
 export const dynamic = 'force-dynamic';

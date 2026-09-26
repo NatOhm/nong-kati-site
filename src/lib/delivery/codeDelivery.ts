@@ -81,10 +81,7 @@ export function deliverCodes(input: CodeDeliveryInput): DeliveryResult {
  * In production, this is enqueued as a BullMQ job with HIGH priority.
  * Retry: 3× exponential backoff (2s, 4s, 8s).
  */
-export function processOrderDelivery(
-  orderId: string,
-  items: CodeDeliveryInput[],
-): DeliveryResult {
+export function processOrderDelivery(orderId: string, items: CodeDeliveryInput[]): DeliveryResult {
   const allCodes: DeliveryResult['codes'] = [];
 
   for (const item of items) {

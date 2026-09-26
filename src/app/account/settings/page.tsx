@@ -101,7 +101,7 @@ export default function AccountSettingsPage(): React.JSX.Element {
       )}
 
       {error && (
-        <p className="rounded-lg bg-coral-50 px-4 py-3 text-sm text-coral-700 dark:bg-coral-900/20 dark:text-coral-300">
+        <p className="bg-error rounded-lg px-4 py-3 text-sm text-fg-error dark:bg-coral-900/20 dark:text-coral-300">
           {error}
         </p>
       )}

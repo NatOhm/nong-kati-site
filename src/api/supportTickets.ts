@@ -204,7 +204,13 @@ export async function adminUpdateTicket(
   // reopen: cleared reply state returns the ticket to the queue
   await prisma.supportTicket.update({
     where: { id },
-    data: { status: 'open', adminReply: null, answeredById: null, answeredAt: null, closedAt: null },
+    data: {
+      status: 'open',
+      adminReply: null,
+      answeredById: null,
+      answeredAt: null,
+      closedAt: null,
+    },
   });
   return { ok: true };
 }

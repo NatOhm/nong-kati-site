@@ -94,7 +94,7 @@ export default function AdminAnalyticsPage(): React.JSX.Element {
 
         {error && (
           <div
-            className="rounded-lg border border-coral-300 bg-coral-50 px-4 py-3 text-sm text-coral-700"
+            className="border-error bg-error rounded-lg border px-4 py-3 text-sm text-fg-error"
             role="alert"
           >
             {error}
@@ -181,13 +181,11 @@ export default function AdminAnalyticsPage(): React.JSX.Element {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-fg-placeholder">ส่วนลด</span>
-                    <span className="text-coral-600">
-                      -{formatThb(data.revenue.discountAmount)}
-                    </span>
+                    <span className="text-fg-error">-{formatThb(data.revenue.discountAmount)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-fg-placeholder">คืนเงิน</span>
-                    <span className="text-coral-600">-{formatThb(data.revenue.refundAmount)}</span>
+                    <span className="text-fg-error">-{formatThb(data.revenue.refundAmount)}</span>
                   </div>
                   <div className="border-t border-line-subtle pt-3">
                     <div className="flex justify-between text-sm font-medium">

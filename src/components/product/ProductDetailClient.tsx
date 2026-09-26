@@ -167,7 +167,7 @@ export function ProductDetailClient({
                   {formatThb(variant.effectivePrice)}
                 </span>
                 {variant.stock === 0 ? (
-                  <span className="text-xs text-coral-600">หมด</span>
+                  <span className="text-xs text-fg-error">หมด</span>
                 ) : variant.stock <= 10 ? (
                   <span
                     className={cn(

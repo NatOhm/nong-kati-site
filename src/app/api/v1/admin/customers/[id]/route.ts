@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { adminAdjustCustomerCredit, adminGetCustomer, adminSetCustomerTier } from '@/api/adminCustomers';
+import {
+  adminAdjustCustomerCredit,
+  adminGetCustomer,
+  adminSetCustomerTier,
+} from '@/api/adminCustomers';
 import { maskEmail } from '@/lib/rbac';
 import { checkPermission } from '@/lib/rbac';
 

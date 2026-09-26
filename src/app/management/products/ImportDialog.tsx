@@ -202,7 +202,7 @@ export function ImportDialog({
         </p>
 
         {error && (
-          <p className="mt-3 flex items-center gap-2 rounded-lg bg-coral-50 px-3 py-2 text-sm text-coral-700 dark:bg-coral-900/20 dark:text-coral-300">
+          <p className="bg-error mt-3 flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-fg-error dark:bg-coral-900/20 dark:text-coral-300">
             <AlertTriangle size={15} /> {error}
           </p>
         )}
@@ -218,7 +218,7 @@ export function ImportDialog({
                 <CheckCircle2 size={15} /> อัปเดต {result.updated}
               </span>
               {result.failed > 0 && (
-                <span className="flex items-center gap-1.5 text-coral-600">
+                <span className="flex items-center gap-1.5 text-fg-error">
                   <XCircle size={15} /> ผิดพลาด {result.failed}
                 </span>
               )}
@@ -236,7 +236,7 @@ export function ImportDialog({
                             'px-3 py-1.5 font-medium',
                             r.status === 'created' && 'text-jade-600',
                             r.status === 'updated' && 'text-fg-brand',
-                            r.status === 'error' && 'text-coral-600',
+                            r.status === 'error' && 'text-fg-error',
                           )}
                         >
                           {r.status === 'created'

@@ -27,7 +27,7 @@ export interface ToastProps extends ToastData {
 
 const iconByType: Record<ToastType, React.ReactNode> = {
   success: <CheckCircle size={20} strokeWidth={1.5} className="text-jade-500" />,
-  error: <AlertCircle size={20} strokeWidth={1.5} className="text-coral-600" />,
+  error: <AlertCircle size={20} strokeWidth={1.5} className="text-fg-error" />,
   warning: <AlertTriangle size={20} strokeWidth={1.5} className="text-topaz-400" />,
   info: <Info size={20} strokeWidth={1.5} className="text-sapphire-400" />,
 };

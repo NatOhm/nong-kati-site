@@ -33,7 +33,11 @@ export function formatLastLogin(iso: string): string {
   if (hrs < 24) return `${hrs} ชม. ${mins % 60} นาทีที่แล้ว`;
   const days = Math.floor(hrs / 24);
   if (days < 30) return `${days} วันที่แล้ว`;
-  return new Date(iso).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
+  return new Date(iso).toLocaleDateString('th-TH', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
 }
 
 /**

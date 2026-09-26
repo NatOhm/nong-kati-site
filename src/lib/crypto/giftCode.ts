@@ -44,10 +44,7 @@ export function encryptCode(plainCode: string): {
   const nonce = randomBytes(NONCE_LENGTH);
   const cipher = createCipheriv(ALGO, key, nonce);
 
-  const encrypted = Buffer.concat([
-    cipher.update(plainCode, 'utf8'),
-    cipher.final(),
-  ]);
+  const encrypted = Buffer.concat([cipher.update(plainCode, 'utf8'), cipher.final()]);
   const authTag = cipher.getAuthTag();
 
   // Store authTag appended to ciphertext (single BYTEA column)
@@ -65,10 +62,7 @@ export function encryptCode(plainCode: string): {
  * @param nonce - the 12-byte nonce used during encryption
  * @returns decrypted plaintext string
  */
-export function decryptCode(
-  ciphertextWithTag: Buffer,
-  nonce: Buffer,
-): string {
+export function decryptCode(ciphertextWithTag: Buffer, nonce: Buffer): string {
   const key = getKey();
 
   if (ciphertextWithTag.length < AUTH_TAG_LENGTH) {
@@ -81,10 +75,7 @@ export function decryptCode(
   const decipher = createDecipheriv(ALGO, key, nonce);
   decipher.setAuthTag(authTag);
 
-  return Buffer.concat([
-    decipher.update(ciphertext),
-    decipher.final(),
-  ]).toString('utf8');
+  return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
 }
 
 /**
@@ -95,9 +86,7 @@ export function decryptCode(
  * @returns 32-byte Buffer (SHA-256 digest)
  */
 export function hashCode(plainCode: string): Buffer {
-  return createHash('sha256')
-    .update(plainCode.trim().toUpperCase())
-    .digest();
+  return createHash('sha256').update(plainCode.trim().toUpperCase()).digest();
 }
 
 /**
@@ -110,10 +99,12 @@ export function maskCode(plainCode: string): string {
     // No dashes — show last 4 chars
     return '*'.repeat(Math.max(0, plainCode.length - 4)) + plainCode.slice(-4);
   }
-  return parts.map((part, i) => {
-    if (i === parts.length - 1) return part;
-    return '*'.repeat(part.length);
-  }).join('-');
+  return parts
+    .map((part, i) => {
+      if (i === parts.length - 1) return part;
+      return '*'.repeat(part.length);
+    })
+    .join('-');
 }
 
 /**

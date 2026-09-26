@@ -49,13 +49,17 @@ export function orderConfirmationTemplate(data: OrderConfirmationData): {
       <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: center;">${item.quantity}</td>
       <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: right;">${formatThb(item.denomination * item.quantity)}</td>
     </tr>
-    ${item.code ? `
+    ${
+      item.code
+        ? `
     <tr>
       <td colspan="3" style="padding: 8px 12px; background: #f8f8f8; font-family: monospace; font-size: 14px; letter-spacing: 0.1em;">
         โค้ด: ${item.code}
       </td>
     </tr>
-    ` : ''}
+    `
+        : ''
+    }
   `,
     )
     .join('');

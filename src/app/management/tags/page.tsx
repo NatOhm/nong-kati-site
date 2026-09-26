@@ -130,7 +130,7 @@ export default function TagsPage(): React.JSX.Element {
           </button>
         </div>
 
-        {error && <p className="mb-4 text-sm text-coral-600">{error}</p>}
+        {error && <p className="mb-4 text-sm text-fg-error">{error}</p>}
 
         {/* List */}
         {loading ? (
@@ -207,7 +207,7 @@ export default function TagsPage(): React.JSX.Element {
                       type="button"
                       aria-label={`ลบแท็ก ${tag.name}`}
                       onClick={() => remove(tag)}
-                      className="text-fg-muted transition-colors hover:text-coral-600"
+                      className="text-fg-muted transition-colors hover:text-fg-error"
                     >
                       <Trash2 size={15} />
                     </button>

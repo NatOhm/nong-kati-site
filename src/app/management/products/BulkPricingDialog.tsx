@@ -130,7 +130,7 @@ export function BulkPricingDialog({
           เติมเฉพาะสินค้าที่ยังไม่ตั้งราคาระดับนั้น (ไม่ทับราคาเดิม)
         </label>
 
-        {error && <p className="mb-3 text-sm text-coral-600">{error}</p>}
+        {error && <p className="mb-3 text-sm text-fg-error">{error}</p>}
 
         {preview && (
           <div className="mb-4 rounded-2xl border border-line bg-surface p-4">

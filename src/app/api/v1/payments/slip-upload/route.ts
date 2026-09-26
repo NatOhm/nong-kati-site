@@ -75,9 +75,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // Content sniffing — magic bytes must match the declared MIME (same rules
   // as /admin/upload).
   const bytes = Buffer.from(dataUrl.split(',')[1] ?? '', 'base64');
-  const png = bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+  const png = bytes
+    .subarray(0, 8)
+    .equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
   const jpg = bytes[0] === 0xff && bytes[1] === 0xd8;
-  const webp = bytes.subarray(0, 4).toString('latin1') === 'RIFF' && bytes.subarray(8, 12).toString('latin1') === 'WEBP';
+  const webp =
+    bytes.subarray(0, 4).toString('latin1') === 'RIFF' &&
+    bytes.subarray(8, 12).toString('latin1') === 'WEBP';
   const declaredPng = dataUrl.startsWith('data:image/png');
   const declaredWebp = dataUrl.startsWith('data:image/webp');
   if (!((declaredPng && png) || (!declaredPng && !declaredWebp && jpg) || (declaredWebp && webp))) {

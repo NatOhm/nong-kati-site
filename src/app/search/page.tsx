@@ -111,14 +111,17 @@ export default async function SearchPage({
                   : 'สินค้าทั้งหมด'}
             </h1>
 
-            {/* Reference-grid toolbar (img 2): search left, sort dropdown + 1/N pager right */}
+            {/* Reference-grid toolbar (img 2): search left, sort dropdown + 1/N pager right.
+                Audit #6: during an outage the sort/pager controls are HIDDEN —
+                they operate on nothing and imply a loaded result set. */}
             <section className="pb-4">
               <Suspense fallback={<div className="h-11 w-full md:max-w-md" />}>
                 <SearchToolbar
                   page={page}
-                  totalPages={totalPages}
+                  totalPages={dbDown ? 1 : totalPages}
                   currentSort={sort}
                   sortOptions={SORT_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+                  hideControls={dbDown}
                 >
                   <CatalogSearchBox className="w-full" />
                 </SearchToolbar>

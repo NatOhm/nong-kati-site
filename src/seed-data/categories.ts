@@ -32,7 +32,8 @@ export const seedCategories: SeedCategory[] = [
     sortOrder: 1,
     isActive: true,
     seoTitle: 'บัตรเกม Gift Card — Nong-Kati',
-    seoDescription: 'ซื้อบัตรเกม ROV, Steam, PUBG, PSN และอีกมากมาย ส่งโค้ดทันที จ่ายผ่าน PromptPay หรือบัตรเครดิต',
+    seoDescription:
+      'ซื้อบัตรเกม ROV, Steam, PUBG, PSN และอีกมากมาย ส่งโค้ดทันที จ่ายผ่าน PromptPay หรือบัตรเครดิต',
     heroImageUrl: null,
     productCount: 9,
   },

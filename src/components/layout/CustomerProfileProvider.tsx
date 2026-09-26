@@ -83,7 +83,9 @@ export function CustomerProfileProvider({ children }: { children: ReactNode }): 
     [profile, state, setProfile, reload],
   );
 
-  return <CustomerProfileContext.Provider value={value}>{children}</CustomerProfileContext.Provider>;
+  return (
+    <CustomerProfileContext.Provider value={value}>{children}</CustomerProfileContext.Provider>
+  );
 }
 
 export function useCustomerProfile(): CustomerProfileContextValue {

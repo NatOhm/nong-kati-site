@@ -62,7 +62,7 @@ export default function DevSeedPage(): React.JSX.Element {
         </button>
 
         {error && (
-          <div className="rounded-md border border-coral-300 bg-coral-50 px-4 py-3 text-sm text-coral-700">
+          <div className="border-error bg-error rounded-md border px-4 py-3 text-sm text-fg-error">
             {error}
           </div>
         )}
@@ -71,15 +71,15 @@ export default function DevSeedPage(): React.JSX.Element {
           <div className="space-y-2 rounded-md border border-jade-500/40 bg-jade-500/10 px-4 py-3 text-sm text-jade-700">
             <p className="font-semibold">สร้างเรียบร้อย ✓</p>
             <p>
-              ลูกค้า: <code className="font-mono">{result.customer?.email}</code> — เครดิต{' '}
-              ฿{result.customer?.walletCreditThb}
+              ลูกค้า: <code className="font-mono">{result.customer?.email}</code> — เครดิต ฿
+              {result.customer?.walletCreditThb}
             </p>
             <p>
               โค้ดทดสอบบน &quot;{result.variant?.productName}&quot; (฿{result.variant?.price}) —
               พร้อมขายทั้งหมด {result.availableCodes} ชิ้น
               {result.codesAdded ? ` (เพิ่มใหม่ ${result.codesAdded})` : ' (มีอยู่แล้ว)'}
             </p>
-            <p className="text-xs text-jade-600">{result.note}</p>
+            <p className="text-jade-600 text-xs">{result.note}</p>
             <p className="text-xs text-fg-muted">
               ขั้นตอนต่อ: สมัคร/ล็อกอินเป็นลูกค้า → ซื้อสินค้านี้ด้วยเครดิต → เช็ค /account/codes
             </p>

@@ -85,6 +85,25 @@ test.describe('touch targets (390×844)', () => {
     }
   });
 
+  test('announcement close + mobile menu button are ≥44px (audit round 4 #8)', async ({ page }) => {
+    await withConsent(page);
+    await page.goto('/');
+
+    // Announcement bar close control — previously p-2.5 on a 16px icon (36px).
+    const close = page.getByRole('button', { name: 'ปิดประกาศ' });
+    if (await close.isVisible().catch(() => false)) {
+      const box = await close.boundingBox();
+      expect(box, 'announcement close must exist').not.toBeNull();
+      expect(Math.min(box!.width, box!.height)).toBeGreaterThanOrEqual(44);
+    }
+
+    // Mobile hamburger — the audit's 38px offender.
+    const menu = page.getByRole('button', { name: 'เปิดเมนู' });
+    const menuBox = await menu.boundingBox();
+    expect(menuBox, 'mobile menu button must exist').not.toBeNull();
+    expect(Math.min(menuBox!.width, menuBox!.height)).toBeGreaterThanOrEqual(44);
+  });
+
   test('cookie consent actions are ≥44px when visible (mobile)', async ({ page }) => {
     await page.goto('/');
     // Fresh consent state so the banner renders.

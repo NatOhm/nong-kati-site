@@ -363,7 +363,7 @@ export default function AdminCategoriesPage(): React.JSX.Element {
                           </button>
                           <button
                             onClick={() => void handleDelete(cat)}
-                            className="rounded p-1.5 text-fg-placeholder hover:bg-surface hover:text-coral-600"
+                            className="rounded p-1.5 text-fg-placeholder hover:bg-surface hover:text-fg-error"
                             aria-label="ลบ"
                           >
                             <Trash2 size={14} />
@@ -483,7 +483,7 @@ export default function AdminCategoriesPage(): React.JSX.Element {
 
               {modalError && (
                 <p
-                  className="rounded-md bg-coral-500/10 px-3 py-2 text-sm text-coral-600"
+                  className="rounded-md bg-coral-500/10 px-3 py-2 text-sm text-fg-error"
                   role="alert"
                 >
                   {modalError}

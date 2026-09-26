@@ -273,7 +273,7 @@ export default function AdminProductsPage(): React.JSX.Element {
             <button
               onClick={() => void bulkPublish(false)}
               disabled={bulkBusy}
-              className="rounded-lg border border-line bg-surface px-3 py-2 text-sm font-semibold text-fg transition-colors hover:border-coral-400 hover:text-coral-700 disabled:opacity-50"
+              className="rounded-lg border border-line bg-surface px-3 py-2 text-sm font-semibold text-fg transition-colors hover:border-coral-400 hover:text-fg-error disabled:opacity-50"
               title="ซ่อนสินค้าทั้งหมด"
             >
               ซ่อนทั้งหมด
@@ -341,7 +341,7 @@ export default function AdminProductsPage(): React.JSX.Element {
             <Loader2 size={16} className="animate-spin" /> กำลังโหลดสินค้า…
           </div>
         ) : loadError ? (
-          <div className="flex items-center gap-2 rounded-lg border border-coral-300 bg-coral-50 px-4 py-3 text-sm text-coral-700">
+          <div className="border-error bg-error flex items-center gap-2 rounded-lg border px-4 py-3 text-sm text-fg-error">
             <AlertTriangle size={16} /> {loadError}
             <button onClick={() => void load()} className="ml-auto font-semibold underline">
               ลองอีกครั้ง
@@ -496,7 +496,7 @@ export default function AdminProductsPage(): React.JSX.Element {
                               });
                               void load();
                             }}
-                            className="rounded p-1.5 text-fg-placeholder hover:bg-surface hover:text-coral-600"
+                            className="rounded p-1.5 text-fg-placeholder hover:bg-surface hover:text-fg-error"
                             aria-label={`เก็บถาวร ${product.name}`}
                           >
                             <Archive size={14} />
@@ -760,7 +760,7 @@ function ProductEditor({
                 {imageUrl && (
                   <button
                     onClick={() => setImageUrl(null)}
-                    className="text-left text-xs text-coral-600 hover:underline"
+                    className="text-left text-xs text-fg-error hover:underline"
                   >
                     ลบรูป
                   </button>
@@ -968,7 +968,7 @@ function ProductEditor({
                       )
                     }
                     disabled={variants.length <= 1}
-                    className="rounded p-1.5 text-fg-placeholder hover:text-coral-600 disabled:opacity-30"
+                    className="rounded p-1.5 text-fg-placeholder hover:text-fg-error disabled:opacity-30"
                     aria-label={`ลบตัวเลือกที่ ${i + 1}`}
                   >
                     <X size={14} />
@@ -982,7 +982,7 @@ function ProductEditor({
           </div>
 
           {error && (
-            <div className="flex items-center gap-2 rounded-lg border border-coral-300 bg-coral-50 px-4 py-3 text-sm text-coral-700">
+            <div className="border-error bg-error flex items-center gap-2 rounded-lg border px-4 py-3 text-sm text-fg-error">
               <AlertTriangle size={16} /> {error}
             </div>
           )}
@@ -1014,7 +1014,7 @@ function ProductEditor({
 type InlineTone = 'cost' | 'price' | 'tier' | 'tier2' | 'stock';
 
 const TONE_STYLES: Record<InlineTone, string> = {
-  cost: 'border-coral-200 bg-coral-50 text-coral-700',
+  cost: 'border-coral-200 bg-coral-50 text-fg-error',
   price: 'border-line-subtle bg-surface text-fg',
   tier: 'border-peach-200 bg-peach-50 text-fg-brand',
   tier2: 'border-line-subtle bg-surface text-fg-secondary',

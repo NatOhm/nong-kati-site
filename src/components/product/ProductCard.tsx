@@ -130,7 +130,7 @@ export function ProductCard({
                 stock === 0
                   ? 'text-fg-muted'
                   : stock <= 5
-                    ? 'text-coral-600 dark:text-coral-200'
+                    ? 'text-fg-error dark:text-coral-200'
                     : 'text-fg-muted',
               )}
             >

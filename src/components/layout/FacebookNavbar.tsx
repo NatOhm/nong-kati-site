@@ -74,23 +74,29 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
         <div className="mx-auto flex h-14 items-center justify-between px-4 md:h-16 md:px-6">
           {/* Left: Logo + Search */}
           <div className="flex items-center gap-3">
-            {/* Mobile menu button - opens sidebar drawer */}
+            {/* Mobile menu button - opens sidebar drawer.
+                Audit #8: ≥44×44 hit area (icon stays 22px). */}
             <button
               onClick={onMenuToggle}
-              className="clay-btn transition-smart cursor-pointer rounded-lg p-2 text-fg-muted duration-interactive ease-ease-out hover:-translate-y-0.5 hover:text-fg-brand active:translate-y-0 active:scale-95 active:shadow-clay-press lg:hidden"
+              className="clay-btn transition-smart flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg text-fg-muted duration-interactive ease-ease-out hover:-translate-y-0.5 hover:text-fg-brand active:translate-y-0 active:scale-95 active:shadow-clay-press lg:hidden"
               aria-label="เปิดเมนู"
             >
               <Menu size={22} />
             </button>
 
-            {/* Logo — the Nong-Kati clay hamster */}
+            {/* Logo — clay hamster mark + text wordmark (audit #7: the mark
+                alone built no brand recall; the name must be readable
+                above the fold on desktop AND mobile). */}
             <Link
               href="/"
               aria-label="Nong-Kati หน้าหลัก"
-              className="group flex items-center gap-2"
+              className="group flex min-h-[44px] items-center gap-2"
             >
               <span className="block rounded-full shadow-clay-sm transition-transform duration-interactive ease-spring group-hover:scale-110 group-active:scale-95">
                 <HamsterFace size={40} />
+              </span>
+              <span className="font-display text-base font-bold leading-none text-fg-brand-strong sm:text-lg">
+                Nong-Kati
               </span>
             </Link>
 

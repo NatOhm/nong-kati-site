@@ -249,7 +249,7 @@ export default function AdminCustomersPage(): React.JSX.Element {
                     <p
                       className={cn(
                         'font-medium',
-                        selectedCustomer.status === 'blocked' ? 'text-coral-600' : 'text-jade-600',
+                        selectedCustomer.status === 'blocked' ? 'text-fg-error' : 'text-jade-600',
                       )}
                     >
                       {selectedCustomer.status === 'blocked' ? 'บล็อค' : 'ใช้งาน'}
@@ -362,7 +362,7 @@ export default function AdminCustomersPage(): React.JSX.Element {
                       'inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm',
                       selectedCustomer.status === 'blocked'
                         ? 'text-jade-600 border-jade-500/40 hover:bg-jade-900/20'
-                        : 'border-coral-300 text-coral-600 hover:bg-coral-50',
+                        : 'hover:bg-error border-coral-300 text-fg-error',
                     )}
                   >
                     {selectedCustomer.status === 'blocked' ? (
@@ -412,7 +412,7 @@ export default function AdminCustomersPage(): React.JSX.Element {
                         className={cn(
                           'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
                           customer.status === 'blocked'
-                            ? 'bg-coral-500/15 text-coral-700'
+                            ? 'bg-coral-500/15 text-fg-error'
                             : 'text-jade-600 bg-jade-500/15',
                         )}
                       >

@@ -15,9 +15,9 @@ export type LockoutConfig = {
 };
 
 export const LOCKOUT_CONFIGS: Record<string, LockoutConfig> = {
-  customer_login: { maxAttempts: 5, lockDurationMs: 15 * 60 * 1000 },      // 15 minutes
-  admin_login: { maxAttempts: 5, lockDurationMs: 30 * 60 * 1000 },        // 30 minutes
-  admin_totp: { maxAttempts: 5, lockDurationMs: 30 * 60 * 1000 },         // 30 minutes
+  customer_login: { maxAttempts: 5, lockDurationMs: 15 * 60 * 1000 }, // 15 minutes
+  admin_login: { maxAttempts: 5, lockDurationMs: 30 * 60 * 1000 }, // 30 minutes
+  admin_totp: { maxAttempts: 5, lockDurationMs: 30 * 60 * 1000 }, // 30 minutes
 };
 
 // ─── In-Memory Mock Store ────────────────────────────────
@@ -48,7 +48,7 @@ if (typeof setInterval !== 'undefined') {
  */
 export function isLockedOut(
   email: string,
-  context: string = 'customer_login'
+  context: string = 'customer_login',
 ): { locked: boolean; retryAfterMs: number } {
   const key = `${context}:${email.toLowerCase()}`;
   const entry = store.get(key);
@@ -76,7 +76,7 @@ export function isLockedOut(
  */
 export function recordFailedAttempt(
   email: string,
-  context: string = 'customer_login'
+  context: string = 'customer_login',
 ): { locked: boolean; attemptsRemaining: number; shouldAlert: boolean } {
   const defaultConfig: LockoutConfig = { maxAttempts: 5, lockDurationMs: 900_000 };
   const config: LockoutConfig = LOCKOUT_CONFIGS[context] ?? defaultConfig;
@@ -103,10 +103,7 @@ export function recordFailedAttempt(
 /**
  * Record a successful login — clears failed attempts.
  */
-export function recordSuccessfulLogin(
-  email: string,
-  context: string = 'customer_login'
-): void {
+export function recordSuccessfulLogin(email: string, context: string = 'customer_login'): void {
   const key = `${context}:${email.toLowerCase()}`;
   store.delete(key);
 }
@@ -114,10 +111,7 @@ export function recordSuccessfulLogin(
 /**
  * Get the current attempt count for an email.
  */
-export function getAttemptCount(
-  email: string,
-  context: string = 'customer_login'
-): number {
+export function getAttemptCount(email: string, context: string = 'customer_login'): number {
   const key = `${context}:${email.toLowerCase()}`;
   const entry = store.get(key);
   return entry?.count ?? 0;
@@ -126,10 +120,7 @@ export function getAttemptCount(
 /**
  * Manually clear lockout (e.g., Super Admin resets 2FA).
  */
-export function clearLockout(
-  email: string,
-  context?: string
-): void {
+export function clearLockout(email: string, context?: string): void {
   if (context) {
     store.delete(`${context}:${email.toLowerCase()}`);
   } else {

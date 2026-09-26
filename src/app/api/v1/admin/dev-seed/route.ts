@@ -56,7 +56,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   let variant = await prisma.productVariant.findFirst({
     where: { isActive: true, product: { isActive: true } },
     orderBy: { price: 'asc' },
-    select: { id: true, price: true, stock: true, product: { select: { name: true, imageUrl: true, categoryId: true } } },
+    select: {
+      id: true,
+      price: true,
+      stock: true,
+      product: { select: { name: true, imageUrl: true, categoryId: true } },
+    },
   });
   if (!variant) {
     return NextResponse.json({ error: 'NO_VARIANT' }, { status: 409 });

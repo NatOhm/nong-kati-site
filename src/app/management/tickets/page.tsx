@@ -212,7 +212,7 @@ export default function AdminTicketsPage(): React.JSX.Element {
         </div>
 
         {error && (
-          <div className="mb-4 rounded-md border border-coral-300 bg-coral-500/10 p-4 text-sm text-coral-700">
+          <div className="mb-4 rounded-md border border-coral-300 bg-coral-500/10 p-4 text-sm text-fg-error">
             {error}{' '}
             <button type="button" onClick={() => void load()} className="underline">
               ลองใหม่
@@ -385,7 +385,7 @@ export default function AdminTicketsPage(): React.JSX.Element {
                   )}
 
                   {actionMsg && <p className="text-jade-600 mt-3 text-sm">{actionMsg}</p>}
-                  {actionErr && <p className="mt-3 text-sm text-coral-700">{actionErr}</p>}
+                  {actionErr && <p className="mt-3 text-sm text-fg-error">{actionErr}</p>}
                 </>
               )}
             </div>

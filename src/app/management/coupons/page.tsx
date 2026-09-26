@@ -167,7 +167,7 @@ export default function AdminCouponsPage(): React.JSX.Element {
           </div>
         )}
         {err && (
-          <div className="rounded-md border border-coral-300 bg-coral-50 px-4 py-3 text-sm text-coral-700">
+          <div className="border-error bg-error rounded-md border px-4 py-3 text-sm text-fg-error">
             {err}
           </div>
         )}
@@ -316,7 +316,7 @@ export default function AdminCouponsPage(): React.JSX.Element {
                         {c.expiresAt === null ? (
                           <span className="text-fg-muted">ไม่มี</span>
                         ) : expired ? (
-                          <span className="text-coral-600">
+                          <span className="text-fg-error">
                             {new Date(c.expiresAt).toLocaleDateString('th-TH')} (หมดแล้ว)
                           </span>
                         ) : (
@@ -348,7 +348,7 @@ export default function AdminCouponsPage(): React.JSX.Element {
                           </button>
                           <button
                             onClick={() => void remove(c)}
-                            className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-coral-600 hover:bg-coral-50"
+                            className="hover:bg-error inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-fg-error"
                             title="ลบ"
                           >
                             <Trash2 size={12} />

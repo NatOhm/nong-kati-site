@@ -19,7 +19,7 @@ const BADGES = [
     icon: <Headphones size={24} className="text-coral-500" />,
     title: 'ตอบไว 24 ชม.',
     desc: 'ทีมงานพร้อมดูแลทุกวัน',
-    color: 'bg-coral-100 text-coral-600',
+    color: 'bg-coral-100 text-fg-error',
   },
   {
     icon: <Wallet size={24} className="text-fg-brand" />,

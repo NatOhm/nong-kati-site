@@ -26,7 +26,7 @@ interface HealthStatus {
 
 export async function GET(): Promise<NextResponse> {
   const startTime = Date.now();
-  
+
   const health: HealthStatus = {
     status: 'healthy',
     timestamp: new Date().toISOString(),
@@ -46,8 +46,8 @@ export async function GET(): Promise<NextResponse> {
   }
 
   const statusCode = health.status === 'healthy' ? 200 : 503;
-  
-  return NextResponse.json(health, { 
+
+  return NextResponse.json(health, {
     status: statusCode,
     headers: {
       'Cache-Control': 'no-cache, no-store, must-revalidate',

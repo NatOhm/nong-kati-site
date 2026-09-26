@@ -345,7 +345,7 @@ export default function AdminStaffPage(): React.JSX.Element {
                           'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
                           member.status === 'active'
                             ? 'text-jade-600 bg-jade-500/15'
-                            : 'bg-coral-500/15 text-coral-700',
+                            : 'bg-coral-500/15 text-fg-error',
                         )}
                       >
                         {member.status === 'active' ? 'ใช้งาน' : 'ปิดใช้งาน'}
@@ -381,7 +381,7 @@ export default function AdminStaffPage(): React.JSX.Element {
                           member.id !== selfId && (
                             <button
                               onClick={() => handleDeactivate(member.id)}
-                              className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-coral-600 hover:bg-coral-50"
+                              className="hover:bg-error inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-fg-error"
                             >
                               <UserMinus size={12} /> ปิดใช้งาน
                             </button>

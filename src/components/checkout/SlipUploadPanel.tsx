@@ -68,10 +68,16 @@ export function SlipUploadPanel({
     });
     const body = (await res.json().catch(() => ({}))) as { message?: string; error?: string };
     if (res.ok) {
-      setResult({ ok: true, message: body.message ?? 'ได้รับสลิปแล้ว — แอดมินจะตรวจและยืนยันให้เร็วที่สุด' });
+      setResult({
+        ok: true,
+        message: body.message ?? 'ได้รับสลิปแล้ว — แอดมินจะตรวจและยืนยันให้เร็วที่สุด',
+      });
       return true;
     }
-    setResult({ ok: false, message: body.message ?? body.error ?? 'ส่งสลิปไม่สำเร็จ — ลองอีกครั้ง' });
+    setResult({
+      ok: false,
+      message: body.message ?? body.error ?? 'ส่งสลิปไม่สำเร็จ — ลองอีกครั้ง',
+    });
     return false;
   }
 
@@ -93,7 +99,10 @@ export function SlipUploadPanel({
           message?: string;
           error?: string;
         };
-        if (res.ok && (body.status === 'confirmed' || body.status === 'pending_manual_fulfilment')) {
+        if (
+          res.ok &&
+          (body.status === 'confirmed' || body.status === 'pending_manual_fulfilment')
+        ) {
           setResult({ ok: true, message: body.message ?? 'ตรวจสลิปผ่าน — ส่งโค้ดแล้ว' });
           return;
         }
@@ -115,7 +124,9 @@ export function SlipUploadPanel({
         <ShieldCheck size={18} className="mt-0.5 shrink-0 text-fg-brand" />
         <div className="text-sm">
           <p className="font-semibold text-fg">
-            {slipVerifyEnabled ? 'โอนแล้ว? อัปโหลดสลิปเพื่อยืนยันอัตโนมัติ' : 'โอนแล้ว? ส่งสลิปเพื่อให้แอดมินตรวจยืนยัน'}
+            {slipVerifyEnabled
+              ? 'โอนแล้ว? อัปโหลดสลิปเพื่อยืนยันอัตโนมัติ'
+              : 'โอนแล้ว? ส่งสลิปเพื่อให้แอดมินตรวจยืนยัน'}
           </p>
           <p className="mt-0.5 text-xs text-fg-muted">
             {slipVerifyEnabled
@@ -131,11 +142,15 @@ export function SlipUploadPanel({
             'mt-3 flex items-start gap-2 rounded-md px-3 py-2.5 text-sm',
             result.ok
               ? 'border border-jade-500/40 bg-jade-900/5 text-jade-700'
-              : 'border border-coral-300 bg-coral-50 text-coral-700',
+              : 'border border-coral-300 bg-coral-50 text-fg-error',
           )}
           role="status"
         >
-          {result.ok ? <CheckCircle2 size={16} className="mt-0.5 shrink-0" /> : <XCircle size={16} className="mt-0.5 shrink-0" />}
+          {result.ok ? (
+            <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
+          ) : (
+            <XCircle size={16} className="mt-0.5 shrink-0" />
+          )}
           <span>{result.message}</span>
         </div>
       ) : (

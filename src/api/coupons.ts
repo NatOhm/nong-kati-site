@@ -111,9 +111,7 @@ export async function adminListCoupons(params: {
   if (q) {
     const term = q.toLowerCase();
     filtered = filtered.filter(
-      (c) =>
-        c.code.toLowerCase().includes(term) ||
-        c.description.toLowerCase().includes(term)
+      (c) => c.code.toLowerCase().includes(term) || c.description.toLowerCase().includes(term),
     );
   }
 
@@ -150,7 +148,7 @@ export async function adminCreateCoupon(
     expiresAt?: Date | null;
   },
   adminId: string,
-  adminEmail: string
+  adminEmail: string,
 ): Promise<{ data?: Coupon; error?: string }> {
   // Validate code format
   if (!input.code.match(/^[A-Z0-9-]{3,20}$/)) {
@@ -168,10 +166,16 @@ export async function adminCreateCoupon(
   }
 
   // Validate scope-specific fields
-  if (input.scope === 'product' && (!input.applicableProductIds || input.applicableProductIds.length === 0)) {
+  if (
+    input.scope === 'product' &&
+    (!input.applicableProductIds || input.applicableProductIds.length === 0)
+  ) {
     return { error: 'PRODUCT_IDS_REQUIRED' };
   }
-  if (input.scope === 'category' && (!input.applicableCategoryIds || input.applicableCategoryIds.length === 0)) {
+  if (
+    input.scope === 'category' &&
+    (!input.applicableCategoryIds || input.applicableCategoryIds.length === 0)
+  ) {
     return { error: 'CATEGORY_IDS_REQUIRED' };
   }
 
@@ -229,7 +233,7 @@ export async function adminUpdateCoupon(
     expiresAt: Date | null;
   }>,
   adminId: string,
-  adminEmail: string
+  adminEmail: string,
 ): Promise<{ data?: Coupon; error?: string }> {
   const coupon = mockCoupons.find((c) => c.id === couponId);
   if (!coupon) return { error: 'COUPON_NOT_FOUND' };
@@ -260,7 +264,7 @@ export async function adminToggleCoupon(
   couponId: string,
   isActive: boolean,
   adminId: string,
-  adminEmail: string
+  adminEmail: string,
 ): Promise<{ data?: Coupon; error?: string }> {
   const coupon = mockCoupons.find((c) => c.id === couponId);
   if (!coupon) return { error: 'COUPON_NOT_FOUND' };
@@ -288,7 +292,7 @@ export async function adminToggleCoupon(
 export async function adminDeleteCoupon(
   couponId: string,
   adminId: string,
-  adminEmail: string
+  adminEmail: string,
 ): Promise<{ error?: string }> {
   const coupon = mockCoupons.find((c) => c.id === couponId);
   if (!coupon) return { error: 'COUPON_NOT_FOUND' };
@@ -323,11 +327,9 @@ export async function adminDeleteCoupon(
 export function validateCoupon(
   code: string,
   cartTotal: number,
-  customerId?: string
+  customerId?: string,
 ): CouponValidationResult {
-  const coupon = mockCoupons.find(
-    (c) => c.code.toUpperCase() === code.toUpperCase()
-  );
+  const coupon = mockCoupons.find((c) => c.code.toUpperCase() === code.toUpperCase());
 
   if (!coupon) {
     return { valid: false, error: 'COUPON_NOT_FOUND' };

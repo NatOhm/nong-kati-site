@@ -56,13 +56,13 @@ const STATUS_CONFIG: Record<
   failed: {
     label: 'ล้มเหลว',
     bgClass: 'bg-coral-50',
-    textClass: 'text-coral-700',
+    textClass: 'text-fg-error',
     borderClass: 'border-coral-300',
   },
   failed_final: {
     label: 'ล้มเหลว (สูงสุด)',
     bgClass: 'bg-coral-50',
-    textClass: 'text-coral-700',
+    textClass: 'text-fg-error',
     borderClass: 'border-coral-300',
   },
   refunded: {

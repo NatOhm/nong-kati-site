@@ -273,9 +273,12 @@
 
 /* ── Semantic Tokens: Dark Cocoa (available via [data-theme='dark']) ── */
 [data-theme='dark'] {
-  --bg-base: var(--clay-950);
-  --bg-surface: var(--clay-900);
-  --bg-nav: var(--clay-900);
+  /* Audit #10: widen the elevation ladder so cards read ABOVE the page —
+     base/surface/nav no longer share one brown. Steps: base 3A2A18 →
+     surface/nav 46321C → elevated 5C4426 (kept for AA text pairing). */
+  --bg-base: #3a2a18;
+  --bg-surface: #46321c;
+  --bg-nav: #46321c;
   --bg-elevated: var(--clay-800);
   --bg-sunken: #2c1e12;
   --bg-overlay: rgba(40, 27, 16, 0.8);

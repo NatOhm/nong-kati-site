@@ -17,7 +17,8 @@
  * checkout keeps the manual-slip fallback (admin clicks ยืนยันการชำระเงิน).
  */
 
-const SLIP_VERIFY_BASE = process.env['SLIP_VERIFY_BASE_OVERRIDE'] ?? 'https://api.slipok.com/api/line/apikey';
+const SLIP_VERIFY_BASE =
+  process.env['SLIP_VERIFY_BASE_OVERRIDE'] ?? 'https://api.slipok.com/api/line/apikey';
 
 export interface SlipVerifyInput {
   imageBase64: string;
@@ -131,7 +132,11 @@ export async function verifySlip(input: SlipVerifyInput): Promise<SlipVerifyResu
   // SlipOK already enforced the amount via the `amount` field (1013), but the
   // local re-check keeps the invariant in our hands, not the provider's.
   if (Math.abs(amount - input.expectedAmountThb) > 0.005) {
-    return { ok: false, code: 'AMOUNT_MISMATCH', detail: `slip ${amount} vs order ${input.expectedAmountThb}` };
+    return {
+      ok: false,
+      code: 'AMOUNT_MISMATCH',
+      detail: `slip ${amount} vs order ${input.expectedAmountThb}`,
+    };
   }
   return {
     ok: true,

@@ -129,7 +129,7 @@ export function AdminTopBar({
             localStorage.removeItem('nk_admin_email');
             window.location.href = '/management/login';
           }}
-          className="rounded p-1.5 text-fg-placeholder hover:bg-surface hover:text-coral-600"
+          className="rounded p-1.5 text-fg-placeholder hover:bg-surface hover:text-fg-error"
           aria-label="ออกจากระบบ"
         >
           <LogOut size={18} strokeWidth={1.5} />

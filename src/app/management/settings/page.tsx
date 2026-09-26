@@ -305,7 +305,7 @@ function AnnouncementSettings({
           </div>
 
           {error && (
-            <div className="flex items-center gap-2 rounded-lg border border-coral-300 bg-coral-50 px-4 py-3 text-sm text-coral-700">
+            <div className="border-error bg-error flex items-center gap-2 rounded-lg border px-4 py-3 text-sm text-fg-error">
               <AlertTriangle size={16} /> {error}
             </div>
           )}
@@ -594,7 +594,7 @@ function AppearanceSettings({
                       type="button"
                       onClick={() => void removeMascot()}
                       disabled={mascotBusy}
-                      className="flex items-center gap-2 rounded-lg border border-coral-300 px-3 py-2 text-sm font-semibold text-coral-700 transition-colors hover:bg-coral-50 disabled:opacity-50 dark:border-coral-700 dark:text-coral-300 dark:hover:bg-coral-900/20"
+                      className="hover:bg-error flex items-center gap-2 rounded-lg border border-coral-300 px-3 py-2 text-sm font-semibold text-fg-error transition-colors disabled:opacity-50 dark:border-coral-700 dark:text-coral-300 dark:hover:bg-coral-900/20"
                     >
                       <Trash2 size={15} /> ใช้แฮมสเตอร์เดิม
                     </button>
@@ -640,7 +640,7 @@ function AppearanceSettings({
           </div>
 
           {error && (
-            <div className="flex items-center gap-2 rounded-lg border border-coral-300 bg-coral-50 px-4 py-3 text-sm text-coral-700">
+            <div className="border-error bg-error flex items-center gap-2 rounded-lg border px-4 py-3 text-sm text-fg-error">
               <AlertTriangle size={16} /> {error}
             </div>
           )}
@@ -825,7 +825,7 @@ function StoreSettings({
           </div>
 
           {error && (
-            <div className="flex items-center gap-2 rounded-lg border border-coral-300 bg-coral-50 px-4 py-3 text-sm text-coral-700">
+            <div className="border-error bg-error flex items-center gap-2 rounded-lg border px-4 py-3 text-sm text-fg-error">
               <AlertTriangle size={16} /> {error}
             </div>
           )}
@@ -1023,7 +1023,7 @@ function ManualTransferSettings(): React.JSX.Element {
       </div>
 
       {error && (
-        <div className="mt-3 flex items-center gap-2 rounded-lg border border-coral-300 bg-coral-50 px-4 py-3 text-sm text-coral-700">
+        <div className="border-error bg-error mt-3 flex items-center gap-2 rounded-lg border px-4 py-3 text-sm text-fg-error">
           <AlertTriangle size={16} /> {error}
         </div>
       )}
@@ -1341,7 +1341,7 @@ function SecuritySettings(): React.JSX.Element {
               </div>
               {!session.current && (
                 <button
-                  className="rounded p-1.5 text-clay-400 hover:bg-surface hover:text-coral-600"
+                  className="rounded p-1.5 text-clay-400 hover:bg-surface hover:text-fg-error"
                   aria-label="ยกเลิก session"
                 >
                   <Trash2 size={14} />
@@ -1490,7 +1490,7 @@ function NotificationSettings({
             />
           </div>
           {error && (
-            <div className="rounded-md border border-coral-300 bg-coral-50 px-4 py-3 text-sm text-coral-700">
+            <div className="border-error bg-error rounded-md border px-4 py-3 text-sm text-fg-error">
               {error}
             </div>
           )}
@@ -1612,7 +1612,7 @@ function ChangePassword(): React.JSX.Element {
           </Field>
         </div>
         {error && (
-          <div className="flex items-center gap-2 rounded-lg border border-coral-300 bg-coral-50 px-4 py-3 text-sm text-coral-700">
+          <div className="border-error bg-error flex items-center gap-2 rounded-lg border px-4 py-3 text-sm text-fg-error">
             <AlertTriangle size={16} /> {error}
           </div>
         )}
@@ -1914,7 +1914,7 @@ function BannerSettings(): React.JSX.Element {
           อัตราส่วนประมาณ 21:8 (สูงสุด 512KB ต่อภาพ) หรือเพิ่มเป็นข้อความโปรโมชั่นล้วนก็ได้
         </p>
         {error && (
-          <p className="mt-3 rounded-lg bg-coral-50 px-3 py-2 text-sm text-coral-700 dark:bg-coral-900/20 dark:text-coral-300">
+          <p className="bg-error mt-3 rounded-lg px-3 py-2 text-sm text-fg-error dark:bg-coral-900/20 dark:text-coral-300">
             {error}
           </p>
         )}
@@ -2052,7 +2052,7 @@ function BannerSettings(): React.JSX.Element {
                 type="button"
                 onClick={() => void remove(slide.id)}
                 aria-label="ลบสไลด์"
-                className="rounded-lg p-2 text-coral-600 transition-colors hover:bg-coral-50 dark:text-coral-400 dark:hover:bg-coral-900/20"
+                className="hover:bg-error rounded-lg p-2 text-fg-error transition-colors dark:text-coral-400 dark:hover:bg-coral-900/20"
               >
                 <Trash2 size={16} />
               </button>

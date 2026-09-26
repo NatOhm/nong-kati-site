@@ -53,7 +53,7 @@ export function Checkbox({
         <span>{label}</span>
       </label>
       {error && (
-        <p role="alert" className="pl-7 text-xs text-coral-700">
+        <p role="alert" className="pl-7 text-xs text-fg-error">
           {error}
         </p>
       )}

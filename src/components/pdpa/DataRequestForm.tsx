@@ -133,7 +133,7 @@ export function DataRequestForm(): React.JSX.Element {
         />
       </div>
 
-      {error && <p className="text-sm text-coral-600">{error}</p>}
+      {error && <p className="text-sm text-fg-error">{error}</p>}
 
       <button
         type="submit"

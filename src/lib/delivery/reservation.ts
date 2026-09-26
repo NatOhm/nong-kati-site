@@ -54,10 +54,7 @@ interface MockGiftCode {
  * Initialize mock codes for a variant (for testing).
  * In production, codes are loaded via CSV import.
  */
-export function initMockCodes(
-  variantId: string,
-  codes: string[],
-): void {
+export function initMockCodes(variantId: string, codes: string[]): void {
   for (const code of codes) {
     const { ciphertext, nonce } = encryptCode(code);
     const hash = hashCode(code);
@@ -99,10 +96,7 @@ export function reserveCodes(
   const availableCodes: MockGiftCode[] = [];
 
   for (const code of mockCodeStore.values()) {
-    if (
-      code.variantId === variantId &&
-      code.status === 'available'
-    ) {
+    if (code.variantId === variantId && code.status === 'available') {
       availableCodes.push(code);
     }
   }
@@ -153,10 +147,7 @@ export function assignCodes(
   const reservedCodes: MockGiftCode[] = [];
 
   for (const code of mockCodeStore.values()) {
-    if (
-      code.orderItemId === orderItemId &&
-      code.status === 'reserved'
-    ) {
+    if (code.orderItemId === orderItemId && code.status === 'reserved') {
       reservedCodes.push(code);
     }
   }
@@ -226,10 +217,7 @@ function fallbackAssign(
   const available: MockGiftCode[] = [];
 
   for (const code of mockCodeStore.values()) {
-    if (
-      code.variantId === variantId &&
-      code.status === 'available'
-    ) {
+    if (code.variantId === variantId && code.status === 'available') {
       available.push(code);
     }
   }
@@ -274,11 +262,7 @@ export function releaseExpiredReservations(timeoutMinutes: number = 30): number 
   let released = 0;
 
   for (const code of mockCodeStore.values()) {
-    if (
-      code.status === 'reserved' &&
-      code.reservedAt &&
-      code.reservedAt < cutoff
-    ) {
+    if (code.status === 'reserved' && code.reservedAt && code.reservedAt < cutoff) {
       // §7.4: Re-check order status before releasing
       // In production, this queries the order table
       // For mock, we release all stale reservations

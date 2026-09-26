@@ -86,7 +86,8 @@ export async function adminListCustomers(params: {
       tier: normalizeTier(c.tier),
       emailVerified: c.emailVerified,
       totalOrders: c._count.orders,
-      totalSpendThb: Math.round(c.orders.reduce((s, o) => s + Number(o.totalAmountThb), 0) * 100) / 100,
+      totalSpendThb:
+        Math.round(c.orders.reduce((s, o) => s + Number(o.totalAmountThb), 0) * 100) / 100,
       walletBalanceThb: Number(c.walletBalanceThb),
       createdAt: c.createdAt,
       lastLoginAt: c.lastLoginAt,
@@ -100,20 +101,20 @@ export async function adminListCustomers(params: {
 /**
  * Get full customer detail for admin. 07-api.md §23 — GET /admin/customers/:id
  */
-export async function adminGetCustomer(
-  customerId: string,
-): Promise<AdminCustomerDetail | null> {
-  const c = await prisma.customer.findUnique({
-    where: { id: customerId },
-    include: {
-      _count: { select: { orders: true } },
-      orders: {
-        orderBy: { createdAt: 'desc' },
-        take: 5,
-        select: { orderNumber: true, status: true, totalAmountThb: true, createdAt: true },
+export async function adminGetCustomer(customerId: string): Promise<AdminCustomerDetail | null> {
+  const c = await prisma.customer
+    .findUnique({
+      where: { id: customerId },
+      include: {
+        _count: { select: { orders: true } },
+        orders: {
+          orderBy: { createdAt: 'desc' },
+          take: 5,
+          select: { orderNumber: true, status: true, totalAmountThb: true, createdAt: true },
+        },
       },
-    },
-  }).catch(() => null);
+    })
+    .catch(() => null);
   if (!c) return null;
 
   const allSpend = await prisma.order.aggregate({
@@ -133,7 +134,9 @@ export async function adminGetCustomer(
     createdAt: c.createdAt,
     lastLoginAt: c.lastLoginAt,
     // Masked per PDPA — never expose the full phone number to staff UI.
-    phoneNumber: c.phoneNumber ? `${c.phoneNumber.slice(0, 3)}****${c.phoneNumber.slice(-3)}` : null,
+    phoneNumber: c.phoneNumber
+      ? `${c.phoneNumber.slice(0, 3)}****${c.phoneNumber.slice(-3)}`
+      : null,
     walletBalanceThb: Number(c.walletBalanceThb),
     lineOptIn: false,
     marketingOptIn: c.marketingOptIn,
@@ -237,8 +240,7 @@ export async function adminAdjustCustomerCredit(
   adminId: string,
   adminEmail: string,
 ): Promise<
-  | { success: true; balanceThb: number; amountThb: number }
-  | { success: false; error: string }
+  { success: true; balanceThb: number; amountThb: number } | { success: false; error: string }
 > {
   const amount = Number(amountThb);
   if (!Number.isFinite(amount) || amount === 0) {
@@ -265,9 +267,7 @@ export async function adminAdjustCustomerCredit(
     const updated = await tx.customer.updateMany({
       where: {
         id: customerId,
-        ...(amount2 < 0
-          ? { walletBalanceThb: { gte: -amount2 } }
-          : {}),
+        ...(amount2 < 0 ? { walletBalanceThb: { gte: -amount2 } } : {}),
       },
       data: { walletBalanceThb: { increment: amount2 } },
     });

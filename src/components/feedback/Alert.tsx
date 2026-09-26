@@ -26,7 +26,7 @@ const styleByType: Record<
   error: {
     bg: 'bg-crimson-900',
     border: 'border-crimson-700',
-    fg: 'text-coral-700',
+    fg: 'text-fg-error',
     icon: <AlertCircle size={20} strokeWidth={1.5} />,
   },
   warning: {

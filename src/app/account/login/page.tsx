@@ -266,6 +266,8 @@ export default function LoginPage(): React.JSX.Element {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   autoComplete="email"
+                  aria-invalid={error ? true : undefined}
+                  aria-describedby={error ? 'login-error' : undefined}
                   className="w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-3 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand"
                   placeholder="your@email.com"
                 />
@@ -300,6 +302,8 @@ export default function LoginPage(): React.JSX.Element {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   autoComplete="current-password"
+                  aria-invalid={error ? true : undefined}
+                  aria-describedby={error ? 'login-error' : undefined}
                   className="w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-10 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand"
                   placeholder="••••••••"
                 />
@@ -326,11 +330,13 @@ export default function LoginPage(): React.JSX.Element {
               <span className="text-sm text-fg-placeholder">จดจำฉัน</span>
             </label>
 
-            {/* Error */}
+            {/* Error — semantic tokens survive both themes at AA contrast;
+                both fields point here via aria-describedby. */}
             {error && (
               <div
+                id="login-error"
                 role="alert"
-                className="rounded-md border border-coral-300 bg-coral-50 px-3 py-2 text-sm text-coral-600"
+                className="border-error bg-error rounded-md border px-3 py-2 text-sm text-fg-error"
               >
                 {error}
               </div>
@@ -470,7 +476,7 @@ export default function LoginPage(): React.JSX.Element {
                 {otpError && (
                   <div
                     role="alert"
-                    className="rounded-md border border-coral-300 bg-coral-50 px-3 py-2 text-sm text-coral-600"
+                    className="border-error bg-error rounded-md border px-3 py-2 text-sm text-fg-error"
                   >
                     {otpError}
                   </div>
@@ -483,7 +489,7 @@ export default function LoginPage(): React.JSX.Element {
           {oauthError && (
             <div
               role="alert"
-              className="mt-4 rounded-md border border-coral-300 bg-coral-50 px-3 py-2 text-sm text-coral-600"
+              className="border-error bg-error mt-4 rounded-md border px-3 py-2 text-sm text-fg-error"
             >
               {oauthError === 'blocked'
                 ? 'บัญชีนี้ถูกบล็อค กรุณาติดต่อฝ่ายสนับสนุน'

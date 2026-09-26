@@ -186,7 +186,7 @@ export default function RegisterPage(): React.JSX.Element {
 
             {/* Error */}
             {error && (
-              <div className="rounded-md border border-coral-300 bg-coral-50 px-3 py-2 text-sm text-coral-600">
+              <div className="border-error bg-error rounded-md border px-3 py-2 text-sm text-fg-error">
                 {error}
               </div>
             )}

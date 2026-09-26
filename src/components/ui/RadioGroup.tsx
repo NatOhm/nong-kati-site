@@ -71,7 +71,7 @@ export function RadioGroup({
         })}
       </div>
       {error && (
-        <p role="alert" className="text-xs text-coral-700">
+        <p role="alert" className="text-xs text-fg-error">
           {error}
         </p>
       )}

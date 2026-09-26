@@ -188,7 +188,7 @@ export default function AdminLoginPage(): React.JSX.Element {
             <h2 className="text-lg font-semibold text-fg">เข้าสู่ระบบ</h2>
 
             {error && (
-              <div className="rounded-md border border-coral-300 bg-coral-50 px-3 py-2 text-sm text-coral-700">
+              <div className="border-error bg-error rounded-md border px-3 py-2 text-sm text-fg-error">
                 {error}
               </div>
             )}
@@ -299,7 +299,7 @@ export default function AdminLoginPage(): React.JSX.Element {
                 maxLength={6}
                 className="w-full rounded-md border border-line bg-surface px-3 py-2.5 text-center font-mono text-lg tracking-widest text-fg focus:ring-2 focus:ring-peach-500"
               />
-              {error && <p className="text-sm text-coral-600">{error}</p>}
+              {error && <p className="text-sm text-fg-error">{error}</p>}
               <button
                 type="submit"
                 disabled={loading || totpCode.length !== 6}
@@ -321,7 +321,7 @@ export default function AdminLoginPage(): React.JSX.Element {
             <p className="text-sm text-fg-placeholder">กรอกรหัส 6 หลักจาก Authenticator App</p>
 
             {error && (
-              <div className="rounded-md border border-coral-300 bg-coral-50 px-3 py-2 text-sm text-coral-700">
+              <div className="border-error bg-error rounded-md border px-3 py-2 text-sm text-fg-error">
                 {error}
               </div>
             )}

@@ -167,7 +167,7 @@ export default async function CategoryPage({
                       id: v.id,
                       label: v.label,
                       price: v.effectivePrice,
-                        effectivePrice: v.effectivePrice,
+                      effectivePrice: v.effectivePrice,
                       stock: v.stock,
                     }))}
                   />

@@ -72,7 +72,7 @@ export function TaxInvoiceToggle({
                 errors?.name ? 'border-crimson-500' : 'border-line',
               )}
             />
-            {errors?.name && <p className="mt-1 text-xs text-coral-600">{errors.name}</p>}
+            {errors?.name && <p className="mt-1 text-xs text-fg-error">{errors.name}</p>}
           </div>
 
           {/* Tax ID */}
@@ -92,7 +92,7 @@ export function TaxInvoiceToggle({
                 errors?.taxId ? 'border-crimson-500' : 'border-line',
               )}
             />
-            {errors?.taxId && <p className="mt-1 text-xs text-coral-600">{errors.taxId}</p>}
+            {errors?.taxId && <p className="mt-1 text-xs text-fg-error">{errors.taxId}</p>}
           </div>
         </div>
       )}

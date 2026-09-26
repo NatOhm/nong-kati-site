@@ -222,7 +222,7 @@ export default function SlowStockReportPage(): React.JSX.Element {
               'rounded-lg px-3 py-2 text-sm',
               daysMsg === 'บันทึกแล้ว'
                 ? 'dark:text-jade-300 bg-jade-500/10 text-jade-700'
-                : 'bg-coral-50 text-coral-700 dark:bg-coral-900/20 dark:text-coral-300',
+                : 'bg-coral-50 text-fg-error dark:bg-coral-900/20 dark:text-coral-300',
             )}
           >
             {daysMsg}
@@ -230,7 +230,7 @@ export default function SlowStockReportPage(): React.JSX.Element {
         )}
 
         {error && (
-          <p className="rounded-lg bg-coral-50 px-3 py-2 text-sm text-coral-700 dark:bg-coral-900/20 dark:text-coral-300">
+          <p className="bg-error rounded-lg px-3 py-2 text-sm text-fg-error dark:bg-coral-900/20 dark:text-coral-300">
             {error}
           </p>
         )}
@@ -315,7 +315,7 @@ export default function SlowStockReportPage(): React.JSX.Element {
                     </td>
                     <td className="px-4 py-3 text-fg-secondary">
                       {r.neverSold ? (
-                        <span className="rounded-full bg-coral-500/15 px-2.5 py-0.5 text-xs font-semibold text-coral-700 dark:text-coral-300">
+                        <span className="rounded-full bg-coral-500/15 px-2.5 py-0.5 text-xs font-semibold text-fg-error dark:text-coral-300">
                           ไม่เคยขายเลย
                         </span>
                       ) : (
@@ -324,7 +324,7 @@ export default function SlowStockReportPage(): React.JSX.Element {
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums text-fg-secondary">
                       {r.neverSold ? (
-                        <span className="font-semibold text-coral-600 dark:text-coral-300">∞</span>
+                        <span className="font-semibold text-fg-error dark:text-coral-300">∞</span>
                       ) : (
                         <>
                           {r.daysSinceLastSale}{' '}

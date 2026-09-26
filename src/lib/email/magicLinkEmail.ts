@@ -46,7 +46,5 @@ export async function sendMagicLinkEmail(params: {
     text,
   });
 
-  return result.success
-    ? { ok: true }
-    : { ok: false, error: result.error ?? 'EMAIL_SEND_FAILED' };
+  return result.success ? { ok: true } : { ok: false, error: result.error ?? 'EMAIL_SEND_FAILED' };
 }

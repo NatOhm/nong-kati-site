@@ -166,7 +166,7 @@ export async function adminListOrders(params: {
       (o) =>
         o.orderNumber.toLowerCase().includes(term) ||
         o.customerEmail.toLowerCase().includes(term) ||
-        o.id.toLowerCase().includes(term)
+        o.id.toLowerCase().includes(term),
     );
   }
 
@@ -181,9 +181,7 @@ export async function adminListOrders(params: {
  * Get full order detail for admin.
  * 07-api.md §22 — GET /admin/orders/:id
  */
-export async function adminGetOrder(
-  orderId: string
-): Promise<AdminOrderDetail | null> {
+export async function adminGetOrder(orderId: string): Promise<AdminOrderDetail | null> {
   const order = mockOrders.find((o) => o.id === orderId);
   if (!order) return null;
 
@@ -249,7 +247,7 @@ export async function adminGetOrder(
 export async function adminResendOrderEmail(
   orderId: string,
   adminId: string,
-  adminEmail: string
+  adminEmail: string,
 ): Promise<{ success: boolean }> {
   const order = mockOrders.find((o) => o.id === orderId);
   if (!order) return { success: false };
@@ -279,7 +277,7 @@ export async function adminAssignCode(
     notes?: string;
   },
   adminId: string,
-  adminEmail: string
+  adminEmail: string,
 ): Promise<{
   success: boolean;
   data?: { orderItemId: string; codeId: string; orderStatus: string };
@@ -335,7 +333,7 @@ export async function adminUpdateOrderNotes(
   orderId: string,
   notes: string,
   adminId: string,
-  adminEmail: string
+  adminEmail: string,
 ): Promise<{ success: boolean }> {
   writeAuditLog({
     actorType: 'admin',
@@ -366,7 +364,7 @@ export async function adminRefundOrder(
     voidCodes: boolean;
   },
   adminId: string,
-  adminEmail: string
+  adminEmail: string,
 ): Promise<{
   success: boolean;
   data?: {

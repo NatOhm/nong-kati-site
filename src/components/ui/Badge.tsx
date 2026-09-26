@@ -11,7 +11,7 @@ export interface BadgeProps {
 
 const variantClasses: Record<BadgeVariant, string> = {
   success: 'bg-jade-900 text-jade-200 border-jade-700',
-  error: 'bg-crimson-900 text-coral-700 border-crimson-700',
+  error: 'bg-crimson-900 text-fg-error border-crimson-700',
   warning: 'bg-topaz-900 text-topaz-200 border-topaz-400',
   info: 'bg-sapphire-900 text-sapphire-200 border-sapphire-700',
   neutral: 'bg-surface text-fg-muted border-line-subtle',

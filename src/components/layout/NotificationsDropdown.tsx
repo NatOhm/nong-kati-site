@@ -124,9 +124,7 @@ export function NotificationsDropdown(): React.JSX.Element {
             <div className="px-4 py-8 text-center">
               <Tag size={28} className="mx-auto mb-2 text-fg-placeholder" />
               <p className="text-sm text-fg-placeholder">ยังไม่มีการแจ้งเตือน</p>
-              <p className="mt-1 text-xs text-fg-placeholder">
-                โปรโมชั่นและข่าวสารจะแสดงที่นี่
-              </p>
+              <p className="mt-1 text-xs text-fg-placeholder">โปรโมชั่นและข่าวสารจะแสดงที่นี่</p>
             </div>
           ) : (
             <ul className="max-h-80 overflow-y-auto overscroll-contain">
@@ -147,7 +145,7 @@ export function NotificationsDropdown(): React.JSX.Element {
                       <p className="truncate text-sm font-medium text-fg">{n.title}</p>
                       <p className="text-xs text-fg-placeholder">{n.body}</p>
                       {hint && (
-                        <p className="mt-0.5 text-[11px] font-medium text-coral-600">{hint}</p>
+                        <p className="mt-0.5 text-[11px] font-medium text-fg-error">{hint}</p>
                       )}
                     </div>
                     {!n.read && (

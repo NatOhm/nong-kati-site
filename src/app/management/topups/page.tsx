@@ -114,7 +114,7 @@ export default function AdminTopupsPage(): React.JSX.Element {
         </div>
 
         {err && (
-          <div className="rounded-lg border border-coral-300 bg-coral-50 px-4 py-3 text-sm text-coral-700">
+          <div className="border-error bg-error rounded-lg border px-4 py-3 text-sm text-fg-error">
             {err}
             <button onClick={() => void load()} className="ml-2 font-semibold underline">
               ลองอีกครั้ง
@@ -180,7 +180,7 @@ export default function AdminTopupsPage(): React.JSX.Element {
                             ? 'bg-jade-500/15 text-jade-700'
                             : t.status === 'pending'
                               ? 'bg-peach-500/15 text-peach-700'
-                              : 'bg-coral-500/15 text-coral-700',
+                              : 'bg-coral-500/15 text-fg-error',
                         )}
                       >
                         {STATUS_TH[t.status] ?? t.status}

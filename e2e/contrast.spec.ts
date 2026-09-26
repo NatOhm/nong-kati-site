@@ -26,4 +26,35 @@ for (const theme of ['light', 'dark'] as const) {
       });
     }
   });
+
+  // Audit round 4 #2 (systemic #3): the previous gate passed login because it
+  // never OPENED the error state — the hardcoded coral-on-light alert that
+  // renders on a failed sign-in was 1.04:1 in dark mode. Inject the same
+  // alert markup the app renders (semantic tokens) into both themes and gate it.
+  test.describe(`error-state contrast ${theme}`, () => {
+    for (const role of ['login', 'lookup']) {
+      test(`${role} error alert passes 4.5:1`, async ({ page }) => {
+        await page.goto('/account/login');
+        await setTheme(page, theme);
+        await page.evaluate((r) => {
+          const div = document.createElement('div');
+          div.id = 'probe-error';
+          div.setAttribute('role', 'alert');
+          div.className =
+            r === 'login'
+              ? 'rounded-md border border-error bg-error px-3 py-2 text-sm text-fg-error'
+              : 'rounded-md border border-error bg-error px-3 py-2 text-sm text-fg-error';
+          div.textContent = 'อีเมลหรือรหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง';
+          document.querySelector('main')?.appendChild(div);
+        }, role);
+        const issues = await scanContrast(page);
+        const probe = issues.filter((i) => i.text.includes('อีเมลหรือรหัสผ่าน'));
+        expect(
+          probe,
+          `${theme} ${role} error alert below 4.5:1:\n` +
+            probe.map((i) => `  ${i.ratio}:1 fg=${i.fg} bg=${i.bg}`).join('\n'),
+        ).toEqual([]);
+      });
+    }
+  });
 }

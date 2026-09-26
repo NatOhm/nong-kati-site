@@ -99,21 +99,39 @@ export const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
   super_admin: ALL_PERMISSIONS as unknown as Permission[],
 
   catalogue_manager: [
-    'products:read', 'products:write', 'products:publish', 'products:delete',
-    'categories:read', 'categories:write',
-    'inventory:read', 'inventory:upload', 'inventory:void', 'inventory:export',
-    'coupons:read', 'coupons:write',
+    'products:read',
+    'products:write',
+    'products:publish',
+    'products:delete',
+    'categories:read',
+    'categories:write',
+    'inventory:read',
+    'inventory:upload',
+    'inventory:void',
+    'inventory:export',
+    'coupons:read',
+    'coupons:write',
   ],
 
   order_manager: [
-    'orders:read', 'orders:read:full', 'orders:write', 'orders:refund',
-    'customers:read', 'customers:read:full', 'customers:block', 'customers:write',
-    'reviews:read', 'reviews:moderate',
+    'orders:read',
+    'orders:read:full',
+    'orders:write',
+    'orders:refund',
+    'customers:read',
+    'customers:read:full',
+    'customers:block',
+    'customers:write',
+    'reviews:read',
+    'reviews:moderate',
   ],
 
   finance_viewer: [
-    'orders:read', 'orders:read:full', 'orders:export',
-    'reports:read', 'reports:export',
+    'orders:read',
+    'orders:read:full',
+    'orders:export',
+    'reports:read',
+    'reports:export',
   ],
 
   support_agent: [
@@ -126,8 +144,10 @@ export const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
   ],
 
   marketing_manager: [
-    'products:read', 'categories:read',
-    'coupons:read', 'coupons:write',
+    'products:read',
+    'categories:read',
+    'coupons:read',
+    'coupons:write',
     'reports:read',
   ],
 };
@@ -135,52 +155,52 @@ export const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
 // ─── Admin JWT Payload ────────────────────────────────────
 
 export interface AdminJwtPayload {
-  sub: string;        // admin UUID
+  sub: string; // admin UUID
   email: string;
   role: AdminRole;
   perms: Permission[];
   iat: number;
   exp: number;
-  jti: string;        // unique token ID
+  jti: string; // unique token ID
 }
 
 // ─── Route → Permission Map ───────────────────────────────
 
 export const ROUTE_PERMISSIONS: Record<string, Permission[]> = {
-  'GET /api/v1/admin/products':              ['products:read'],
-  'POST /api/v1/admin/products':             ['products:write'],
-  'PUT /api/v1/admin/products/:id':          ['products:write'],
+  'GET /api/v1/admin/products': ['products:read'],
+  'POST /api/v1/admin/products': ['products:write'],
+  'PUT /api/v1/admin/products/:id': ['products:write'],
   'PATCH /api/v1/admin/products/:id/status': ['products:publish'],
-  'DELETE /api/v1/admin/products/:id':       ['products:delete'],
+  'DELETE /api/v1/admin/products/:id': ['products:delete'],
 
-  'GET /api/v1/admin/categories':            ['categories:read'],
-  'POST /api/v1/admin/categories':           ['categories:write'],
-  'PUT /api/v1/admin/categories/:id':        ['categories:write'],
-  'DELETE /api/v1/admin/categories/:id':     ['categories:write'],
+  'GET /api/v1/admin/categories': ['categories:read'],
+  'POST /api/v1/admin/categories': ['categories:write'],
+  'PUT /api/v1/admin/categories/:id': ['categories:write'],
+  'DELETE /api/v1/admin/categories/:id': ['categories:write'],
 
-  'GET /api/v1/admin/inventory':                          ['inventory:read'],
-  'POST /api/v1/admin/inventory/:id/upload':              ['inventory:upload'],
-  'POST /api/v1/admin/inventory/:id/codes':               ['inventory:upload'],
-  'PATCH /api/v1/admin/inventory/codes/:id/void':         ['inventory:void'],
-  'GET /api/v1/admin/inventory/codes/:id/reveal':         ['inventory:reveal'],
+  'GET /api/v1/admin/inventory': ['inventory:read'],
+  'POST /api/v1/admin/inventory/:id/upload': ['inventory:upload'],
+  'POST /api/v1/admin/inventory/:id/codes': ['inventory:upload'],
+  'PATCH /api/v1/admin/inventory/codes/:id/void': ['inventory:void'],
+  'GET /api/v1/admin/inventory/codes/:id/reveal': ['inventory:reveal'],
 
-  'GET /api/v1/admin/orders':                  ['orders:read'],
-  'GET /api/v1/admin/orders/:id':              ['orders:read'],
-  'POST /api/v1/admin/orders/:id/resend-email':['orders:write'],
+  'GET /api/v1/admin/orders': ['orders:read'],
+  'GET /api/v1/admin/orders/:id': ['orders:read'],
+  'POST /api/v1/admin/orders/:id/resend-email': ['orders:write'],
   'POST /api/v1/admin/orders/:id/assign-code': ['orders:write'],
-  'POST /api/v1/admin/orders/:id/refund':      ['orders:refund'],
+  'POST /api/v1/admin/orders/:id/refund': ['orders:refund'],
 
-  'GET /api/v1/admin/customers':              ['customers:read'],
-  'GET /api/v1/admin/customers/:id':          ['customers:read'],
-  'PATCH /api/v1/admin/customers/:id/block':  ['customers:block'],
-  'PATCH /api/v1/admin/customers/:id/tier':   ['customers:write'],
+  'GET /api/v1/admin/customers': ['customers:read'],
+  'GET /api/v1/admin/customers/:id': ['customers:read'],
+  'PATCH /api/v1/admin/customers/:id/block': ['customers:block'],
+  'PATCH /api/v1/admin/customers/:id/tier': ['customers:write'],
 
-  'GET /api/v1/admin/staff':                  ['staff:read'],
-  'POST /api/v1/admin/staff':                 ['staff:write'],
-  'PATCH /api/v1/admin/staff/:id/role':       ['staff:write'],
+  'GET /api/v1/admin/staff': ['staff:read'],
+  'POST /api/v1/admin/staff': ['staff:write'],
+  'PATCH /api/v1/admin/staff/:id/role': ['staff:write'],
   'PATCH /api/v1/admin/staff/:id/deactivate': ['staff:deactivate'],
 
-  'GET /api/v1/admin/dashboard/stats':        ['products:read'],
+  'GET /api/v1/admin/dashboard/stats': ['products:read'],
 };
 
 // ─── Admin Account Status ─────────────────────────────────
