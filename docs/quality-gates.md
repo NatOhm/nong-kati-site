@@ -114,6 +114,7 @@ Playwright เลือก target ตาม `E2E_BASE_URL` > localhost:4200 (dev
   1. Refresh token เดียว × 20 concurrent refreshes → ได้ 200 **พอดี 1** (CAS rotation, first-writer-wins), อีก 19 ต้อง 401 `TOKEN_INVALID`, DB จบด้วย session ที่ยังไม่ revoke **พอดี 1**
   2. 20 tokens ต่างกัน × 20 refreshes → **ทุกตัว 200** และแต่ละตัว revoke เฉพาะแถวตัวเอง (พิสูจน์ว่าข้อ 1 เป็น locking ที่ถูกต้อง ไม่ใช่ over-revocation)
   3. รหัสผ่านผิด × 10 concurrent → ทั้งหมด 401, account **lock พอดีหนึ่งครั้ง** (atomic guarded increment): จบด้วย `status=locked` + `lockedUntil` ในอนาคต + counter ถูก reset เหลือ 0 โดยตัว lock คนเดียว และหลัง lock รหัสถูกต้องก็ยังต้อง 401 `ACCOUNT_LOCKED`
+  4. **lock หมดอายุแล้วต้อง lock ใหม่ได้** (audit #3): จำลอง `lockedUntil` ในอดีต + counter ค้าง → ยิงรหัสผิด 5 ครั้ง ต้อง re-lock (predicate เดิม `lockedUntil: null` ทำให้นับไม่เพิ่มหลัง lock แรกหมดอายุ = brute force ฟรี) — predicate ฝั่ง customer/admin ถูก assert เป๊ะ ๆ ใน `tests/lockout-expiry.test.ts` (vitest ปกติ)
 - **วิธีแก้เมื่อแดง:** อย่าเปลี่ยน guarded `updateMany` (CAS) หรือ atomic increment กลับเป็น read-modify-write; seeding/cleanup ใช้ email ต่อท้าย run id กันชน — แดงซ้ำให้เช็คว่าไม่มี state ค้างจาก run ก่อนใน DB ทดสอบ
 
 ---

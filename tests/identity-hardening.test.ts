@@ -104,8 +104,14 @@ describe('loginCustomer failure counter', () => {
 
     const res = await loginCustomer({ email: 'c@x', password: 'wrong' });
     expect(res.success).toBe(false);
+    // Audit fix 2026-09-27: an EXPIRED lock (lockedUntil <= now) counts as
+    // eligible again — the old `lockedUntil: null`-only predicate froze the
+    // counter after the first lockout expired (audit finding #3).
     expect(m.customer.updateMany).toHaveBeenCalledWith({
-      where: { id: 'c1', lockedUntil: null },
+      where: {
+        id: 'c1',
+        OR: [{ lockedUntil: null }, { lockedUntil: { lte: expect.any(Date) } }],
+      },
       data: { failedLoginAttempts: { increment: 1 } },
     });
   });

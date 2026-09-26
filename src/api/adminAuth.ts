@@ -247,8 +247,15 @@ export async function adminLogin(
   if (!passwordOk) {
     // Atomic increment with a CAS-style guard (review 2026-09-26): the old
     // read-modify-write let N concurrent failures all write N=1.
+    // Audit fix 2026-09-27: an EXPIRED lock (lockedUntil <= now) counts as
+    // eligible again — with the old `lockedUntil: null` predicate, wrong
+    // passwords after the first lockout never incremented the counter
+    // (unlimited attempts until a real login cleared the row).
     const bumped = await prisma.adminUser.updateMany({
-      where: { id: user.id, lockedUntil: null },
+      where: {
+        id: user.id,
+        OR: [{ lockedUntil: null }, { lockedUntil: { lte: new Date() } }],
+      },
       data: { failedLoginAttempts: { increment: 1 } },
     });
     const fresh =

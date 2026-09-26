@@ -237,4 +237,59 @@ d('admin concurrency (live dev server)', () => {
       expect(post.body['error']).toBe('ACCOUNT_LOCKED');
     },
   );
+
+  it(
+    'expired lock: 5 wrong passwords lock again (audit #3 — counter must survive expiry)',
+    { timeout: 120_000 },
+    async () => {
+      const email = `concurrency-${RUN}-relock@ci.local`;
+      const { prisma } = await import('@/lib/db');
+      const admin = await seedAdmin(email);
+
+      // Simulate a lock that ALREADY EXPIRED (the state the old predicate
+      // froze: lockedUntil non-null but in the past, counter mid-flight).
+      await prisma.adminUser.update({
+        where: { id: admin.id },
+        data: {
+          failedLoginAttempts: 2,
+          lockedUntil: new Date(Date.now() - 60_000),
+          status: 'locked',
+        },
+      });
+
+      // 5 wrong passwords post-expiry. The pre-fix bug kept the counter at
+      // 2 forever (increment required lockedUntil: null); the fix counts
+      // expired locks as eligible, so attempt #3 hits the default
+      // lockoutMaxAttempts=5 and re-locks the account.
+      const results = await Promise.all(
+        Array.from({ length: 5 }, () =>
+          postJson('/api/v1/auth/admin/login', {
+            email,
+            password: `post-expiry-${RUN}-${randomBytes(4).toString('hex')}`,
+          }),
+        ),
+      );
+      expect(
+        results.filter((r) => r.status !== 401).map((r) => [r.status, r.body]),
+        'all post-expiry bad logins must be 401',
+      ).toEqual([]);
+
+      const user = await prisma.adminUser.findUnique({ where: { id: admin.id } });
+      expect(user?.status, 'account must RE-LOCK after expiry (audit #3)').toBe('locked');
+      expect(user?.lockedUntil?.getTime() ?? 0, 'new lock must be in the FUTURE').toBeGreaterThan(
+        Date.now(),
+      );
+      expect(user?.failedLoginAttempts, 'the re-lock resets the counter').toBe(0);
+
+      // And it stays locked even for the CORRECT password until the deadline.
+      const post = await postJson('/api/v1/auth/admin/login', {
+        email,
+        password: 'ConcTest!2026x',
+      });
+      expect(post.status).toBe(401);
+      expect(post.body['error']).toBe('ACCOUNT_LOCKED');
+
+      await cleanupAdmin(email);
+    },
+  );
 });

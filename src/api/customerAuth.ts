@@ -135,8 +135,15 @@ export async function loginCustomer(params: {
   if (!passwordValid) {
     // Atomic increment with CAS guard (review 2026-09-26): the old
     // read-modify-write lost concurrent increments (N failures → count 1).
+    // Audit fix 2026-09-27: an EXPIRED lock (lockedUntil <= now) must count
+    // as eligible again — the old `lockedUntil: null` predicate made every
+    // wrong password after the first lockout free (counter frozen until a
+    // successful login cleared the row).
     const bumped = await prisma.customer.updateMany({
-      where: { id: customer.id, lockedUntil: null },
+      where: {
+        id: customer.id,
+        OR: [{ lockedUntil: null }, { lockedUntil: { lte: new Date() } }],
+      },
       data: { failedLoginAttempts: { increment: 1 } },
     });
     const fresh =
