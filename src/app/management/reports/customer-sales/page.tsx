@@ -52,6 +52,8 @@ export default function CustomerSalesReportPage(): React.JSX.Element {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const load = useCallback(async (p: 'all' | 'month'): Promise<void> => {
     setLoading(true);
@@ -84,40 +86,47 @@ export default function CustomerSalesReportPage(): React.JSX.Element {
     [rows, query],
   );
 
-  function exportCsv(): void {
-    const header = [
-      'อีเมล',
-      'ชื่อ',
-      'ระดับ',
-      'ออเดอร์',
-      'ชิ้น',
-      'ยอดซื้อ (บาท)',
-      'กำไร (บาท)',
-      'กำไรครอบคลุมข้อมูลต้นทุน (%)',
-      'วอลเล็ต (บาท)',
-    ];
-    const lines = filtered.map((r) =>
-      [
-        r.email,
-        r.fullName ?? '',
-        TIER_LABEL[r.tier] ?? r.tier,
-        r.orders,
-        r.units,
-        r.spendThb.toFixed(2),
-        r.profitThb.toFixed(2),
-        r.profitCoveragePct,
-        r.walletBalanceThb.toFixed(2),
-      ]
-        .map((v) => `"${String(v).replaceAll('"', '""')}"`)
-        .join(','),
-    );
-    const csv = '\uFEFF' + [header.join(','), ...lines].join('\n');
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `customer-sales-${period === 'month' ? 'เดือนนี้' : 'ทั้งหมด'}-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+  /**
+   * CSV export — server-side: the file is built (and PII-masked) by
+   * /api/v1/admin/reports/customer-sales/export (reports:export). The
+   * client never assembles customer data into a file itself, so a limited
+   * role can only ever download the masked file the server produces.
+   * 403 (no reports:export) gets a friendly inline explanation instead of
+   * a raw error.
+   */
+  async function exportCsv(): Promise<void> {
+    setExporting(true);
+    setExportError(null);
+    try {
+      const res = await adminFetch(`/api/v1/admin/reports/customer-sales/export?period=${period}`);
+      if (!res.ok) {
+        if (res.status === 403) {
+          setExportError(
+            'บัญชีของคุณไม่มีสิทธิ์ส่งออกไฟล์ CSV (ต้องการสิทธิ์ reports:export) — ขอสิทธิ์จากผู้ดูแลระบบ หรือใช้ข้อมูลบนหน้านี้แทน',
+          );
+          return;
+        }
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        setExportError(data.error ? `ส่งออกไม่สำเร็จ: ${data.error}` : 'ส่งออกไม่สำเร็จ');
+        return;
+      }
+      // Filename from Content-Disposition; fallback to the local convention.
+      const disposition = res.headers.get('content-disposition') ?? '';
+      const m = /filename="([^"]+)"/.exec(disposition);
+      const filename =
+        m?.[1] ??
+        `customer-sales-${period === 'month' ? 'เดือนนี้' : 'ทั้งหมด'}-${new Date().toISOString().slice(0, 10)}.csv`;
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setExportError('เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ — ส่งออกไม่สำเร็จ');
+    } finally {
+      setExporting(false);
+    }
   }
 
   return (
@@ -173,12 +182,12 @@ export default function CustomerSalesReportPage(): React.JSX.Element {
             </button>
             <button
               type="button"
-              onClick={exportCsv}
-              disabled={filtered.length === 0}
+              onClick={() => void exportCsv()}
+              disabled={exporting || rows.length === 0}
               className="flex items-center gap-2 rounded-full bg-peach-500 px-4 py-2.5 text-sm font-semibold text-white shadow-clay-sm transition-transform duration-fast ease-out-quart hover:scale-105 active:scale-90 disabled:opacity-50"
             >
-              <Download size={16} />
-              CSV
+              {exporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+              {exporting ? 'กำลังส่งออก…' : 'CSV'}
             </button>
           </div>
         </div>
@@ -206,6 +215,16 @@ export default function CustomerSalesReportPage(): React.JSX.Element {
           <p className="bg-error rounded-lg px-3 py-2 text-sm text-fg-error dark:bg-coral-900/20 dark:text-coral-300">
             {error}
           </p>
+        )}
+
+        {exportError && (
+          <div
+            role="alert"
+            className="flex items-start gap-2 rounded-lg border border-coral-300 bg-coral-500/10 px-4 py-3 text-sm text-fg-error dark:border-coral-700 dark:bg-coral-900/20 dark:text-coral-300"
+          >
+            <Download size={16} className="mt-0.5 shrink-0" />
+            <span>{exportError}</span>
+          </div>
         )}
 
         {/* Search */}
