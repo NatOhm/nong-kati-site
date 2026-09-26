@@ -131,8 +131,11 @@ for (const theme of ['light', 'dark'] as const) {
       page,
     }) => {
       await page.goto('/orders/lookup');
-      const email = page.locator('#lookup-email');
-      const order = page.locator('#lookup-order');
+      // Locate by label text, not id — the a11y gate (duplicate-ID) moved
+      // these inputs onto React useId values, which are per-instance and
+      // not stable selectors.
+      const email = page.getByLabel('อีเมล *');
+      const order = page.getByLabel('รหัสคำสั่งซื้อ *');
       const btn = page.locator('form button[type="submit"]');
       await expect(btn).toBeDisabled();
 
