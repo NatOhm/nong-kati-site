@@ -29,6 +29,7 @@ import {
   ArrowDown,
   Loader2,
   Tag,
+  QrCode,
 } from 'lucide-react';
 import { AdminShell } from '@/components/layout/AdminShell';
 import { adminFetch, clearAdminSession } from '@/lib/adminSession';
@@ -853,6 +854,7 @@ interface ManualTransferForm {
   accountName: string;
   accountNumber: string;
   bankName: string;
+  qrImageUrl: string | null;
 }
 
 /**
@@ -867,10 +869,45 @@ function ManualTransferSettings(): React.JSX.Element {
     accountName: '',
     accountNumber: '',
     bankName: '',
+    qrImageUrl: null,
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [qrBusy, setQrBusy] = useState(false);
+  const qrInput = useRef<HTMLInputElement>(null);
+
+  /** Upload the shop's static bank QR via /admin/upload, then keep the
+   * returned path in the form (persisted on the next Save). */
+  async function uploadQr(file: File): Promise<void> {
+    setQrBusy(true);
+    setError(null);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error('อ่านไฟล์ไม่สำเร็จ'));
+        reader.readAsDataURL(file);
+      });
+      const up = await adminFetch('/api/v1/admin/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dataUrl }),
+      });
+      if (!up.ok) {
+        const data = (await up.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error ?? `HTTP ${up.status}`);
+      }
+      const { path } = (await up.json()) as { path: string };
+      set('qrImageUrl', path);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'อัปโหลดภาพ QR ไม่สำเร็จ');
+    } finally {
+      setQrBusy(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -888,6 +925,7 @@ function ManualTransferSettings(): React.JSX.Element {
           accountName: data.accountName ?? f.accountName,
           accountNumber: data.accountNumber ?? f.accountNumber,
           bankName: data.bankName ?? f.bankName,
+          qrImageUrl: data.qrImageUrl ?? null,
         }));
       })
       .catch((e: Error) => {
@@ -915,11 +953,16 @@ function ManualTransferSettings(): React.JSX.Element {
           accountName: form.accountName,
           accountNumber: form.accountNumber,
           bankName: form.bankName,
+          qrImageUrl: form.qrImageUrl,
         }),
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(data.error ?? `HTTP ${res.status}`);
+        throw new Error(
+          data.error === 'INVALID_QR_IMAGE_URL'
+            ? 'พาธรูป QR ไม่ถูกต้อง — ต้องเป็นไฟล์ที่อัปโหลดผ่านระบบเท่านั้น'
+            : (data.error ?? `HTTP ${res.status}`),
+        );
       }
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -1014,6 +1057,65 @@ function ManualTransferSettings(): React.JSX.Element {
                 />
               </Field>
             )}
+            <Field label="ภาพ QR ของร้าน (ไม่บังคับ)">
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-xl border border-line-subtle bg-surface">
+                  {form.qrImageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={form.qrImageUrl}
+                      alt="ภาพ QR ที่ใช้ในหน้าชำระเงิน"
+                      className="h-full w-full object-contain p-1"
+                    />
+                  ) : (
+                    <QrCode size={28} className="text-fg-placeholder" />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1 space-y-2">
+                  <p className="text-xs text-fg-placeholder">
+                    {form.qrImageUrl
+                      ? 'แสดงภาพนี้ข้างข้อมูลบัญชีในหน้าชำระเงิน — ใช้ QR ที่ธนาคารออกให้กับบัญชีดิบ (ไม่ฝังยอด)'
+                      : 'อัปโหลดภาพ QR ที่ธนาคารออกให้กับบัญชี (PNG/JPG/WebP สูงสุด 512KB) — ลูกค้าสแกนแล้วกรอกยอดเอง'}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => qrInput.current?.click()}
+                      disabled={qrBusy}
+                      className="flex items-center gap-2 rounded-lg border border-line-subtle bg-surface px-3 py-2 text-sm font-semibold text-fg transition-colors hover:bg-surface-brand-subtle disabled:opacity-50"
+                    >
+                      {qrBusy ? (
+                        <Loader2 size={15} className="animate-spin" />
+                      ) : (
+                        <ImageIcon size={15} />
+                      )}
+                      {form.qrImageUrl ? 'เปลี่ยนภาพ QR' : 'อัปโหลดภาพ QR'}
+                    </button>
+                    {form.qrImageUrl && (
+                      <button
+                        type="button"
+                        onClick={() => set('qrImageUrl', null)}
+                        disabled={qrBusy}
+                        className="hover:bg-error flex items-center gap-2 rounded-lg border border-coral-300 px-3 py-2 text-sm font-semibold text-fg-error transition-colors disabled:opacity-50 dark:border-coral-700 dark:text-coral-300 dark:hover:bg-coral-900/20"
+                      >
+                        <Trash2 size={15} /> ลบภาพ QR
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <input
+                  ref={qrInput}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="sr-only"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = '';
+                    if (f) void uploadQr(f);
+                  }}
+                />
+              </div>
+            </Field>
             <div className="rounded-md bg-surface p-3 text-xs text-fg-placeholder">
               ข้อมูลนี้จะแสดงในขั้นตอนชำระเงินของลูกค้า (ช่อง “PromptPay / Thai QR”)
               พร้อมปุ่มอัปโหลดสลิป

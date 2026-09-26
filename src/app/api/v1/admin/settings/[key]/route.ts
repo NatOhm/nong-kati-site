@@ -183,10 +183,23 @@ export async function PUT(
   } else if (key === 'manual-transfer') {
     // Manual transfer instructions shown in checkout while the real Omise
     // gateway is not implemented (review High #2). Null clears a field.
+    // qrImageUrl: optional STATIC bank-QR image (client ask 2026-09-27) —
+    // only paths produced by /api/v1/admin/upload are accepted (same rule
+    // as the mascot), so the setting can never point at an external/
+    // attacker-controlled image.
     next = {};
     if (typeof b['enabled'] === 'boolean') next['enabled'] = b['enabled'];
     if (b['accountType'] === 'promptpay' || b['accountType'] === 'bank') {
       next['accountType'] = b['accountType'];
+    }
+    if (b['qrImageUrl'] === null) {
+      next['qrImageUrl'] = null;
+    } else if (typeof b['qrImageUrl'] === 'string') {
+      const v = (b['qrImageUrl'] as string).trim();
+      if (v !== '' && !/^\/api\/v1\/images\/[0-9a-z-]+$/i.test(v)) {
+        return NextResponse.json({ error: 'INVALID_QR_IMAGE_URL' }, { status: 400 });
+      }
+      next['qrImageUrl'] = v === '' ? null : v;
     }
     for (const field of ['accountName', 'bankName'] as const) {
       if (b[field] === null) {

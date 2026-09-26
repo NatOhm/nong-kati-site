@@ -86,6 +86,7 @@ export default function CheckoutPage(): React.JSX.Element {
     accountNumber: string | null;
     accountType: 'promptpay' | 'bank';
     bankName: string | null;
+    qrImageUrl?: string | null;
   } | null>(null);
   const [couponInput, setCouponInput] = useState('');
   const [couponApplied, setCouponApplied] = useState<{ code: string; discountThb: number } | null>(
@@ -148,6 +149,7 @@ export default function CheckoutPage(): React.JSX.Element {
             accountNumber: string | null;
             accountType: 'promptpay' | 'bank';
             bankName: string | null;
+            qrImageUrl?: string | null;
           } | null,
         ) => {
           if (!cancelled) setManualInfo(d && d.enabled ? d : null);
@@ -504,41 +506,56 @@ export default function CheckoutPage(): React.JSX.Element {
               {paymentMethod === 'promptpay' && !paymentState?.qrImageUrl && manualInfo && (
                 <div className="mt-6 space-y-4">
                   <div className="rounded-md border border-line-brand bg-peach-50 p-4">
-                    <div className="flex items-start gap-3">
-                      <Banknote size={20} className="mt-0.5 shrink-0 text-fg-brand" />
-                      <div className="text-sm">
-                        <p className="font-semibold text-fg">
-                          {manualInfo.accountType === 'bank'
-                            ? 'โอนเงินผ่านธนาคาร'
-                            : 'โอนเงินผ่านพร้อมเพย์'}
-                        </p>
-                        <p className="mt-1 text-fg-muted">
-                          โอนยอด <strong>{formatThb(order?.totalAmountThb ?? 0)}</strong>{' '}
-                          ไปยังบัญชีด้านล่าง แล้วอัปโหลดสลิปเพื่อยืนยันการชำระเงิน
-                        </p>
-                        <dl className="mt-3 space-y-1">
-                          <div className="flex gap-2">
-                            <dt className="text-fg-muted">ชื่อบัญชี:</dt>
-                            <dd className="font-medium text-fg">{manualInfo.accountName}</dd>
-                          </div>
-                          <div className="flex gap-2">
-                            <dt className="text-fg-muted">
-                              {manualInfo.accountType === 'bank'
-                                ? 'เลขบัญชี:'
-                                : 'เบอร์พร้อมเพย์ / เลขบัตร:'}
-                            </dt>
-                            <dd className="font-mono font-medium text-fg">
-                              {manualInfo.accountNumber}
-                            </dd>
-                          </div>
-                          {manualInfo.accountType === 'bank' && manualInfo.bankName && (
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+                      <div className="flex flex-1 items-start gap-3">
+                        <Banknote size={20} className="mt-0.5 shrink-0 text-fg-brand" />
+                        <div className="text-sm">
+                          <p className="font-semibold text-fg">
+                            {manualInfo.accountType === 'bank'
+                              ? 'โอนเงินผ่านธนาคาร'
+                              : 'โอนเงินผ่านพร้อมเพย์'}
+                          </p>
+                          <p className="mt-1 text-fg-muted">
+                            โอนยอด <strong>{formatThb(order?.totalAmountThb ?? 0)}</strong>{' '}
+                            ไปยังบัญชีด้านล่าง แล้วอัปโหลดสลิปเพื่อยืนยันการชำระเงิน
+                          </p>
+                          <dl className="mt-3 space-y-1">
                             <div className="flex gap-2">
-                              <dt className="text-fg-muted">ธนาคาร:</dt>
-                              <dd className="font-medium text-fg">{manualInfo.bankName}</dd>
+                              <dt className="text-fg-muted">ชื่อบัญชี:</dt>
+                              <dd className="font-medium text-fg">{manualInfo.accountName}</dd>
                             </div>
-                          )}
-                        </dl>
+                            <div className="flex gap-2">
+                              <dt className="text-fg-muted">
+                                {manualInfo.accountType === 'bank'
+                                  ? 'เลขบัญชี:'
+                                  : 'เบอร์พร้อมเพย์ / เลขบัตร:'}
+                              </dt>
+                              <dd className="font-mono font-medium text-fg">
+                                {manualInfo.accountNumber}
+                              </dd>
+                            </div>
+                            {manualInfo.accountType === 'bank' && manualInfo.bankName && (
+                              <div className="flex gap-2">
+                                <dt className="text-fg-muted">ธนาคาร:</dt>
+                                <dd className="font-medium text-fg">{manualInfo.bankName}</dd>
+                              </div>
+                            )}
+                          </dl>
+                        </div>
                       </div>
+                      {manualInfo.qrImageUrl && (
+                        <div className="shrink-0 self-center rounded-lg border border-line-subtle bg-surface p-2 sm:self-start">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={manualInfo.qrImageUrl}
+                            alt="ภาพ QR สำหรับโอนเงินของร้าน"
+                            className="h-40 w-40 object-contain"
+                          />
+                          <p className="mt-1 text-center text-[10px] text-fg-placeholder">
+                            สแกนด้วยแอปธนาคาร
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
 

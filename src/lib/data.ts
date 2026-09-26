@@ -690,6 +690,12 @@ export interface ManualTransferInfo {
   /** 'promptpay' | 'bank' — controls the icon/label in checkout. */
   accountType: 'promptpay' | 'bank';
   bankName: string | null;
+  /**
+   * Optional STATIC bank-QR image (uploaded via /api/v1/admin/upload) shown
+   * beside the account details — for QRs the bank issues against the raw
+   * account (no amount embedded). Served same-origin, admin-controlled.
+   */
+  qrImageUrl: string | null;
 }
 
 /**
@@ -706,6 +712,7 @@ export async function getManualTransferInfo(): Promise<ManualTransferInfo> {
     accountNumber: null,
     accountType: 'promptpay',
     bankName: null,
+    qrImageUrl: null,
   };
   try {
     const row = await prisma.siteSetting.findUnique({ where: { key: 'manual-transfer' } });
@@ -718,6 +725,13 @@ export async function getManualTransferInfo(): Promise<ManualTransferInfo> {
       accountNumber: typeof parsed.accountNumber === 'string' ? parsed.accountNumber : null,
       accountType: type,
       bankName: typeof parsed.bankName === 'string' ? parsed.bankName : null,
+      // Only accept upload-produced paths — defence in depth (the settings
+      // validator already enforces this at write time).
+      qrImageUrl:
+        typeof parsed.qrImageUrl === 'string' &&
+        /^\/api\/v1\/images\/[0-9a-z-]+$/i.test(parsed.qrImageUrl)
+          ? parsed.qrImageUrl
+          : null,
     };
   } catch {
     return empty;
