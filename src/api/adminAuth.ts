@@ -51,8 +51,90 @@ export interface AdminSession {
   expiresAt: Date;
 }
 
-const MAX_FAILED_ATTEMPTS = 5;
-const LOCKOUT_MINUTES = 15;
+// ─── Runtime-tunable security policy (security settings group) ──────────
+// The /management/settings security panel persists its values in the
+// SiteSetting table (key 'security'); the helpers below read that group so
+// the configured values are actually enforced — the panel is not decorative.
+
+const SECURITY_DEFAULTS = {
+  lockoutMaxAttempts: 5,
+  lockoutMinutes: 15,
+  passwordMinLength: 12,
+  pwRequireUpper: true,
+  pwRequireLower: true,
+  pwRequireDigit: true,
+  pwRequireSpecial: false,
+};
+
+export type SecurityPolicy = typeof SECURITY_DEFAULTS;
+
+let securityPolicyCache: { value: SecurityPolicy; at: number } | null = null;
+const SECURITY_POLICY_TTL_MS = 30_000;
+
+/**
+ * Effective security policy: SiteSetting('security') overlaid on defaults,
+ * cached for 30s so the login hot path stays one query when unchanged.
+ */
+export async function getSecurityPolicy(): Promise<SecurityPolicy> {
+  if (securityPolicyCache && Date.now() - securityPolicyCache.at < SECURITY_POLICY_TTL_MS) {
+    return securityPolicyCache.value;
+  }
+  let value: SecurityPolicy = { ...SECURITY_DEFAULTS };
+  try {
+    const row = await prisma.siteSetting.findUnique({ where: { key: 'security' } });
+    if (row) {
+      const parsed: unknown = JSON.parse(row.value);
+      if (typeof parsed === 'object' && parsed !== null) {
+        const p = parsed as Record<string, unknown>;
+        const num = (
+          key: 'lockoutMaxAttempts' | 'lockoutMinutes' | 'passwordMinLength',
+          min: number,
+          max: number,
+        ): number => {
+          const v = p[key];
+          return typeof v === 'number' && Number.isInteger(v) && v >= min && v <= max
+            ? v
+            : value[key];
+        };
+        const bool = (key: keyof SecurityPolicy): boolean =>
+          typeof p[key] === 'boolean' ? (p[key] as boolean) : (value[key] as boolean);
+        value = {
+          lockoutMaxAttempts: num('lockoutMaxAttempts', 3, 10),
+          lockoutMinutes: num('lockoutMinutes', 5, 1440),
+          passwordMinLength: num('passwordMinLength', 8, 64),
+          pwRequireUpper: bool('pwRequireUpper'),
+          pwRequireLower: bool('pwRequireLower'),
+          pwRequireDigit: bool('pwRequireDigit'),
+          pwRequireSpecial: bool('pwRequireSpecial'),
+        };
+      }
+    }
+  } catch {
+    // Unreadable setting → defaults; brute-force protection never opens up.
+  }
+  securityPolicyCache = { value, at: Date.now() };
+  return value;
+}
+
+/** Drop the cached policy — called right after the settings save. */
+export function invalidateSecurityPolicyCache(): void {
+  securityPolicyCache = null;
+}
+
+/**
+ * Validate a new password against the configured policy.
+ * Returns an error code, or null when the password passes.
+ */
+export async function checkPasswordPolicy(newPassword: string): Promise<string | null> {
+  const policy = await getSecurityPolicy();
+  if (newPassword.length < policy.passwordMinLength) return 'PASSWORD_TOO_SHORT';
+  if (policy.pwRequireUpper && !/[A-Z]/.test(newPassword)) return 'PASSWORD_MISSING_UPPER';
+  if (policy.pwRequireLower && !/[a-z]/.test(newPassword)) return 'PASSWORD_MISSING_LOWER';
+  if (policy.pwRequireDigit && !/[0-9]/.test(newPassword)) return 'PASSWORD_MISSING_DIGIT';
+  if (policy.pwRequireSpecial && !/[^A-Za-z0-9]/.test(newPassword))
+    return 'PASSWORD_MISSING_SPECIAL';
+  return null;
+}
 // Step-2 TOTP guessing: same 5-strike discipline as the password step, but a
 // separate persistent counter so password failures never seed/burn it.
 const ADMIN_TOTP_MAX_ATTEMPTS = 5;
@@ -177,14 +259,15 @@ export async function adminLogin(
           })
         : null;
     const attempts = fresh?.failedLoginAttempts ?? 1;
-    const lock = attempts >= MAX_FAILED_ATTEMPTS;
+    const policy = await getSecurityPolicy();
+    const lock = attempts >= policy.lockoutMaxAttempts;
     if (lock) {
       await prisma.adminUser.update({
         where: { id: user.id },
         data: {
           failedLoginAttempts: 0,
           status: 'locked',
-          lockedUntil: new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000),
+          lockedUntil: new Date(Date.now() + policy.lockoutMinutes * 60 * 1000),
         },
       });
     }
@@ -495,8 +578,9 @@ export async function changeAdminPassword(
   if (!(await verifyPassword(currentPassword, user.passwordHash))) {
     return { success: false, error: 'CURRENT_PASSWORD_INCORRECT' };
   }
-  if (newPassword.length < 12) {
-    return { success: false, error: 'PASSWORD_TOO_SHORT' };
+  const policyError = await checkPasswordPolicy(newPassword);
+  if (policyError) {
+    return { success: false, error: policyError };
   }
 
   await prisma.$transaction([

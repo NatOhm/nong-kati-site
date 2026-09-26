@@ -12,7 +12,6 @@ import {
   Banknote,
   Save,
   Eye,
-  EyeOff,
   Key,
   Smartphone,
   Lock,
@@ -156,14 +155,11 @@ export default function AdminSettingsPage(): React.JSX.Element {
             {activeTab === 'payment' && (
               <>
                 <ManualTransferSettings />
-                {/* Review: mock UI must be labelled as such — it cannot be
-                    distinguished from a live panel otherwise. */}
-                <PreviewNotice />
-                <PaymentSettings />
+                <PaymentSettings registerSaver={registerSaver} />
               </>
             )}
-            {activeTab === 'email' && <EmailSettings />}
-            {activeTab === 'security' && <SecuritySettings />}
+            {activeTab === 'email' && <EmailSettings registerSaver={registerSaver} />}
+            {activeTab === 'security' && <SecuritySettings registerSaver={registerSaver} />}
             {activeTab === 'notifications' && (
               <NotificationSettings registerSaver={registerSaver} />
             )}
@@ -1044,27 +1040,117 @@ function ManualTransferSettings(): React.JSX.Element {
   );
 }
 
-// Review: shared banner for sections whose UI is still a mock — the save
-// button is disabled and the panel must say so explicitly.
-function PreviewNotice(): React.JSX.Element {
-  return (
-    <div
-      role="note"
-      className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-800 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-200"
-    >
-      ⚠️ ส่วนนี้เป็นโหมดตัวอย่าง — การเปลี่ยนแปลงที่นี่ยังไม่ถูกบันทึก
-    </div>
-  );
+// ─── Payment Gateway Settings — wired to SiteSetting('payment-gateway') ──
+interface PaymentGatewaySettings {
+  promptpayEnabled?: boolean;
+  promptpayId?: string | null;
+  cardEnabled?: boolean;
+  omisePublicKey?: string | null;
+  omiseSecretKeyEnv?: string | null;
 }
 
-// ─── Payment Gateway Settings (mock UI — ยังไม่เชื่อม API จริง) ──────────
-function PaymentSettings(): React.JSX.Element {
+function PaymentSettings({
+  registerSaver,
+}: {
+  registerSaver: (fn: SettingsSaver | null) => void;
+}): React.JSX.Element {
   const [promptpayEnabled, setPromptpayEnabled] = useState(true);
-  const [promptpayId, setPromptpayId] = useState('0123456789012');
-  const [cardEnabled, setCardEnabled] = useState(true);
-  const [omisePublicKey, setOmisePublicKey] = useState('pkey_test_xxxxx');
-  const [omiseSecretKey] = useState('••••••••••••••••');
-  const [showSecret, setShowSecret] = useState(false);
+  const [promptpayId, setPromptpayId] = useState('');
+  const [cardEnabled, setCardEnabled] = useState(false);
+  const [omisePublicKey, setOmisePublicKey] = useState('');
+  const [omiseSecretKeyEnv, setOmiseSecretKeyEnv] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    adminFetch('/api/v1/admin/settings/payment-gateway')
+      .then(async (r): Promise<PaymentGatewaySettings> => (r.ok ? r.json() : {}))
+      .then((data) => {
+        if (cancelled) return;
+        setPromptpayEnabled(data.promptpayEnabled ?? false);
+        setPromptpayId(data.promptpayId ?? '');
+        setCardEnabled(data.cardEnabled ?? false);
+        setOmisePublicKey(data.omisePublicKey ?? '');
+        setOmiseSecretKeyEnv(data.omiseSecretKeyEnv ?? '');
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const valuesRef = useRef({
+    promptpayEnabled,
+    promptpayId,
+    cardEnabled,
+    omisePublicKey,
+    omiseSecretKeyEnv,
+  });
+  valuesRef.current = {
+    promptpayEnabled,
+    promptpayId,
+    cardEnabled,
+    omisePublicKey,
+    omiseSecretKeyEnv,
+  };
+
+  async function saveToApi(): Promise<void> {
+    const v = valuesRef.current;
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await adminFetch('/api/v1/admin/settings/payment-gateway', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          promptpayEnabled: v.promptpayEnabled,
+          promptpayId: v.promptpayId.trim() === '' ? null : v.promptpayId.trim(),
+          cardEnabled: v.cardEnabled,
+          omisePublicKey: v.omisePublicKey.trim() === '' ? null : v.omisePublicKey.trim(),
+          omiseSecretKeyEnv: v.omiseSecretKeyEnv.trim(),
+        }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(
+          data.error === 'INVALID_PROMPTPAY_ID'
+            ? 'PromptPay ID ต้องเป็นตัวเลข 13 หลัก'
+            : data.error === 'INVALID_OMISE_PUBLIC_KEY'
+              ? 'Omise Public Key ต้องขึ้นต้นด้วย pkey_test_ หรือ pkey_live_'
+              : data.error === 'INVALID_ENV_VAR_NAME'
+                ? 'ชื่อ environment variable ต้องเป็น A-Z ตัวใหญ่ ตัวเลข และ _ เท่านั้น'
+                : 'บันทึกไม่สำเร็จ',
+        );
+      }
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
+      throw e;
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  useEffect(() => {
+    registerSaver(saveToApi);
+    return () => registerSaver(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [registerSaver]);
+
+  if (loading) {
+    return (
+      <Section title="การชำระเงิน" subtitle="ตั้งค่าช่องทางการชำระเงินและ Payment Gateway">
+        <p className="py-6 text-center text-sm text-fg-muted">กำลังโหลด...</p>
+      </Section>
+    );
+  }
 
   return (
     <Section title="การชำระเงิน" subtitle="ตั้งค่าช่องทางการชำระเงินและ Payment Gateway">
@@ -1092,10 +1178,8 @@ function PaymentSettings(): React.JSX.Element {
               />
             </Field>
             <div className="rounded-md bg-surface p-3 text-xs text-fg-placeholder">
-              <p>ใช้ PromptPay ID ของร้านค้าในการสร้าง QR Code</p>
-              <p className="mt-1">
-                ทดสอบ: ใช้ <code className="text-fg-brand">0123456789012</code>
-              </p>
+              ตัวเลข 13 หลัก (บัตรประชาชน / เลขนิติบุคคล) — ใช้สร้าง QR ในหน้าชำระเงิน เว้นว่างไว้ =
+              ไม่แสดงช่องพร้อมเพย์
             </div>
           </div>
         )}
@@ -1124,84 +1208,229 @@ function PaymentSettings(): React.JSX.Element {
                 <input
                   value={omisePublicKey}
                   onChange={(e) => setOmisePublicKey(e.target.value)}
+                  placeholder="pkey_test_... หรือ pkey_live_..."
                   className="flex-1 rounded-lg border border-line bg-surface px-3 py-2.5 font-mono text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
                 />
                 <CopyButton text={omisePublicKey} />
               </div>
             </Field>
-            <Field label="Omise Secret Key">
-              <div className="flex gap-2">
-                <input
-                  type={showSecret ? 'text' : 'password'}
-                  value={showSecret ? 'sk_test_xxxxxxxxxxxxxxxx' : omiseSecretKey}
-                  readOnly
-                  className="flex-1 rounded-lg border border-line bg-surface px-3 py-2.5 font-mono text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
-                />
-                <button
-                  onClick={() => setShowSecret(!showSecret)}
-                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-line text-fg-placeholder hover:bg-surface hover:text-fg"
-                >
-                  {showSecret ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
+            <Field label="ชื่อ Environment Variable ของ Secret Key">
+              <input
+                value={omiseSecretKeyEnv}
+                onChange={(e) => setOmiseSecretKeyEnv(e.target.value)}
+                placeholder="OMISE_SECRET_KEY"
+                className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 font-mono text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
+              />
             </Field>
             <div className="rounded-md bg-surface p-3 text-xs text-fg-placeholder">
-              <p>
-                🧪 <strong className="text-fg-secondary">โหมดทดสอบ:</strong> ใช้ keys ที่ขึ้นต้นด้วย{' '}
-                <code className="text-fg-brand">pkey_test_</code> /{' '}
-                <code className="text-fg-brand">sk_test_</code>
-              </p>
-              <p className="mt-1">
-                🔑 <strong className="text-fg-secondary">โหมดจริง:</strong> เปลี่ยนเป็น{' '}
-                <code className="text-fg-brand">pkey_live_</code> /{' '}
-                <code className="text-fg-brand">sk_live_</code>
-              </p>
+              Secret key ไม่ถูกเก็บในฐานข้อมูล — ระบบอ่านจาก environment variable
+              ที่ระบุชื่อไว้ตอนรันจริง (ตั้งได้ใน Vercel → Settings → Environment Variables)
+              เพื่อไม่ให้คีย์ลับหลุดออกจาก API นี้
             </div>
           </div>
         )}
       </div>
 
-      {/* Test Mode Badge */}
-      <div className="border-line-brand/30 flex items-center gap-3 rounded-lg border bg-peach-50 p-4">
-        <AlertTriangle size={20} className="flex-shrink-0 text-fg-brand" />
-        <div>
-          <p className="text-sm font-medium text-fg-brand">โหมดทดสอบเปิดใช้งานอยู่</p>
-          <p className="text-xs text-fg-placeholder">
-            ระบบจะไม่เรียกเก็บเงินจริง เหมาะสำหรับการทดสอบก่อนเปิดใช้งานจริง
-          </p>
+      {/* Live/test hint — follows the configured public key, not a fixed claim. */}
+      {cardEnabled && omisePublicKey.startsWith('pkey_live_') && (
+        <div className="flex items-center gap-3 rounded-lg border border-jade-500/40 bg-jade-500/10 p-4">
+          <AlertTriangle size={20} className="flex-shrink-0 text-jade-700" />
+          <div>
+            <p className="text-sm font-medium text-jade-700">โหมดจริง (live)</p>
+            <p className="text-xs text-fg-placeholder">
+              Public key ขึ้นต้นด้วย pkey_live_ — ระบบจะเรียกเก็บเงินจริงเมื่อชำระผ่านบัตร
+            </p>
+          </div>
         </div>
-      </div>
+      )}
+      {cardEnabled && omisePublicKey.startsWith('pkey_test_') && (
+        <div className="flex items-center gap-3 rounded-lg border bg-peach-50 p-4">
+          <AlertTriangle size={20} className="flex-shrink-0 text-fg-brand" />
+          <div>
+            <p className="text-sm font-medium text-fg-brand">โหมดทดสอบ (test)</p>
+            <p className="text-xs text-fg-placeholder">
+              Public key ขึ้นต้นด้วย pkey_test_ — ระบบจะไม่เรียกเก็บเงินจริง
+            </p>
+          </div>
+        </div>
+      )}
 
-      <div className="flex justify-end">
-        <SaveButton />
+      {error && (
+        <div className="border-error bg-error mt-3 flex items-center gap-2 rounded-lg border px-4 py-3 text-sm text-fg-error">
+          <AlertTriangle size={16} /> {error}
+        </div>
+      )}
+      <div className="mt-4 flex justify-end">
+        <button
+          onClick={() => void saveToApi()}
+          disabled={saving}
+          className="flex items-center gap-2 rounded-lg bg-peach-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-peach-400 disabled:opacity-50"
+        >
+          {saved ? <CheckCircle2 size={14} /> : <Save size={14} />}
+          {saving ? 'กำลังบันทึก…' : saved ? 'บันทึกแล้ว!' : 'บันทึกการชำระเงิน'}
+        </button>
       </div>
     </Section>
   );
 }
 
-// ─── Email Settings ───────────────────────────────────────
-function EmailSettings(): React.JSX.Element {
-  const [smtpHost, setSmtpHost] = useState('smtp.resend.com');
+// ─── Email Settings — wired to SiteSetting('email') ──────
+interface EmailSettingsData {
+  smtpHost?: string | null;
+  smtpPort?: number;
+  smtpUser?: string | null;
+  smtpPasswordEnv?: string | null;
+  fromName?: string | null;
+  fromEmail?: string | null;
+  emailTemplates?: Partial<
+    Record<'order_confirm' | 'code_delivery' | 'low_stock' | 'invoice', boolean>
+  >;
+}
+
+const EMAIL_TEMPLATES: {
+  key: keyof NonNullable<EmailSettingsData['emailTemplates']>;
+  name: string;
+  desc: string;
+}[] = [
+  { key: 'order_confirm', name: 'ยืนยันคำสั่งซื้อ', desc: 'ส่งเมื่อลูกค้าชำระเงินสำเร็จ' },
+  { key: 'code_delivery', name: 'ส่งโค้ดสินค้า', desc: 'ส่งโค้ดหลังจากทำรายการสำเร็จ' },
+  { key: 'low_stock', name: 'แจ้งเตือนสต็อกต่ำ', desc: 'ส่งเมื่อสินค้าใกล้หมด' },
+  { key: 'invoice', name: 'ใบแจ้งหนี้ / ใบเสร็จ', desc: 'ส่งใบเสร็จรับเงิน' },
+];
+
+function EmailSettings({
+  registerSaver,
+}: {
+  registerSaver: (fn: SettingsSaver | null) => void;
+}): React.JSX.Element {
+  const [smtpHost, setSmtpHost] = useState('');
   const [smtpPort, setSmtpPort] = useState('587');
-  const [smtpUser, setSmtpUser] = useState('resend');
-  const [fromName, setFromName] = useState('Nong-Kati');
-  const [fromEmail, setFromEmail] = useState('noreply@nong-kati.co.th');
+  const [smtpUser, setSmtpUser] = useState('');
+  const [smtpPasswordEnv, setSmtpPasswordEnv] = useState('');
+  const [fromName, setFromName] = useState('');
+  const [fromEmail, setFromEmail] = useState('');
+  const [templates, setTemplates] = useState<Record<string, boolean>>({
+    order_confirm: true,
+    code_delivery: true,
+    low_stock: true,
+    invoice: false,
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    adminFetch('/api/v1/admin/settings/email')
+      .then(async (r): Promise<EmailSettingsData> => (r.ok ? r.json() : {}))
+      .then((data) => {
+        if (cancelled) return;
+        setSmtpHost(data.smtpHost ?? '');
+        setSmtpPort(String(data.smtpPort ?? 587));
+        setSmtpUser(data.smtpUser ?? '');
+        setSmtpPasswordEnv(data.smtpPasswordEnv ?? '');
+        setFromName(data.fromName ?? '');
+        setFromEmail(data.fromEmail ?? '');
+        setTemplates((t) => ({ ...t, ...(data.emailTemplates ?? {}) }));
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const valuesRef = useRef({
+    smtpHost,
+    smtpPort,
+    smtpUser,
+    smtpPasswordEnv,
+    fromName,
+    fromEmail,
+    templates,
+  });
+  valuesRef.current = {
+    smtpHost,
+    smtpPort,
+    smtpUser,
+    smtpPasswordEnv,
+    fromName,
+    fromEmail,
+    templates,
+  };
+
+  async function saveToApi(): Promise<void> {
+    const v = valuesRef.current;
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await adminFetch('/api/v1/admin/settings/email', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          smtpHost: v.smtpHost.trim() === '' ? null : v.smtpHost.trim(),
+          smtpPort: Number(v.smtpPort) || 0,
+          smtpUser: v.smtpUser.trim() === '' ? null : v.smtpUser.trim(),
+          smtpPasswordEnv: v.smtpPasswordEnv.trim(),
+          fromName: v.fromName.trim() === '' ? null : v.fromName.trim(),
+          fromEmail: v.fromEmail.trim() === '' ? null : v.fromEmail.trim(),
+          emailTemplates: v.templates,
+        }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(
+          data.error === 'INVALID_SMTP_PORT'
+            ? 'SMTP Port ต้องเป็นตัวเลข 1-65535'
+            : data.error === 'INVALID_FROM_EMAIL'
+              ? 'รูปแบบอีเมลผู้ส่งไม่ถูกต้อง'
+              : data.error === 'INVALID_ENV_VAR_NAME'
+                ? 'ชื่อ environment variable ต้องเป็น A-Z ตัวใหญ่ ตัวเลข และ _ เท่านั้น'
+                : 'บันทึกไม่สำเร็จ',
+        );
+      }
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
+      throw e;
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  useEffect(() => {
+    registerSaver(saveToApi);
+    return () => registerSaver(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [registerSaver]);
+
+  if (loading) {
+    return (
+      <Section title="การตั้งค่าอีเมล" subtitle="ตั้งค่า SMTP และรูปแบบอีเมลที่ส่งให้ลูกค้า">
+        <p className="py-6 text-center text-sm text-fg-muted">กำลังโหลด...</p>
+      </Section>
+    );
+  }
 
   return (
     <Section title="การตั้งค่าอีเมล" subtitle="ตั้งค่า SMTP และรูปแบบอีเมลที่ส่งให้ลูกค้า">
-      <PreviewNotice />
       <div className="grid grid-cols-2 gap-4">
         <Field label="SMTP Host">
           <input
             value={smtpHost}
             onChange={(e) => setSmtpHost(e.target.value)}
+            placeholder="smtp.resend.com"
             className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 font-mono text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
           />
         </Field>
         <Field label="SMTP Port">
           <input
             value={smtpPort}
-            onChange={(e) => setSmtpPort(e.target.value)}
+            onChange={(e) => setSmtpPort(e.target.value.replace(/[^0-9]/g, ''))}
             className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 font-mono text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
           />
         </Field>
@@ -1212,6 +1441,17 @@ function EmailSettings(): React.JSX.Element {
           onChange={(e) => setSmtpUser(e.target.value)}
           className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
         />
+      </Field>
+      <Field label="ชื่อ Environment Variable ของรหัสผ่าน SMTP">
+        <input
+          value={smtpPasswordEnv}
+          onChange={(e) => setSmtpPasswordEnv(e.target.value)}
+          placeholder="SMTP_PASSWORD"
+          className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 font-mono text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
+        />
+        <p className="mt-1 text-xs text-clay-400">
+          รหัสผ่าน SMTP ไม่ถูกเก็บในฐานข้อมูล — ระบบอ่านจาก environment variable ที่ระบุชื่อไว้
+        </p>
       </Field>
       <div className="grid grid-cols-2 gap-4">
         <Field label="ชื่อผู้ส่ง (From Name)">
@@ -1225,6 +1465,7 @@ function EmailSettings(): React.JSX.Element {
           <input
             value={fromEmail}
             onChange={(e) => setFromEmail(e.target.value)}
+            placeholder="noreply@nong-kati.co.th"
             className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
           />
         </Field>
@@ -1233,45 +1474,176 @@ function EmailSettings(): React.JSX.Element {
       <div className="rounded-lg border border-line-subtle bg-surface p-4">
         <h3 className="mb-3 text-sm font-semibold text-fg-secondary">เทมเพลตอีเมล</h3>
         <div className="space-y-2">
-          {[
-            { name: 'ยืนยันคำสั่งซื้อ', desc: 'ส่งเมื่อลูกค้าชำระเงินสำเร็จ', active: true },
-            { name: 'ส่งโค้ดสินค้า', desc: 'ส่งโค้ดหลังจากทำรายการสำเร็จ', active: true },
-            { name: 'แจ้งเตือนสต็อกต่ำ', desc: 'ส่งเมื่อสินค้าใกล้หมด', active: true },
-            { name: 'ใบแจ้งหนี้ / ใบเสร็จ', desc: 'ส่งใบเสร็จรับเงิน', active: false },
-          ].map((tpl) => (
+          {EMAIL_TEMPLATES.map((tpl) => (
             <div
-              key={tpl.name}
+              key={tpl.key}
               className="flex items-center justify-between rounded-md bg-surface px-3 py-2"
             >
               <div>
                 <p className="text-xs font-medium text-fg-secondary">{tpl.name}</p>
                 <p className="text-[10px] text-clay-400">{tpl.desc}</p>
               </div>
-              <span
-                className={cn(
-                  'inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium',
-                  tpl.active ? 'bg-jade-500/15 text-jade-700' : 'bg-surface text-clay-400',
-                )}
-              >
-                {tpl.active ? 'เปิดใช้งาน' : 'ปิด'}
-              </span>
+              <ToggleSwitch
+                enabled={templates[tpl.key] ?? false}
+                onChange={(v) => setTemplates((t) => ({ ...t, [tpl.key]: v }))}
+              />
             </div>
           ))}
         </div>
       </div>
 
-      <div className="flex justify-end">
-        <SaveButton />
+      {error && (
+        <div className="border-error bg-error mt-3 flex items-center gap-2 rounded-lg border px-4 py-3 text-sm text-fg-error">
+          <AlertTriangle size={16} /> {error}
+        </div>
+      )}
+      <div className="mt-4 flex justify-end">
+        <button
+          onClick={() => void saveToApi()}
+          disabled={saving}
+          className="flex items-center gap-2 rounded-lg bg-peach-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-peach-400 disabled:opacity-50"
+        >
+          {saved ? <CheckCircle2 size={14} /> : <Save size={14} />}
+          {saving ? 'กำลังบันทึก…' : saved ? 'บันทึกแล้ว!' : 'บันทึกการตั้งค่าอีเมล'}
+        </button>
       </div>
     </Section>
   );
 }
 
 // ─── Security Settings ────────────────────────────────────
-function SecuritySettings(): React.JSX.Element {
+interface SecuritySettingsData {
+  lockoutMaxAttempts?: number;
+  lockoutMinutes?: number;
+  passwordMinLength?: number;
+  pwRequireUpper?: boolean;
+  pwRequireLower?: boolean;
+  pwRequireDigit?: boolean;
+  pwRequireSpecial?: boolean;
+}
+
+interface AdminMeData {
+  activeSessions?: number;
+}
+
+const PW_RULES = [
+  { key: 'pwRequireUpper' as const, label: 'ตัวพิมพ์ใหญ่' },
+  { key: 'pwRequireLower' as const, label: 'ตัวพิมพ์เล็ก' },
+  { key: 'pwRequireDigit' as const, label: 'ตัวเลข' },
+  { key: 'pwRequireSpecial' as const, label: 'อักขระพิเศษ' },
+];
+
+function SecuritySettings({
+  registerSaver,
+}: {
+  registerSaver: (fn: SettingsSaver | null) => void;
+}): React.JSX.Element {
+  const [lockoutMaxAttempts, setLockoutMaxAttempts] = useState('5');
+  const [lockoutMinutes, setLockoutMinutes] = useState('15');
+  const [passwordMinLength, setPasswordMinLength] = useState('12');
+  const [pwRules, setPwRules] = useState<Record<string, boolean>>({
+    pwRequireUpper: true,
+    pwRequireLower: true,
+    pwRequireDigit: true,
+    pwRequireSpecial: false,
+  });
+  const [activeSessions, setActiveSessions] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    adminFetch('/api/v1/admin/settings/security')
+      .then(async (r): Promise<SecuritySettingsData> => (r.ok ? r.json() : {}))
+      .then((data) => {
+        if (cancelled) return;
+        setLockoutMaxAttempts(String(data.lockoutMaxAttempts ?? 5));
+        setLockoutMinutes(String(data.lockoutMinutes ?? 15));
+        setPasswordMinLength(String(data.passwordMinLength ?? 12));
+        setPwRules((prev) => ({
+          ...prev,
+          ...(data.pwRequireUpper !== undefined && { pwRequireUpper: data.pwRequireUpper }),
+          ...(data.pwRequireLower !== undefined && { pwRequireLower: data.pwRequireLower }),
+          ...(data.pwRequireDigit !== undefined && { pwRequireDigit: data.pwRequireDigit }),
+          ...(data.pwRequireSpecial !== undefined && { pwRequireSpecial: data.pwRequireSpecial }),
+        }));
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    adminFetch('/api/v1/auth/admin/me')
+      .then(async (r): Promise<AdminMeData> => (r.ok ? r.json() : {}))
+      .then((data) => {
+        if (!cancelled) setActiveSessions(data.activeSessions ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const valuesRef = useRef({ lockoutMaxAttempts, lockoutMinutes, passwordMinLength, pwRules });
+  valuesRef.current = { lockoutMaxAttempts, lockoutMinutes, passwordMinLength, pwRules };
+
+  async function saveToApi(): Promise<void> {
+    const v = valuesRef.current;
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await adminFetch('/api/v1/admin/settings/security', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lockoutMaxAttempts: Number(v.lockoutMaxAttempts) || 0,
+          lockoutMinutes: Number(v.lockoutMinutes) || 0,
+          passwordMinLength: Number(v.passwordMinLength) || 0,
+          pwRequireUpper: v.pwRules['pwRequireUpper'] ?? true,
+          pwRequireLower: v.pwRules['pwRequireLower'] ?? true,
+          pwRequireDigit: v.pwRules['pwRequireDigit'] ?? true,
+          pwRequireSpecial: v.pwRules['pwRequireSpecial'] ?? false,
+        }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(
+          data.error === 'INVALID_LOCKOUT_ATTEMPTS'
+            ? 'จำนวนครั้งก่อนล็อกต้องเป็น 3-10'
+            : data.error === 'INVALID_LOCKOUT_MINUTES'
+              ? 'เวลาล็อกต้องเป็น 5-1440 นาที'
+              : data.error === 'INVALID_PASSWORD_MIN_LENGTH'
+                ? 'ความยาวรหัสผ่านขั้นต่ำต้องเป็น 8-64'
+                : 'บันทึกไม่สำเร็จ',
+        );
+      }
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
+      throw e;
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  useEffect(() => {
+    registerSaver(saveToApi);
+    return () => registerSaver(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [registerSaver]);
+
+  if (loading) {
+    return (
+      <Section title="ความปลอดภัย" subtitle="จัดการ 2FA, Sessions, และ Password Policy">
+        <p className="py-6 text-center text-sm text-fg-muted">กำลังโหลด...</p>
+      </Section>
+    );
+  }
+
   return (
     <Section title="ความปลอดภัย" subtitle="จัดการ 2FA, Sessions, และ Password Policy">
-      <PreviewNotice />
       {/* Change Password */}
       <ChangePassword />
 
@@ -1292,111 +1664,100 @@ function SecuritySettings(): React.JSX.Element {
         </div>
       </div>
 
-      {/* Password Policy */}
+      {/* Password Policy — enforced by checkPasswordPolicy on every change. */}
       <div className="rounded-lg border border-line-subtle bg-surface p-4">
         <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-fg-secondary">
           <Key size={14} />
           นโยบายรหัสผ่าน
         </h3>
         <div className="space-y-3">
-          <Field label="ความยาวรหัสผ่านขั้นต่ำ">
+          <Field label="ความยาวรหัสผ่านขั้นต่ำ (8-64)">
             <input
               type="number"
-              defaultValue={12}
+              value={passwordMinLength}
               min={8}
               max={64}
+              onChange={(e) => setPasswordMinLength(e.target.value.replace(/[^0-9]/g, ''))}
               className="w-24 rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
             />
           </Field>
-          <div className="flex flex-wrap gap-3">
-            {['ตัวเลข', 'ตัวพิมพ์ใหญ่', 'ตัวพิมพ์เล็ก', 'อักขระพิเศษ'].map((rule) => (
-              <label key={rule} className="flex items-center gap-2 text-xs text-fg-muted">
+          <div className="flex flex-wrap gap-4">
+            {PW_RULES.map((rule) => (
+              <label key={rule.key} className="flex items-center gap-2 text-xs text-fg-muted">
                 <input
                   type="checkbox"
-                  defaultChecked
+                  checked={pwRules[rule.key] ?? false}
+                  onChange={(e) =>
+                    setPwRules((prev) => ({ ...prev, [rule.key]: e.target.checked }))
+                  }
                   className="h-4 w-4 rounded border-line bg-surface accent-peach-500"
                 />
-                {rule}
+                {rule.label}
               </label>
             ))}
           </div>
+          <p className="text-xs text-clay-400">
+            บังคับใช้ทันทีกับการเปลี่ยนรหัสผ่านและรหัสผ่านชั่วคราวที่สร้างใหม่ทั้งหมด
+          </p>
         </div>
       </div>
 
-      {/* Active Sessions */}
+      {/* Active Sessions — real count from /auth/admin/me. */}
       <div className="rounded-lg border border-line-subtle bg-surface p-4">
         <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-fg-secondary">
           <Shield size={14} />
           Sessions ที่ใช้งานอยู่
         </h3>
-        <div className="space-y-2">
-          {[
-            { device: 'Chrome · Windows 11', ip: '1.2.3.4', lastActive: 'ตอนนี้', current: true },
-            {
-              device: 'Safari · iPhone 15',
-              ip: '5.6.7.8',
-              lastActive: '2 ชม. ที่แล้ว',
-              current: false,
-            },
-          ].map((session) => (
-            <div
-              key={session.ip}
-              className="flex items-center justify-between rounded-md bg-surface px-3 py-2.5"
-            >
-              <div className="flex items-center gap-3">
-                <div
-                  className={cn(
-                    'h-2 w-2 rounded-full',
-                    session.current ? 'bg-jade-500' : 'bg-clay-300',
-                  )}
-                />
-                <div>
-                  <p className="text-xs font-medium text-fg-secondary">{session.device}</p>
-                  <p className="text-[10px] text-clay-400">
-                    IP: {session.ip} · {session.lastActive}
-                  </p>
-                </div>
-              </div>
-              {!session.current && (
-                <button
-                  className="rounded p-1.5 text-clay-400 hover:bg-surface hover:text-fg-error"
-                  aria-label="ยกเลิก session"
-                >
-                  <Trash2 size={14} />
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
+        <p className="text-sm text-fg">
+          บัญชีนี้มี session ที่ยังไม่หมดอายุ:{' '}
+          <span className="font-semibold">{activeSessions ?? '—'}</span>
+        </p>
+        <p className="mt-1 text-xs text-clay-400">
+          การเปลี่ยนรหัสผ่านจะเพิกถอนทุก session ทันที (ระบบบังคับล็อกอินใหม่)
+        </p>
       </div>
 
-      {/* Login Attempt Limits */}
+      {/* Login Attempt Limits — enforced by the login flow. */}
       <div className="rounded-lg border border-line-subtle bg-surface p-4">
         <h3 className="mb-3 text-sm font-semibold text-fg-secondary">ล็อกอินล้มเหลว</h3>
         <div className="grid grid-cols-2 gap-4">
-          <Field label="ล็อกบัญชีหลังจาก (ครั้ง)">
+          <Field label="ล็อกบัญชีหลังจาก (ครั้ง, 3-10)">
             <input
               type="number"
-              defaultValue={5}
+              value={lockoutMaxAttempts}
               min={3}
               max={10}
+              onChange={(e) => setLockoutMaxAttempts(e.target.value.replace(/[^0-9]/g, ''))}
               className="w-24 rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
             />
           </Field>
-          <Field label="ล็อกอิน (นาที)">
+          <Field label="ล็อกนาน (นาที, 5-1440)">
             <input
               type="number"
-              defaultValue={30}
+              value={lockoutMinutes}
               min={5}
               max={1440}
+              onChange={(e) => setLockoutMinutes(e.target.value.replace(/[^0-9]/g, ''))}
               className="w-24 rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
             />
           </Field>
         </div>
       </div>
 
-      <div className="flex justify-end">
-        <SaveButton />
+      {error && (
+        <div className="border-error bg-error mt-3 flex items-center gap-2 rounded-lg border px-4 py-3 text-sm text-fg-error">
+          <AlertTriangle size={16} /> {error}
+        </div>
+      )}
+      <div className="mt-4 flex justify-end">
+        <button
+          onClick={() => void saveToApi()}
+          disabled={saving}
+          className="flex items-center gap-2 rounded-lg bg-peach-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-peach-400 disabled:opacity-50"
+        >
+          {saved ? <CheckCircle2 size={14} /> : <Save size={14} />}
+          {saving ? 'กำลังบันทึก…' : saved ? 'บันทึกแล้ว!' : 'บันทึกการตั้งค่าความปลอดภัย'}
+        </button>
       </div>
     </Section>
   );
@@ -1702,20 +2063,6 @@ function ToggleSwitch({ enabled, onChange }: { enabled: boolean; onChange: (v: b
           enabled ? 'translate-x-5' : 'translate-x-0',
         )}
       />
-    </button>
-  );
-}
-
-/** Placeholder sections have no backend yet — the button says so honestly. */
-function SaveButton(): React.JSX.Element {
-  return (
-    <button
-      disabled
-      title="ส่วนนี้ยังไม่รองรับการบันทึก"
-      className="flex cursor-not-allowed items-center gap-2 rounded-lg bg-surface px-4 py-2 text-sm font-semibold text-fg-placeholder"
-    >
-      <Save size={14} />
-      ยังไม่รองรับการบันทึก
     </button>
   );
 }
