@@ -55,7 +55,7 @@ export default async function ConfirmationPage({
 
           <div className="mx-auto max-w-2xl pb-16">
             {/* Order Status Header */}
-            <div className="mb-8 rounded-md border border-line-subtle bg-white p-6 text-center">
+            <div className="mb-8 rounded-md border border-line-subtle bg-surface p-6 text-center">
               <div className="mb-4 flex justify-center">
                 {isCompleted ? (
                   <>
@@ -109,7 +109,7 @@ export default async function ConfirmationPage({
                   {deliveredCodes.map((delivered, idx) => (
                     <div
                       key={`${delivered.code}-${idx}`}
-                      className="rounded-md border border-line-brand bg-white p-4"
+                      className="rounded-md border border-line-brand bg-surface p-4"
                     >
                       <p className="mb-2 text-sm text-fg-muted">
                         {delivered.productName} ฿{delivered.denomination.toLocaleString('th-TH')}
@@ -118,7 +118,7 @@ export default async function ConfirmationPage({
                     </div>
                   ))}
                   {deliveredCodes.length === 0 && (
-                    <div className="rounded-md border border-line-brand bg-white p-4">
+                    <div className="rounded-md border border-line-brand bg-surface p-4">
                       <p className="font-mono text-sm text-fg-brand">
                         โค้ดจะแสดงที่นี่ — รีเฟรชหน้านี้อีกครั้งในอีกสักครู่
                       </p>
@@ -129,7 +129,7 @@ export default async function ConfirmationPage({
             )}
 
             {/* Order Details */}
-            <div className="rounded-md border border-line-subtle bg-white p-6">
+            <div className="rounded-md border border-line-subtle bg-surface p-6">
               <h2 className="mb-4 text-lg font-semibold text-fg">รายละเอียดคำสั่งซื้อ</h2>
 
               {/* Items */}

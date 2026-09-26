@@ -9,6 +9,64 @@ import { scanContrast, setTheme } from './helpers';
  */
 const PAGES = ['/', '/search', '/account/login', '/account/register'] as const;
 
+// Audit #11: checkout was tested with a real cart item and had near-white
+// text on hardcoded white cards in dark mode (1.06–1.4:1). The gate seeds a
+// real-shaped cart (nk_cart:v2 + nk_cart_session key) and scans the contact
+// step in BOTH themes.
+for (const theme of ['light', 'dark'] as const) {
+  test.describe(`checkout contrast ${theme}`, () => {
+    test(`${theme}: checkout contact step passes 4.5:1 with a seeded cart`, async ({ page }) => {
+      await page.addInitScript(() => {
+        const sessionKey = crypto.randomUUID();
+        localStorage.setItem('nk_cart_session', sessionKey);
+        const item = {
+          id: 'seed-1',
+          variantId: 'seed-v1',
+          skuCode: 'SEED-1',
+          productNameTh: 'สินค้าทดสอบ',
+          productNameEn: 'Seed Product',
+          productSlug: 'seed-product',
+          thumbnailUrl: null,
+          denominationThb: 45,
+          unitPriceThb: 45,
+          vatAmountThb: 2.86,
+          quantity: 1,
+          lineTotalThb: 45,
+        };
+        localStorage.setItem(
+          'nk_cart:v2',
+          JSON.stringify({
+            cartId: null,
+            sessionKey,
+            items: [item],
+            summary: {
+              subtotalThb: 45,
+              vatExcludedThb: 42.14,
+              vatThb: 2.86,
+              totalThb: 45,
+              itemCount: 1,
+            },
+            expiresAt: null,
+          }),
+        );
+      });
+      await page.goto('/checkout');
+      await setTheme(page, theme);
+      // Cart hydration + the 550ms page-transition fade must settle before
+      // scanning, or we measure an intermediate blended background.
+      await page.waitForTimeout(900);
+      const issues = await scanContrast(page);
+      expect(
+        issues,
+        `${theme} /checkout: text contrast below 4.5:1:\n` +
+          issues
+            .map((i) => `  ${i.ratio}:1 "${i.text}" fg=${i.fg} bg=${i.bg} (${i.cls})`)
+            .join('\n'),
+      ).toEqual([]);
+    });
+  });
+}
+
 for (const theme of ['light', 'dark'] as const) {
   test.describe(`contrast ${theme}`, () => {
     for (const path of PAGES) {

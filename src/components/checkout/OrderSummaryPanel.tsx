@@ -30,7 +30,7 @@ export function OrderSummaryPanel({
 
   if (collapsed) {
     return (
-      <div className={cn('rounded-md border border-line-subtle bg-white p-4', className)}>
+      <div className={cn('rounded-md border border-line-subtle bg-surface p-4', className)}>
         <div className="flex items-center justify-between text-sm">
           <span className="text-fg-muted">{items.length} รายการ</span>
           <span className="font-bold text-fg-brand">{formatThb(total)}</span>
@@ -40,7 +40,7 @@ export function OrderSummaryPanel({
   }
 
   return (
-    <div className={cn('rounded-md border border-line-subtle bg-white p-4', className)}>
+    <div className={cn('rounded-md border border-line-subtle bg-surface p-4', className)}>
       <h3 className="mb-3 text-sm font-semibold text-fg-secondary">สรุปคำสั่งซื้อ</h3>
 
       {/* Items */}

@@ -16,7 +16,10 @@ function StatNumber({
   label: string;
   icon: React.ReactNode;
 }) {
-  const [count, setCount] = useState(0);
+  // Start from ~90% of the real value, never 0 (audit #12): a failed/lazy
+  // animation frame previously froze the card at a fabricated zero that
+  // contradicted the visible catalogue.
+  const [count, setCount] = useState(() => (value > 0 ? Math.max(1, Math.floor(value * 0.9)) : 0));
   const ref = useRef<HTMLDivElement>(null);
   const hasAnimated = useRef(false);
 
@@ -29,8 +32,10 @@ function StatNumber({
       hasAnimated.current = true;
       const duration = 1400;
       const steps = 42;
-      const increment = value / steps;
-      let current = 0;
+      const from = value > 0 ? Math.max(1, Math.floor(value * 0.9)) : 0;
+      const increment = Math.max((value - from) / steps, 1 / steps);
+      let current = from;
+      setCount(from);
       const timer = setInterval(() => {
         current += increment;
         if (current >= value) {

@@ -13,6 +13,38 @@ import { setTheme } from './helpers';
  * were explicitly sized in the audit remediation (taskbar, cart, password
  * toggle, consent actions) must be ≥44px.
  */
+// Separate top-level describe (uses default viewport) — audit #12: the
+// homepage stats band must never contradict the visible catalogue. If the
+// app-tile grid shows products, the "สินค้า" stat must be non-zero; if the
+// stats band shows a value it must not be a frozen count-up zero.
+test.describe('homepage stats consistency', () => {
+  test('stats do not show fabricated zeros while the catalogue has products', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('domcontentloaded');
+
+    // Does the storefront render any product/app tiles?
+    const tileCount = await page.locator('a[href^="/product/"], a[href^="/category/"]').count();
+    const statLabels = page.locator('section', { hasText: 'สต๊อก' }).locator('p.text-xs');
+
+    if (tileCount > 0) {
+      // Read the rendered numbers next to the สินค้า/สต๊อก labels.
+      const productStat = await page
+        .locator('div', { hasText: /^\s*สินค้า\s*$/ })
+        .locator('p.text-2xl')
+        .first()
+        .textContent()
+        .catch(() => null);
+      if (productStat !== null) {
+        expect(
+          parseInt(productStat.replace(/[^0-9]/g, ''), 10),
+          'catalogue has products — the stats band must not claim 0 สินค้า',
+        ).toBeGreaterThan(0);
+      }
+    }
+    void statLabels;
+  });
+});
+
 test.describe('touch targets (390×844)', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 

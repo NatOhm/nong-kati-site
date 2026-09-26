@@ -408,7 +408,7 @@ export default function CheckoutPage(): React.JSX.Element {
         {/* Main area */}
         <div>
           {step === 1 && (
-            <div className="rounded-md border border-line-subtle bg-white p-6">
+            <div className="rounded-md border border-line-subtle bg-surface p-6">
               <h2 className="mb-4 text-lg font-semibold text-fg">ข้อมูลการติดต่อ</h2>
               <ContactForm onSubmit={handleContactSubmit} loading={loading} />
 
@@ -450,7 +450,7 @@ export default function CheckoutPage(): React.JSX.Element {
           )}
 
           {step === 2 && (
-            <div className="rounded-md border border-line-subtle bg-white p-6">
+            <div className="rounded-md border border-line-subtle bg-surface p-6">
               {/* Security review [High]: no actionable payment channel → say
                   so honestly instead of stranding the customer on step 2. */}
               {paymentMethod === 'promptpay' && !paymentState?.qrImageUrl && !manualInfo && (
