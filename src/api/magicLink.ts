@@ -174,7 +174,7 @@ export async function consumeMagicLinkToken(params: {
     },
   });
 
-  writeAuditLog({
+  await writeAuditLog({
     actorType: 'customer',
     actorId: customer.id,
     actorEmail: customer.email,

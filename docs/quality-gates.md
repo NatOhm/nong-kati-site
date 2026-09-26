@@ -155,6 +155,13 @@ Playwright เลือก target ตาม `E2E_BASE_URL` > localhost:4200 (dev
 
 ---
 
+## Audit-log atomicity — `tests/audit-atomicity.test.ts` (audit fix 2026-09-27)
+
+- **กฎ (external audit #5 — High):** `writeAuditLog` เป็น **async ต้อง await** ทุก call site (CI lint/coverage ไม่มีทางลืมได้เพราะไม่ await = ไม่ได้ entry) โดย:
+  - **ส่ง `tx`** → row เข้า **transaction ของ caller** แบบ awaited — mutation กับ evidence commit/rollback เป็นหน่วยเดียว (**insert fail = mutation ทั้งก้อน rollback**) — บังคับกับ mutation ที่ sensitive ทุกจุด: role change / staff deactivate / staff password reset / wallet adjust / password reset
+  - **ไม่ส่ง `tx`** → insert เข้า global prisma แบบ awaited + ผูกกับ Next `after()` กัน serverless freeze; fail = log แต่ไม่ทำ action ล้ม (non-critical path)
+- **เคส regression สองทิศทาง:** (1) audit insert fail ระหว่าง tx → ทั้ง mutation ต้อง reject (2) mutation สำเร็จ → audit ต้องถูกเขียนผ่าน tx client ก่อน transaction callback จบ — เคสเก่าที่ fire-and-forget จะแดงทันที; เคสที่เกี่ยวใน `password-reset.test.ts` / `staff-audit-hardening.test.ts` ก็ถูกย้ายไป assert ฝั่ง tx
+
 ## CI pipeline (`.github/workflows/ci.yml`)
 
 | Job                         | ทำอะไร                                                                  | ผูกกับ gate                                           |

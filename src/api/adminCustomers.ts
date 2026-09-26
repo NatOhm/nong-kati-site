@@ -172,7 +172,7 @@ export async function adminBlockCustomer(
     data: { status: nextStatus },
   });
 
-  writeAuditLog({
+  await writeAuditLog({
     actorType: 'admin',
     actorId: adminId,
     actorEmail: adminEmail,
@@ -213,7 +213,7 @@ export async function adminSetCustomerTier(
 
   await prisma.customer.update({ where: { id: customerId }, data: { tier: next } });
 
-  writeAuditLog({
+  await writeAuditLog({
     actorType: 'admin',
     actorId: adminId,
     actorEmail: adminEmail,
@@ -292,7 +292,9 @@ export async function adminAdjustCustomerCredit(
       },
     });
 
-    writeAuditLog({
+    // Audit fix: awaited + tx-bound — wallet evidence is atomic with the
+    // balance change and the ledger row.
+    await writeAuditLog({
       actorType: 'admin',
       actorId: adminId,
       actorEmail: adminEmail,
@@ -304,6 +306,7 @@ export async function adminAdjustCustomerCredit(
         after: { walletBalanceThb: Number(updated1.walletBalanceThb) },
       },
       metadata: { email: customer.email, note: note?.slice(0, 200) },
+      tx,
     });
 
     return {

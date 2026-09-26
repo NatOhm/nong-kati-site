@@ -252,7 +252,7 @@ export async function adminResendOrderEmail(
   const order = mockOrders.find((o) => o.id === orderId);
   if (!order) return { success: false };
 
-  writeAuditLog({
+  await writeAuditLog({
     actorType: 'admin',
     actorId: adminId,
     actorEmail: adminEmail,
@@ -297,7 +297,7 @@ export async function adminAssignCode(
   order.requiresManualFulfilment = false;
   order.completedAt = new Date();
 
-  writeAuditLog({
+  await writeAuditLog({
     actorType: 'admin',
     actorId: adminId,
     actorEmail: adminEmail,
@@ -335,7 +335,7 @@ export async function adminUpdateOrderNotes(
   adminId: string,
   adminEmail: string,
 ): Promise<{ success: boolean }> {
-  writeAuditLog({
+  await writeAuditLog({
     actorType: 'admin',
     actorId: adminId,
     actorEmail: adminEmail,
@@ -395,7 +395,7 @@ export async function adminRefundOrder(
   const previousStatus = order.status;
   order.status = 'refunded';
 
-  writeAuditLog({
+  await writeAuditLog({
     actorType: 'admin',
     actorId: adminId,
     actorEmail: adminEmail,

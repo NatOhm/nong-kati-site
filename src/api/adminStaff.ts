@@ -137,7 +137,7 @@ export async function adminCreateStaff(
     select: STAFF_SELECT,
   });
 
-  writeAuditLog({
+  await writeAuditLog({
     actorType: 'admin',
     actorId: adminId,
     actorEmail: adminEmail,
@@ -177,7 +177,9 @@ export async function adminChangeStaffRole(
     // A demotion must not keep live sessions minted with the old permission set.
     await revokeSessions(tx, staffId);
 
-    writeAuditLog({
+    // Audit fix: awaited + tx-bound — evidence commits/rolls back WITH the
+    // role change (a failed audit insert aborts the whole mutation).
+    await writeAuditLog({
       actorType: 'admin',
       actorId: adminId,
       actorEmail: adminEmail,
@@ -186,6 +188,7 @@ export async function adminChangeStaffRole(
       recordId: staffId,
       diff: { before: { role: staff.role }, after: { role: newRole } },
       metadata: { staffEmail: staff.email },
+      tx,
     });
 
     return { success: true as const };
@@ -225,7 +228,8 @@ export async function adminDeactivateStaff(
     });
     if (deactivate) await revokeSessions(tx, staffId);
 
-    writeAuditLog({
+    // Audit fix: awaited + tx-bound — see adminChangeStaffRole.
+    await writeAuditLog({
       actorType: 'admin',
       actorId: adminId,
       actorEmail: adminEmail,
@@ -237,6 +241,7 @@ export async function adminDeactivateStaff(
         after: { status: deactivate ? 'deactivated' : 'active' },
       },
       metadata: { staffEmail: staff.email },
+      tx,
     });
 
     return { success: true as const };
@@ -260,8 +265,9 @@ export async function adminResetStaffPassword(
   if (!staff) return { error: 'STAFF_NOT_FOUND' };
 
   const tempPassword = generateTempPassword();
-  // Atomic: the new credential and the session invalidation land together —
-  // a crash between them must not leave live sessions on a known temp password.
+  // Atomic: the new credential, the session invalidation AND the audit row
+  // land together — a crash between them must not leave live sessions on a
+  // known temp password, and a lost audit row must abort the reset.
   await runStaffMutation(async (tx) => {
     await tx.adminUser.update({
       where: { id: staffId },
@@ -273,18 +279,18 @@ export async function adminResetStaffPassword(
       },
     });
     await revokeSessions(tx, staffId);
+    await writeAuditLog({
+      actorType: 'admin',
+      actorId: adminId,
+      actorEmail: adminEmail,
+      action: 'staff_password_reset',
+      tableName: 'AdminUser',
+      recordId: staffId,
+      diff: null,
+      metadata: { staffEmail: staff.email },
+      tx,
+    });
     return { success: true as const };
-  });
-
-  writeAuditLog({
-    actorType: 'admin',
-    actorId: adminId,
-    actorEmail: adminEmail,
-    action: 'staff_password_reset',
-    tableName: 'AdminUser',
-    recordId: staffId,
-    diff: null,
-    metadata: { staffEmail: staff.email },
   });
 
   return { tempPassword };
@@ -313,7 +319,7 @@ export async function adminUnlockStaff(
     }),
   ]);
 
-  writeAuditLog({
+  await writeAuditLog({
     actorType: 'admin',
     actorId: adminId,
     actorEmail: adminEmail,

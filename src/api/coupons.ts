@@ -202,7 +202,7 @@ export async function adminCreateCoupon(
 
   mockCoupons.push(coupon);
 
-  writeAuditLog({
+  await writeAuditLog({
     actorType: 'admin',
     actorId: adminId,
     actorEmail: adminEmail,
@@ -243,7 +243,7 @@ export async function adminUpdateCoupon(
 
   Object.assign(coupon, input, { updatedAt: new Date() });
 
-  writeAuditLog({
+  await writeAuditLog({
     actorType: 'admin',
     actorId: adminId,
     actorEmail: adminEmail,
@@ -272,7 +272,7 @@ export async function adminToggleCoupon(
   coupon.isActive = isActive;
   coupon.updatedAt = new Date();
 
-  writeAuditLog({
+  await writeAuditLog({
     actorType: 'admin',
     actorId: adminId,
     actorEmail: adminEmail,
@@ -305,7 +305,7 @@ export async function adminDeleteCoupon(
   coupon.isActive = false;
   coupon.updatedAt = new Date();
 
-  writeAuditLog({
+  await writeAuditLog({
     actorType: 'admin',
     actorId: adminId,
     actorEmail: adminEmail,

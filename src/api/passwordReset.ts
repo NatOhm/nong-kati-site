@@ -168,22 +168,27 @@ export async function resetPasswordWithToken(params: {
         data: { ipAddress: params.ipAddress ?? row.ipAddress },
       });
 
+      // Audit fix: the reset-completed evidence is written INSIDE this
+      // transaction (awaited + tx-bound) — password change, session
+      // invalidation and the audit row commit or roll back as one unit.
+      await writeAuditLog({
+        actorType: 'customer',
+        actorId: customer.id,
+        actorEmail: customer.email,
+        action: 'password_reset_completed',
+        tableName: 'store.customers',
+        recordId: customer.id,
+        ipAddress: params.ipAddress ?? null,
+        metadata: { tokenId: row.id },
+        tx,
+      });
+
       return { blocked: false as const, customer: updated };
     });
 
     if (result.blocked) return { ok: false, error: 'ACCOUNT_BLOCKED' };
 
     const customer = result.customer;
-    writeAuditLog({
-      actorType: 'customer',
-      actorId: customer.id,
-      actorEmail: customer.email,
-      action: 'password_reset_completed',
-      tableName: 'store.customers',
-      recordId: customer.id,
-      ipAddress: params.ipAddress ?? null,
-      metadata: { tokenId: row.id },
-    });
 
     return { ok: true, customerId: customer.id, email: customer.email };
   } catch (err) {

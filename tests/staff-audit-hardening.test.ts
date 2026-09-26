@@ -87,9 +87,14 @@ describe('writeAuditLog transactional path', () => {
   it('writes through the provided tx client instead of the global prisma', async () => {
     const { writeAuditLog } = await import('@/lib/auditLog');
     const txCreate = vi.fn().mockResolvedValue({});
-    const tx = { auditLog: { create: txCreate } };
+    // Audit fix 2026-09-27: writeAuditLog is now async — the insert is
+    // awaited, and the accepted tx type is the real Prisma transaction
+    // client (cast here because this fake only implements the used slice).
+    const tx = { auditLog: { create: txCreate } } as unknown as NonNullable<
+      Parameters<typeof writeAuditLog>[0]['tx']
+    >;
 
-    writeAuditLog({
+    await writeAuditLog({
       actorType: 'admin',
       actorId: 'a1',
       actorEmail: 'admin@x',

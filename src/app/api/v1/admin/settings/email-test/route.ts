@@ -136,7 +136,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   // Audit the ATTEMPT (success or failure) — actor, target, per-step outcome.
   // Credentials are never logged: the DB stores only the env-var NAME.
-  writeAuditLog({
+  await writeAuditLog({
     actorType: 'admin',
     actorId: check.payload?.sub ?? 'unknown',
     actorEmail: check.payload?.email ?? 'unknown',

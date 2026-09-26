@@ -2,13 +2,22 @@
  * Audit Log Helper — 06-database.md §14, 11-admin.md.
  * Append-only audit trail for every mutating admin action.
  *
- * Review M5: entries persist to the `AuditLog` table (was an in-memory
- * mock that reset on every serverless instance). Writes are fire-and-
- * forget: they never throw, never block the guarded mutation, and a DB
- * hiccup degrades to a console warning instead of failing the request —
- * an audit helper must not take business actions down with it. Callers
- * inside prisma.$transaction blocks keep their current fire-after-write
- * shape (the audit row then commits with the caller's transaction).
+ * Audit fix 2026-09-27 (external finding, High): the old helper returned
+ * synchronously and started the insert behind a floating promise, so (a)
+ * privileged mutations could commit with no durable audit row and (b) rows
+ * could outlive a rolled-back mutation. The helper is now **async and must
+ * be awaited**:
+ *
+ *  - `tx` supplied  → the audit row is written INSIDE the caller's
+ *    transaction and is awaited: mutation and evidence commit/roll back as
+ *    one unit (role changes, staff deactivation, wallet adjustments,
+ *    password resets, fulfilment confirmations).
+ *  - no `tx`        → the insert is awaited and scheduled via Next's
+ *    `after()` so the row survives the response (serverless-safe); failures
+ *    are logged but do not fail the (non-privileged) action.
+ *
+ * A forced insert failure inside a transactional caller now rolls the whole
+ * mutation back (asserted by tests/audit-atomicity.test.ts).
  */
 
 import type { Prisma } from '@prisma/client';
@@ -59,18 +68,13 @@ export type AuditLogEntry = {
 };
 
 /**
- * Write an audit log entry to the DB. Returns synchronously with the entry
- * (so every existing call site stays valid); the insert itself is scheduled
- * to run after the response via Next's after() — keeping the serverless
- * invocation alive so the row cannot be frozen away. Failures are reported
- * via console.error only.
- *
- * Review addition: pass `tx` (a prisma.$transaction client) to write the
- * audit row INSIDE the caller's transaction — the entry then commits and
- * rolls back atomically with the mutation it describes. Without `tx` the
- * legacy after-response path is used.
+ * The Prisma interactive-transaction client — the audit write accepts the
+ * exact client type `prisma.$transaction(async (tx) => …)` hands to callers,
+ * so `tx` can be passed through with no casts anywhere.
  */
-export function writeAuditLog(params: {
+export type AuditTx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
+export async function writeAuditLog(params: {
   actorType: AuditActorType;
   actorId: string;
   actorEmail: string;
@@ -83,9 +87,13 @@ export function writeAuditLog(params: {
   } | null;
   ipAddress?: string | null;
   metadata?: Record<string, unknown> | null;
-  /** Transaction client — makes the audit row atomic with the mutation. */
-  tx?: { auditLog: { create: (args: { data: Record<string, unknown> }) => Promise<unknown> } };
-}): AuditLogEntry {
+  /**
+   * Transaction client — makes the audit row ATOMIC with the caller's
+   * mutation: awaited, and rolled back together with it. Every
+   * security- or money-sensitive mutation MUST pass its tx here.
+   */
+  tx?: AuditTx;
+}): Promise<AuditLogEntry> {
   const entry: AuditLogEntry = {
     id: `audit_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     actorType: params.actorType,
@@ -113,41 +121,37 @@ export function writeAuditLog(params: {
     ...(entry.metadata && { metadata: asJson(entry.metadata) }),
   };
 
-  // Transactional path: the row commits/rolls back with the caller's
-  // mutation — no after() scheduling, no fire-and-forget divergence.
+  // Transactional path: awaited, atomic with the caller's mutation. A
+  // failure here throws INTO the transaction → the whole mutation rolls
+  // back with its evidence missing.
   if (params.tx) {
-    void params.tx.auditLog.create({ data }).catch((err: unknown) => {
-      console.error(
-        '[audit] transactional write failed:',
-        err instanceof Error ? err.message : err,
-      );
-    });
+    await params.tx.auditLog.create({ data });
     return entry;
   }
 
   // Durable-after-response insert (finding: a bare floating promise can be
   // frozen away on serverless once the response returns, losing the audit
-  // row of a SUCCESSFUL mutation). `after` keeps the invocation alive until
-  // the insert settles; failures are logged rather than propagated so audit
-  // cannot break the action itself.
-  const insert = prisma.auditLog.create({ data }).catch((err: unknown) => {
-    console.error('[audit] write failed:', err instanceof Error ? err.message : err);
-  });
-
-  void (async () => {
-    try {
-      const after = await nextAfter();
-      if (after) {
-        after(() => insert);
-      }
-      // Outside a request context (scripts/tests) — degrade to floating
-      // promise as before.
-    } catch {
-      // Scheduler unavailable — degrade to floating promise as before.
+  // row of a SUCCESSFUL action). The insert itself is awaited here so
+  // callers observe persistence; `after` keeps the invocation alive when
+  // the call happens inside a request scope. Failures are logged, not
+  // thrown — non-transactional audit must not take the action down.
+  const insert = prisma.auditLog.create({ data }).then(() => entry);
+  try {
+    const after = await nextAfter();
+    if (after) {
+      after(() => insert);
     }
-  })();
-
-  return entry;
+    // Outside a request context (scripts/tests) — the awaited insert below
+    // still persists the row synchronously with respect to the caller.
+  } catch {
+    // Scheduler unavailable — fall through to the awaited insert.
+  }
+  try {
+    return await insert;
+  } catch (err) {
+    console.error('[audit] write failed:', err instanceof Error ? err.message : err);
+    return entry;
+  }
 }
 
 /**

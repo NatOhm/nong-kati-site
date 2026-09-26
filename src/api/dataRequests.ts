@@ -88,7 +88,7 @@ export async function submitDataRequest(params: {
     },
   });
 
-  writeAuditLog({
+  await writeAuditLog({
     actorType: 'customer',
     actorId: row.email,
     actorEmail: row.email,
@@ -156,7 +156,7 @@ export async function updateDataRequest(
     },
   });
 
-  writeAuditLog({
+  await writeAuditLog({
     actorType: 'admin',
     actorId: adminId,
     actorEmail: adminEmail,

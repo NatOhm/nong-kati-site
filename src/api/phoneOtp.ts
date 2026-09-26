@@ -255,7 +255,7 @@ export async function verifyPhoneOtp(params: {
     },
   });
 
-  writeAuditLog({
+  await writeAuditLog({
     actorType: 'customer',
     actorId: customer.id,
     actorEmail: customer.email,

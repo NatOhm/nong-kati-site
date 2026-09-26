@@ -442,7 +442,7 @@ export async function confirm2fa(
           status: 'locked',
         },
       });
-      writeAuditLog({
+      await writeAuditLog({
         actorType: 'admin',
         actorId: user.id,
         actorEmail: user.email,

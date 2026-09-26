@@ -113,7 +113,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   });
 
   // Review: money-affecting mutations are audited (code, discount shape).
-  writeAuditLog({
+  await writeAuditLog({
     actorType: 'admin',
     actorId: check.payload?.sub ?? 'unknown',
     actorEmail: check.payload?.email ?? '',

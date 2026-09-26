@@ -79,7 +79,7 @@ export async function registerCustomer(params: {
     },
   });
 
-  writeAuditLog({
+  await writeAuditLog({
     actorType: 'customer',
     actorId: customer.id,
     actorEmail: email,
@@ -181,7 +181,7 @@ export async function loginCustomer(params: {
     },
   });
 
-  writeAuditLog({
+  await writeAuditLog({
     actorType: 'customer',
     actorId: customer.id,
     actorEmail: customer.email,
@@ -236,7 +236,7 @@ export async function logoutCustomer(
         data: { sessionsInvalidBefore: new Date() },
       });
     }
-    writeAuditLog({
+    await writeAuditLog({
       actorType: 'customer',
       actorId: customerId,
       actorEmail: customer.email,
@@ -302,7 +302,7 @@ export async function loginOrCreateCustomerViaOAuth(params: {
     },
   });
 
-  writeAuditLog({
+  await writeAuditLog({
     actorType: 'customer',
     actorId: customer.id,
     actorEmail: customer.email,

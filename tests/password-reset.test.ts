@@ -14,6 +14,9 @@ const txMock = {
   passwordResetToken: {
     update: vi.fn().mockResolvedValue({}),
   },
+  // Audit fix 2026-09-27: the reset-completed audit row is written INSIDE
+  // the transaction (awaited + tx-bound), not through the global client.
+  auditLog: { create: vi.fn().mockResolvedValue({}) },
 };
 
 vi.mock('@/lib/db', () => ({
@@ -169,10 +172,12 @@ describe('resetPasswordWithToken', () => {
     expect(updateArg.data.passwordHash).not.toBe('old');
     expect(updateArg.data.passwordHash.startsWith('scrypt$')).toBe(true);
     expect(updateArg.data.sessionsInvalidBefore.getTime()).toBeLessThan(Date.now());
-    // Audit trail written.
-    expect(prisma.auditLog.create).toHaveBeenCalledWith({
+    // Audit trail written INSIDE the transaction (tx-bound since the
+    // 2026-09-27 audit fix — evidence commits with the password change).
+    expect(txMock.auditLog.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ action: 'password_reset_completed' }),
     });
+    expect(prisma.auditLog.create).not.toHaveBeenCalled();
     expect(newHash).toBeTruthy();
   });
 
