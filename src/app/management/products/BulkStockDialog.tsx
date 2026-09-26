@@ -63,11 +63,27 @@ export function BulkStockDialog({
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<ApplyResponse | null>(null);
 
-  /** Client-side record estimate: lines (short) or blank-line blocks (long). */
+  /**
+   * Client-side record estimate — MUST mirror the server's split rule exactly
+   * (stock/bulk route): short = one record per line; long = blocks separated by
+   * 2+ consecutive blank lines (a single blank line is kept INSIDE a block so
+   * vendor templates survive delivery).
+   */
   const recordCount = useMemo(() => {
     if (raw.trim() === '') return 0;
     if (format === 'short') return raw.split(/\r?\n/).filter((l) => l.trim() !== '').length;
-    return raw.split(/(?:\r?\n)\s*(?:\r?\n)/).filter((b) => b.trim() !== '').length;
+    return raw.split(/(?:\r?\n)[ \t]*(?:\r?\n)[ \t]*(?:\r?\n)/).filter((b) => b.trim() !== '')
+      .length;
+  }, [raw, format]);
+
+  /**
+   * Rough account-count heuristic (mail/user/pass/id-ish lines). When it
+   * exceeds the record count in long format, the paste is probably several
+   * accounts separated by ONE blank line — warn before they save one blob.
+   */
+  const accountGuess = useMemo(() => {
+    if (format !== 'long' || raw.trim() === '') return 0;
+    return raw.split(/\r?\n/).filter((l) => /mail|user|pass|ไอดี|บัญชี|id\s*[:：]/i.test(l)).length;
   }, [raw, format]);
 
   const dirty = raw.trim() !== '';
@@ -239,14 +255,21 @@ export function BulkStockDialog({
                 placeholder={
                   format === 'short'
                     ? 'user1:pass1\nuser2:pass2\nuser3:pass3'
-                    : '🍎 ➤ HBO MAX 4K  7 days 💜\n\n✅ Mail : mansdevt@gmail.com\n✅ pass : baby123456hii\n\nค ณ + เข้าครั้งแรกที่อื่น\n\n(บล็อกถัดไป คั่นด้วยบรรทัดว่าง)'
+                    : '🍎 ➤ HBO MAX 4K  7 days 💜\n\n✅ Mail : mansdevt@gmail.com\n✅ pass : baby123456hii\n\n\n✅ Mail : บัญชีถัดไป@gmail.com\n✅ pass : xxxxxxxx\n\n\n(บล็อกถัดไป คั่นด้วยบรรทัดว่าง 2 บรรทัดติดกัน)'
                 }
                 className="min-h-[220px] w-full resize-y rounded-lg border border-line-subtle bg-surface-elevated p-3 font-mono text-sm text-fg placeholder:text-fg-placeholder focus:border-line-brand"
               />
               <p className="mt-1 text-xs text-fg-placeholder">
                 ตอนนี้: {recordCount} รายการ
-                {format === 'long' && ' (แยกบล็อกด้วยบรรทัดว่าง)'}
+                {format === 'long' && ' (แยกบล็อกด้วยบรรทัดว่าง 2 บรรทัดติดกัน)'}
               </p>
+              {format === 'long' && accountGuess > recordCount && recordCount > 0 && (
+                <p className="mt-1 text-xs font-medium text-coral-700" role="alert">
+                  ⚠️ ดูเหมือนมีราวๆ {accountGuess} บัญชี แต่จะถูกรวมเป็น {recordCount} ก้อน —
+                  คั่นแต่ละบัญชีด้วยบรรทัดว่าง 2 บรรทัดติดกัน
+                  (บรรทัดว่างเดียวถือว่าอยู่ในบัญชีเดียวกัน)
+                </p>
+              )}
             </div>
 
             {/* Preview */}
