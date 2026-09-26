@@ -177,6 +177,8 @@ const ROUTE_COVERAGE: MatrixRow[] = [
   // settings
   { method: 'GET', path: '/settings/some-key', perm: 'settings:read' },
   { method: 'PUT', path: '/settings/some-key', perm: 'settings:write', body: { value: 'x' } },
+  // SMTP connectivity probe for the email settings panel (no save, no send)
+  { method: 'POST', path: '/settings/email-test', perm: 'settings:write', body: {} },
   // staff
   { method: 'GET', path: '/staff', perm: 'staff:read' },
   { method: 'POST', path: '/staff', perm: 'staff:write', body: {} },

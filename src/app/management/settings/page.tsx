@@ -33,6 +33,7 @@ import {
 import { AdminShell } from '@/components/layout/AdminShell';
 import { adminFetch, clearAdminSession } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
+import type { SmtpProbeResult } from '@/lib/email/smtpProbe';
 
 /** A tab's save implementation, registered with the page so the header
  *  button can trigger the active tab's real save. */
@@ -1408,6 +1409,48 @@ function EmailSettings({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [registerSaver]);
 
+  // ── Test connection (SMTP probe) — uses the values TYPED in the form;
+  // no save required. The route fills gaps from the saved settings.
+  const [probe, setProbe] = useState<SmtpProbeResult | null>(null);
+  const [testing, setTesting] = useState(false);
+  const [testError, setTestError] = useState<string | null>(null);
+
+  async function runConnectionTest(): Promise<void> {
+    setTesting(true);
+    setTestError(null);
+    setProbe(null);
+    try {
+      const res = await adminFetch('/api/v1/admin/settings/email-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          smtpHost: smtpHost.trim() || undefined,
+          smtpPort: Number(smtpPort) || undefined,
+          smtpUser: smtpUser.trim() || undefined,
+          smtpPasswordEnv: smtpPasswordEnv.trim() || undefined,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      if (!res.ok) {
+        setTestError(
+          data['error'] === 'SMTP_NOT_CONFIGURED'
+            ? 'กรอก SMTP Host และ Port ก่อนทดสอบ'
+            : data['error'] === 'INVALID_SMTP_HOST'
+              ? 'ชื่อโฮสต์ไม่ถูกต้อง'
+              : data['error'] === 'INVALID_ENV_VAR_NAME'
+                ? 'ชื่อ environment variable ต้องเป็น A-Z ตัวใหญ่ ตัวเลข และ _ เท่านั้น'
+                : 'ทดสอบไม่สำเร็จ',
+        );
+        return;
+      }
+      setProbe(data as unknown as SmtpProbeResult);
+    } catch {
+      setTestError('เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ');
+    } finally {
+      setTesting(false);
+    }
+  }
+
   if (loading) {
     return (
       <Section title="การตั้งค่าอีเมล" subtitle="ตั้งค่า SMTP และรูปแบบอีเมลที่ส่งให้ลูกค้า">
@@ -1469,6 +1512,74 @@ function EmailSettings({
             className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
           />
         </Field>
+      </div>
+
+      <div className="rounded-lg border border-line-subtle bg-surface p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-semibold text-fg-secondary">ทดสอบการเชื่อมต่อ SMTP</h3>
+            <p className="mt-0.5 text-xs text-clay-400">
+              ทดสอบ DNS → TCP → Greeting → EHLO ด้วยค่าในฟอร์ม (ไม่ต้องบันทึกก่อน) —
+              ไม่มีการส่งอีเมลจริง
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void runConnectionTest()}
+            disabled={testing}
+            className="flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm font-semibold text-fg transition-colors hover:border-peach-400 disabled:opacity-50"
+          >
+            {testing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+            {testing ? 'กำลังทดสอบ…' : 'ทดสอบการเชื่อมต่อ'}
+          </button>
+        </div>
+        {testError && (
+          <p className="mt-3 rounded-md bg-coral-500/10 px-3 py-2 text-sm text-fg-error">
+            {testError}
+          </p>
+        )}
+        {probe && (
+          <div className="mt-3 space-y-2">
+            <div className="flex items-center gap-2 text-sm">
+              {probe.ok ? (
+                <span className="flex items-center gap-1.5 font-semibold text-fg-success">
+                  <CheckCircle2 size={16} /> เชื่อมต่อสำเร็จ ({probe.latencyMs} ms)
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5 font-semibold text-fg-error">
+                  <AlertTriangle size={16} /> เชื่อมต่อไม่สำเร็จ
+                  {probe.error ? ` — ${probe.error}` : ''}
+                </span>
+              )}
+            </div>
+            <ul className="grid grid-cols-2 gap-1.5 text-xs sm:grid-cols-4">
+              {(
+                [
+                  ['DNS', probe.steps.dns],
+                  ['TCP', probe.steps.tcp],
+                  ['Greeting', probe.steps.greeting],
+                  ['EHLO', probe.steps.ehlo],
+                ] as const
+              ).map(([label, passed]) => (
+                <li
+                  key={label}
+                  className={cn(
+                    'flex items-center gap-1.5 rounded-md px-2.5 py-1.5',
+                    passed ? 'bg-jade-500/15 text-fg-success' : 'bg-coral-500/15 text-fg-error',
+                  )}
+                >
+                  {passed ? <CheckCircle2 size={12} /> : <AlertTriangle size={12} />} {label}
+                </li>
+              ))}
+            </ul>
+            {probe.ok && (
+              <p className="text-xs text-clay-400">
+                STARTTLS: {probe.capabilities.starttls ? 'รองรับ' : 'ไม่รองรับ'} · AUTH:{' '}
+                {probe.capabilities.auth ? 'รองรับ' : 'ไม่รองรับ'}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="rounded-lg border border-line-subtle bg-surface p-4">

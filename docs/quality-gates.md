@@ -179,4 +179,4 @@ Playwright เลือก target ตาม `E2E_BASE_URL` > localhost:4200 (dev
 - [ ] endpoint ใหม่คืนข้อมูลลูกค้า → ตรวจว่าอยู่ใต้ branch mask ของ PII ด้วย (เพิ่มเคสใน `admin-pii-masking.test.ts`) — รวมถึง **CSV/excel export ทุกรูปแบบ**: mask ต้องเกิดก่อนเขียนไฟล์ (อ้างแบบ `reports/customer-sales/export` + `lib/reports/customerSales`)
 - [ ] export ใหม่ที่โหลดไฟล์ออกจากระบบ → ผ่าน formula-injection guard (`isFormulaInjection`)
 
-**งานค้างที่เกี่ยว:** route `POST /api/v1/admin/settings/email-test` (ปุ่ม Test connection ของ Email settings, ใช้ `src/lib/email/smtpProbe.ts` ที่เสร็จแล้ว) เมื่อเพิ่ม ต้อง: เพิ่ม row ใน `ROUTE_COVERAGE` (perm `settings:write`) + ครอบ SSRF guard ที่ lib มีให้ + เพิ่มเคส PII หาก response มีข้อมูลอ่อนไหว
+**ปิดแล้วเดิม:** route `POST /api/v1/admin/settings/email-test` (ปุ่ม Test connection ของ Email settings) พร้อมครบตาม checklist — row ใน `ROUTE_COVERAGE` (perm `settings:write`), SSRF guard ที่ `probeSmtp` + แบน localhost ใน route, audit `settings.email_test` (เก็บแค่ผล per-step ไม่มี credential) — คลุมด้วย `tests/admin-email-test.test.ts` (fake SMTP server ต่อ TCP จริง + route guard/override/fallback)
