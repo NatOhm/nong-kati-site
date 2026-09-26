@@ -170,6 +170,8 @@ const ROUTE_COVERAGE: MatrixRow[] = [
   { method: 'POST', path: '/products/publish', perm: 'products:write', body: { skus: [] } },
   // reports
   { method: 'GET', path: '/reports/customer-sales', perm: 'reports:read' },
+  // CSV export — PII masking rides customers:read:full inside the handler
+  { method: 'GET', path: '/reports/customer-sales/export', perm: 'reports:export' },
   { method: 'GET', path: '/reports/slow-stock', perm: 'reports:read' },
   { method: 'PUT', path: '/reports/slow-stock', perm: 'settings:write', body: { days: 30 } },
   // settings

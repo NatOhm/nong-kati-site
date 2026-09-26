@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { prisma } from '@/lib/db';
-import { checkPermission } from '@/lib/rbac';
+import { checkPermission, maskEmail } from '@/lib/rbac';
 
 export const dynamic = 'force-dynamic';
 
@@ -162,15 +162,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     }),
   ]);
   // Review [High]: full customer PII (email) is only for holders of
-  // customers:read:full. Everyone else with reports:read gets masked emails.
+  // customers:read:full. Everyone else with reports:read gets masked emails
+  // (maskEmail from lib/rbac — the same helper the order/topup routes use).
   const canSeeFullPii = check.payload?.perms.includes('customers:read:full') ?? false;
-  const maskEmail = (email: string) =>
-    canSeeFullPii ? email : email.replace(/^(.).*(@.*)$/, (_m, a, b) => `${a}***${b as string}`);
 
   const fullCustomerOrders = topCustomers
     .map((c) => ({
       customerId: c.id,
-      email: maskEmail(c.email),
+      email: canSeeFullPii ? c.email : maskEmail(c.email),
       totalOrders: c._count.orders,
       totalSpend: c.orders.reduce((s, o) => s + Number(o.totalAmountThb), 0),
     }))
@@ -333,7 +332,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     },
     recentOrders: recentOrders.map((o) => ({
       id: o.orderNumber,
-      customer: o.customerEmail,
+      // PII: recentOrders rides the same customers:read:full branch as
+      // topCustomers above — a reports:read role without read:full gets the
+      // masked email here too (regression-asserted in admin-pii-masking).
+      customer: canSeeFullPii ? o.customerEmail : maskEmail(o.customerEmail),
       product: o.items[0]?.productNameTh ?? '—',
       amount: Number(o.totalAmountThb),
       status: o.status,

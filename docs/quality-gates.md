@@ -9,10 +9,9 @@
 ## ภาพรวม
 
 | #     | Gate                                                  | ไฟล์ test                          | ตัวรัน               | CI job                 |
-| ----- | ----------------------------------------------------- | ---------------------------------- | -------------------- | ---------------------- |
+| ----- | ----------------------------------------------------- | ---------------------------------- | -------------------- | ---------------------- | --- | --- | ---------------------------------------- | --------------------------------- | ---------- | ---------- |
 | R1–R6 | Design-token / duplicate-ID (static source scan)      | `tests/design-token-gates.test.ts` | `npm test` (vitest)  | Unit Tests             |
-| A     | Admin authz matrix (53 endpoints × no-auth + 6 roles) | `tests/admin-authz-matrix.test.ts` | `npm test`           | Unit Tests             |
-| P     | PII masking (permission-scoped response)              | `tests/admin-pii-masking.test.ts`  | `npm test`           | Unit Tests             |
+| A     | Admin authz matrix (53 endpoints × no-auth + 6 roles) | `tests/admin-authz-matrix.test.ts` | `npm test`           | Unit Tests             |     | P   | PII masking (permission-scoped response) | `tests/admin-pii-masking.test.ts` | `npm test` | Unit Tests |
 | C     | Concurrency (DB races — refresh CAS, lockout)         | `tests/admin-concurrency.test.ts`  | vitest + live server | Concurrency (DB races) |
 | E1    | Disabled-state affordance (WCAG 1.4.1)                | `e2e/disabled-state.spec.ts`       | `npm run test:e2e`   | (local/preview)        |
 | E2    | No hardcoded white in dark mode                       | `e2e/no-hardcoded-white.spec.ts`   | `npm run test:e2e`   | (local/preview)        |
@@ -96,12 +95,17 @@ Playwright เลือก target ตาม `E2E_BASE_URL` > localhost:4200 (dev
 ## PII masking — `tests/admin-pii-masking.test.ts`
 
 - **กฎ:** endpoint เดียวกันคืนข้อมูลต่างกันตาม permission:
-  - `support_agent` (ไม่มี `customers:read:full` / `orders:read:full`) → ต้องได้ **masked**: `s***@gmail.com`, `08****78`, และใน topups **ต้องไม่มี key `customerName` อยู่เลย**
-  - `order_manager` / `super_admin` → ต้องได้ raw ครบ
-- **คลุม:** `GET /customers` (list + [id]), `GET /orders` (list + [id]), `GET /topups` — เรียก in-process ด้วย JWT จริง prisma mock คืน fixture ค่าเดิมเสมอ จึง assert แบบเป๊ะ และมี sanity test กัน fixture เองเผลอ mask ชน raw
+  - โดยปกติ role ที่ไม่มี `customers:read:full` / `orders:read:full` → ต้องได้ **masked**: `s***@gmail.com`, `08****78`, และใน topups **ต้องไม่มี key `customerName` อยู่เลย**
+  - role ที่มี permission ดังกล่าว → ต้องได้ raw ครบ
+- **คลุม (8 surface):** `GET /customers` (list + [id]), `GET /orders` (list + [id]), `GET /topups`, **`GET /dashboard` (topCustomers + recentOrders)**, **`GET /reports/customer-sales` (JSON)** และ **`GET /reports/customer-sales/export` (CSV — mask ในไฟล์ที่ดาวน์โหลดจริง)**
+- **เคส CSV สำคัญ:** `finance_viewer` มี `reports:export` (ดาวน์โหลดได้) แต่ไม่มี `customers:read:full` → ไฟล์ CSV ที่ได้ต้องมีแค่ `s***@gmail.com` และ **ห้ามมี raw email/ชื่ออยู่เลย** — พิสูจน์ว่า mask เกิดก่อนเขียนไฟล์ ไม่ใช่แค่หน้าจอ ส่วน role ที่มี read:full ได้ CSV แบบ raw + มี BOM (ตรวจจาก bytes เพราะ `Response.text()` ตัด BOM ตาม spec)
+- **CSV formula-injection guard:** ทุก cell ผ่าน `isFormulaInjection` (นำหน้าด้วย `= + - @ TAB CR` จะโดน prefix `'`) — customer-controlled strings (ชื่อ/อีเมล) จึงปลอดภัยเมื่อเปิดใน Excel/Sheets (unit-tested ผ่าน `lib/reports/customerSales`)
+- **สถาปัตยกรรม:** JSON กับ CSV ผ่าน `aggregateCustomerSales` + `maskCustomerSalesRows` ฟังก์ชันเดียวกันใน `lib/reports/customerSales` — ห้ามแยก masking ออก ไม่อย่างนั้น CSV หลุด
+- **ข้อควรระวังเรื่อง RBAC:** `support_agent` และ `order_manager` **ไม่มี** `reports:read` → 403 ที่ dashboard/customer-sales (สัญญานั้นเป็นของ authz matrix); masked-role ที่ถึงรายงานเหล่านี้ได้จริงคือ `finance_viewer` / `marketing_manager`
 - **วิธีแก้เมื่อแดง:**
   - masked role เห็น raw → route หลุด branch ตรวจ permission `*:read:full` (หรือลืม mask ฟิลด์ใหม่) — กลับไปใช้ `maskEmail`/`maskPhone` จาก `lib/rbac` ตาม branch เดิม
-  - full role โดน mask → permission หลุดจาก `ROLE_PERMISSIONS` หรือเงื่อนไขใน route ชี้ role ผิด
+  - full role โดน mask → permission หลุดจาก `ROLE_PERMISSIONS` หรือเงื่อนไขใน route ชี้ role ผิด (ดูเคสจริง: เรียก `maskEmail` แบบไม่มีเงื่อนไขหลัง import จาก rbac = raw role โดน mask ด้วย)
+  - CSV แดง → mask ต้องเกิดใน `maskCustomerSalesRows` **ก่อน** `toCustomerSalesCsv` — ห้าม bypass lib
 
 ## Concurrency — `tests/admin-concurrency.test.ts`
 
@@ -172,6 +176,7 @@ Playwright เลือก target ตาม `E2E_BASE_URL` > localhost:4200 (dev
 - [ ] **แตะ UI/component ใหม่?** → `npm run test:e2e` เขียว (อย่างน้อย E1–E5 ชุดที่เกี่ยว)
 - [ ] **แตะสี/token?** → R1–R6 + E1 + E2 + E4 ต้องพร้อมกัน
 - [ ] Component ใหม่มี input/label → ids จาก `useId()` ไม่ใช่ literal
-- [ ] endpoint ใหม่คืนข้อมูลลูกค้า → ตรวจว่าอยู่ใต้ branch mask ของ PII ด้วย (เพิ่มเคสใน `admin-pii-masking.test.ts`)
+- [ ] endpoint ใหม่คืนข้อมูลลูกค้า → ตรวจว่าอยู่ใต้ branch mask ของ PII ด้วย (เพิ่มเคสใน `admin-pii-masking.test.ts`) — รวมถึง **CSV/excel export ทุกรูปแบบ**: mask ต้องเกิดก่อนเขียนไฟล์ (อ้างแบบ `reports/customer-sales/export` + `lib/reports/customerSales`)
+- [ ] export ใหม่ที่โหลดไฟล์ออกจากระบบ → ผ่าน formula-injection guard (`isFormulaInjection`)
 
 **งานค้างที่เกี่ยว:** route `POST /api/v1/admin/settings/email-test` (ปุ่ม Test connection ของ Email settings, ใช้ `src/lib/email/smtpProbe.ts` ที่เสร็จแล้ว) เมื่อเพิ่ม ต้อง: เพิ่ม row ใน `ROUTE_COVERAGE` (perm `settings:write`) + ครอบ SSRF guard ที่ lib มีให้ + เพิ่มเคส PII หาก response มีข้อมูลอ่อนไหว

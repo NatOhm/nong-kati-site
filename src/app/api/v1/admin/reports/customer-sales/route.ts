@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { prisma } from '@/lib/db';
 import { checkPermission } from '@/lib/rbac';
+import { aggregateCustomerSales, maskCustomerSalesRows } from '@/lib/reports/customerSales';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,17 +11,17 @@ function bearer(req: NextRequest): string | null {
   return header.slice(7) || null;
 }
 
-/** Orders that count as revenue (confirmed or fulfilled — never pending/failed). */
-const REVENUE_STATUSES = ['payment_confirmed', 'code_delivered', 'completed'];
-
 /**
  * GET /api/v1/admin/reports/customer-sales?period=all|month (reports:read)
  *
  * Per-customer purchase statistics (client ask: "สถิติตัวแทน/สมาชิกที่ซื้อสินค้า —
  * ดูได้ว่าสมาชิกคนไหนทำยอดขายได้เท่าไร"). Revenue-recognized orders only.
- * Profit per customer = Σ(lineTotal − unitCostExVat × qty) using the variant's
- * costThb; items without a cost are excluded from profit, not zeroed (a null
- * cost is "unknown", not "free").
+ *
+ * Review [High]: full identity + wallet balance requires customers:read:full.
+ * reports:read alone gets masked emails, no names, no wallet balances. The
+ * shaping runs through maskCustomerSalesRows in lib/reports/customerSales —
+ * the SAME function the CSV export uses, so a limited role can never obtain
+ * raw PII in either form.
  */
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const token = bearer(req);
@@ -32,97 +32,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   }
 
   const period = req.nextUrl.searchParams.get('period') === 'month' ? 'month' : 'all';
-  const since = new Date();
-  if (period === 'month') since.setDate(1), since.setHours(0, 0, 0, 0);
-
-  // Review [High]: full identity + wallet balance requires customers:read:full.
-  // reports:read alone gets masked emails, no names, no wallet balances.
   const canSeeFullPii = check.payload?.perms.includes('customers:read:full') ?? false;
-  const maskEmail = (email: string) =>
-    canSeeFullPii ? email : email.replace(/^(.).*(@.*)$/, (_m, a, b) => `${a}***${b as string}`);
 
-  const orders = await prisma.order.findMany({
-    where: {
-      status: { in: REVENUE_STATUSES },
-      customerId: { not: null },
-      ...(period === 'month' ? { createdAt: { gte: since } } : {}),
-    },
-    select: {
-      id: true,
-      items: {
-        select: {
-          quantity: true,
-          lineTotalThb: true,
-          variant: { select: { costThb: true, price: true } },
-        },
-      },
-      customer: {
-        select: { id: true, email: true, fullName: true, tier: true, walletBalanceThb: true },
-      },
-    },
-  });
-
-  interface Agg {
-    customerId: string;
-    email: string;
-    fullName: string | null;
-    tier: string;
-    walletBalanceThb: number;
-    orders: number;
-    units: number;
-    spendThb: number;
-    profitThb: number;
-    profitKnownThb: number;
-  }
-  const byCustomer = new Map<string, Agg>();
-  for (const o of orders) {
-    if (!o.customer) continue;
-    const c = o.customer;
-    let row = byCustomer.get(c.id);
-    if (!row) {
-      row = {
-        customerId: c.id,
-        email: c.email,
-        fullName: c.fullName,
-        tier: c.tier,
-        walletBalanceThb: Number(c.walletBalanceThb),
-        orders: 0,
-        units: 0,
-        spendThb: 0,
-        profitThb: 0,
-        profitKnownThb: 0,
-      };
-      byCustomer.set(c.id, row);
-    }
-    row.orders += 1;
-    for (const item of o.items) {
-      const qty = item.quantity;
-      const line = Number(item.lineTotalThb);
-      row.units += qty;
-      row.spendThb += line;
-      const cost = item.variant?.costThb;
-      if (cost != null) {
-        row.profitThb += line - Number(cost) * qty;
-        row.profitKnownThb += line;
-      }
-    }
-  }
-
-  const rows = [...byCustomer.values()]
-    .sort((a, b) => b.spendThb - a.spendThb)
-    .map((r) => ({
-      customerId: r.customerId,
-      email: maskEmail(r.email),
-      ...(canSeeFullPii ? { fullName: r.fullName } : {}),
-      tier: r.tier,
-      ...(canSeeFullPii ? { walletBalanceThb: r.walletBalanceThb } : {}),
-      orders: r.orders,
-      units: r.units,
-      spendThb: r.spendThb,
-      // Profit covers only costed items; pct relative to those items' revenue.
-      profitThb: r.profitThb,
-      profitCoveragePct: r.spendThb > 0 ? Math.round((r.profitKnownThb / r.spendThb) * 100) : 0,
-    }));
+  const rows = maskCustomerSalesRows(await aggregateCustomerSales(period), canSeeFullPii);
 
   const totals = rows.reduce(
     (t, r) => ({

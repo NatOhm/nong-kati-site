@@ -20,6 +20,14 @@
  *  - GET /api/v1/admin/orders               (list)      orders:read
  *  - GET /api/v1/admin/orders/[id]          (detail)    orders:read
  *  - GET /api/v1/admin/topups               (queue)     topups:read
+ *  - GET /api/v1/admin/dashboard            topCustomers + recentOrders emails
+ *  - GET /api/v1/admin/reports/customer-sales           (JSON, masked)
+ *  - GET /api/v1/admin/reports/customer-sales/export    (CSV — masked IN THE
+ *    FILE, served by the server behind reports:export; a limited role can
+ *    never obtain a CSV carrying raw PII)
+ *
+ * The CSV formula-injection guard (=,+,-,@ prefixed cells) is unit-tested
+ * against the shared lib directly (src/lib/reports/customerSales.ts).
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
@@ -57,6 +65,14 @@ const FIXTURE = {
     orderNumber: 'NK-2026-ABC123',
     customerEmail: 'somchai.prasert@gmail.com',
     customerPhone: '0812345678',
+    // customer relation — read by reports/customer-sales (JSON + CSV export)
+    customer: {
+      id: 'cust-1',
+      email: 'somchai.prasert@gmail.com',
+      fullName: 'สมชาย ประเสริฐ',
+      tier: 'retail',
+      walletBalanceThb: '120.50',
+    },
     status: 'completed',
     paymentMethod: 'promptpay',
     subtotalThb: '25',
@@ -101,6 +117,12 @@ const { prismaMock } = vi.hoisted(() => {
     order: { findMany: vi.fn(), findUnique: vi.fn(), groupBy: vi.fn(), aggregate: vi.fn() },
     topUpLog: { findMany: vi.fn(), aggregate: vi.fn(), count: vi.fn() },
     auditLog: { create: vi.fn().mockResolvedValue({}) },
+    // dashboard route models (topCustomers + recentOrders + aggregates)
+    refund: { aggregate: vi.fn() },
+    orderItem: { groupBy: vi.fn(), findMany: vi.fn(), aggregate: vi.fn() },
+    productVariant: { aggregate: vi.fn(), findMany: vi.fn() },
+    product: { groupBy: vi.fn(), findUnique: vi.fn() },
+    category: { findMany: vi.fn() },
   };
   return { prismaMock };
 });
@@ -130,6 +152,27 @@ beforeEach(() => {
   prismaMock.topUpLog.findMany.mockResolvedValue([FIXTURE.topUp]);
   prismaMock.topUpLog.aggregate.mockResolvedValue({ _sum: { amountThb: null }, _count: 0 });
   prismaMock.topUpLog.count.mockResolvedValue(0);
+
+  // Dashboard defaults: every aggregate/groupBy is empty/zero — individual
+  // tests only override the branches that carry PII (customer.findMany for
+  // topCustomers, order.findMany for recentOrders, both already shaped above).
+  prismaMock.refund.aggregate.mockResolvedValue({ _sum: { amountThb: null } });
+  prismaMock.order.aggregate.mockResolvedValue({
+    _count: { _all: 0 },
+    _sum: { totalAmountThb: null, discountThb: null, quantity: null },
+  });
+  prismaMock.order.groupBy.mockResolvedValue([]);
+  prismaMock.orderItem.groupBy.mockResolvedValue([]);
+  prismaMock.orderItem.findMany.mockResolvedValue([]);
+  prismaMock.orderItem.aggregate.mockResolvedValue({ _sum: { quantity: null } });
+  prismaMock.productVariant.aggregate.mockResolvedValue({
+    _sum: { stock: null },
+    _count: { _all: 0 },
+  });
+  prismaMock.productVariant.findMany.mockResolvedValue([]);
+  prismaMock.product.groupBy.mockResolvedValue([]);
+  prismaMock.product.findUnique.mockResolvedValue(null);
+  prismaMock.category.findMany.mockResolvedValue([]);
 });
 
 import { issueAdminJwt } from '@/lib/jwt';
@@ -264,5 +307,196 @@ describe('masking sanity (shared fixture)', () => {
     expect(MASKED_PHONE).not.toBe(FULL_PHONE);
     expect(MASKED_PHONE).not.toContain('345678');
     void get;
+  });
+});
+
+// ─── Dashboard: topCustomers + recentOrders ──────────────────────────────
+// Dashboard requires reports:read — support_agent/order_manager lack it and
+// are 403 there (that contract belongs to the authz matrix). The roles that
+// REACH the dashboard are the ones these PII assertions shape.
+
+describe('PII masking — dashboard', () => {
+  it.each(['finance_viewer', 'marketing_manager'] as const)(
+    '%s (reports:read, no customers:read:full) gets MASKED emails in topCustomers AND recentOrders',
+    async (role) => {
+      const mod = await importRoute('/dashboard/route.ts');
+      const { status, body } = await callGet(mod, '/dashboard', await tokenFor(role));
+      expect(status).toBe(200);
+      const customers = body['customers'] as { topCustomers: Array<{ email: string }> };
+      expect(customers.topCustomers[0]?.email).toBe(MASKED_EMAIL);
+      const recent = body['recentOrders'] as Array<{ customer: string }>;
+      expect(recent[0]?.customer).toBe(MASKED_EMAIL);
+    },
+  );
+
+  it('super_admin (reports:read + customers:read:full) gets raw emails in BOTH lists', async () => {
+    const mod = await importRoute('/dashboard/route.ts');
+    const { status, body } = await callGet(mod, '/dashboard', await tokenFor('super_admin'));
+    expect(status).toBe(200);
+    const customers = body['customers'] as { topCustomers: Array<{ email: string }> };
+    expect(customers.topCustomers[0]?.email).toBe(FULL_EMAIL);
+    const recent = body['recentOrders'] as Array<{ customer: string }>;
+    expect(recent[0]?.customer).toBe(FULL_EMAIL);
+  });
+
+  it('support_agent and order_manager (no reports:read) are 403 — authz before PII', async () => {
+    const mod = await importRoute('/dashboard/route.ts');
+    for (const role of ['support_agent', 'order_manager'] as const) {
+      const { status } = await callGet(mod, '/dashboard', await tokenFor(role));
+      expect(status, role).toBe(403);
+    }
+  });
+});
+
+// ─── Customer-sales report: JSON + server-side CSV export ────────────────
+// JSON requires reports:read; the CSV export requires reports:export.
+// finance_viewer holds BOTH export paths but NOT customers:read:full — it is
+// the live proof that a downloadable CSV can carry only masked identities.
+
+describe('PII masking — reports/customer-sales (JSON)', () => {
+  it('finance_viewer (reports:read, no read:full): masked email, NO name, NO wallet', async () => {
+    const mod = await importRoute('/reports/customer-sales/route.ts');
+    const masked = await callGet(mod, '/reports/customer-sales', await tokenFor('finance_viewer'));
+    expect(masked.status).toBe(200);
+    const rows = masked.body['customers'] as Array<Record<string, unknown>>;
+    expect(rows[0]?.['email']).toBe(MASKED_EMAIL);
+    expect(rows[0]).not.toHaveProperty('fullName');
+    expect(rows[0]).not.toHaveProperty('walletBalanceThb');
+  });
+
+  it('marketing_manager (reports:read, no read:full): masked email only', async () => {
+    const mod = await importRoute('/reports/customer-sales/route.ts');
+    const masked = await callGet(
+      mod,
+      '/reports/customer-sales',
+      await tokenFor('marketing_manager'),
+    );
+    expect(masked.status).toBe(200);
+    const rows = masked.body['customers'] as Array<Record<string, unknown>>;
+    expect(rows[0]?.['email']).toBe(MASKED_EMAIL);
+    expect(rows[0]).not.toHaveProperty('fullName');
+  });
+
+  it('super_admin (reports:read + customers:read:full): raw email + name + wallet', async () => {
+    const mod = await importRoute('/reports/customer-sales/route.ts');
+    const full = await callGet(mod, '/reports/customer-sales', await tokenFor('super_admin'));
+    expect(full.status).toBe(200);
+    const rows = full.body['customers'] as Array<Record<string, unknown>>;
+    expect(rows[0]?.['email']).toBe(FULL_EMAIL);
+    expect(rows[0]?.['fullName']).toBe(FIXTURE.customer.fullName);
+    expect(typeof rows[0]?.['walletBalanceThb']).toBe('number');
+  });
+
+  it('support_agent and order_manager (no reports:read) are 403 on the JSON', async () => {
+    const mod = await importRoute('/reports/customer-sales/route.ts');
+    for (const role of ['support_agent', 'order_manager'] as const) {
+      const { status } = await callGet(mod, '/reports/customer-sales', await tokenFor(role));
+      expect(status, role).toBe(403);
+    }
+  });
+});
+
+describe('PII masking — reports/customer-sales CSV export (server-side)', () => {
+  const callCsv = async (
+    token: string,
+    query = '',
+  ): Promise<{ status: number; csv: string; contentType: string | null }> => {
+    const mod = await importRoute('/reports/customer-sales/export/route.ts');
+    const req = new NextRequest(
+      `http://localhost/api/v1/admin/reports/customer-sales/export${query}`,
+      { headers: { authorization: `Bearer ${token}` } },
+    );
+    const res = (await (mod['GET'] as (r: NextRequest) => Promise<Response>)(req)) as Response;
+    // Raw bytes — Response.text() strips a leading UTF-8 BOM per spec, and
+    // the BOM's whole purpose is sitting in the downloaded FILE for Excel.
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    const hasBom = bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf;
+    const csv = new TextDecoder().decode(bytes.slice(hasBom ? 3 : 0));
+    return {
+      status: res.status,
+      csv: (hasBom ? '\uFEFF' : '') + csv,
+      contentType: res.headers.get('content-type'),
+    };
+  };
+
+  it('support_agent and order_manager lack reports:export → exactly 403', async () => {
+    for (const role of ['support_agent', 'order_manager'] as const) {
+      const { status } = await callCsv(await tokenFor(role));
+      expect(status, role).toBe(403);
+    }
+  });
+
+  it('marketing_manager (reports:read but no reports:export) → exactly 403', async () => {
+    const { status } = await callCsv(await tokenFor('marketing_manager'));
+    expect(status).toBe(403);
+  });
+
+  it('super_admin (reports:export + read:full) gets CSV: BOM, Thai header, RAW email + name', async () => {
+    const { status, csv, contentType } = await callCsv(await tokenFor('super_admin'));
+    expect(status).toBe(200);
+    expect(contentType).toBe('text/csv; charset=utf-8');
+    expect(csv.charCodeAt(0)).toBe(0xfeff);
+    expect(csv).toContain('อีเมล');
+    expect(csv).toContain(FULL_EMAIL);
+    expect(csv).toContain('สมชาย ประเสริฐ');
+  });
+
+  it('finance_viewer (reports:export, NO customers:read:full) downloads a CSV with MASKED email and NO name — masking happens in the FILE', async () => {
+    const { status, csv } = await callCsv(await tokenFor('finance_viewer'));
+    expect(status).toBe(200);
+    expect(csv.charCodeAt(0)).toBe(0xfeff);
+    expect(csv).toContain(MASKED_EMAIL);
+    // Raw identity must not survive anywhere in the downloaded file.
+    expect(csv).not.toContain(FULL_EMAIL);
+    expect(csv).not.toContain('สมชาย');
+  });
+
+  it('lib: mask→CSV drops identity for limited roles; formula guard neutralizes injection-shaped cells', async () => {
+    const { maskCustomerSalesRows, toCustomerSalesCsv, isFormulaInjection } = await import(
+      '@/lib/reports/customerSales'
+    );
+    expect(isFormulaInjection('=CMD|/C calc')).toBe(true);
+    expect(isFormulaInjection('+66812345678')).toBe(true);
+    expect(isFormulaInjection('normal@example.com')).toBe(false);
+
+    // Limited role: name is dropped entirely, email masked before writing.
+    const maskedCsv = toCustomerSalesCsv(
+      maskCustomerSalesRows(
+        [
+          {
+            customerId: 'c1',
+            email: 'attacker@example.com',
+            fullName: '=HYPERLINK("http://evil","click")',
+            tier: 'retail',
+            walletBalanceThb: 0,
+            orders: 1,
+            units: 1,
+            spendThb: 25,
+            profitThb: 0,
+            profitCoveragePct: 0,
+          },
+        ],
+        false,
+      ),
+    );
+    expect(maskedCsv).not.toContain('attacker@example.com');
+    expect(maskedCsv).not.toContain('HYPERLINK');
+
+    // Full role: an injection-shaped name must be single-quote prefixed.
+    const fullCsv = toCustomerSalesCsv([
+      {
+        customerId: 'c1',
+        email: 'someone@example.com',
+        fullName: '=HYPERLINK("http://evil","click")',
+        tier: 'retail',
+        walletBalanceThb: 0,
+        orders: 1,
+        units: 1,
+        spendThb: 25,
+        profitThb: 0,
+        profitCoveragePct: 0,
+      },
+    ]);
+    expect(fullCsv).toContain("'=HYPERLINK");
   });
 });
