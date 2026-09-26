@@ -67,6 +67,65 @@ jobs:
       - run: npx prisma generate
       - run: npm test
 
+  # ─── Concurrency Tests (real DB + real dev server) ────
+  # Races the auth paths for real: 20 parallel refreshes of one refresh
+  # token (CAS rotation must yield exactly one winner), 20 distinct tokens
+  # (all must succeed), and 10 parallel wrong passwords (account must lock
+  # exactly once). Needs a live server, so it spins one up against a real
+  # Postgres service; the test file itself skips when NK_TEST_BASE_URL is
+  # absent, so local `npm test` stays green without a server.
+  concurrency-tests:
+    name: Concurrency (DB races)
+    runs-on: ubuntu-latest
+    needs: [test]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+      NK_JWT_SECRET: ci-test-secret-0123456789abcdef0123456789abcdef
+      NK_ENCRYPTION_KEY: ci-test-encryption-key-32bytes!!
+      NK_GIFT_CODE_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      NK_OTP_DEV_MODE: '1'
+      NEXT_PUBLIC_SITE_URL: http://127.0.0.1:4200
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npx prisma migrate deploy
+      - name: Start dev server
+        run: |
+          nohup npx next dev -p 4200 > dev-server.log 2>&1 &
+          for i in $(seq 1 60); do
+            sleep 2
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:4200/ || true)
+            if [ "$code" = "200" ]; then echo "dev server up (attempt $i)"; exit 0; fi
+          done
+          echo "dev server did not become ready"; tail -50 dev-server.log; exit 1
+      - name: Run concurrency tests
+        run: NK_TEST_BASE_URL=http://127.0.0.1:4200 npx vitest run tests/admin-concurrency.test.ts
+      - name: Upload dev server log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dev-server-log
+          path: dev-server.log
+
   # ─── Build ────────────────────────────────────────────
   build:
     name: Build
@@ -85,6 +144,6 @@ jobs:
           NEXT_PUBLIC_SITE_URL: http://localhost:3000
           NK_JWT_SECRET: ci-test-secret
           NK_ENCRYPTION_KEY: ci-test-encryption-key-32bytes!!
-          NK_CSP_REPORT_ONLY: "true"
+          NK_CSP_REPORT_ONLY: 'true'
           # Prerendering never queries these — CI has no database.
           DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
