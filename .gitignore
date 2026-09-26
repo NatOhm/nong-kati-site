@@ -9,6 +9,9 @@ node_modules/
 # TypeScript incremental build artifact
 tsconfig.tsbuildinfo
 
+# One-off scripts (prod e2e dress rehearsals etc.)
+tmp/
+
 # Playwright artifacts
 test-results/
 playwright-report/
