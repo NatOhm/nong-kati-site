@@ -49,16 +49,7 @@ export function AcornIcon({ size = 22, className }: ClayIconProps): React.JSX.El
         transform="rotate(-18 9 8.6)"
       />
       <ellipse cx="9.5" cy="14.5" rx="2.2" ry="3" fill="#FFFFFF" opacity="0.28" />
-      <defs>
-        <radialGradient id="acornShade" cx="0.35" cy="0.3" r="1">
-          <stop offset="0" stopColor="#E8B76E" />
-          <stop offset="1" stopColor="#C4853F" />
-        </radialGradient>
-        <radialGradient id="capShade" cx="0.35" cy="0.25" r="1">
-          <stop offset="0" stopColor="#A06A35" />
-          <stop offset="1" stopColor="#6B421C" />
-        </radialGradient>
-      </defs>
+      {/* gradient defs live once in ClayIconDefs (root layout) */}
     </svg>
   );
 }
@@ -137,12 +128,7 @@ export function WheelIcon({ size = 22, className }: ClayIconProps): React.JSX.El
       {/* hub */}
       <circle cx="12" cy="12" r="3" fill="#F97316" />
       <circle cx="11" cy="11" r="1" fill="#FFFFFF" opacity="0.5" />
-      <defs>
-        <linearGradient id="wheelShade" x1="4" y1="4" x2="20" y2="20">
-          <stop offset="0" stopColor="#FFFFFF" />
-          <stop offset="1" stopColor="#6B4F2E" />
-        </linearGradient>
-      </defs>
+      {/* gradient defs live once in ClayIconDefs (root layout) */}
     </svg>
   );
 }
@@ -227,12 +213,7 @@ export function HamsterFace({ size = 40, className }: ClayIconProps): React.JSX.
       {/* blush */}
       <ellipse cx="16" cy="54" rx="4.4" ry="2.6" fill="#FECDD3" opacity="0.85" />
       <ellipse cx="64" cy="54" rx="4.4" ry="2.6" fill="#FECDD3" opacity="0.85" />
-      <defs>
-        <radialGradient id="hamsterFaceBody" cx="0.32" cy="0.24" r="1.15">
-          <stop offset="0" stopColor="#FED7AA" />
-          <stop offset="1" stopColor="#FB923C" />
-        </radialGradient>
-      </defs>
+      {/* gradient defs live once in ClayIconDefs (root layout) */}
     </svg>
   );
 }
@@ -278,12 +259,7 @@ export function HamsterMascot({ size = 120, className }: ClayIconProps): React.J
       {/* blush */}
       <ellipse cx="26" cy="66" rx="5" ry="3" fill="#FECDD3" opacity="0.8" />
       <ellipse cx="94" cy="66" rx="5" ry="3" fill="#FECDD3" opacity="0.8" />
-      <defs>
-        <radialGradient id="hamsterBody" cx="0.35" cy="0.25" r="1.1">
-          <stop offset="0" stopColor="#FED7AA" />
-          <stop offset="1" stopColor="#FB923C" />
-        </radialGradient>
-      </defs>
+      {/* gradient defs live once in ClayIconDefs (root layout) */}
     </svg>
   );
 }
@@ -374,12 +350,7 @@ export function HamsterSleeping({ size = 120, className }: ClayIconProps): React
       <ellipse cx="44" cy="64" rx="7" ry="4.5" fill="#FED7AA" />
       {/* blush */}
       <ellipse cx="24" cy="55" rx="4.5" ry="2.6" fill="#FECDD3" opacity="0.8" />
-      <defs>
-        <radialGradient id="hamsterSleep" cx="0.35" cy="0.25" r="1.1">
-          <stop offset="0" stopColor="#FED7AA" />
-          <stop offset="1" stopColor="#FB923C" />
-        </radialGradient>
-      </defs>
+      {/* gradient defs live once in ClayIconDefs (root layout) */}
     </svg>
   );
 }
@@ -438,12 +409,7 @@ export function HamsterCelebrating({ size = 120, className }: ClayIconProps): Re
       <ellipse cx="60" cy="86" rx="20" ry="11" fill="#FFF7ED" />
       <ellipse cx="38" cy="72" rx="4.5" ry="2.6" fill="#FECDD3" opacity="0.8" />
       <ellipse cx="82" cy="72" rx="4.5" ry="2.6" fill="#FECDD3" opacity="0.8" />
-      <defs>
-        <radialGradient id="hamsterCheer" cx="0.35" cy="0.25" r="1.1">
-          <stop offset="0" stopColor="#FED7AA" />
-          <stop offset="1" stopColor="#FB923C" />
-        </radialGradient>
-      </defs>
+      {/* gradient defs live once in ClayIconDefs (root layout) */}
     </svg>
   );
 }
@@ -485,12 +451,7 @@ export function HamsterWorried({ size = 120, className }: ClayIconProps): React.
       <ellipse cx="60" cy="88" rx="20" ry="11" fill="#FFF7ED" />
       <ellipse cx="38" cy="74" rx="4.5" ry="2.6" fill="#FECDD3" opacity="0.8" />
       <ellipse cx="82" cy="74" rx="4.5" ry="2.6" fill="#FECDD3" opacity="0.8" />
-      <defs>
-        <radialGradient id="hamsterWorry" cx="0.35" cy="0.25" r="1.1">
-          <stop offset="0" stopColor="#FED7AA" />
-          <stop offset="1" stopColor="#FB923C" />
-        </radialGradient>
-      </defs>
+      {/* gradient defs live once in ClayIconDefs (root layout) */}
     </svg>
   );
 }

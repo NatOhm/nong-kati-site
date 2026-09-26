@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { cn } from '@/utils/cn';
 import { isValidEmail } from '@/lib/pricing';
 import { TaxInvoiceToggle } from './TaxInvoiceToggle';
@@ -52,6 +52,16 @@ export function ContactForm({
 
   const [errors, setErrors] = useState<FormErrors>({});
 
+  /* a11y gate (duplicate-ID): checkout may briefly mount twin forms during
+   * soft navigation — ids must be unique per instance (useId). */
+  const uid = useId();
+  const emailId = `${uid}-email`;
+  const emailErrorId = `${uid}-email-error`;
+  const phoneId = `${uid}-phone`;
+  const tosId = `${uid}-tos`;
+  const tosErrorId = `${uid}-tos-error`;
+  const marketingId = `${uid}-marketing`;
+
   const validate = (): boolean => {
     const newErrors: FormErrors = {};
 
@@ -95,21 +105,18 @@ export function ContactForm({
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Email */}
       <div>
-        <label
-          htmlFor="checkout-email"
-          className="mb-1 block text-sm font-medium text-fg-secondary"
-        >
+        <label htmlFor={emailId} className="mb-1 block text-sm font-medium text-fg-secondary">
           อีเมล *
         </label>
         <input
-          id="checkout-email"
+          id={emailId}
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           readOnly={readOnlyEmail}
           required
           aria-invalid={errors.email ? true : undefined}
-          aria-describedby={errors.email ? 'checkout-email-error' : undefined}
+          aria-describedby={errors.email ? emailErrorId : undefined}
           placeholder="kaem@example.com"
           className={cn(
             'w-full rounded-md border bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-fg-placeholder focus:ring-2 focus:ring-peach-500',
@@ -118,7 +125,7 @@ export function ContactForm({
           )}
         />
         {errors.email && (
-          <p id="checkout-email-error" role="alert" className="mt-1 text-xs text-fg-error">
+          <p id={emailErrorId} role="alert" className="mt-1 text-xs text-fg-error">
             {errors.email}
           </p>
         )}
@@ -126,15 +133,12 @@ export function ContactForm({
 
       {/* Phone */}
       <div>
-        <label
-          htmlFor="checkout-phone"
-          className="mb-1 block text-sm font-medium text-fg-secondary"
-        >
+        <label htmlFor={phoneId} className="mb-1 block text-sm font-medium text-fg-secondary">
           เบอร์โทรศัพท์ (LINE)
           <span className="ml-1 text-fg-placeholder">(ไม่บังคับ)</span>
         </label>
         <input
-          id="checkout-phone"
+          id={phoneId}
           type="tel"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
@@ -164,7 +168,7 @@ export function ContactForm({
       {/* Consent Checkboxes */}
       <div className="space-y-3">
         <ConsentCheckbox
-          id="tos"
+          id={tosId}
           label={
             <>
               ยอมรับ {/* /legal/… — the old /terms and /privacy paths 404ed (audit #1). */}
@@ -192,16 +196,16 @@ export function ContactForm({
           onChange={setTosAccepted}
           required
           invalid={Boolean(errors.tos)}
-          describedBy={errors.tos ? 'checkout-tos-error' : undefined}
+          describedBy={errors.tos ? tosErrorId : undefined}
         />
         {errors.tos && (
-          <p id="checkout-tos-error" role="alert" className="text-xs text-fg-error">
+          <p id={tosErrorId} role="alert" className="text-xs text-fg-error">
             {errors.tos}
           </p>
         )}
 
         <ConsentCheckbox
-          id="marketing"
+          id={marketingId}
           label="รับข่าวสารและโปรโมชัน"
           checked={marketingOptIn}
           onChange={setMarketingOptIn}

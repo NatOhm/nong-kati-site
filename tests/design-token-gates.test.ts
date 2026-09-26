@@ -67,6 +67,21 @@ const HARDCODED_WHITE_FILES: Record<string, string> = {
     'switch knob — white-on-track affordance kept on both themes',
 };
 
+/**
+ * Files allowed to declare literal id= attributes (suffix match):
+ *  - ClayIconDefs  — the shared SVG gradient registry, rendered exactly once
+ *    by the root layout; its gradient ids are the whole point.
+ *  - root layout   — mounts the registry + the main-content landmark.
+ *  - layouts       — main-content landmark (one layout active per page).
+ * Everything else must derive ids from React useId().
+ */
+const HARDCODED_ID_FILES = [
+  'src/components/ui/ClayIconDefs.tsx',
+  'src/app/layout.tsx',
+  'src/app/account/layout.tsx',
+  'src/components/layout/FacebookLayout.tsx',
+];
+
 function* walk(dir: string): Generator<string> {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const p = path.join(dir, entry.name);
@@ -162,6 +177,7 @@ function scanSource(): {
   r4: Violation[];
   r5: Violation[];
   r5marker: Violation[];
+  r6: Violation[];
 } {
   const r1: Violation[] = [];
   const r2: Violation[] = [];
@@ -169,6 +185,7 @@ function scanSource(): {
   const r4: Violation[] = [];
   const r5: Violation[] = [];
   const r5marker: Violation[] = [];
+  const r6: Violation[] = [];
 
   for (const file of walk('src')) {
     const rel = file.split(path.sep).join('/');
@@ -232,9 +249,34 @@ function scanSource(): {
       }
       void why;
     }
+
+    // R6 — hardcoded DOM ids (the duplicate-ID incident: /orders/lookup
+    // briefly mounted twin forms and duplicated #lookup-order). REUSABLE
+    // components (src/components) must derive ids from React useId(); page
+    // files may keep literal ids (single-mount) and are verified rendered-
+    // reality by e2e/duplicate-ids.spec.ts across the whole site.
+    if (
+      rel.endsWith('.tsx') &&
+      rel.startsWith('src/components/') &&
+      !HARDCODED_ID_FILES.some((f) => rel.endsWith(f))
+    ) {
+      lines.forEach((raw, i) => {
+        if (/^\s*(\/\/|\*|\/\*)/.test(raw)) return;
+        // Literal ids only — id={expression} (useId-derived or data-keyed) is
+        // the sanctioned pattern this rule pushes components toward.
+        if (/(?<![\w-])id\s*=\s*"/.test(raw)) {
+          r6.push({
+            file: rel,
+            line: i + 1,
+            rule: 'R6',
+            text: raw.trim().slice(0, 140),
+          });
+        }
+      });
+    }
   }
 
-  return { r1, r2, r3, r4, r5, r5marker };
+  return { r1, r2, r3, r4, r5, r5marker, r6 };
 }
 
 const fmt = (list: Violation[]): string =>
@@ -273,6 +315,14 @@ describe('design-token regression gates (source scan)', () => {
     expect(
       gates.r4,
       `disabled state styled like the primary CTA (peach fill / brand glow):\n${fmt(gates.r4)}`,
+    ).toEqual([]);
+  });
+
+  it('R6: no hardcoded DOM ids outside the shared SVG defs registry / layout landmarks', () => {
+    expect(
+      gates.r6,
+      'hardcoded id= in a component (duplicate-ID risk — twin mounts dupe ids). ' +
+        `Use React useId() and derive label/input/error ids from it:\n${fmt(gates.r6)}`,
     ).toEqual([]);
   });
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronDown } from 'lucide-react';
 
@@ -38,6 +38,8 @@ export function SearchToolbar({
   const router = useRouter();
   const params = useSearchParams();
   const [sortOpen, setSortOpen] = useState(false);
+  /* a11y gate (duplicate-ID): control id is per-instance (useId). */
+  const sortBtnId = useId();
 
   const go = (next: Record<string, string | undefined>) => {
     const sp = new URLSearchParams(params.toString());
@@ -76,13 +78,13 @@ export function SearchToolbar({
         <div className="flex items-center justify-between gap-2 md:justify-end md:gap-3">
           {/* Sort By dropdown */}
           <div className="relative">
-            <label className="sr-only" htmlFor="search-sort">
+            <label className="sr-only" htmlFor={sortBtnId}>
               เรียงตาม
             </label>
             <div className="flex items-center gap-2">
               <span className="hidden text-sm text-fg-muted sm:inline">เรียงตาม :</span>
               <button
-                id="search-sort"
+                id={sortBtnId}
                 type="button"
                 aria-haspopup="listbox"
                 aria-expanded={sortOpen}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Search } from 'lucide-react';
 import { cn } from '@/utils/cn';
@@ -25,6 +25,8 @@ export function CatalogSearchBox({ className }: { className?: string }): React.J
   const [query, setQuery] = useState(params.get('q') ?? '');
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
+  /* a11y gate (duplicate-ID): listbox id is per-instance (useId). */
+  const suggestListId = useId();
   const boxRef = useRef<HTMLDivElement>(null);
 
   // Debounced suggestion fetch (250ms, mirrors the navbar box)
@@ -76,7 +78,7 @@ export function CatalogSearchBox({ className }: { className?: string }): React.J
             type="text"
             role="combobox"
             aria-expanded={open && suggestions.length > 0}
-            aria-controls="catalog-search-suggest"
+            aria-controls={suggestListId}
             aria-label="ค้นหาสินค้า"
             placeholder="ค้นหาสินค้า…"
             autoComplete="off"
@@ -94,7 +96,7 @@ export function CatalogSearchBox({ className }: { className?: string }): React.J
       {/* Google-style dropdown: slides down over the grid */}
       {open && suggestions.length > 0 && (
         <div
-          id="catalog-search-suggest"
+          id={suggestListId}
           role="listbox"
           aria-label="คำค้นแนะนำ"
           className="clay-card suggest-drop absolute left-0 top-full z-40 mt-2 w-full overflow-hidden rounded-2xl p-1.5"

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Search, MessageCircle, Menu } from 'lucide-react';
@@ -40,6 +40,8 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
   const isAuthenticated = sessionState === 'authed';
   const { cart, updateQuantity, removeItem, itemCount } = useCart();
   const [searchFocused, setSearchFocused] = useState(false);
+  /* a11y gate (duplicate-ID): listbox id is per-instance (useId). */
+  const suggestListId = useId();
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
@@ -134,7 +136,7 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
                   type="text"
                   role="combobox"
                   aria-expanded={searchFocused && suggestions.length > 0}
-                  aria-controls="nav-search-suggest"
+                  aria-controls={suggestListId}
                   aria-label="ค้นหาสินค้า"
                   placeholder="ค้นหาสินค้า…"
                   autoComplete="off"
@@ -153,7 +155,7 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
                   blur can hide the list */}
               {searchFocused && suggestions.length > 0 && (
                 <div
-                  id="nav-search-suggest"
+                  id={suggestListId}
                   role="listbox"
                   aria-label="คำค้นแนะนำ"
                   className="clay-card suggest-drop absolute left-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-2xl p-1.5"

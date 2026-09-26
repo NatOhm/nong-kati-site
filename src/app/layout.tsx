@@ -8,6 +8,7 @@ import { CustomerProfileProvider } from '@/components/layout/CustomerProfileProv
 import { CookieConsentBanner } from '@/components/pdpa/CookieConsentBanner';
 import { MobileBottomNav } from '@/components/home/MobileBottomNav';
 import { ThemeVars } from '@/components/layout/ThemeVars';
+import { ClayIconDefs } from '@/components/ui/ClayIconDefs';
 import { getAppearance } from '@/lib/data';
 import { ToastMount } from './ToastMount';
 
@@ -67,6 +68,9 @@ export default async function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body className="text-thai font-ui">
+        {/* Shared SVG paint-server defs (one document-wide registry — the
+            duplicate-ID gate's sanctioned source of literal gradient ids). */}
+        <ClayIconDefs />
         <ThemeVars />
         <MascotProvider mascotUrl={(await getAppearance()).mascotUrl}>
           <ThemeProvider defaultTheme="light">

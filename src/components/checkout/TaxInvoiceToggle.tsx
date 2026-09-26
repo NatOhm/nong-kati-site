@@ -1,5 +1,7 @@
 'use client';
 
+import { useId } from 'react';
+
 import { cn } from '@/utils/cn';
 
 export interface TaxInvoiceData {
@@ -29,6 +31,11 @@ export function TaxInvoiceToggle({
   onChange,
   errors,
 }: TaxInvoiceToggleProps): React.JSX.Element {
+  /* a11y gate (duplicate-ID): unique field ids per instance (useId). */
+  const uid = useId();
+  const nameId = `${uid}-tax-name`;
+  const taxIdId = `${uid}-tax-id`;
+
   return (
     <div className="rounded-md border border-line bg-surface p-4">
       {/* Toggle header */}
@@ -66,7 +73,7 @@ export function TaxInvoiceToggle({
               ชื่อ / บริษัท *
             </label>
             <input
-              id="tax-name"
+              id={nameId}
               type="text"
               value={value?.name ?? ''}
               onChange={(e) => onChange?.({ name: e.target.value, taxId: value?.taxId ?? '' })}
@@ -85,7 +92,7 @@ export function TaxInvoiceToggle({
               เลขประจำตัวผู้เสียภาษี *
             </label>
             <input
-              id="tax-id"
+              id={taxIdId}
               type="text"
               value={value?.taxId ?? ''}
               onChange={(e) => onChange?.({ name: value?.name ?? '', taxId: e.target.value })}

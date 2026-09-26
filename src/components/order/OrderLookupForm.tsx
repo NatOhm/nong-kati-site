@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
@@ -28,6 +28,18 @@ export function OrderLookupForm({
   const [orderNumber, setOrderNumber] = useState('');
   const [touched, setTouched] = useState(false);
 
+  /*
+   * a11y gate (duplicate-ID): the form may legally be mounted more than
+   * once (soft-nav/hydration races included), so DOM ids must be unique
+   * per instance — React's useId guarantees that even for twin mounts.
+   */
+  const uid = useId();
+  const emailId = `${uid}-email`;
+  const orderErrorId = `${uid}-order-error`;
+  const orderHintId = `${uid}-order-hint`;
+  const serverErrorId = `${uid}-server-error`;
+  const orderId = `${uid}-order`;
+
   const normalized = orderNumber.trim().toUpperCase();
   const orderFormatError =
     touched && normalized !== '' && !ORDER_RE.test(normalized)
@@ -50,18 +62,18 @@ export function OrderLookupForm({
     <form onSubmit={handleSubmit} noValidate className={cn('space-y-4', className)}>
       {/* Email */}
       <div>
-        <label htmlFor="lookup-email" className="mb-1 block text-sm font-medium text-fg-secondary">
+        <label htmlFor={emailId} className="mb-1 block text-sm font-medium text-fg-secondary">
           อีเมล *
         </label>
         <input
-          id="lookup-email"
+          id={emailId}
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
           autoComplete="email"
           aria-invalid={error ? true : undefined}
-          aria-describedby={error ? 'lookup-error' : undefined}
+          aria-describedby={error ? serverErrorId : undefined}
           placeholder="kaem@example.com"
           className="w-full rounded-md border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-fg-placeholder focus:ring-2 focus:ring-peach-500"
         />
@@ -69,11 +81,11 @@ export function OrderLookupForm({
 
       {/* Order Number */}
       <div>
-        <label htmlFor="lookup-order" className="mb-1 block text-sm font-medium text-fg-secondary">
+        <label htmlFor={orderId} className="mb-1 block text-sm font-medium text-fg-secondary">
           รหัสคำสั่งซื้อ *
         </label>
         <input
-          id="lookup-order"
+          id={orderId}
           type="text"
           value={orderNumber}
           onChange={(e) => {
@@ -82,9 +94,7 @@ export function OrderLookupForm({
           }}
           required
           aria-invalid={orderFormatError ? true : error ? true : undefined}
-          aria-describedby={
-            orderFormatError ? 'lookup-order-error' : error ? 'lookup-error' : 'lookup-order-hint'
-          }
+          aria-describedby={orderFormatError ? orderErrorId : error ? serverErrorId : orderHintId}
           placeholder="NK-2026-XXXXXX"
           className={cn(
             'w-full rounded-md border bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-fg-placeholder focus:ring-2 focus:ring-peach-500',
@@ -92,11 +102,11 @@ export function OrderLookupForm({
           )}
         />
         {orderFormatError ? (
-          <p id="lookup-order-error" className="mt-1 text-xs font-medium text-fg-error">
+          <p id={orderErrorId} className="mt-1 text-xs font-medium text-fg-error">
             {orderFormatError}
           </p>
         ) : (
-          <p id="lookup-order-hint" className="mt-1 text-xs text-fg-placeholder">
+          <p id={orderHintId} className="mt-1 text-xs text-fg-placeholder">
             พบในอีเมลยืนยันคำสั่งซื้อ — รูปแบบ NK-ปี-รหัส 6 หลัก
           </p>
         )}
@@ -105,7 +115,7 @@ export function OrderLookupForm({
       {/* Error — server-side failure (semantic tokens pass both themes) */}
       {error && (
         <div
-          id="lookup-error"
+          id={serverErrorId}
           role="alert"
           className="border-error bg-error rounded-md border px-3 py-2 text-sm text-fg-error"
         >
