@@ -45,10 +45,12 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
       {...props}
     >
       {icon}
+      {/* Badge fill is coral-700 so the white label keeps ≥4.5:1 (AA); the
+          design-token regression gate forbids text on lighter coral fills. */}
       {typeof badge === 'number' && badge > 0 && (
         <span
           aria-hidden="true"
-          className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-coral-500 px-1 text-xs font-bold leading-none text-white"
+          className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-coral-700 px-1 text-xs font-bold leading-none text-white"
         >
           {badge > 99 ? '99+' : badge}
         </span>

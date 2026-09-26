@@ -113,14 +113,15 @@ export function OrderLookupForm({
         </div>
       )}
 
-      {/* Submit — disabled is visually distinct (muted fill, no brand shadow). */}
+      {/* Submit — disabled is visually distinct: muted fill, no brand shadow,
+          label still perceivable (≥2:1) — gated by e2e/disabled-state.spec.ts. */}
       <button
         type="submit"
         disabled={!canSubmit}
         className={cn(
           'flex min-h-[44px] w-full items-center justify-center gap-2 rounded-md px-5 py-2.5 text-sm font-semibold transition-colors',
           !canSubmit
-            ? 'cursor-not-allowed bg-clay-200 text-clay-500 dark:bg-clay-800 dark:text-clay-400'
+            ? 'cursor-not-allowed bg-clay-200 text-clay-600 dark:bg-clay-800 dark:text-clay-400'
             : 'bg-peach-500 text-white shadow-clay-sm hover:bg-peach-400',
         )}
       >
