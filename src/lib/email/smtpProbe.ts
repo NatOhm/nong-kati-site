@@ -154,7 +154,8 @@ export async function probeSmtp(params: SmtpProbeParams): Promise<SmtpProbeResul
       });
       socket.once('error', (err) => {
         clearTimeout(timer);
-        reject(Object.assign(err, { code: err.code ?? 'TCP_FAIL' }));
+        const code = (err as NodeJS.ErrnoException).code ?? 'TCP_FAIL';
+        reject(Object.assign(err, { code }));
       });
       socket.connect({ host: ip, port });
     });
