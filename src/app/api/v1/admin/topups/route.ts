@@ -37,6 +37,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const takeRaw = Number(url.searchParams.get('take') ?? '100');
   const take = Number.isFinite(takeRaw) ? Math.min(Math.max(Math.trunc(takeRaw), 1), 200) : 100;
 
+  // Review [High]: full identity requires customers:read:full. Roles with
+  // only topups:read (support_agent) get masked emails and no full names.
+  const canSeeFullPii = check.payload?.perms.includes('customers:read:full') ?? false;
+  const maskEmail = (email: string) =>
+    canSeeFullPii ? email : email.replace(/^(.).*(@.*)$/, (_m, a, b) => `${a}***${b as string}`);
+
   const logs = await prisma.topUpLog.findMany({
     where: status === 'all' ? {} : { status },
     orderBy: { createdAt: 'desc' },
@@ -59,8 +65,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     logs: logs.map((t) => ({
       id: t.id,
       createdAt: t.createdAt.toISOString(),
-      customerEmail: t.customer.email,
-      customerName: t.customer.fullName,
+      customerEmail: maskEmail(t.customer.email),
+      ...(canSeeFullPii ? { customerName: t.customer.fullName } : {}),
       amount: Number(t.amountThb),
       method: t.method,
       methodLabel: METHOD_TH[t.method] ?? t.method,

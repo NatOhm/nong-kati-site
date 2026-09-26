@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { prisma } from '@/lib/db';
+import { writeAuditLog } from '@/lib/auditLog';
 import { checkPermission } from '@/lib/rbac';
 
 export const dynamic = 'force-dynamic';
@@ -109,6 +110,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       expiresAt,
       createdBy: check.payload?.sub ?? null,
     },
+  });
+
+  // Review: money-affecting mutations are audited (code, discount shape).
+  writeAuditLog({
+    actorType: 'admin',
+    actorId: check.payload?.sub ?? 'unknown',
+    actorEmail: check.payload?.email ?? '',
+    action: 'coupon_create',
+    tableName: 'Coupon',
+    recordId: created.id,
+    metadata: { code, discountType, discountValue, usageLimit, minSpendThb: minSpend },
   });
 
   return NextResponse.json(mapCoupon(created), { status: 201 });

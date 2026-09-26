@@ -35,6 +35,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const since = new Date();
   if (period === 'month') since.setDate(1), since.setHours(0, 0, 0, 0);
 
+  // Review [High]: full identity + wallet balance requires customers:read:full.
+  // reports:read alone gets masked emails, no names, no wallet balances.
+  const canSeeFullPii = check.payload?.perms.includes('customers:read:full') ?? false;
+  const maskEmail = (email: string) =>
+    canSeeFullPii ? email : email.replace(/^(.).*(@.*)$/, (_m, a, b) => `${a}***${b as string}`);
+
   const orders = await prisma.order.findMany({
     where: {
       status: { in: REVENUE_STATUSES },
@@ -106,10 +112,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     .sort((a, b) => b.spendThb - a.spendThb)
     .map((r) => ({
       customerId: r.customerId,
-      email: r.email,
-      fullName: r.fullName,
+      email: maskEmail(r.email),
+      ...(canSeeFullPii ? { fullName: r.fullName } : {}),
       tier: r.tier,
-      walletBalanceThb: r.walletBalanceThb,
+      ...(canSeeFullPii ? { walletBalanceThb: r.walletBalanceThb } : {}),
       orders: r.orders,
       units: r.units,
       spendThb: r.spendThb,

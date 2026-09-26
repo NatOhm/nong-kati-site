@@ -13,6 +13,8 @@
  *   (revokedAt on AdminSession + sessionsInvalidBefore on the user).
  */
 
+import { randomInt } from 'node:crypto';
+
 import { prisma } from '@/lib/db';
 import { writeAuditLog } from '@/lib/auditLog';
 import { hashPassword } from '@/lib/password';
@@ -328,10 +330,13 @@ export async function adminUnlockStaff(
 // ─── Helpers ─────────────────────────────────────────────
 
 function generateTempPassword(): string {
+  // Security review: temp credentials are secrets — Math.random() is a PRNG
+  // predictable from observable outputs. randomInt() is CSPRNG-backed with
+  // exact uniform sampling (no modulo bias).
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
   let password = '';
   for (let i = 0; i < 16; i++) {
-    password += chars[Math.floor(Math.random() * chars.length)];
+    password += chars[randomInt(0, chars.length)];
   }
   return password;
 }

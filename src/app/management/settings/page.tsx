@@ -156,6 +156,9 @@ export default function AdminSettingsPage(): React.JSX.Element {
             {activeTab === 'payment' && (
               <>
                 <ManualTransferSettings />
+                {/* Review: mock UI must be labelled as such — it cannot be
+                    distinguished from a live panel otherwise. */}
+                <PreviewNotice />
                 <PaymentSettings />
               </>
             )}
@@ -1041,6 +1044,19 @@ function ManualTransferSettings(): React.JSX.Element {
   );
 }
 
+// Review: shared banner for sections whose UI is still a mock — the save
+// button is disabled and the panel must say so explicitly.
+function PreviewNotice(): React.JSX.Element {
+  return (
+    <div
+      role="note"
+      className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-800 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-200"
+    >
+      ⚠️ ส่วนนี้เป็นโหมดตัวอย่าง — การเปลี่ยนแปลงที่นี่ยังไม่ถูกบันทึก
+    </div>
+  );
+}
+
 // ─── Payment Gateway Settings (mock UI — ยังไม่เชื่อม API จริง) ──────────
 function PaymentSettings(): React.JSX.Element {
   const [promptpayEnabled, setPromptpayEnabled] = useState(true);
@@ -1173,6 +1189,7 @@ function EmailSettings(): React.JSX.Element {
 
   return (
     <Section title="การตั้งค่าอีเมล" subtitle="ตั้งค่า SMTP และรูปแบบอีเมลที่ส่งให้ลูกค้า">
+      <PreviewNotice />
       <div className="grid grid-cols-2 gap-4">
         <Field label="SMTP Host">
           <input
@@ -1254,6 +1271,7 @@ function EmailSettings(): React.JSX.Element {
 function SecuritySettings(): React.JSX.Element {
   return (
     <Section title="ความปลอดภัย" subtitle="จัดการ 2FA, Sessions, และ Password Policy">
+      <PreviewNotice />
       {/* Change Password */}
       <ChangePassword />
 

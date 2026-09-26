@@ -64,6 +64,11 @@ export type AuditLogEntry = {
  * to run after the response via Next's after() — keeping the serverless
  * invocation alive so the row cannot be frozen away. Failures are reported
  * via console.error only.
+ *
+ * Review addition: pass `tx` (a prisma.$transaction client) to write the
+ * audit row INSIDE the caller's transaction — the entry then commits and
+ * rolls back atomically with the mutation it describes. Without `tx` the
+ * legacy after-response path is used.
  */
 export function writeAuditLog(params: {
   actorType: AuditActorType;
@@ -78,6 +83,8 @@ export function writeAuditLog(params: {
   } | null;
   ipAddress?: string | null;
   metadata?: Record<string, unknown> | null;
+  /** Transaction client — makes the audit row atomic with the mutation. */
+  tx?: { auditLog: { create: (args: { data: Record<string, unknown> }) => Promise<unknown> } };
 }): AuditLogEntry {
   const entry: AuditLogEntry = {
     id: `audit_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -93,29 +100,39 @@ export function writeAuditLog(params: {
     createdAt: new Date(),
   };
 
+  const data = {
+    actorType: entry.actorType,
+    actorId: entry.actorId,
+    actorEmail: entry.actorEmail,
+    action: entry.action,
+    tableName: entry.tableName,
+    recordId: entry.recordId,
+    ...(entry.diff?.before && { diffBefore: asJson(entry.diff.before) }),
+    ...(entry.diff?.after && { diffAfter: asJson(entry.diff.after) }),
+    ...(entry.ipAddress && { ipAddress: entry.ipAddress }),
+    ...(entry.metadata && { metadata: asJson(entry.metadata) }),
+  };
+
+  // Transactional path: the row commits/rolls back with the caller's
+  // mutation — no after() scheduling, no fire-and-forget divergence.
+  if (params.tx) {
+    void params.tx.auditLog.create({ data }).catch((err: unknown) => {
+      console.error(
+        '[audit] transactional write failed:',
+        err instanceof Error ? err.message : err,
+      );
+    });
+    return entry;
+  }
+
   // Durable-after-response insert (finding: a bare floating promise can be
   // frozen away on serverless once the response returns, losing the audit
   // row of a SUCCESSFUL mutation). `after` keeps the invocation alive until
   // the insert settles; failures are logged rather than propagated so audit
   // cannot break the action itself.
-  const insert = prisma.auditLog
-    .create({
-      data: {
-        actorType: entry.actorType,
-        actorId: entry.actorId,
-        actorEmail: entry.actorEmail,
-        action: entry.action,
-        tableName: entry.tableName,
-        recordId: entry.recordId,
-        ...(entry.diff?.before && { diffBefore: asJson(entry.diff.before) }),
-        ...(entry.diff?.after && { diffAfter: asJson(entry.diff.after) }),
-        ...(entry.ipAddress && { ipAddress: entry.ipAddress }),
-        ...(entry.metadata && { metadata: asJson(entry.metadata) }),
-      },
-    })
-    .catch((err: unknown) => {
-      console.error('[audit] write failed:', err instanceof Error ? err.message : err);
-    });
+  const insert = prisma.auditLog.create({ data }).catch((err: unknown) => {
+    console.error('[audit] write failed:', err instanceof Error ? err.message : err);
+  });
 
   void (async () => {
     try {

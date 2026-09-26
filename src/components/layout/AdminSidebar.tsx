@@ -44,7 +44,10 @@ const NAV_ITEMS: NavItem[] = [
     label: 'แดชบอร์ด',
     href: '/management/dashboard',
     icon: LayoutDashboard,
-    permission: 'products:read',
+    // Review: must match the API gate — the dashboard endpoint requires
+    // reports:read, so the menu used to show for catalogue_manager (who
+    // cannot load it) and hide for finance/marketing (who can).
+    permission: 'reports:read',
   },
   { label: 'สินค้า', href: '/management/products', icon: Package, permission: 'products:read' },
   { label: 'หมวดหมู่', href: '/management/categories', icon: Tags, permission: 'categories:read' },

@@ -40,20 +40,24 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const weekAgo = dayStart(6);
   const month = monthStart();
 
+  // Review: revenue figures must exclude pending/failed/expired orders.
+  // Same canonical set the customer-sales report uses.
+  const REVENUE_STATUSES = ['payment_confirmed', 'code_delivered', 'completed'];
+
   const [todayAgg, weekAgg, monthAgg, allAgg, statusCounts, monthDiscountAgg, refundsAgg] =
     await Promise.all([
       prisma.order.aggregate({
-        where: { createdAt: { gte: today } },
+        where: { createdAt: { gte: today }, status: { in: REVENUE_STATUSES } },
         _count: { _all: true },
         _sum: { totalAmountThb: true, discountThb: true },
       }),
       prisma.order.aggregate({
-        where: { createdAt: { gte: weekAgo } },
+        where: { createdAt: { gte: weekAgo }, status: { in: REVENUE_STATUSES } },
         _count: { _all: true },
         _sum: { totalAmountThb: true },
       }),
       prisma.order.aggregate({
-        where: { createdAt: { gte: month } },
+        where: { createdAt: { gte: month }, status: { in: REVENUE_STATUSES } },
         _count: { _all: true },
         _sum: { totalAmountThb: true },
       }),
@@ -71,6 +75,22 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     ]);
 
   const statusCount = (s: string) => statusCounts.find((x) => x.status === s)?._count._all ?? 0;
+
+  // Status cards are TIME-SCOPED (review): the groupBy above is all-time, so
+  // today/failed counts re-aggregate within the window instead of reusing it.
+  const [todayStatusGroups, weekCompletedAgg] = await Promise.all([
+    prisma.order.groupBy({
+      by: ['status'],
+      where: { createdAt: { gte: today } },
+      _count: { _all: true },
+    }),
+    prisma.order.aggregate({
+      where: { status: 'completed', createdAt: { gte: weekAgo } },
+      _count: { _all: true },
+    }),
+  ]);
+  const todayStatusCount = (s: string) =>
+    todayStatusGroups.find((x) => x.status === s)?._count._all ?? 0;
 
   // Revenue by day (last 7 days, completed only)
   const revenueByDay: { date: string; revenue: number }[] = [];
@@ -141,15 +161,21 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       take: 500,
     }),
   ]);
-  const customerTotals = topCustomers
+  // Review [High]: full customer PII (email) is only for holders of
+  // customers:read:full. Everyone else with reports:read gets masked emails.
+  const canSeeFullPii = check.payload?.perms.includes('customers:read:full') ?? false;
+  const maskEmail = (email: string) =>
+    canSeeFullPii ? email : email.replace(/^(.).*(@.*)$/, (_m, a, b) => `${a}***${b as string}`);
+
+  const fullCustomerOrders = topCustomers
     .map((c) => ({
       customerId: c.id,
-      email: c.email,
+      email: maskEmail(c.email),
       totalOrders: c._count.orders,
       totalSpend: c.orders.reduce((s, o) => s + Number(o.totalAmountThb), 0),
     }))
-    .sort((a, b) => b.totalSpend - a.totalSpend)
-    .slice(0, 5);
+    .sort((a, b) => b.totalSpend - a.totalSpend);
+  const customerTotals = fullCustomerOrders.slice(0, 5);
 
   // Stock
   const [stockAgg, lowStock] = await Promise.all([
@@ -187,8 +213,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   // ราคาขายรวม VAT แล้ว — VAT ที่เก็บจริง = ยอด − ยอด/1.07
   const vatCollected = Math.round((grossRevenue - grossRevenue / 1.07) * 100) / 100;
 
-  // Returning-customer rate: customers with ≥2 completed orders.
-  const repeatCustomers = customerTotals.filter((c) => c.totalOrders >= 2).length;
+  // Returning-customer rate (review): computed from the FULL 500-customer
+  // analytical set BEFORE the top-5 slice, so the denominator is the active
+  // base and the numerator is every repeat customer — not the top 5.
+  const repeatCustomers = fullCustomerOrders.filter((c) => c.totalOrders >= 2).length;
   const activeBase = Math.max(activeCustomers, 1);
   const averageOrdersPerCustomer = Math.round((completedOrders / activeBase) * 10) / 10;
   const averageCustomerLifetimeValue = Math.round((grossRevenue / activeBase) * 100) / 100;
@@ -238,8 +266,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     sales: {
       todayOrders: todayAgg._count._all,
       todayRevenue: Number(todayAgg._sum.totalAmountThb ?? 0),
-      todayCompleted: statusCount('completed'),
-      todayFailed: statusCount('failed') + statusCount('expired'),
+      todayCompleted: todayStatusCount('completed'),
+      todayFailed: todayStatusCount('failed') + todayStatusCount('expired'),
       pendingManualFulfilment: statusCount('pending_manual_fulfilment'),
       lowStockAlerts: lowStock.length,
       weekOrders: weekAgg._count._all,

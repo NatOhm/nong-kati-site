@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { prisma } from '@/lib/db';
+import { writeAuditLog } from '@/lib/auditLog';
 import { checkPermission } from '@/lib/rbac';
 
 export const dynamic = 'force-dynamic';
@@ -38,6 +39,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const result = await prisma.product.updateMany({
     where: { isActive: !value },
     data: { isActive: value },
+  });
+
+  // Review: bulk catalogue visibility flip is audited (which products moved).
+  const flipped = await prisma.product.findMany({
+    where: { isActive: value },
+    select: { id: true, sku: true },
+  });
+  writeAuditLog({
+    actorType: 'admin',
+    actorId: check.payload?.sub ?? 'unknown',
+    actorEmail: check.payload?.email ?? '',
+    action: value ? 'products_bulk_publish' : 'products_bulk_unpublish',
+    tableName: 'Product',
+    recordId: 'bulk',
+    metadata: { changed: result.count, skus: flipped.map((p) => p.sku).slice(0, 100) },
   });
 
   return NextResponse.json({
