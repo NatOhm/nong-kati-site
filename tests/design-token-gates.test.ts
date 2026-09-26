@@ -22,6 +22,14 @@
  *       that looks like the primary CTA defeats the affordance (WCAG 1.4.1).
  *       Ternary-styled disabled states (no `disabled:` utilities) are covered
  *       dynamically by e2e/disabled-state.spec.ts.
+ *  R5 — no hardcoded `bg-white` outside the two sanctioned components.
+ *       Fixed white dies in dark mode (the /orders/lookup card regression:
+ *       label 1.35:1). Only the PromptPay QR (true-white quiet zone is
+ *       required for scanner reliability) and the tax-invoice switch knob
+ *       may opt out — and only while their file carries the
+ *       `data-allow-hardcoded-white` marker. The rendered counterpart
+ *       (near-white computed backgrounds in dark) lives in
+ *       e2e/no-hardcoded-white.spec.ts.
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
@@ -44,6 +52,20 @@ const DISABLED_BRAND_GLOW = /disabled:shadow-(?:brand-glow|clay-brand)/;
 
 /** Dark-scope coral shades that clear 4.5:1 on the cocoa surfaces. */
 const DARK_OK_SHADES = new Set(['200', '300', '400']);
+
+/** Tailwind `bg-white` and its alpha variants (not bg-whitesmoke etc). */
+const BG_WHITE = /(?<![\w-])bg-white(?:\/\d{1,3})?(?![\w-])/;
+
+/**
+ * Files allowed to hardcode white backgrounds, with the reason each opt-out
+ * exists. Everything else fails R5.
+ */
+const HARDCODED_WHITE_FILES: Record<string, string> = {
+  'src/components/checkout/PromptPayQR.tsx':
+    'PromptPay QR quiet zone — must stay true white to scan on any theme',
+  'src/components/checkout/TaxInvoiceToggle.tsx':
+    'switch knob — white-on-track affordance kept on both themes',
+};
 
 function* walk(dir: string): Generator<string> {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -133,11 +155,20 @@ const ALLOWLIST: ReadonlyArray<{
 const allowed = (rel: string, raw: string, rule: 'R1' | 'R2'): boolean =>
   ALLOWLIST.some((a) => a.rule === rule && rel.endsWith(a.file) && raw.includes(a.content));
 
-function scanSource(): { r1: Violation[]; r2: Violation[]; r3: Violation[]; r4: Violation[] } {
+function scanSource(): {
+  r1: Violation[];
+  r2: Violation[];
+  r3: Violation[];
+  r4: Violation[];
+  r5: Violation[];
+  r5marker: Violation[];
+} {
   const r1: Violation[] = [];
   const r2: Violation[] = [];
   const r3: Violation[] = [];
   const r4: Violation[] = [];
+  const r5: Violation[] = [];
+  const r5marker: Violation[] = [];
 
   for (const file of walk('src')) {
     const rel = file.split(path.sep).join('/');
@@ -182,9 +213,28 @@ function scanSource(): { r1: Violation[]; r2: Violation[]; r3: Violation[]; r4: 
         if (DISABLED_BRAND_BG.test(code) || DISABLED_BRAND_GLOW.test(code)) r4.push(at('R4'));
       }
     });
+
+    // R5 — hardcoded white surfaces. File-level allowlist: any bg-white in a
+    // file not listed here fails, and allowlisted files must keep their
+    // data-allow-hardcoded-white marker (a silent marker removal re-enables
+    // the gate).
+    if (BG_WHITE.test(readFileSync(file, 'utf8'))) {
+      const why = HARDCODED_WHITE_FILES[rel];
+      if (!why) {
+        r5.push({ file: rel, line: 0, rule: 'R5', text: 'bg-white is banned here' });
+      } else if (!readFileSync(file, 'utf8').includes('data-allow-hardcoded-white')) {
+        r5marker.push({
+          file: rel,
+          line: 0,
+          rule: 'R5',
+          text: 'allowlisted file lost its data-allow-hardcoded-white marker',
+        });
+      }
+      void why;
+    }
   }
 
-  return { r1, r2, r3, r4 };
+  return { r1, r2, r3, r4, r5, r5marker };
 }
 
 const fmt = (list: Violation[]): string =>
@@ -223,6 +273,19 @@ describe('design-token regression gates (source scan)', () => {
     expect(
       gates.r4,
       `disabled state styled like the primary CTA (peach fill / brand glow):\n${fmt(gates.r4)}`,
+    ).toEqual([]);
+  });
+
+  it('R5: no hardcoded bg-white outside the sanctioned QR/knob files', () => {
+    expect(
+      gates.r5,
+      'hardcoded bg-white returns (dies in dark mode). Use bg-surface, or if ' +
+        'white is genuinely required (QR quiet zone, switch knob), move the ' +
+        `element into an allowlisted file with a data-allow-hardcoded-white marker:\n${fmt(gates.r5)}`,
+    ).toEqual([]);
+    expect(
+      gates.r5marker,
+      `allowlisted files must keep their opt-out marker:\n${fmt(gates.r5marker)}`,
     ).toEqual([]);
   });
 });

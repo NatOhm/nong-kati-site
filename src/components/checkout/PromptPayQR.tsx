@@ -27,12 +27,18 @@ export function PromptPayQR({
   className,
 }: PromptPayQRProps): React.JSX.Element {
   return (
-    <div className={cn('rounded-md border border-line-brand bg-white p-6', className)}>
+    // bg-white is intentional here: PromptPay QR needs a true-white quiet
+    // zone to scan reliably on any theme. Marked so the hardcoded-white
+    // regression gates (static R5 + e2e dark scan) allow it.
+    <div
+      data-allow-hardcoded-white
+      className={cn('rounded-md border border-line-brand bg-white p-6', className)}
+    >
       <h3 className="mb-4 text-center text-lg font-semibold text-fg">ชำระผ่าน PromptPay</h3>
 
       {/* QR Code */}
       <div className="mx-auto mb-4 flex w-fit flex-col items-center gap-4">
-        <div className="rounded-lg bg-white p-4 shadow-code-glow">
+        <div data-allow-hardcoded-white className="rounded-lg bg-white p-4 shadow-code-glow">
           <img
             src={qrDataUrl}
             alt={`PromptPay QR Code สำหรับคำสั่งซื้อ ${formatThb(amount)}`}

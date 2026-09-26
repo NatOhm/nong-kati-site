@@ -43,7 +43,11 @@ export function TaxInvoiceToggle({
             enabled ? 'bg-peach-500' : 'bg-clay-300',
           )}
         >
+          {/* Knob stays white on both themes — conventional switch affordance
+              (slightly inaccurate for dark but visually correct); allowed by
+              the hardcoded-white gates via the parent marker below. */}
           <span
+            data-allow-hardcoded-white
             className={cn(
               'inline-block h-4 w-4 rounded-full bg-white transition-transform',
               enabled ? 'translate-x-6' : 'translate-x-1',
