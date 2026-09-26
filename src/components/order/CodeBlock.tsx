@@ -23,7 +23,10 @@ export function CodeBlock({
 }: CodeBlockProps): React.JSX.Element {
   return (
     <div
-      className={cn('rounded-lg border border-line-brand bg-white p-5 shadow-code-glow', className)}
+      className={cn(
+        'rounded-lg border border-line-brand bg-surface p-5 shadow-code-glow',
+        className,
+      )}
     >
       {/* Product name + denomination */}
       <p className="mb-3 text-sm font-medium text-fg-muted">

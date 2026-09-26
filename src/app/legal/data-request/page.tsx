@@ -19,7 +19,7 @@ export default function DataRequestPage(): React.JSX.Element {
         ภายใต้ พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562 คุณมีสิทธิ์ขอจัดการข้อมูลส่วนบุคคลของคุณ
       </p>
 
-      <div className="rounded-md border border-line-subtle bg-white p-6">
+      <div className="rounded-md border border-line-subtle bg-surface p-6">
         <DataRequestForm />
       </div>
 

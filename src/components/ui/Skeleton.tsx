@@ -10,7 +10,7 @@ export function Skeleton({ className }: SkeletonProps) {
 
 export function ProductCardSkeleton() {
   return (
-    <div className="flex flex-col overflow-hidden rounded-lg border border-line-subtle bg-white">
+    <div className="flex flex-col overflow-hidden rounded-lg border border-line-subtle bg-surface">
       <Skeleton className="aspect-square w-full" />
       <div className="flex flex-1 flex-col gap-2 p-3">
         <Skeleton className="h-3 w-16" />
@@ -24,7 +24,7 @@ export function ProductCardSkeleton() {
 
 export function CategoryCardSkeleton() {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-lg border border-line-subtle bg-white p-6">
+    <div className="flex flex-col items-center gap-3 rounded-lg border border-line-subtle bg-surface p-6">
       <Skeleton className="h-16 w-16 rounded-full" />
       <Skeleton className="h-4 w-20" />
       <Skeleton className="h-3 w-12" />

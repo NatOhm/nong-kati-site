@@ -166,7 +166,7 @@ export function ProductCard({
                   </>
                 ) : (
                   <>
-                    <span className="h-1.5 w-1.5 rounded-full bg-white/80" />
+                    <span className="bg-surface/80 h-1.5 w-1.5 rounded-full" />
                     ซื้อสินค้า →
                   </>
                 )}

@@ -35,7 +35,7 @@ export function Toggle({
       <span
         aria-hidden="true"
         className={cn(
-          'inline-block rounded-full bg-white shadow-sm transition-transform duration-default ease-in-out',
+          'inline-block rounded-full bg-surface shadow-sm transition-transform duration-default ease-in-out',
           isSmall ? 'h-3.5 w-3.5' : 'h-[18px] w-[18px]',
           checked ? (isSmall ? 'translate-x-[15px]' : 'translate-x-[19px]') : 'translate-x-0.5',
         )}

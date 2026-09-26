@@ -47,7 +47,7 @@ export function OrderDetailCard({
   const isCompleted = order.status === 'completed';
 
   return (
-    <div className={cn('rounded-md border border-line-subtle bg-white p-6', className)}>
+    <div className={cn('rounded-md border border-line-subtle bg-surface p-6', className)}>
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <div>

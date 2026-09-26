@@ -71,7 +71,7 @@ export function Modal({
         aria-modal="true"
         aria-labelledby={titleId}
         className={cn(
-          'relative w-full animate-modal-enter rounded-t-3xl border border-line-subtle bg-white p-8 shadow-clay-lg md:rounded-2xl',
+          'relative w-full animate-modal-enter rounded-t-3xl border border-line-subtle bg-surface p-8 shadow-clay-lg md:rounded-2xl',
           sizeClasses[size],
         )}
       >

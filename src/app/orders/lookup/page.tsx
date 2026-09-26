@@ -68,12 +68,12 @@ export default function OrderLookupPage(): React.JSX.Element {
         <p className="mb-8 text-fg-placeholder">ค้นหาคำสั่งซื้อของคุณด้วยอีเมลและรหัสคำสั่งซื้อ</p>
 
         {/* Form */}
-        <div className="rounded-md border border-line-subtle bg-white p-6">
+        <div className="rounded-md border border-line-subtle bg-surface p-6">
           <OrderLookupForm onSubmit={handleSubmit} loading={loading} error={error ?? undefined} />
         </div>
 
         {/* Help text */}
-        <div className="mt-8 rounded-md border border-line-subtle bg-white p-6">
+        <div className="mt-8 rounded-md border border-line-subtle bg-surface p-6">
           <h2 className="mb-3 text-sm font-semibold text-fg-secondary">ไม่พบคำสั่งซื้อ?</h2>
           <ul className="space-y-2 text-sm text-fg-placeholder">
             <li>• ตรวจสอบอีเมลที่ใช้สั่งซื้อ</li>

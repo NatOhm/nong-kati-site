@@ -72,7 +72,7 @@ export function CookieConsentBanner() {
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-50 p-4 sm:p-6">
-      <div className="mx-auto max-w-2xl rounded-xl border border-line-subtle bg-white p-5 shadow-2xl">
+      <div className="mx-auto max-w-2xl rounded-xl border border-line-subtle bg-surface p-5 shadow-2xl">
         {/* Header */}
         <div className="mb-4 flex items-start justify-between">
           <div className="flex items-center gap-3">

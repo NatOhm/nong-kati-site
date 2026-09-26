@@ -267,7 +267,7 @@ export default function AdminLoginPage(): React.JSX.Element {
             </p>
 
             <div className="flex justify-center">
-              <div className="rounded-md bg-white p-4">
+              <div className="rounded-md bg-surface p-4">
                 {/* Server-rendered PNG data URL — no external image host, so the
                     QR can never fail to load because of a blocked domain. */}
                 <img src={setupData.qrDataUrl} alt="QR Code 2FA" width={200} height={200} />
