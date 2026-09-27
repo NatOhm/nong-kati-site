@@ -81,10 +81,9 @@ test.describe('home page under enforced CSP', () => {
     ).toBeVisible();
 
     // 3. Hydration check: with 'unsafe-inline' gone, a blocked Next.js
-    //    bootstrap script would leave the page static — the header nav
-    //    toggle is a client component and only becomes interactive after
-    //    React mounts.
-    await expect(page.locator('header button').first()).toBeVisible();
+    //    bootstrap script would leave the page static — the cart button is
+    //    a client component and only becomes interactive after React mounts.
+    await expect(page.getByRole('button', { name: /ตะกร้าสินค้า/ })).toBeVisible();
 
     // 4. Nothing was blocked by the policy while loading (a blocked script
     //    surfaces as a console error naming the CSP directive).
@@ -131,9 +130,12 @@ test.describe('checkout flow creates an order', () => {
         availableQuantity: 10,
         maxQuantity: 10,
       };
+      // The stored cart is only accepted when its sessionKey matches the
+      // one getSessionKey() keeps under 'nk_cart_session' — set both.
+      const sessionKey = crypto.randomUUID();
       const cart = {
         cartId: null,
-        sessionKey: crypto.randomUUID(),
+        sessionKey,
         items: [item],
         summary: {
           subtotalThb: 25,
@@ -143,6 +145,7 @@ test.describe('checkout flow creates an order', () => {
           discountAmountThb: 0,
         },
       };
+      localStorage.setItem('nk_cart_session', sessionKey);
       localStorage.setItem('nk_cart:v2', JSON.stringify(cart));
     });
     await page.reload();
