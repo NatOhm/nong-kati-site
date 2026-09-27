@@ -7,13 +7,21 @@
  * POST https://api.resend.com/emails with the server-only API key.
  *
  * Env vars:
- *   NK_RESEND_API_KEY   (server-only; absent => mock mode for local dev)
- *   NK_RESEND_FROM_EMAIL (e.g. "orders@nong-kati.co.th"; required in real mode)
+ *   NK_RESEND_API_KEY   (server-only; required — there is NO mock success)
+ *   NK_RESEND_FROM_EMAIL (e.g. "orders@nong-kati.co.th"; required)
  *
- * Mock mode (no key / re_mock_key): logs and returns success so local dev
- * and unit tests never depend on network egress. Production must set the
- * key — a real deployment without one surfaces as FAILED at send time
- * rather than silently claiming delivery.
+ * External audit #2 (2026-09-27): the old mock mode returned
+ * `{ success: true, messageId: 'mock_...' }` whenever the API key was
+ * missing — production without the key reported deliveries that never
+ * happened, and callers told customers their codes were emailed.
+ *
+ * The client is now FAIL-CLOSED: without real credentials every send
+ * returns `{ success: false, error: 'EMAIL_NOT_CONFIGURED: ... }` (no
+ * network call, no retries — configuration cannot heal by retrying).
+ * Callers report failure honestly: the outbox parks the email as pending/
+ * failed for redelivery, and the auth routes answer 503 instead of a
+ * fake success. Local dev/tests that need a fake provider inject one via
+ * vitest module mocks — never via a magic API key.
  */
 
 export interface EmailOptions {
@@ -32,9 +40,14 @@ export interface EmailResult {
 const RESEND_ENDPOINT = 'https://api.resend.com/emails';
 const REQUEST_TIMEOUT_MS = 10_000;
 
-function isMockMode(): boolean {
+/**
+ * True when real delivery is configured. Routes that must not lie to users
+ * (magic link, password reset, checkout success copy) consult this to fail
+ * fast with an honest error instead of enqueueing into a void.
+ */
+export function isEmailDeliveryConfigured(): boolean {
   const key = process.env['NK_RESEND_API_KEY'];
-  return !key || key === 're_mock_key';
+  return Boolean(key) && key !== 're_mock_key' && Boolean(process.env['NK_RESEND_FROM_EMAIL']);
 }
 
 interface ResendSendResponse {
@@ -95,15 +108,18 @@ async function resendSend(options: EmailOptions): Promise<string> {
 }
 
 /**
- * Send an email via Resend (or mock when no API key is configured).
+ * Send an email via Resend. FAIL-CLOSED (audit #2): without real
+ * credentials this returns success:false immediately — no fake message id,
+ * no retries (configuration errors cannot heal by retrying).
  * 10-digital-code.md §9.2 — Retried 3× exponential backoff (2s, 4s, 8s).
  */
 export async function sendEmail(options: EmailOptions): Promise<EmailResult> {
-  if (isMockMode()) {
-    console.log(`[Email Mock] To: ${options.to}, Subject: ${options.subject}`);
+  if (!isEmailDeliveryConfigured()) {
+    const missing = process.env['NK_RESEND_API_KEY'] ? 'NK_RESEND_FROM_EMAIL' : 'NK_RESEND_API_KEY';
+    console.error(`[Email] NOT CONFIGURED — set ${missing} (mock success is no longer returned)`);
     return {
-      success: true,
-      messageId: `mock_${Date.now()}`,
+      success: false,
+      error: `EMAIL_NOT_CONFIGURED: ${missing} is not set`,
     };
   }
 

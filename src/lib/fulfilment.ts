@@ -16,6 +16,61 @@
 
 import { prisma } from '@/lib/db';
 import { decryptCode } from '@/lib/crypto/giftCode';
+import { enqueueEmail, scheduleOutboxDrain } from '@/lib/email/outbox';
+import { orderConfirmationTemplate } from '@/lib/email/templates';
+
+/** Re-export for route callers: schedule a delivery-worker run after the
+ * response (serverless-safe). Keeps route imports one-deep. */
+export { scheduleOutboxDrain };
+
+/**
+ * External audit #2 (2026-09-27): after a successful payment the customer
+ * MUST receive their codes by email. The enqueue is TX-BOUND — it joins
+ * the fulfilment transaction, so the email is promised exactly when the
+ * codes/stock/order-status commit, across every confirmation path
+ * (gateway webhook, wallet, slip-verify, admin verify). A transaction that
+ * rolls back discards the email with it; a committed one always leaves a
+ * durable outbox row behind for the delivery worker.
+ *
+ * Idempotent: code_delivery:<orderId> is unique — a repeat confirmation
+ * (webhook redelivery, admin re-press, racing paths) never duplicates.
+ */
+export async function enqueueCodeDeliveryEmail(
+  tx: PrismaTx,
+  order: {
+    id: string;
+    orderNumber: string;
+    customerEmail: string;
+    items: Array<{ productNameTh: string; denominationThb: unknown; quantity: number }>;
+    subtotalThb: unknown;
+    vatAmountThb: unknown;
+    totalAmountThb: unknown;
+  },
+): Promise<void> {
+  const siteUrl = process.env['NEXT_PUBLIC_SITE_URL'] ?? 'http://localhost:3000';
+  const confirmationUrl = `${siteUrl}/orders/${order.id}`;
+  const template = orderConfirmationTemplate({
+    orderNumber: order.orderNumber,
+    customerEmail: order.customerEmail,
+    items: order.items.map((item) => ({
+      productNameTh: item.productNameTh,
+      denomination: Number(item.denominationThb),
+      quantity: item.quantity,
+    })),
+    subtotalThb: Number(order.subtotalThb),
+    vatAmountThb: Number(order.vatAmountThb),
+    totalAmountThb: Number(order.totalAmountThb),
+    confirmationUrl,
+  });
+  await enqueueEmail({
+    idempotencyKey: `code_delivery:${order.id}`,
+    templateKey: 'code_delivery',
+    to: order.customerEmail,
+    subject: template.subject,
+    html: template.html,
+    tx,
+  });
+}
 
 export interface FulfilmentResult {
   success: boolean;
@@ -118,6 +173,11 @@ export async function fulfilOrder(
         where: { id: order.id },
         data: { status: 'completed', completedAt: new Date() },
       });
+
+      // Audit #2: promise the customer their codes INSIDE the same unit —
+      // delivery itself is decoupled (outbox worker), but the row commits
+      // or rolls back with the codes themselves. Idempotent per order.
+      await enqueueCodeDeliveryEmail(tx, order);
 
       return delivered;
     };

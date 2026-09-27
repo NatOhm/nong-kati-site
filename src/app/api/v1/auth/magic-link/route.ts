@@ -63,11 +63,28 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // addresses are registered.
   if (result.accountExists) {
     const base = process.env['NEXT_PUBLIC_SITE_URL'] ?? req.nextUrl.origin;
-    await sendMagicLinkEmail({
+    const delivery = await sendMagicLinkEmail({
       to: email,
       url: magicLinkUrl(result.token, base),
       expiresAt: result.expiresAt,
     });
+    // Audit #2: NEVER report success for mail that did not go out — the old
+    // uniform-200 turned real delivery failures (no provider key, provider
+    // outage) into customers staring at an inbox that stays empty. Enumer-
+    // ation safety is kept: unknown addresses still get the identical 200
+    // below, so a 503 here leaks only that the address HAS an account AND
+    // the mail system is down — acceptable when the alternative is a sign-in
+    // link that silently never arrives.
+    if (!delivery.ok) {
+      console.error('[magic-link] delivery failed:', delivery.error);
+      return NextResponse.json(
+        {
+          error: 'EMAIL_DELIVERY_UNAVAILABLE',
+          message: 'ระบบส่งอีเมลขัดข้องชั่วคราว — กรุณาลองอีกครั้งในภายหลัง',
+        },
+        { status: 503 },
+      );
+    }
   }
 
   return NextResponse.json({

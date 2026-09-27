@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { claimOrderForConfirmation, getOrderById } from '@/api/orders';
 import { prisma } from '@/lib/db';
 import { getNotificationSettings, notifyPaymentConfirmed, notifyStockLow } from '@/lib/notify';
-import { fulfilOrder } from '@/lib/fulfilment';
+import { fulfilOrder, scheduleOutboxDrain } from '@/lib/fulfilment';
 import { getClientIp, checkRateLimit } from '@/lib/rateLimit';
 import { isSlipVerificationEnabled, verifySlip } from '@/lib/payment/slipok';
 import { isValidSlipUploadToken } from '@/lib/slipSecurity';
@@ -205,6 +205,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           if (claimed.count !== 1) throw new Error('ALREADY_CLAIMED');
         })
         .catch(() => undefined);
+      // Audit #2: schedule an outbox drain even on this degraded path —
+      // there may be queued mails (previous successes) worth delivering.
+      await scheduleOutboxDrain();
       return NextResponse.json({
         status: 'pending_manual_fulfilment',
         message: 'ชำระเงินถูกตรวจแล้ว — สินค้าเซ็นต์ไม่พอ แอดมินจะจัดส่งโค้ดให้เร็วที่สุด',
@@ -220,7 +223,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // ── Notifications (after commit, fire-and-forget) ───────
+  // ── Notifications + outbox drain (after commit, fire-and-forget) ───────
+  // Audit #2: the code-delivery email is now a durable outbox row written
+  // inside the fulfilment transaction above — the drain below delivers it.
+  // The old success copy claimed "ส่งโค้ดให้ทางอีเมลแล้ว" while nobody had
+  // sent anything; that was a lie and is gone.
+  await scheduleOutboxDrain();
+
   const cfg = await getNotificationSettings();
   void notifyPaymentConfirmed({
     orderNumber: order.orderNumber,
@@ -241,6 +250,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     ref: result.ref,
     amountThb: result.amountThb,
     confirmationUuid: order.confirmationUuid,
-    message: 'ตรวจสลิปผ่าน — ส่งโค้ดให้ทางอีเมลแล้ว',
+    message: 'ตรวจสลิปผ่าน — ระบบกำลังจัดส่งโค้ดให้ทางอีเมล',
   });
 }

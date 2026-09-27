@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getCustomerFromToken } from '@/api/customerAuth';
 import { claimOrderForConfirmation } from '@/api/orders';
-import { fulfilOrder } from '@/lib/fulfilment';
+import { fulfilOrder, scheduleOutboxDrain } from '@/lib/fulfilment';
 
 export const dynamic = 'force-dynamic';
 
@@ -105,6 +105,11 @@ export async function POST(
     if (result.code === 'ORDER_NOT_PAYABLE' || result.code === 'INSUFFICIENT_BALANCE') {
       return NextResponse.json({ error: { code: result.code } }, { status: 409 });
     }
+    // Audit #2: the unit committed — codes delivered, wallet debited, and the
+    // code-delivery outbox row promised. Kick the delivery worker after the
+    // response; a failure to send never undoes the payment (the row stays
+    // pending for the retry paths).
+    await scheduleOutboxDrain();
     return NextResponse.json({ success: true, ...result });
   } catch (err) {
     // Transaction rolled back — balance, ledger, claim, codes all intact.

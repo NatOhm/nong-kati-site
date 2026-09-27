@@ -742,6 +742,36 @@ model PasswordResetToken {
 // Phone (SMS OTP) sign-in: mirrors MagicLinkToken — only the SHA-256 hash of
 // the 6-digit code is stored, with expiry, single-use consumption and attempt
 // tracking for the audit trail. destinationPhone is E.164 (+66...).
+// ─── Email Outbox (external audit #2, 2026-09-27) ─────────
+// Durable email queue: enqueueing happens INSIDE the caller's transaction
+// (code delivery joins the fulfilment commit — a rolled-back payment can
+// never enqueue a delivery email, and a committed payment can never lose
+// one). Delivery is claimed atomically (status CAS pending→sending) so
+// concurrent workers never double-send; failures back off exponentially
+// and the row keeps lastError for the admin outbox view.
+model EmailOutbox {
+  id             String    @id @default(cuid())
+  // Idempotency: one row per logical email (e.g. code_delivery:<orderId>).
+  // A repeated enqueue attempt inside any later transaction is a no-op
+  // (P2002 caught), so retries of confirmations never duplicate mail.
+  idempotencyKey String    @unique
+  templateKey    String // code_delivery | magic_link | password_reset | order_confirm
+  toEmail        String
+  subject        String
+  html           String
+  text           String?
+  status         String    @default("pending") // pending | sent | failed
+  attempts       Int       @default(0)
+  lastError      String?
+  availableAt    DateTime  @default(now()) // next eligible delivery attempt
+  sentAt         DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([status, availableAt])
+  @@index([templateKey, createdAt(sort: Desc)])
+}
+
 model PhoneOtpToken {
   id               String    @id @default(cuid())
   destinationPhone String

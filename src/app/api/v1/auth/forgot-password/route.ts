@@ -56,11 +56,22 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   if (result.accountExists) {
     const base = process.env['NEXT_PUBLIC_SITE_URL'] ?? req.nextUrl.origin;
-    await sendPasswordResetEmail({
+    const delivery = await sendPasswordResetEmail({
       to: email,
       url: passwordResetUrl(result.token, base),
       expiresAt: result.expiresAt,
     });
+    // Audit #2: no fake success — see the identical gate in magic-link.
+    if (!delivery.ok) {
+      console.error('[forgot-password] delivery failed:', delivery.error);
+      return NextResponse.json(
+        {
+          error: 'EMAIL_DELIVERY_UNAVAILABLE',
+          message: 'ระบบส่งอีเมลขัดข้องชั่วคราว — กรุณาลองอีกครั้งในภายหลัง',
+        },
+        { status: 503 },
+      );
+    }
   }
 
   return NextResponse.json({

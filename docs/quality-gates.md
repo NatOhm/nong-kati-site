@@ -162,16 +162,27 @@ Playwright เลือก target ตาม `E2E_BASE_URL` > localhost:4200 (dev
   - **ไม่ส่ง `tx`** → insert เข้า global prisma แบบ awaited + ผูกกับ Next `after()` กัน serverless freeze; fail = log แต่ไม่ทำ action ล้ม (non-critical path)
 - **เคส regression สองทิศทาง:** (1) audit insert fail ระหว่าง tx → ทั้ง mutation ต้อง reject (2) mutation สำเร็จ → audit ต้องถูกเขียนผ่าน tx client ก่อน transaction callback จบ — เคสเก่าที่ fire-and-forget จะแดงทันที; เคสที่เกี่ยวใน `password-reset.test.ts` / `staff-audit-hardening.test.ts` ก็ถูกย้ายไป assert ฝั่ง tx
 
+## Email outbox — `tests/email-outbox.test.ts` + `tests/email-auth-honesty.test.ts` (audit fix #2, 2026-09-27)
+
+- **กฎ (external audit #2 — Critical):** ห้ามมี "success ปลอม" ในระบบเมลอีกต่อไป ทั้งฝั่ง provider และฝั่ง API ต่อผู้ใช้:
+  - **`lib/email/resend.ts` fail-closed** — ไม่มี `NK_RESEND_API_KEY`/`NK_RESEND_FROM_EMAIL` (หรือ key = `re_mock_key`) ทุก send คืน `{ success:false, error:'EMAIL_NOT_CONFIGURED:…' }` ทันที (ไม่ยิง network, ไม่ retry — config ไม่หายด้วยการ retry); **ลบ mock-mode ที่คืน `success:true, messageId:'mock_…'`** — dev/test ที่ต้องการ fake provider ต้อง inject ผ่าน vi.mock เท่านั้น
+  - **Outbox tx-bound** — `enqueueEmail({ tx })` ต้องถูกเรียก **ใน transaction ของ caller** เหมือน `writeAuditLog`: แถวเมล commit/rollback พร้อมหน่วย business (จ่ายเงิน+โค้ด+สต๊อก+เมล = หนึ่งเดียว); idempotent ด้วย `idempotencyKey` unique (เช่น `code_delivery:<orderId>`) — pre-check ด้วย findUnique + backstop ด้วย **native upsert (ON CONFLICT DO NOTHING)** เพราะการ catch P2002 กลาง tx ของ Postgres จะทำ tx พิษทั้งก้อน; **enqueue fail = fulfilment ทั้งหน่วย rollback** (รอยเท้า audit-atomicity เดียวกัน)
+  - **Delivery worker decoupled** — `processDueEmails` claim แบบ CAS (`pending→sending` guarded availableAt + re-claim แถว `sending` ที่ค้างเกิน 5 นาที = worker ตาย) → concurrent worker ส่งซ้ำไม่ได้; fail ต่อแถว = `attempts+1` + backoff 1/2/4…นาที; ครบ `MAX_OUTBOX_ATTEMPTS` = park `failed` พร้อม `lastError` (ไม่เคยหลุดเงียบ ๆ ไม่เคยปลอมว่าส่งแล้ว); trigger ผ่าน `scheduleOutboxDrain()` (Next `after()`) หลังทุก confirmation + cron ภายนอกยิง `POST /api/v1/internal/email-outbox/drain` (auth ด้วย `NK_CRON_SECRET` หรือ admin JWT; ไม่ตั้ง secret = 503 fail-closed)
+  - **จุด enqueue:** `fulfilOrder` (จากนั้น 4 path ทั้งหมด — omise webhook / wallet / slip-verify / admin verify รวม recovery `pending_manual_fulfilment` ที่ resume แล้วก็ส่งเช่นกัน) + `scheduleOutboxDrain` หลัง commit ทุก path; slip-verify เลิกตอบ "ส่งโค้ดให้ทางอีเมลแล้ว" (เท็จ) → "ระบบกำลังจัดส่งโค้ดให้ทางอีเมล"
+  - **Auth routes ตอบจริง** — magic-link/forgot-password: ส่งไม่ออก = **503 `EMAIL_DELIVERY_UNAVAILABLE`** (ไม่ตอบ 200 ปลอม) แต่ address ที่ไม่มีบัญชียังได้ 200 uniform เท่าเดิม (no enumeration)
+- **เคส regression:** provider fail-closed (`re_mock_key` ไม่นับเป็น configured), enqueue ซ้ำ = no-op, race = upsert ไม่ duplicate, enqueue fail กลาง tx → fulfilment reject, worker fail → pending+backoff → failed+lastError, stale `sending` ถูก re-claim, แถวที่ยังไม่ถึง `availableAt` ไม่ถูกส่ง, route 503 เมื่อ delivery fail, drain endpoint ต้องมี token
+- **งานค้างฝั่งคน (ทบทวนทุกครั้ง):** prod ยังไม่มี `NK_RESEND_API_KEY`/`NK_RESEND_FROM_EMAIL` ใน Vercel — ก่อนหน้านี้ระบบจะปลอมว่าส่งสำเร็จ ตอนนี้จะ fail-closed ตามธรรมชาติ: อีเมลทุกฉบับจะ **ค้าง pending ใน outbox พร้อม retry อัตโนมัติ** จนกว่าจะใส่ key จริง (ไม่มีแถวไหนหาย) — ใส่ key แล้ว drain จะส่งทุกฉบับที่ค้างให้เอง
+
 ## CI pipeline (`.github/workflows/ci.yml`)
 
-| Job                         | ทำอะไร                                                                  | ผูกกับ gate                                           |
-| --------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------- |
-| Lint & Typecheck            | `eslint .` + `tsc --noEmit`                                             | —                                                     |
-| Security Audit              | `npm audit --audit-level=high` (blocking)                               | —                                                     |
-| Unit Tests                  | `npm test` (vitest ~101 tests)                                          | R1–R6, authz matrix, PII (concurrency skip อัตโนมัติ) |
-| Concurrency (DB races)      | Postgres 16 service + migrate + `next dev -p 4200` + `NK_TEST_BASE_URL` | Concurrency                                           |
-| Build                       | `next build` ด้วย env ปลอม                                              | —                                                     |
-| report-build-status, deploy | ของ Vercel (Git integration)                                            | —                                                     |
+| Job                         | ทำอะไร                                                                  | ผูกกับ gate                                                         |
+| --------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Lint & Typecheck            | `eslint .` + `tsc --noEmit`                                             | —                                                                   |
+| Security Audit              | `npm audit --audit-level=high` (blocking)                               | —                                                                   |
+| Unit Tests                  | `npm test` (vitest ~167 tests)                                          | R1–R6, authz matrix, PII, email outbox (concurrency skip อัตโนมัติ) |
+| Concurrency (DB races)      | Postgres 16 service + migrate + `next dev -p 4200` + `NK_TEST_BASE_URL` | Concurrency                                                         |
+| Build                       | `next build` ด้วย env ปลอม                                              | —                                                                   |
+| report-build-status, deploy | ของ Vercel (Git integration)                                            | —                                                                   |
 
 ทุก push บน `master` = CI 8 checks + deploy prod อัตโนมัติ
 

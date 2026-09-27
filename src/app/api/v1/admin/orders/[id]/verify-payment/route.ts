@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { checkPermission } from '@/lib/rbac';
 import { claimOrderForConfirmation, getOrderById } from '@/api/orders';
-import { fulfilOrder } from '@/lib/fulfilment';
+import { fulfilOrder, scheduleOutboxDrain } from '@/lib/fulfilment';
 import { getNotificationSettings, notifyPaymentConfirmed, notifyStockLow } from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
@@ -86,6 +86,7 @@ export async function POST(
     }
     if (resume instanceof NextResponse) return resume;
 
+    await scheduleOutboxDrain();
     return NextResponse.json({
       status: 'completed',
       resumed: true,
@@ -179,6 +180,10 @@ export async function POST(
     console.error('[verify-payment] confirmation transaction failed:', msg);
     return NextResponse.json({ error: 'FULFILMENT_FAILED' }, { status: 500 });
   }
+
+  // Audit #2: delivery email row committed with the fulfilment — schedule
+  // the drain before the notifications.
+  await scheduleOutboxDrain();
 
   // Notifications (fire-and-forget).
   const cfg = await getNotificationSettings();

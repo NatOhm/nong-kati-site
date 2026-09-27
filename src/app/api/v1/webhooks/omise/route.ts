@@ -16,7 +16,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { OmiseAdapter } from '@/lib/payment/omise';
 import { prisma } from '@/lib/db';
 import { getOrderById, claimOrderForConfirmation } from '@/api/orders';
-import { fulfilOrder } from '@/lib/fulfilment';
+import { fulfilOrder, scheduleOutboxDrain } from '@/lib/fulfilment';
 import { getNotificationSettings, notifyPaymentConfirmed, notifyStockLow } from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
@@ -115,6 +115,12 @@ async function handleChargeSucceeded(chargeId: string, gatewayAmount: number): P
         throw new WebhookAlreadyConfirmedError(order.orderNumber);
       return c;
     });
+
+    // Audit #2: the code-delivery email is a durable outbox row written
+    // inside the fulfilment transaction — schedule the delivery worker run
+    // now that the unit committed. Webhook retries stay idempotent via the
+    // outbox's unique idempotency key.
+    await scheduleOutboxDrain();
 
     // Notifications (fire-and-forget), only after a real commit.
     const cfg = await getNotificationSettings();
