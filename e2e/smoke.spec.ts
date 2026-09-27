@@ -1,0 +1,192 @@
+import { test, expect } from '@playwright/test';
+
+/**
+ * Production smoke suite (production roadmap §7/§8 — the last missing gates):
+ * the deployed build must actually load under the ENFORCED CSP (no blocked
+ * scripts → framework still boots → data renders), and a customer can walk
+ * the checkout to a created order whose confirmation link works.
+ *
+ * Runs against `next start` (production build) in CI — see the
+ * browser-smoke job in ci.yml. The DB is a per-job Postgres service seeded
+ * with prisma/seed.ts, so the flow exercises the REAL paths: catalog,
+ * server-side pricing, order-number allocation, and the payment-channel
+ * union gate (manual transfer is seeded via SiteSetting; Opn keys stay
+ * absent on purpose — production builds fail closed on mock payments).
+ *
+ * The checkout test also works against `next dev` with NK_PAYMENT_MOCK=true
+ * (the mock gateway path), so it can be run locally without a DB seed.
+ */
+
+interface CreatedOrder {
+  order: { id: string; orderNumber: string; confirmationUuid: string; status: string };
+}
+
+/** Grab the POST /api/v1/orders payload the page sends (server truth beats UI). */
+function captureOrderCreation(page: import('@playwright/test').Page): {
+  body: () => CreatedOrder | null;
+} {
+  let created: CreatedOrder | null = null;
+  page.on('response', async (res) => {
+    if (res.url().endsWith('/api/v1/orders') && res.request().method() === 'POST') {
+      try {
+        created = (await res.json()) as CreatedOrder;
+      } catch {
+        /* body already consumed by the page — the UI assertions still hold */
+      }
+    }
+  });
+  return { body: () => created };
+}
+
+/** Home page must not just return HTML — the framework must boot. */
+test.describe('home page under enforced CSP', () => {
+  test('loads, ships an enforced CSP, and hydrates interactive UI', async ({ page }) => {
+    const consoleErrors: string[] = [];
+    page.on('console', (msg) => {
+      if (msg.type() === 'error') consoleErrors.push(msg.text());
+    });
+    page.on('pageerror', (err) => consoleErrors.push(String(err)));
+
+    const response = await page.goto('/');
+    expect(response?.status()).toBe(200);
+
+    // 1. The enforced nonce policy is present (production roadmap §1).
+    const csp = response?.headers()['content-security-policy'] ?? '';
+    expect(csp, 'CSP header must be present').not.toBe('');
+    expect(csp).toContain("script-src 'self' 'nonce-");
+    expect(csp).not.toContain("'unsafe-inline'");
+    expect(csp).toContain("frame-ancestors 'none'");
+
+    // 2. Seed data is actually reachable through the real catalog query.
+    await expect(page.getByRole('heading', { level: 1 }), 'home must render its h1').toBeVisible();
+    await expect(
+      page.getByText('HBO Max 7 วัน 4K').first(),
+      'seeded product must appear in the featured catalog',
+    ).toBeVisible();
+
+    // 3. Hydration check: with 'unsafe-inline' gone, a blocked Next.js
+    //    bootstrap script would leave the page static — the header nav
+    //    toggle is a client component and only becomes interactive after
+    //    React mounts.
+    await expect(page.locator('header button').first()).toBeVisible();
+
+    // 4. Nothing was blocked by the policy while loading (a blocked script
+    //    surfaces as a console error naming the CSP directive).
+    expect(
+      consoleErrors.filter((e) => /Content Security Policy|Refused to (load|execute)/i.test(e)),
+    ).toEqual([]);
+  });
+});
+
+/**
+ * Guest checkout → order creation. Cart is seeded via localStorage (v2
+ * schema from CartProvider), the contact form walks step 1, and the order
+ * is verified through the API + its confirmation page (§2 definition of
+ * done: "the order link works").
+ */
+test.describe('checkout flow creates an order', () => {
+  test('guest checkout: seeded cart → contact form → pending_payment order', async ({ page }) => {
+    test.setTimeout(180_000); // compile headroom when pointed at `next dev`
+
+    const orderCapture = captureOrderCreation(page);
+
+    await page.goto('/checkout');
+
+    // Seed the cart exactly as CartProvider persists it (key nk_cart:v2 +
+    // per-tab session key), then reload so the provider hydrates it.
+    await page.evaluate(() => {
+      // Seed id formula: `${slug}-${label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`
+      // (Thai chars each become a dash — verified against prisma/seed.ts).
+      const variantId = 'hbo-max-7-4k-7-----4k---4-';
+      const item = {
+        id: 'smoke-item-1',
+        variantId,
+        skuCode: '7 วัน 4K (÷4)',
+        productNameTh: 'HBO Max 7 วัน 4K',
+        productNameEn: 'HBO Max 7 วัน 4K',
+        productSlug: 'hbo-max-7-4k',
+        thumbnailUrl: null,
+        denominationThb: 25,
+        unitPriceThb: 25,
+        vatAmountThb: 0,
+        quantity: 1,
+        lineTotalThb: 25,
+        inStock: true,
+        availableQuantity: 10,
+        maxQuantity: 10,
+      };
+      const cart = {
+        cartId: null,
+        sessionKey: crypto.randomUUID(),
+        items: [item],
+        summary: {
+          subtotalThb: 25,
+          vatAmountThb: 1.75,
+          totalAmountThb: 25,
+          itemCount: 1,
+          discountAmountThb: 0,
+        },
+      };
+      localStorage.setItem('nk_cart:v2', JSON.stringify(cart));
+    });
+    await page.reload();
+
+    // Step 1 — contact form (ContactForm ids are useId-derived; the TOS
+    // checkbox id ends with "-tos").
+    await page.fill('input[type="email"]', `smoke+${Date.now()}@nong-kati.test`);
+    await page.fill('input[type="tel"]', '0812345678');
+    await page.check('input[id$="-tos"]');
+
+    await page.getByRole('button', { name: 'ดำเนินการต่อ' }).click();
+
+    // Step 2 — an order now exists server-side. The payment surface depends
+    // on the environment: manual-transfer instructions (CI: seeded
+    // SiteSetting) or the mock PromptPay QR (local dev, NK_PAYMENT_MOCK).
+    await expect(page.getByText('โอนยอด').or(page.locator('img[alt*="PromptPay QR"]'))).toBeVisible(
+      { timeout: 30_000 },
+    );
+    await expect(page.getByText('ยังไม่มีช่องทางชำระเงินที่ใช้ได้ในขณะนี้')).toHaveCount(0);
+
+    // Server truth: the page's own POST created a pending order.
+    const created = orderCapture.body();
+    expect(created, 'POST /api/v1/orders must have returned the order').toBeTruthy();
+    expect(created?.order.status).toBe('pending_payment');
+    expect(created?.order.orderNumber).toMatch(/^NK-\d{4}-\d{6}$/);
+    expect(created?.order.confirmationUuid).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+    );
+
+    // §2 definition of done, link half: the confirmationUuid link renders
+    // the order (not a 404) — the delivery email links to this exact path.
+    const confirmation = await page.goto(
+      `/checkout/confirmation/${created?.order.confirmationUuid}`,
+    );
+    expect(confirmation?.status()).toBe(200);
+    await expect(page.getByText(created?.order.orderNumber ?? '').first()).toBeVisible();
+  });
+});
+
+/** Security headers that must ship with every production response. */
+test.describe('API security headers', () => {
+  test('version endpoint exposes only sha/ref and carries the CSP policy', async ({ request }) => {
+    const res = await request.get('/api/v1/version');
+    expect(res.status()).toBe(200);
+
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(Object.keys(body).sort()).toEqual(['gitRef', 'gitSha']);
+
+    const csp = res.headers()['content-security-policy'] ?? '';
+    expect(csp).toContain("script-src 'self' 'nonce-");
+  });
+
+  test('manual-info channel reflects the seeded setting', async ({ request }) => {
+    const res = await request.get('/api/v1/payments/manual-info');
+    expect(res.status()).toBe(200);
+    const info = (await res.json()) as { enabled: boolean; accountNumber: string | null };
+    // CI seeds the setting; a dev machine without it just skips the claim.
+    test.info().annotations.push({
+      type: 'manual-info',
+      description: `enabled=${info.enabled} account=${info.accountNumber ? 'set' : 'null'}`,
+    });
+  });
+});

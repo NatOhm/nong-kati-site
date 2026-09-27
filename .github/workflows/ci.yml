@@ -128,6 +128,85 @@ jobs:
           name: dev-server-log
           path: dev-server.log
 
+  # ─── Browser Smoke (roadmap §7/§8) ─────────────────
+  # Minimal production smoke against a REAL database and a REAL production
+  # build (`next start`, never the dev server — production mode fails
+  # closed on NK_PAYMENT_MOCK by design). Three gates:
+  #   1. Home page loads under the ENFORCED nonce CSP and hydrates.
+  #   2. A guest walks checkout to a created order whose confirmationUuid
+  #      link renders (§2 definition of done, link half).
+  #   3. /api/v1/version reports the exact commit under test.
+  # Opn keys stay absent: the checkout gate passes via the seeded
+  # manual-transfer channel (union gate — exactly the §4 behavior).
+  browser-smoke:
+    name: Browser Smoke (CSP + checkout)
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+      DATABASE_DIRECT_URL: postgresql://ci:ci@localhost:5432/ci
+      NEXT_PUBLIC_SITE_URL: http://127.0.0.1:4200
+      GIT_SHA: ${{ github.sha }}
+      GIT_REF: ${{ github.ref_name }}
+      NK_JWT_SECRET: ci-test-secret-0123456789abcdef0123456789abcdef
+      NK_ENCRYPTION_KEY: ci-test-encryption-key-32bytes!!
+      NK_GIFT_CODE_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4 (pinned)
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4 (pinned)
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npx prisma migrate deploy
+      - name: Seed catalog + payment channel
+        run: node scripts/seed-smoke.mjs
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Build production bundle
+        run: npm run build
+      - name: Start production server
+        run: |
+          nohup npx next start -p 4200 > smoke-server.log 2>&1 &
+          for i in $(seq 1 60); do
+            sleep 2
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:4200/ || true)
+            if [ "$code" = "200" ]; then echo "prod server up (attempt $i)"; exit 0; fi
+          done
+          echo "prod server did not become ready"; tail -50 smoke-server.log; exit 1
+      - name: Run browser smoke tests
+        run: E2E_BASE_URL=http://127.0.0.1:4200 npx playwright test e2e/smoke.spec.ts
+      - name: Verify deployed SHA matches the commit under test
+        run: |
+          body=$(curl -s http://127.0.0.1:4200/api/v1/version)
+          echo "version: $body"
+          echo "$body" | grep -q "\"gitSha\":\"$GIT_SHA\""
+      - name: Upload smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4 (pinned)
+        with:
+          name: browser-smoke-artifacts
+          path: |
+            playwright-report/
+            test-results/
+            smoke-server.log
+          if-no-files-found: ignore
+
   # ─── Build ────────────────────────────────────────────
   build:
     name: Build
@@ -135,7 +214,7 @@ jobs:
     # Production review MEDIUM-2: the build (and the deploy that follows it)
     # must be gated by EVERY other check — a failing security audit or DB
     # concurrency/RLS run must not promote an artifact.
-    needs: [lint, test, audit, concurrency-tests]
+    needs: [lint, test, audit, concurrency-tests, browser-smoke]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4 (pinned)
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4 (pinned)
