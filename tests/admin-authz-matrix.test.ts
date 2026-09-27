@@ -125,6 +125,13 @@ const ROUTE_COVERAGE: MatrixRow[] = [
   { method: 'GET', path: '/audit-log', perm: 'audit:read' },
   // reconciliation queue (roadmap §6 operator view)
   { method: 'GET', path: '/reconciliation', perm: 'orders:read' },
+  // re-run fulfilment — the queue's operator action (audit #4 follow-up)
+  {
+    method: 'POST',
+    path: '/reconciliation/ord-1/rerun-fulfilment',
+    perm: 'orders:write',
+    body: {},
+  },
   // categories
   { method: 'GET', path: '/categories', perm: 'categories:read' },
   { method: 'POST', path: '/categories', perm: 'categories:write', body: { nameTh: 'x' } },

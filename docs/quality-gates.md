@@ -260,6 +260,16 @@ Test: 14 เคส — Bearer/cookie resolution, HttpOnly+markers, browser-sessi
 
 Test: 14 เคส + static guards (ไม่มี inline script ใน layout, migration SQL รูปแบบถูก, gate ใหม่)
 
+## Reconciliation UI + operator re-run (2026-09-27, ต่อยอด roadmap §6) — `tests/reconciliation-rerun.test.ts`
+
+- **หน้า `/management/reconciliation`** (nav `orders:read`) — คิวงานของ operator 3 ตาราง: การชำระที่ต้องดำเนินการ (resolved ดูจากสถานะ order ปัจจุบัน), อีเมล dead-letter, และเงินเข้าแต่ออเดอร์ค้าง (webhook gaps) — ปุ่ม **ส่งมอบอีกครั้ง** ต่อรายการ + ปุ่ม **ส่งใหม่ทั้งหมด** ของ outbox drain
+- **`POST /api/v1/admin/reconciliation/[id]/rerun-fulfilment`** (perm `orders:write` — เข้า authz matrix แล้ว):
+  - claim = **CAS บนสถานะ order** (`pending_payment`|`pending_manual_fulfilment` → `payment_confirmed`) — แพ้ race = 0 แถว → อ่านสถานะจริงแล้วตอบตามผล (completed = 200 ตามสถานะ, อื่น ๆ = 409) — double-allocation เป็นไปไม่ได้ตามเงื่อนไขเดียวกับ fulfilment
+  - fulfilment strict + settle attempt `pending → succeeded` + **ทั้งหมดใน tx เดียว** (Serializable) — เมล code_delivery เป็น outbox row unique ต่อ order ลูกค้าไม่มีทางได้เมลซ้ำ
+  - ตอบตรงไปตรงมา: `ALREADY_SETTLED` (completed/refunded) 409, `UNEXPECTED_STATUS` 409, `ORDER_NOT_FOUND` 404
+  - INSUFFICIENT_STOCK → recovery park ที่ awaited+verified (ตาม audit #4); recovery พัง → evidence ใหม่ผ่าน `recordPaymentReconciliation` + 500 `RECONCILIATION_REQUIRED`; ความล้มเหลวอื่น → evidence + 500 `RERUN_FAILED` — ไม่มี success ปลอมแม้แต่บรรทัดเดียว
+- **เคส regression (11):** gate 401/403/404, ALREADY_SETTLED/UNEXPECTED_STATUS ไม่แตะ fulfilment, happy path (ส่งมอบ 2 โค้ด + settle + drain), resume ไม่ re-settle, race แพ้รายงานสถานะจริง, stock ไม่พอ → park กลับ, park พัง → evidence+500, unexpected → evidence+500
+
 ## CI pipeline (`.github/workflows/ci.yml`)
 
 | Job                         | ทำอะไร                                                                  | ผูกกับ gate                                                                                                    |
