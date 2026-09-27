@@ -49,7 +49,12 @@ beforeEach(() => {
   txMock.order.update.mockResolvedValue({});
 });
 
+import type { Prisma } from '@prisma/client';
+
 import { claimOrderForConfirmation } from '@/api/orders';
+
+/** The mock as the Prisma interactive-transaction client type. */
+const TX = txMock as unknown as Prisma.TransactionClient;
 
 function seedClaimOrder(couponId: string | null, customerId: string | null): void {
   // Call 1: the claim helper's coupon/customer ref read (select projection);
@@ -85,7 +90,7 @@ describe('HIGH-2 — paid-external claims honor the coupon snapshot', () => {
       isActive: false,
     });
 
-    const claimed = await claimOrderForConfirmation('ord-1', txMock, { paidExternally: true });
+    const claimed = await claimOrderForConfirmation('ord-1', TX, { paidExternally: true });
     expect(claimed).not.toBeNull();
   });
 
@@ -97,9 +102,7 @@ describe('HIGH-2 — paid-external claims honor the coupon snapshot', () => {
       isActive: false,
     });
 
-    await expect(claimOrderForConfirmation('ord-1', txMock)).rejects.toThrow(
-      'COUPON_NO_LONGER_VALID',
-    );
+    await expect(claimOrderForConfirmation('ord-1', TX)).rejects.toThrow('COUPON_NO_LONGER_VALID');
   });
 
   it('usage-limit race + paidExternally → usage still recorded (over-limit, honest), confirmation succeeds', async () => {
@@ -112,7 +115,7 @@ describe('HIGH-2 — paid-external claims honor the coupon snapshot', () => {
     // The guarded bump loses the race (coupon full).
     txMock.coupon.updateMany.mockResolvedValue({ count: 0 });
 
-    const claimed = await claimOrderForConfirmation('ord-1', txMock, { paidExternally: true });
+    const claimed = await claimOrderForConfirmation('ord-1', TX, { paidExternally: true });
     expect(claimed).not.toBeNull();
     // The unconditional increment documents the charged discount.
     expect(txMock.coupon.update).toHaveBeenCalledWith(
@@ -129,7 +132,7 @@ describe('HIGH-2 — paid-external claims honor the coupon snapshot', () => {
     });
     txMock.coupon.updateMany.mockResolvedValue({ count: 0 });
 
-    await expect(claimOrderForConfirmation('ord-1', txMock)).rejects.toThrow('COUPON_USAGE_LIMIT');
+    await expect(claimOrderForConfirmation('ord-1', TX)).rejects.toThrow('COUPON_USAGE_LIMIT');
   });
 });
 
