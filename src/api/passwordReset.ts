@@ -7,9 +7,11 @@
  * stored ONLY as a SHA-256 hash, 30-minute expiry) is bound to the
  * account and the raw link is emailed. Opening the link lets them set a
  * new password; the token is claimed atomically (guarded updateMany on
- * usedAt = null) inside the same transaction that writes the new scrypt
+ * usedAt = null) INSIDE the same transaction that writes the new scrypt
  * hash and bumps Customer.sessionsInvalidBefore so every JWT issued
- * before the reset stops resolving (stolen-session recovery).
+ * before the reset stops resolving (stolen-session recovery) — claim and
+ * password commit or roll back as ONE unit (audit #6: the claim used to
+ * run outside the transaction and needed a manual repair on failure).
  *
  * Security notes (mirrors src/api/magicLink.ts):
  * - Request responses are identical whether or not the account exists or
@@ -110,10 +112,28 @@ export async function createPasswordResetToken(params: {
 }
 
 /**
- * Consume a reset token and set the new password — atomically. The token
- * claim (guarded updateMany), the scrypt hash write, the lockout clear and
- * the sessionsInvalidBefore bump commit together or not at all.
+ * Consume a reset token and set the new password — atomically (audit #6,
+ * 2026-09-27): the token claim (guarded updateMany on usedAt = null) is the
+ * FIRST write INSIDE the same transaction that writes the new scrypt hash,
+ * clears the lockout, bumps sessionsInvalidBefore and records the audit
+ * row. The old shape claimed the token OUTSIDE the transaction and patched
+ * the claim back open from a catch block when the transaction failed — a
+ * crash between claim and patch burned a single-use link whose password
+ * never changed. Now the claim commits or rolls back WITH the password
+ * write: a failed transaction leaves the link usable, by construction —
+ * there is no repair step to forget.
+ *
+ * Concurrency: the guarded updateMany is the CAS — a racer blocks on the
+ * row lock until the winner commits, then matches 0 rows and reports
+ * TOKEN_USED. Blocked accounts intentionally keep their claim consumed
+ * (the transaction commits that result): a blocked customer must not be
+ * able to retry the link at all.
  */
+/** Shape of the transaction callback's outcome (typed-error discipline). */
+type ResetTxResult =
+  | { typed: 'INVALID_TOKEN' | 'TOKEN_USED' | 'TOKEN_EXPIRED' | 'ACCOUNT_BLOCKED' }
+  | { typed: null; customer: { id: string; email: string } };
+
 export async function resetPasswordWithToken(params: {
   rawToken: string;
   newPassword: string;
@@ -127,26 +147,30 @@ export async function resetPasswordWithToken(params: {
   const tokenHash = hashToken(params.rawToken);
   const now = new Date();
 
-  // Atomic single-use claim — concurrent submits resolve to one winner.
-  const claimed = await prisma.passwordResetToken.updateMany({
-    where: { tokenHash, usedAt: null, expiresAt: { gt: now } },
-    data: { usedAt: now, attemptedAt: now },
-  });
-  if (claimed.count === 0) {
-    const row = await prisma.passwordResetToken.findUnique({ where: { tokenHash } });
-    if (!row) return { ok: false, error: 'INVALID_TOKEN' };
-    if (row.usedAt) return { ok: false, error: 'TOKEN_USED' };
-    return { ok: false, error: 'TOKEN_EXPIRED' };
-  }
-
+  // Advisory read so typed errors stay exact and we know the row's
+  // customerId — the AUTHORITATIVE single-use decision is the guarded
+  // updateMany inside the transaction below.
   const row = await prisma.passwordResetToken.findUnique({ where: { tokenHash } });
   if (!row) return { ok: false, error: 'INVALID_TOKEN' };
 
   try {
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx): Promise<ResetTxResult> => {
+      // Atomic single-use claim INSIDE the unit (audit #6).
+      const claimed = await tx.passwordResetToken.updateMany({
+        where: { tokenHash, usedAt: null, expiresAt: { gt: now } },
+        data: { usedAt: now, attemptedAt: now },
+      });
+      if (claimed.count === 0) {
+        // Distinguish why the CAS did not match.
+        const current = await tx.passwordResetToken.findUnique({ where: { tokenHash } });
+        if (!current) return { typed: 'INVALID_TOKEN' as const };
+        if (current.usedAt) return { typed: 'TOKEN_USED' as const };
+        return { typed: 'TOKEN_EXPIRED' as const };
+      }
+
       const customer = await tx.customer.findUnique({ where: { id: row.customerId } });
       if (!customer || customer.status === 'blocked' || !customer.passwordHash) {
-        return { blocked: true as const };
+        return { typed: 'ACCOUNT_BLOCKED' as const };
       }
 
       const passwordHash = await hashPassword(newPassword);
@@ -183,22 +207,21 @@ export async function resetPasswordWithToken(params: {
         tx,
       });
 
-      return { blocked: false as const, customer: updated };
+      return { typed: null, customer: updated };
     });
 
-    if (result.blocked) return { ok: false, error: 'ACCOUNT_BLOCKED' };
+    if (result.typed) return { ok: false, error: result.typed };
 
     const customer = result.customer;
 
     return { ok: true, customerId: customer.id, email: customer.email };
   } catch (err) {
-    // Release the claim so the customer may retry with the same link.
-    await prisma.passwordResetToken
-      .updateMany({
-        where: { tokenHash, usedAt: now },
-        data: { usedAt: null },
-      })
-      .catch(() => undefined);
+    // Audit #6: nothing to repair — the claim joined the transaction that
+    // failed, so it rolled back WITH it and the link stays usable.
+    console.error(
+      '[password-reset] reset transaction failed:',
+      err instanceof Error ? err.message : err,
+    );
     throw err;
   }
 }

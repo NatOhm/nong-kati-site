@@ -12,6 +12,11 @@ const txMock = {
     update: vi.fn(),
   },
   passwordResetToken: {
+    // Audit #6: the single-use CLAIM (guarded updateMany on usedAt = null)
+    // now runs INSIDE the transaction too — through the tx client, not the
+    // global one — so claim + password change commit/roll back as one unit.
+    updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    findUnique: vi.fn().mockResolvedValue(null),
     update: vi.fn().mockResolvedValue({}),
   },
   // Audit fix 2026-09-27: the reset-completed audit row is written INSIDE
@@ -62,6 +67,9 @@ beforeEach(() => {
   vi.mocked(prisma.customer.findUnique).mockResolvedValue(null);
   txMock.customer.findUnique.mockReset();
   txMock.customer.update.mockReset();
+  txMock.passwordResetToken.updateMany.mockReset().mockResolvedValue({ count: 1 });
+  txMock.passwordResetToken.findUnique.mockReset().mockResolvedValue(null);
+  txMock.passwordResetToken.update.mockReset().mockResolvedValue({});
   vi.useFakeTimers();
   vi.setSystemTime(NOW);
 });
@@ -160,11 +168,18 @@ describe('resetPasswordWithToken', () => {
     });
 
     expect(result).toEqual({ ok: true, customerId: 'c1', email: 'kaem@example.com' });
-    // Single-use claim guarded on usedAt = null and unexpired.
-    expect(prisma.passwordResetToken.updateMany).toHaveBeenCalledWith({
+    // Audit #6: the single-use claim (guarded on usedAt = null + unexpired)
+    // is issued on the TRANSACTION client, inside the same unit as the
+    // password write — the global client must stay out of the consume path.
+    expect(txMock.passwordResetToken.updateMany).toHaveBeenCalledWith({
       where: { tokenHash: hash, usedAt: null, expiresAt: { gt: expect.any(Date) } },
       data: { usedAt: expect.any(Date), attemptedAt: expect.any(Date) },
     });
+    expect(prisma.passwordResetToken.updateMany).not.toHaveBeenCalled();
+    // The claim is the FIRST write of the unit — before any customer write.
+    expect(txMock.passwordResetToken.updateMany.mock.invocationCallOrder[0]!).toBeLessThan(
+      txMock.customer.update.mock.invocationCallOrder[0]!,
+    );
     // New scrypt hash differs from the old one and revokes pre-reset sessions.
     const updateArg = txMock.customer.update.mock.calls[0]?.[0] as {
       data: { passwordHash: string; sessionsInvalidBefore: Date };
@@ -182,8 +197,10 @@ describe('resetPasswordWithToken', () => {
   });
 
   it('reports TOKEN_USED without re-consuming a claimed token', async () => {
-    vi.mocked(prisma.passwordResetToken.updateMany).mockResolvedValue({ count: 0 });
-    vi.mocked(prisma.passwordResetToken.findUnique).mockResolvedValue({
+    // Audit #6: the losing CAS happens on the tx client; the follow-up read
+    // (why did it not match) also runs on the tx client for a fresh view.
+    txMock.passwordResetToken.updateMany.mockResolvedValue({ count: 0 });
+    txMock.passwordResetToken.findUnique.mockResolvedValue({
       id: 't1',
       customerId: 'c1',
       tokenHash: hash,
@@ -196,8 +213,8 @@ describe('resetPasswordWithToken', () => {
   });
 
   it('reports TOKEN_EXPIRED for stale tokens', async () => {
-    vi.mocked(prisma.passwordResetToken.updateMany).mockResolvedValue({ count: 0 });
-    vi.mocked(prisma.passwordResetToken.findUnique).mockResolvedValue({
+    txMock.passwordResetToken.updateMany.mockResolvedValue({ count: 0 });
+    txMock.passwordResetToken.findUnique.mockResolvedValue({
       id: 't1',
       customerId: 'c1',
       tokenHash: hash,
@@ -210,11 +227,12 @@ describe('resetPasswordWithToken', () => {
   });
 
   it('reports INVALID_TOKEN for unknown tokens', async () => {
-    vi.mocked(prisma.passwordResetToken.updateMany).mockResolvedValue({ count: 0 });
     vi.mocked(prisma.passwordResetToken.findUnique).mockResolvedValue(null);
 
     const result = await resetPasswordWithToken({ rawToken: raw, newPassword: 'newpassword123' });
     expect(result).toEqual({ ok: false, error: 'INVALID_TOKEN' });
+    // No transaction was even opened — nothing was claimed or written.
+    expect(txMock.passwordResetToken.updateMany).not.toHaveBeenCalled();
   });
 
   it('rejects consumption for blocked accounts and rolls the claim back', async () => {
@@ -238,7 +256,7 @@ describe('resetPasswordWithToken', () => {
     // normally) — a blocked customer must not be able to retry at all.
   });
 
-  it('releases the claim when the transaction itself fails', async () => {
+  it('tx failure rolls the claim back WITH the unit — no repair write (audit #6)', async () => {
     vi.mocked(prisma.passwordResetToken.findUnique).mockResolvedValue({
       id: 't1',
       customerId: 'c1',
@@ -250,8 +268,13 @@ describe('resetPasswordWithToken', () => {
     await expect(
       resetPasswordWithToken({ rawToken: raw, newPassword: 'newpassword123' }),
     ).rejects.toThrow('db down');
-    // Retry friendly: the claim is released on failure.
-    expect(prisma.passwordResetToken.updateMany).toHaveBeenCalledTimes(2);
+    // The claim was attempted INSIDE the transaction…
+    expect(txMock.passwordResetToken.updateMany).toHaveBeenCalledTimes(1);
+    // …and the old post-failure release (a second updateMany on the GLOBAL
+    // client) is GONE: in a real DB the claim rolled back with the aborted
+    // transaction, so the link stays usable by construction. A regression
+    // back to the repair-patch shape fails here.
+    expect(prisma.passwordResetToken.updateMany).not.toHaveBeenCalled();
   });
 });
 
