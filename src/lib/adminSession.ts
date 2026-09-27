@@ -1,25 +1,26 @@
 'use client';
 
 /**
- * Admin client-session helper.
+ * Admin client-session helper — cookie-backed (security review CRITICAL-1).
  *
- * Access JWTs live 15 minutes; refresh tokens 30 days (rotated server-side on
- * every refresh). This module is the single place that reads/writes the admin
- * tokens in localStorage and the single place that refreshes:
+ * The access/refresh JWT pair used to live in localStorage, where any XSS
+ * could read a 30-day refresh credential. They now live in HttpOnly cookies
+ * set by the auth routes; this module only tracks the secret-free presence
+ * marker (`nk_admin_flag`) and expiry hint (`nk_admin_exp`) and drives the
+ * refresh flow:
  *
- * - `adminFetch` wraps fetch and transparently retries once through the
- *   refresh endpoint on a 401, so a mid-session expiry never surfaces.
- * - `ensureFreshAdminToken` proactively refreshes when the access JWT is
- *   within a grace window of expiring (used by the layout timer).
+ * - `adminFetch` wraps fetch (credentials are sent automatically as
+ *   same-origin cookies) and transparently retries once through the refresh
+ *   endpoint on a 401, so a mid-session expiry never surfaces.
+ * - `ensureFreshAdminToken` proactively refreshes near expiry (layout timer).
  * - Refreshes are single-flight: concurrent 401s share one in-flight request.
- * - A failed refresh clears storage and dispatches `nk-admin-session-expired`,
- *   which the management layout turns into a redirect to the login page.
+ * - A failed refresh clears the local marker and dispatches
+ *   `nk-admin-session-expired`, which the management layout turns into a
+ *   redirect to the login page.
  */
 
 import type { Permission, AdminRole } from '@/types/auth';
 
-const ACCESS_KEY = 'nk_admin_access_token';
-const REFRESH_KEY = 'nk_admin_refresh_token';
 export const ADMIN_SESSION_EXPIRED_EVENT = 'nk-admin-session-expired';
 
 /** Refresh when the access token has ≤60s of life left (proactive path). */
@@ -27,43 +28,43 @@ const PROACTIVE_REFRESH_WINDOW_MS = 60 * 1000;
 
 let inflightRefresh: Promise<boolean> | null = null;
 
-// ─── Storage ─────────────────────────────────────────────
+// ─── Presence marker (no secrets) ────────────────────────
 
-export function getAdminToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem(ACCESS_KEY);
-}
-
-export function getAdminRefreshToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem(REFRESH_KEY);
-}
-
-export function setAdminSession(accessToken: string, refreshToken: string): void {
-  localStorage.setItem(ACCESS_KEY, accessToken);
-  localStorage.setItem(REFRESH_KEY, refreshToken);
-}
-
-export function clearAdminSession(): void {
-  localStorage.removeItem(ACCESS_KEY);
-  localStorage.removeItem(REFRESH_KEY);
+function readCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const match = new RegExp(`(?:^|;\\s*)${name}=([^;]*)`).exec(document.cookie);
+  if (!match?.[1]) return null;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return match[1];
+  }
 }
 
 /**
- * True when admin tokens exist in storage (access or refresh) — used by the
- * storefront chrome to route an admin's profile icon into /management. The
- * management layout itself decides freshness (refresh/redirect on arrival).
+ * True when the admin session marker cookie exists. The HttpOnly access and
+ * refresh cookies cannot (and must not) be inspected from JS; the flag is
+ * set/cleared by the auth routes together with them.
  */
 export function hasAdminSession(): boolean {
-  if (typeof window === 'undefined') return false;
-  return Boolean(localStorage.getItem(ACCESS_KEY) || localStorage.getItem(REFRESH_KEY));
+  if (typeof document === 'undefined') return false;
+  return readCookie('nk_admin_flag') === '1';
+}
+
+/** Milliseconds left on the refresh session per the expiry-hint cookie; ≤0 unknown/expired. */
+export function adminSessionTtlMs(): number {
+  const raw = readCookie('nk_admin_exp');
+  if (!raw) return 0;
+  const exp = Number(raw);
+  if (!Number.isFinite(exp)) return 0;
+  return exp - Date.now();
 }
 
 // ─── Remember me ──────────────────────────────────────────
 
 const REMEMBER_KEY = 'nk_admin_remember';
 
-/** Remember-me choice of the current login (default false). */
+/** Remember-me choice of the current login (default false). UI-only today. */
 export function isAdminRemembered(): boolean {
   if (typeof window === 'undefined') return false;
   return localStorage.getItem(REMEMBER_KEY) === '1';
@@ -75,71 +76,23 @@ export function setAdminRemembered(remember: boolean): void {
   else localStorage.setItem(REMEMBER_KEY, '0');
 }
 
-/**
- * Un-remembered sessions must end with the browser: clear the tokens when
- * the tab closes. beforeunload/pagehide fire on every tab close (and on
- * refresh — harmless, tokens re-saved by the next login only). Remembered
- * sessions deliberately persist.
- */
-export function installSessionScopeGuard(): void {
-  if (typeof window === 'undefined') return;
-  if ((window as Window & { __nkAdminScopeGuard?: boolean })['__nkAdminScopeGuard']) return;
-  (window as Window & { __nkAdminScopeGuard?: boolean })['__nkAdminScopeGuard'] = true;
-  window.addEventListener('pagehide', () => {
-    if (!isAdminRemembered()) clearAdminSession();
-  });
-}
-
-export interface AdminJwtPayloadLike {
-  exp?: number;
-  sub?: string;
-  email?: string;
-  role?: AdminRole;
-  perms?: Permission[];
-}
-
-/** Decode the access JWT payload without verifying (client-side read only). */
-export function decodeAdminToken(token: string): AdminJwtPayloadLike | null {
-  try {
-    const [, payloadB64] = token.split('.');
-    if (!payloadB64) return null;
-    const base64 = payloadB64.replace(/-/g, '+').replace(/_/g, '/');
-    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
-    return JSON.parse(atob(padded)) as AdminJwtPayloadLike;
-  } catch {
-    return null;
-  }
-}
-
-/** Milliseconds until the access token expires; ≤0 means expired/unreadable. */
-export function accessTokenTtlMs(token: string): number {
-  const payload = decodeAdminToken(token);
-  if (!payload?.exp) return 0;
-  return payload.exp * 1000 - Date.now();
-}
-
 // ─── Refresh ─────────────────────────────────────────────
 
 /**
- * Refresh the session via the API. Returns true on success (storage updated
- * with the rotated pair). Single-flight: concurrent callers share the request.
+ * Refresh the session via the API. Returns true on success (HttpOnly cookies
+ * rotated server-side). Single-flight: concurrent callers share the request.
  */
 export function refreshAdminSession(): Promise<boolean> {
   if (inflightRefresh) return inflightRefresh;
 
   const task = (async () => {
-    const refreshToken = getAdminRefreshToken();
-    if (!refreshToken) return false;
     try {
       const res = await fetch('/api/v1/auth/admin/refresh', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken }),
+        body: JSON.stringify({}),
       });
       if (!res.ok) return false;
-      const data = (await res.json()) as { accessToken?: string; refreshToken?: string };
-      if (!data.accessToken || !data.refreshToken) return false;
-      setAdminSession(data.accessToken, data.refreshToken);
       return true;
     } catch {
       return false;
@@ -152,46 +105,58 @@ export function refreshAdminSession(): Promise<boolean> {
   return task;
 }
 
-/** Refresh failed definitively — drop the session and notify the app. */
+/** Refresh failed definitively — drop the marker and notify the app. */
 function expireSession(): void {
-  clearAdminSession();
+  if (typeof window === 'undefined') return;
   window.dispatchEvent(new CustomEvent(ADMIN_SESSION_EXPIRED_EVENT));
 }
 
 /**
- * Proactively refresh when inside the grace window. Returns the current
- * access token if the session is (now) fresh, else null.
+ * Proactively refresh when near expiry. Returns true when a session exists
+ * and is (now) fresh, else false.
  */
-export async function ensureFreshAdminToken(): Promise<string | null> {
-  const token = getAdminToken();
-  if (!token) return null;
-  if (accessTokenTtlMs(token) > PROACTIVE_REFRESH_WINDOW_MS) return token;
+export async function ensureFreshAdminSession(): Promise<boolean> {
+  if (!hasAdminSession()) return false;
+  if (adminSessionTtlMs() > PROACTIVE_REFRESH_WINDOW_MS) return true;
   const ok = await refreshAdminSession();
   if (!ok) {
     expireSession();
-    return null;
+    return false;
   }
-  return getAdminToken();
+  return true;
+}
+
+/**
+ * Force-clear the browser-side session state: revoke server-side (best
+ * effort, bounded), drop the local marker, then let the caller navigate.
+ */
+export async function clearAdminSession(): Promise<void> {
+  try {
+    await fetch('/api/v1/auth/admin/logout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+      keepalive: true,
+      signal: AbortSignal.timeout(4_000),
+    });
+  } catch {
+    // Revocation is best-effort here; AdminTopBar awaits it explicitly and
+    // surfaces failures. Cookies are cleared by the response regardless.
+  }
+  if (typeof window !== 'undefined') setAdminRemembered(false);
 }
 
 // ─── Fetch wrapper ───────────────────────────────────────
 
-function withAuth(init: RequestInit | undefined, token: string): RequestInit {
-  const headers = new Headers(init?.headers ?? {});
-  headers.set('Authorization', `Bearer ${token}`);
-  return { ...init, headers };
-}
-
 /**
- * fetch() for admin APIs: attaches the bearer token and, on a 401, refreshes
- * the session once and retries the original request with the new token.
- * Rejects with a 401-like Error if the retry also fails.
+ * fetch() for admin APIs. Cookies ride along automatically; on a 401 the
+ * session is refreshed once (rotating the HttpOnly cookies) and the request
+ * retried. Rejects with the 401 response if the retry also fails.
  */
 export async function adminFetch(url: string, init: RequestInit = {}): Promise<Response> {
-  const token = getAdminToken();
-  const res = await fetch(url, token ? withAuth(init, token) : init);
+  const res = await fetch(url, init);
 
-  if (res.status !== 401 || !getAdminRefreshToken()) return res;
+  if (res.status !== 401 || !hasAdminSession()) return res;
 
   const ok = await refreshAdminSession();
   if (!ok) {
@@ -199,11 +164,9 @@ export async function adminFetch(url: string, init: RequestInit = {}): Promise<R
     return res;
   }
 
-  const fresh = getAdminToken();
-  if (!fresh) return res;
-  const retry = await fetch(url, withAuth(init, fresh));
+  const retry = await fetch(url, init);
   if (retry.status === 401) {
-    // New token also rejected — the session is truly dead.
+    // New cookie also rejected — the session is truly dead.
     expireSession();
   }
   return retry;
@@ -233,4 +196,31 @@ export async function adminJson<T>(url: string, init: RequestInit = {}): Promise
     throw new Error(typeof data.error === 'string' ? data.error : `HTTP ${res.status}`);
   }
   return data;
+}
+
+// ─── Back-compat shims (JWT-decode helpers used by old callers) ──
+
+export interface AdminJwtPayloadLike {
+  exp?: number;
+  sub?: string;
+  email?: string;
+  role?: AdminRole;
+  perms?: Permission[];
+}
+
+/**
+ * Decode a JWT payload without verifying (client-side read only). Kept for
+ * callers that still hold a token string; the cookie flow never hands
+ * tokens to JS, so this is effectively legacy-only.
+ */
+export function decodeAdminToken(token: string): AdminJwtPayloadLike | null {
+  try {
+    const [, payloadB64] = token.split('.');
+    if (!payloadB64) return null;
+    const base64 = payloadB64.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+    return JSON.parse(atob(padded)) as AdminJwtPayloadLike;
+  } catch {
+    return null;
+  }
 }

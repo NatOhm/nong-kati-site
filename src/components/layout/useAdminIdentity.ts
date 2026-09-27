@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-import { getAdminToken, hasAdminSession } from '@/lib/adminSession';
+import { hasAdminSession } from '@/lib/adminSession';
 import { type AdminRole } from '@/types/auth';
 
 export const ADMIN_ROLE_LABELS: Record<AdminRole, string> = {
@@ -53,11 +53,9 @@ export function useAdminIdentity(): { isAdmin: boolean; identity: AdminIdentity 
   useEffect(() => {
     if (!hasAdminSession()) return;
     setIsAdmin(true);
-    const token = getAdminToken();
-    if (!token) return;
-    fetch('/api/v1/auth/admin/me', {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    // The access token rides in its HttpOnly cookie — the browser attaches
+    // it automatically; JS never sees the credential.
+    fetch('/api/v1/auth/admin/me', { credentials: 'same-origin' })
       .then((r) => (r.ok ? (r.json() as Promise<AdminIdentity>) : null))
       .then((d) => {
         if (d?.email) setIdentity(d);

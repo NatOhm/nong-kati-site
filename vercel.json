@@ -2,6 +2,9 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "buildCommand": "npx prisma migrate deploy && npx prisma generate && npm run build",
+  "env": {
+    "GIT_SHA": "{ vercel.git.commitSha }"
+  },
   "installCommand": "npm ci",
   "outputDirectory": ".next",
   "regions": ["sin1"],

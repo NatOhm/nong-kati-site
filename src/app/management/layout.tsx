@@ -5,16 +5,14 @@ import { usePathname, useRouter } from 'next/navigation';
 
 import {
   ADMIN_SESSION_EXPIRED_EVENT,
-  accessTokenTtlMs,
-  ensureFreshAdminToken,
-  getAdminRefreshToken,
-  getAdminToken,
-  installSessionScopeGuard,
+  adminSessionTtlMs,
+  ensureFreshAdminSession,
+  hasAdminSession,
 } from '@/lib/adminSession';
 
 const PUBLIC_MANAGEMENT_ROUTES = ['/management/login'];
 
-/** How often the tab checks token freshness while a session exists. */
+/** How often the tab checks session freshness while a session exists. */
 const REFRESH_TICK_MS = 60 * 1000;
 
 export default function ManagementLayout({
@@ -38,31 +36,30 @@ export default function ManagementLayout({
       return;
     }
 
-    // No tokens at all → not logged in.
-    if (!getAdminToken() && !getAdminRefreshToken()) {
+    // No session marker → not logged in (the HttpOnly cookies, if any stale
+    // leftovers, die on the next auth call).
+    if (!hasAdminSession()) {
       redirectToLogin();
       return;
     }
 
-    // Tokens exist → refresh if stale/expired, then admit. A dead refresh
-    // triggers the expiry event below, which redirects.
-    void ensureFreshAdminToken().then((token) => {
-      if (token || getAdminRefreshToken()) {
+    // Session exists → refresh if the expiry hint is stale, then admit. A
+    // dead refresh triggers the expiry event below, which redirects.
+    void ensureFreshAdminSession().then((ok) => {
+      if (ok || hasAdminSession()) {
         setIsAuthenticated(true);
       }
     });
   }, [isPublic, redirectToLogin]);
 
   // Proactive refresh: while the tab is open and a session exists, refresh
-  // shortly before the access JWT expires so admin calls never see a 401.
+  // when the expiry hint is near/past.
   useEffect(() => {
     if (isPublic) return;
 
     const tick = setInterval(() => {
-      const token = getAdminToken();
-      // Only bother when a session exists and the token is stale or near expiry.
-      if (getAdminRefreshToken() && (!token || accessTokenTtlMs(token) <= 0)) {
-        void ensureFreshAdminToken();
+      if (hasAdminSession() && adminSessionTtlMs() <= 0) {
+        void ensureFreshAdminSession();
       }
     }, REFRESH_TICK_MS);
 
@@ -72,16 +69,9 @@ export default function ManagementLayout({
   // Any adminFetch whose refresh failed broadcasts this event → redirect.
   useEffect(() => {
     if (isPublic) return;
-    const onExpired = () => redirectToLogin();
-    window.addEventListener(ADMIN_SESSION_EXPIRED_EVENT, onExpired);
-    return () => window.removeEventListener(ADMIN_SESSION_EXPIRED_EVENT, onExpired);
+    window.addEventListener(ADMIN_SESSION_EXPIRED_EVENT, redirectToLogin);
+    return () => window.removeEventListener(ADMIN_SESSION_EXPIRED_EVENT, redirectToLogin);
   }, [isPublic, redirectToLogin]);
-
-  // Un-remembered sessions end with the browser: the guard clears the
-  // tokens on pagehide (tab close). Remembered sessions persist.
-  useEffect(() => {
-    installSessionScopeGuard();
-  }, []);
 
   // Loading state while checking auth
   if (isAuthenticated === null) {

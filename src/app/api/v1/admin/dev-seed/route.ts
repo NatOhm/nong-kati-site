@@ -3,11 +3,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { encryptCode, hashCode } from '@/lib/crypto/giftCode';
 import { checkPermission } from '@/lib/rbac';
+import { getAdminToken } from '@/lib/adminRequest';
 
 function bearer(req: NextRequest): string | null {
-  const header = req.headers.get('authorization');
-  if (!header?.startsWith('Bearer ')) return null;
-  return header.slice(7) || null;
+  const token = getAdminToken(req);
+  if (!token) return null;
+  return token;
 }
 
 const GIFT_KEY_ENV = 'GIFT_CODE_KEY';

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { getAdminUserById } from '@/api/adminAuth';
+import { getAdminToken } from '@/lib/adminRequest';
 import { verifyAdminJwt } from '@/lib/jwt';
 
 export const dynamic = 'force-dynamic';
@@ -11,8 +12,7 @@ export const dynamic = 'force-dynamic';
  * to render role-gated chrome and to test RBAC surface behavior.
  */
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  const header = req.headers.get('authorization');
-  const token = header?.startsWith('Bearer ') ? header.slice(7) : null;
+  const token = getAdminToken(req);
   if (!token) return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 });
 
   const payload = await verifyAdminJwt(token);

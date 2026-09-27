@@ -83,6 +83,28 @@ const UPSTASH_URL = process.env['UPSTASH_REDIS_REST_URL'];
 const UPSTASH_TOKEN = process.env['UPSTASH_REDIS_REST_TOKEN'];
 const SHARED_ENABLED = Boolean(UPSTASH_URL && UPSTASH_TOKEN);
 
+// ─── Strict mode (production review MEDIUM-1) ──────────────────────────
+// When NK_RATE_LIMIT_STRICT=true (set it in Vercel prod once Upstash is
+// configured), a HIGH-RISK route that cannot reach the shared store is
+// FAILED CLOSED with a controlled 503 instead of silently degrading to a
+// per-instance memory counter. Low-risk storefront reads keep the memory
+// fallback — an outage must not take the catalogue down.
+const STRICT_MODE = process.env['NK_RATE_LIMIT_STRICT'] === 'true';
+
+const HIGH_RISK_ROUTE_PREFIXES = [
+  '/api/v1/auth/',
+  '/api/v1/orders',
+  '/api/v1/payments',
+  '/api/v1/admin',
+  '/api/v1/legal/data-requests',
+  '/api/v1/cart',
+];
+
+/** High-risk routes fail closed in strict mode; everything else fails open. */
+function isHighRiskRoute(route: string): boolean {
+  return HIGH_RISK_ROUTE_PREFIXES.some((p) => route.startsWith(p));
+}
+
 async function sharedIncrement(
   key: string,
   windowMs: number,
@@ -129,11 +151,11 @@ export async function checkRateLimit(
   identifier: string,
 
   rule?: RateLimitRule,
-): Promise<{ allowed: boolean; remaining: number; resetAt: number }> {
+): Promise<{ allowed: boolean; remaining: number; resetAt: number; degraded: boolean }> {
   const matchedRule = rule ?? findMatchingRule(route);
   if (!matchedRule) {
     // No rule = unlimited
-    return { allowed: true, remaining: Infinity, resetAt: 0 };
+    return { allowed: true, remaining: Infinity, resetAt: 0, degraded: false };
   }
 
   const key = `${matchedRule.route}:${identifier}`;
@@ -146,7 +168,14 @@ export async function checkRateLimit(
         allowed,
         remaining: Math.max(0, matchedRule.maxRequests - shared.count),
         resetAt: shared.resetAt,
+        degraded: false,
       };
+    }
+    // Shared store unavailable → strict mode fails high-risk routes closed
+    // here; the memory store below would otherwise give every serverless
+    // instance its own counter (the exact bypass MEDIUM-1 describes).
+    if (STRICT_MODE && isHighRiskRoute(route)) {
+      return { allowed: false, remaining: 0, resetAt: Date.now() + 10_000, degraded: true };
     }
     // Shared store unavailable → fall through to the memory store.
   }
@@ -158,12 +187,17 @@ export async function checkRateLimit(
     // New window
     const resetAt = now + matchedRule.windowMs;
     store.set(key, { count: 1, resetAt });
-    return { allowed: true, remaining: matchedRule.maxRequests - 1, resetAt };
+    return {
+      allowed: true,
+      remaining: matchedRule.maxRequests - 1,
+      resetAt,
+      degraded: SHARED_ENABLED,
+    };
   }
 
   // Existing window
   if (entry.count >= matchedRule.maxRequests) {
-    return { allowed: false, remaining: 0, resetAt: entry.resetAt };
+    return { allowed: false, remaining: 0, resetAt: entry.resetAt, degraded: SHARED_ENABLED };
   }
 
   entry.count++;
@@ -171,6 +205,7 @@ export async function checkRateLimit(
     allowed: true,
     remaining: matchedRule.maxRequests - entry.count,
     resetAt: entry.resetAt,
+    degraded: SHARED_ENABLED,
   };
 }
 
@@ -201,15 +236,28 @@ export async function applyRateLimit(
   const result = await checkRateLimit(route, identifier);
   const fallbackRule: RateLimitRule = RATE_LIMIT_RULES[0]!;
   const rule = findMatchingRule(route) ?? fallbackRule;
-  const res = response ?? NextResponse.next();
   const headers = getRateLimitHeaders(result, rule);
 
-  for (const [key, value] of Object.entries(headers)) {
-    res.headers.set(key, value);
-  }
-
   if (!result.allowed) {
-    return NextResponse.json(
+    // Strict-mode fail-closed: the shared limiter could not be reached for a
+    // high-risk route — answer a controlled 503 (distinct from the real 429
+    // limit) so clients retry later instead of silently bypassing the cap.
+    if (result.degraded && STRICT_MODE && isHighRiskRoute(route)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'RATE_LIMITER_UNAVAILABLE',
+            message: 'ระบบป้องกันการใช้งานเกินขีดจำกัดขัดข้องชั่วคราว กรุณาลองใหม่ภายหลัง',
+          },
+        },
+        {
+          status: 503,
+          headers: { ...headers, 'Retry-After': '10', 'Content-Type': 'application/json' },
+        },
+      );
+    }
+    const res = NextResponse.json(
       {
         success: false,
         error: {
@@ -225,8 +273,16 @@ export async function applyRateLimit(
         },
       },
     );
+    return res;
   }
 
+  const res = response ?? NextResponse.next();
+  for (const [key, value] of Object.entries(headers)) {
+    res.headers.set(key, value);
+  }
+  if (result.degraded) {
+    res.headers.set('X-RateLimit-Degraded', 'memory-fallback');
+  }
   return res;
 }
 

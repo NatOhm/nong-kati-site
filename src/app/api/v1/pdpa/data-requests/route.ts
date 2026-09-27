@@ -2,14 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { listDataRequests, submitDataRequest, type DataRequestStatus } from '@/api/dataRequests';
 import { checkPermission } from '@/lib/rbac';
+import { getAdminToken } from '@/lib/adminRequest';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
 function bearer(req: NextRequest): string | null {
-  const header = req.headers.get('authorization');
-  if (!header?.startsWith('Bearer ')) return null;
-  return header.slice(7) || null;
+  const token = getAdminToken(req);
+  if (!token) return null;
+  return token;
 }
 
 /**

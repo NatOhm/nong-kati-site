@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Shield, Eye, EyeOff } from 'lucide-react';
 
-import { setAdminSession, setAdminRemembered } from '@/lib/adminSession';
+import { setAdminRemembered } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
 
 /**
@@ -122,7 +122,7 @@ export default function AdminLoginPage(): React.JSX.Element {
         const res = await fetch('/api/v1/auth/admin/2fa', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ challengeToken, code: totpCode }),
+          body: JSON.stringify({ challengeToken, code: totpCode, remember }),
         });
         const result = (await res.json()) as {
           success: boolean;
@@ -132,11 +132,9 @@ export default function AdminLoginPage(): React.JSX.Element {
           error?: string;
         };
         if (result.success) {
-          // Store the token pair via the shared session helper
-          if (result.accessToken && result.refreshToken) {
-            setAdminSession(result.accessToken, result.refreshToken);
-            setAdminRemembered(remember);
-          }
+          // The session pair was set as HttpOnly cookies by the response —
+          // nothing token-shaped is stored in JS from here on.
+          setAdminRemembered(remember);
           localStorage.setItem('nk_admin_email', email);
           if (result.mustChangePassword) {
             // First login / forced rotation — land on the change form.
@@ -166,7 +164,7 @@ export default function AdminLoginPage(): React.JSX.Element {
         setLoading(false);
       }
     },
-    [challengeToken, totpCode],
+    [challengeToken, totpCode, remember],
   );
 
   return (

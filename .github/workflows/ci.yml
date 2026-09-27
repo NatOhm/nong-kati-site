@@ -16,8 +16,8 @@ jobs:
     name: Lint & Typecheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4 (pinned)
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4 (pinned)
         with:
           node-version: 20
           cache: npm
@@ -36,8 +36,8 @@ jobs:
     name: Security Audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4 (pinned)
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4 (pinned)
         with:
           node-version: 20
           cache: npm
@@ -47,7 +47,7 @@ jobs:
         run: |
           npm audit --json > audit-report.json || true
           npm audit --audit-level=high
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4 (pinned)
         if: always()
         with:
           name: audit-report
@@ -58,8 +58,8 @@ jobs:
     name: Unit Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4 (pinned)
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4 (pinned)
         with:
           node-version: 20
           cache: npm
@@ -100,8 +100,8 @@ jobs:
       NK_OTP_DEV_MODE: '1'
       NEXT_PUBLIC_SITE_URL: http://127.0.0.1:4200
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4 (pinned)
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4 (pinned)
         with:
           node-version: 20
           cache: npm
@@ -123,7 +123,7 @@ jobs:
         run: node scripts/verify-rls.cjs
       - name: Upload dev server log
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4 (pinned)
         with:
           name: dev-server-log
           path: dev-server.log
@@ -137,8 +137,8 @@ jobs:
     # concurrency/RLS run must not promote an artifact.
     needs: [lint, test, audit, concurrency-tests]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4 (pinned)
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4 (pinned)
         with:
           node-version: 20
           cache: npm

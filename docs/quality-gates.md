@@ -223,6 +223,22 @@ Playwright เลือก target ตาม `E2E_BASE_URL` > localhost:4200 (dev
 - **[Med] Build job depend ครบ** — `needs: [lint, test, audit, concurrency-tests]` — check ใดตก build (และ deploy ที่ตามมา) ไม่เกิด
 - **ค้างต้องทำฝั่งคน/infra:** ย้าย admin refresh token → HttpOnly cookie; CSP enforce ตัด unsafe-inline; DNS `nong-kati.com`/`.co.th` (ยัง NXDOMAIN ทั้งคู่) + ตั้ง `NEXT_PUBLIC_SITE_URL` เป็น domain จริง; ยืนยันว่า Vercel Production ชี้ branch master; Upstash Redis ใน prod (rate limit ยัง degrade ต่อ instance); pin actions เป็น commit SHA; branch protection
 
+## Cookie-backed admin sessions + hardening (2026-09-27, review round 3) — `tests/admin-cookie-session.test.ts`
+
+**CRITICAL-1 ปิดสมบูรณ์ (HttpOnly cookies):** access/refresh token ของแอดมินไม่อยู่ใน `localStorage` อีกต่อไป —
+อยู่ใน cookie `HttpOnly; SameSite=Lax; Secure(prod)` (`nk_admin_at` 15 นาที, `nk_admin_rt` 30 วันเมื่อจดจำ /
+browser-session เมื่อไม่จดจำ) ที่ JS อ่านไม่ได้ XSS จึงขโมย session ไม่ได้ ส่วนที่เหลือ:
+
+- **ทุก admin API ยังรับ `Authorization: Bearer`** (43 route ผ่าน `getAdminToken()` — Bearer มาก่อน, cookie fallback) ดังนั้น scripts/tests/แอดมิน API ภายนอกไม่พัง
+- **Markers ไร้ความลับ** `nk_admin_flag`/`nk_admin_exp` (ไม่ httpOnly) ให้ client รู้ว่ามี session/ก่อนหมดอายุ — ไม่มี token หลุดเข้า JS
+- Refresh/logout/2fa จัดการ cookie ครบ: rotate พร้อมกัน, dead refresh = เคลียร์ cookie, ตอบกลับ browser แบบไม่ echo token
+- **⑤ MEDIUM-1 strict limiter:** `NK_RATE_LIMIT_STRICT=true` → high-risk routes (auth/orders/payments/admin/pdpa/cart) **fail-closed 503 `RATE_LIMITER_UNAVAILABLE`** เมื่อ Upstash ล่ม (แทนที่จะยอมให้แต่ละ instance มี counter เอง); low-risk (products) ยัง fail-open + header `X-RateLimit-Degraded`
+- **③ HIGH-4 diagnostics:** `GET /api/v1/internal/build-info` (internal token หรือ admin JWT) รายงาน `gitSha` (vercel inject `GIT_SHA`), migration ล่าสุดที่ finished จริง, RLS per-table — ไม่มี secret/PII; ใช้เทียบ SHA↔deploy↔DB ตอน release
+- **② CSP staged:** `NK_CSP_STRICT=true` → ตัด `unsafe-inline` ออกจาก script-src (JSON-LD เป็น data-only script ไม่กระทบ) — เปิดใน preview ก่อน แล้วค่อย enforce ใน prod
+- **④ Actions pinned:** `actions/checkout|setup-node|upload-artifact` ล็อกเป็น commit SHA (major v4 เดิม) + comment กำกับ
+
+Test: 14 เคส — Bearer/cookie resolution, HttpOnly+markers, browser-session cookie, clear ครบทุกชื่อ, rotation ไม่ echo token, dead refresh เคลียร์ cookie, logout เคลียร์แม้ไม่มี body, strict 503/fail-open, build-info 401/token/RLS drift
+
 ## CI pipeline (`.github/workflows/ci.yml`)
 
 | Job                         | ทำอะไร                                                                  | ผูกกับ gate                                                                                                    |

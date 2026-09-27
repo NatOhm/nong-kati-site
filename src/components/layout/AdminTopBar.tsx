@@ -4,7 +4,7 @@ import { useCallback, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Bell, LogOut, Menu, Store } from 'lucide-react';
-import { clearAdminSession, setAdminRemembered } from '@/lib/adminSession';
+import { clearAdminSession } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
 import { type AdminRole } from '@/types/auth';
 import { ThemeToggle } from './ThemeToggle';
@@ -51,29 +51,11 @@ export function AdminTopBar({
    */
   const handleLogout = useCallback(async (): Promise<void> => {
     setLoggingOut(true);
-    const refreshToken = localStorage.getItem('nk_admin_refresh_token');
-    if (refreshToken) {
-      try {
-        await Promise.race([
-          fetch('/api/v1/auth/admin/logout', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ refreshToken }),
-            keepalive: true,
-          }),
-          // Bounded: never trap the admin on a hung request. On timeout the
-          // best effort below still clears local state; the server-side
-          // session expiry (and the revocation attempt queued via keepalive)
-          // bounds the exposure.
-          new Promise((resolve) => setTimeout(resolve, 4000)),
-        ]);
-      } catch {
-        // Revocation is idempotent server-side; if it truly failed the
-        // session still expires server-side. Never block logout on it.
-      }
-    }
-    clearAdminSession();
-    setAdminRemembered(false);
+    // Cookie session (security review CRITICAL-1): the refresh credential
+    // rides in its HttpOnly cookie — revoke server-side (awaited, bounded
+    // inside the helper) and let the response clear the cookies. No token
+    // was ever JS-readable to begin with.
+    await clearAdminSession();
     localStorage.removeItem('nk_admin_email');
     router.push('/management/login');
   }, [router]);

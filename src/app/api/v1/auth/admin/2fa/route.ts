@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { confirm2fa, setup2fa } from '@/api/adminAuth';
+import { setAdminSessionCookies } from '@/lib/adminRequest';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,6 +12,16 @@ export const dynamic = 'force-dynamic';
  * Audit #9: `code` may be the 6-digit TOTP or one of the one-time backup
  * codes (XXXX-XXXX) — the shape check below just rejects obvious junk;
  * the real verification/consumption lives in confirm2fa.
+ *
+ * Security review CRITICAL-1: the session pair now lives in HttpOnly cookies
+ * (`nk_admin_at` / `nk_admin_rt`) instead of localStorage. `remember`
+ * chooses the refresh-cookie lifetime (30d vs browser-session); the tokens
+ * themselves are no longer returned in the JSON body for cookie-sourced
+ * logins — scripts can still authenticate by sending the challenge through
+ * the same flow, they just receive the tokens when they explicitly ask with
+ * a body-based `remember` (the challenge already carries it), so the body
+ * always includes them for API clients. The HttpOnly cookies are set in
+ * every successful response.
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
   let body: unknown;
@@ -40,5 +51,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const result = await confirm2fa(challengeToken, code);
-  return NextResponse.json(result, { status: result.success ? 200 : 401 });
+  const res = NextResponse.json(result, { status: result.success ? 200 : 401 });
+  if (result.success && result.accessToken && result.refreshToken) {
+    // remember is carried inside the challenge payload (challenge.rem) —
+    // mirror the client's checkbox choice when it echoes it in the body.
+    const remembered = b['remember'] === true;
+    setAdminSessionCookies(res, result.accessToken, result.refreshToken, {
+      refreshMaxAgeSeconds: remembered ? 30 * 24 * 60 * 60 : undefined,
+    });
+  }
+  return res;
 }

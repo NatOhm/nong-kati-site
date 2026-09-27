@@ -7,14 +7,15 @@ import {
   adminUnlockStaff,
 } from '@/api/adminStaff';
 import { checkPermission } from '@/lib/rbac';
+import { getAdminToken } from '@/lib/adminRequest';
 import type { AdminRole } from '@/types/auth';
 
 export const dynamic = 'force-dynamic';
 
 function bearer(req: NextRequest): string | null {
-  const header = req.headers.get('authorization');
-  if (!header?.startsWith('Bearer ')) return null;
-  return header.slice(7) || null;
+  const token = getAdminToken(req);
+  if (!token) return null;
+  return token;
 }
 
 function status(result: { success?: boolean; error?: string }): number {

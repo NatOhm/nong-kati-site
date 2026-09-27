@@ -549,6 +549,9 @@ export async function confirm2fa(
  * Not remembered → 12-hour refresh: the session still survives refreshes
  * within the workday but is gone by tomorrow, or whenever the browser
  * session ends (the client clears storage on unload).
+ *
+ * `refreshTokenExpiresIn` (seconds) lets the HTTP layer pick the matching
+ * cookie lifetime for the refresh credential.
  */
 const REFRESH_TTL_REMEMBER_MS = 30 * 24 * 60 * 60 * 1000;
 const REFRESH_TTL_SESSION_MS = 12 * 60 * 60 * 1000;
@@ -559,25 +562,38 @@ async function issueAdminSession(
     email: string;
     role: string;
   },
-  remember = false,
-): Promise<{ success: boolean; accessToken: string; refreshToken: string; expiresIn: number }> {
+  rememberFlag = false,
+): Promise<{
+  success: boolean;
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+  refreshTokenExpiresIn: number;
+}> {
   const role = user.role as AdminRole;
   const perms: Permission[] = ROLE_PERMISSIONS[role] ?? [];
   const accessToken = await issueAdminJwt(user.id, user.email, role, perms);
   const refreshToken = generateRefreshToken();
   const tokenHash = hashToken(refreshToken);
 
+  const remember = rememberFlag;
+  const refreshTtlMs = remember ? REFRESH_TTL_REMEMBER_MS : REFRESH_TTL_SESSION_MS;
+
   await prisma.adminSession.create({
     data: {
       adminUserId: user.id,
       tokenHash,
-      expiresAt: new Date(
-        Date.now() + (remember ? REFRESH_TTL_REMEMBER_MS : REFRESH_TTL_SESSION_MS),
-      ),
+      expiresAt: new Date(Date.now() + refreshTtlMs),
     },
   });
 
-  return { success: true, accessToken, refreshToken, expiresIn: 15 * 60 };
+  return {
+    success: true,
+    accessToken,
+    refreshToken,
+    expiresIn: 15 * 60,
+    refreshTokenExpiresIn: Math.floor(refreshTtlMs / 1000),
+  };
 }
 
 /**
@@ -603,6 +619,7 @@ export async function refreshAdminSession(refreshToken: string): Promise<{
   accessToken?: string;
   refreshToken?: string;
   expiresIn?: number;
+  refreshTokenExpiresIn?: number;
   error?: string;
 }> {
   const trimmed = refreshToken.trim();

@@ -93,8 +93,19 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 
   // Use report-only CSP in staging
   const reportOnly = process.env['NK_CSP_REPORT_ONLY'] === 'true';
+  // NK_CSP_STRICT=true (production review CRITICAL-1 follow-up): enforce the
+  // policy WITHOUT 'unsafe-inline' in script-src. JSON-LD blocks are
+  // data-only <script type="application/ld+json"> and unaffected; enable
+  // this only after verifying no inline runtime script needs it (Next.js
+  // injects inline bootstrap scripts — verify in preview first). Default:
+  // enforced-with-unsafe-inline (or report-only when NK_CSP_REPORT_ONLY=true).
+  const strict = process.env['NK_CSP_STRICT'] === 'true' && !isDev;
+  const buildCsp = (directives: string): string =>
+    strict
+      ? directives.replace("script-src 'self' 'unsafe-inline'", "script-src 'self'")
+      : directives;
   const cspHeader = reportOnly ? 'Content-Security-Policy-Report-Only' : 'Content-Security-Policy';
-  const cspValue = reportOnly ? CSP_REPORT_DIRECTIVES : CSP_DIRECTIVES;
+  const cspValue = buildCsp(reportOnly ? CSP_REPORT_DIRECTIVES : CSP_DIRECTIVES);
 
   // ─── Core Security Headers (all routes) ───────────
   response.headers.set(cspHeader, cspValue);
