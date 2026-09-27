@@ -179,10 +179,14 @@ describe('POST /api/v1/payments/slip-verify — recovery honesty (audit #4)', ()
     expect(res.status).toBe(200);
     const body = (await res.json()) as { status: string };
     expect(body.status).toBe('pending_manual_fulfilment');
-    // The recovery wrote the parking state through a real transaction.
-    expect(prismaMock.order.updateMany).toHaveBeenCalledWith(
+    // Production review (Medium): the recovery claims through the SHARED
+    // helper (coupon usage counted), then parks the order — the bare
+    // updateMany that skipped coupon accounting is gone.
+    expect(ordersMock.claimOrderForConfirmation).toHaveBeenCalledWith('ord-sv', expect.anything());
+    expect(prismaMock.order.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'ord-sv', status: 'pending_payment' },
+        where: { id: 'ord-sv' },
+        data: expect.objectContaining({ status: 'pending_manual_fulfilment' }),
       }),
     );
     // And no reconciliation evidence was needed.
@@ -216,7 +220,9 @@ describe('POST /api/v1/payments/slip-verify — recovery honesty (audit #4)', ()
     });
     ordersMock.claimOrderForConfirmation.mockResolvedValue({ id: 'ord-sv' });
     fulfilmentMock.fulfilOrder.mockResolvedValue({ success: false, error: 'INSUFFICIENT_STOCK' });
-    prismaMock.order.updateMany.mockRejectedValue(new Error('db down'));
+    // The parking write inside the recovery transaction fails (ONCE — a
+    // persistent rejection would leak into the following test cases).
+    prismaMock.order.update.mockRejectedValueOnce(new Error('db down'));
 
     const res = await call(post());
     expect(res.status).toBe(500);
@@ -293,7 +299,7 @@ describe('POST /api/v1/admin/orders/[id]/verify-payment — recovery honesty (au
       success: false,
       error: 'INSUFFICIENT_STOCK',
     });
-    prismaMock.order.update.mockRejectedValue(new Error('db gone'));
+    prismaMock.order.update.mockRejectedValueOnce(new Error('db gone'));
 
     const res = await call(post());
     expect(res.status).toBe(500);

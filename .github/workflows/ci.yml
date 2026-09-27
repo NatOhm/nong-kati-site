@@ -119,6 +119,26 @@ jobs:
           echo "dev server did not become ready"; tail -50 dev-server.log; exit 1
       - name: Run concurrency tests
         run: NK_TEST_BASE_URL=http://127.0.0.1:4200 npx vitest run tests/admin-concurrency.test.ts
+      - name: Verify RLS baseline (production review, High)
+        run: |
+          node -e "
+            const { PrismaClient } = require('@prisma/client');
+            const p = new PrismaClient();
+            (async () => {
+              const missing = await p.\$queryRawUnsafe(\"SELECT tablename FROM pg_tables WHERE schemaname='public' AND rowsecurity = false\");
+              if (missing.length > 0) { console.error('RLS not enabled on: ' + missing.map(r => r.tablename).join(', ')); process.exit(1); }
+              const total = await p.\$queryRawUnsafe(\"SELECT count(*)::int AS n FROM pg_tables WHERE schemaname='public'\");
+              console.log('RLS enabled on all ' + total[0].n + ' public tables');
+              for (const role of ['anon', 'authenticated']) {
+                const exists = await p.\$queryRawUnsafe(\"SELECT 1 FROM pg_roles WHERE rolname='\" + role + \"'\");
+                if (exists.length === 0) continue;
+                const granted = await p.\$queryRawUnsafe(\"SELECT privilege_type FROM information_schema.table_privileges WHERE grantee='\" + role + \"' AND table_schema='public' LIMIT 1\");
+                if (granted.length > 0) { console.error('client role still has table privileges: ' + role); process.exit(1); }
+                console.log('client role has zero table privileges: ' + role);
+              }
+              await p.\$disconnect();
+            })().catch(e => { console.error(e.message); process.exit(1); });
+          "
       - name: Upload dev server log
         if: always()
         uses: actions/upload-artifact@v4

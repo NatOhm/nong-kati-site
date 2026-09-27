@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Bell, LogOut, Menu, Store } from 'lucide-react';
@@ -39,6 +39,45 @@ export function AdminTopBar({
   onSidebarToggle,
   className,
 }: AdminTopBarProps): React.JSX.Element {
+  const router = useRouter();
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  /**
+   * Logout (production review, Medium): the old handler fired the revocation
+   * fetch fire-and-forget and navigated immediately — a throttled/dropped
+   * request left the stolen-or-copied refresh token server-valid while the
+   * UI claimed success. Now the revocation is AWAITED (bounded) before any
+   * local cleanup/navigation, with a keepalive fallback for unload races.
+   */
+  const handleLogout = useCallback(async (): Promise<void> => {
+    setLoggingOut(true);
+    const refreshToken = localStorage.getItem('nk_admin_refresh_token');
+    if (refreshToken) {
+      try {
+        await Promise.race([
+          fetch('/api/v1/auth/admin/logout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refreshToken }),
+            keepalive: true,
+          }),
+          // Bounded: never trap the admin on a hung request. On timeout the
+          // best effort below still clears local state; the server-side
+          // session expiry (and the revocation attempt queued via keepalive)
+          // bounds the exposure.
+          new Promise((resolve) => setTimeout(resolve, 4000)),
+        ]);
+      } catch {
+        // Revocation is idempotent server-side; if it truly failed the
+        // session still expires server-side. Never block logout on it.
+      }
+    }
+    clearAdminSession();
+    setAdminRemembered(false);
+    localStorage.removeItem('nk_admin_email');
+    router.push('/management/login');
+  }, [router]);
+
   return (
     <header
       className={cn(
@@ -114,23 +153,10 @@ export function AdminTopBar({
 
         {/* Logout */}
         <button
-          onClick={() => {
-            // Fire-and-forget: revoke the refresh session server-side.
-            const refreshToken = localStorage.getItem('nk_admin_refresh_token');
-            if (refreshToken) {
-              void fetch('/api/v1/auth/admin/logout', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ refreshToken }),
-              }).catch(() => undefined);
-            }
-            clearAdminSession();
-            setAdminRemembered(false);
-            localStorage.removeItem('nk_admin_email');
-            window.location.href = '/management/login';
-          }}
-          className="rounded p-1.5 text-fg-placeholder hover:bg-surface hover:text-fg-error"
-          aria-label="ออกจากระบบ"
+          onClick={handleLogout}
+          disabled={loggingOut}
+          className="rounded p-1.5 text-fg-placeholder hover:bg-surface hover:text-fg-error disabled:opacity-50"
+          aria-label={loggingOut ? 'กำลังออกจากระบบ' : 'ออกจากระบบ'}
         >
           <LogOut size={18} strokeWidth={1.5} />
         </button>

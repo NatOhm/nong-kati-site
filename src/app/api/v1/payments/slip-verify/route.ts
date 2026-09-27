@@ -190,6 +190,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       // pending, no evidence row). ALREADY_CLAIMED = the admin button or a
       // racing verify won → the payment is already being handled → 409.
       try {
+        // Production review (Medium): the recovery MUST use the shared claim
+        // helper — the old direct updateMany skipped claimOrderForConfirmation,
+        // so discounted orders that hit a shortage were parked for manual
+        // fulfilment WITHOUT consuming the coupon's global/per-customer
+        // allowance; the restock-resume path then assumed it was already
+        // counted and the discount could be reused.
         await prisma.$transaction(async (tx) => {
           await tx.paymentAttempt.update({
             where: { id: attempt.id },
@@ -201,14 +207,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
               slipVerifiedBy: 'slipok:auto',
             },
           });
-          const claimed = await tx.order.updateMany({
-            where: { id: order.id, status: 'pending_payment' },
+          const claimed = await claimOrderForConfirmation(order.id, tx);
+          if (!claimed) throw new Error('ALREADY_CLAIMED');
+          await tx.order.update({
+            where: { id: order.id },
             data: {
               status: 'pending_manual_fulfilment',
               manualFulfilmentReason: 'INSUFFICIENT_STOCK',
             },
           });
-          if (claimed.count !== 1) throw new Error('ALREADY_CLAIMED');
         });
       } catch (recoveryErr) {
         const recMsg = recoveryErr instanceof Error ? recoveryErr.message : String(recoveryErr);

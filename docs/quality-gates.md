@@ -204,16 +204,24 @@ Playwright เลือก target ตาม `E2E_BASE_URL` > localhost:4200 (dev
 - **เคส regression:** charge body ถูกต้อง (satang/source/metadata/auth header), QR มาเป็น data URI, pending ไร้ scannable_code → typed error, 4xx → `OMISE_API_ERROR` พร้อม code, network fail → `OMISE_NETWORK_ERROR`, 3DS `authorize_uri`, refund path, signature ทั้งสองแบบรับ/ปฏิเสธถูกต้อง (รวม uppercase hex, tampered body, garbage), webhook payload normalization (charge.complete/failed/unknown/junk), **prod + NK_PAYMENT_MOCK=true ต้องเดิน real path** (offline-safe ผ่าน dead port → `OMISE_NETWORK_ERROR`)
 - **Sandbox check (คนรัน):** `node tmp/omise-sandbox-test.js` ด้วย `NK_OMISE_SECRET_KEY`/`NK_OMISE_WEBHOOK_SECRET` sandbox keys + dev server — สร้าง charge จริง, ดาวน์โหลด QR (`DUMP_QR=1` เซฟไฟล์ไว้สแกนจ่ายจริงได้), ยิง webhook ทั้ง signature ถูก/ผิด; **คีย์จริงใส่ใน Vercel เท่านั้น: `NK_OMISE_SECRET_KEY`/`NK_OMISE_PUBLIC_KEY`/`NK_OMISE_WEBHOOK_SECRET`** (ต้องตั้ง webhook URL ใน dashboard ของ Opn ด้วย)
 
+## Production-review patch (2026-09-27, หลัง audit #1–#9)
+
+- **[High] JSON-LD XSS (`tests/jsonld-xss.test.ts`)** — `JSON.stringify` ธรรมดาไม่ปลอดภัยใน `<script>`: product name/description (ซึ่ง catalogue_manager เขียนได้) ที่มี `</script>` ปิด tag แล้ว execute บน public origin — ตอนนี้ทุก inline JSON-LD ผ่าน `serializeJsonLd()` (escape `<` `>` `&` U+2028/2029 เป็น `\uXXXX` หลัง stringify — ทำใน replacer จะ double-escape) JSON decode กลับได้ค่าเดิม แต่ไม่มีทางปิด tag; **ต่อยอดที่ควรทำ:** ย้าย admin refresh token ไป HttpOnly cookie + CSP enforce ไม่มี unsafe-inline
+- **[Medium] slip-verify recovery ต้องผ่าน claim helper (`tests/jsonld-xss.test.ts` + `payment-recovery.test.ts`)** — recovery เดิม updateMany ตรง ข้าม `claimOrderForConfirmation` → ออเดอร์ที่มีส่วนลดแล้วเจอ stock ไม่พอ ถูก park โดยไม่จด usage (global/per-customer) → resume แล้วส่วนลดถูกใช้ซ้ำได้; ตอนนี้ recovery claim ผ่าน helper เดียวกันกับ normal path (จดคูปองครั้งเดียว) — static guard กัน re-inline bare updateMany
+- **[High] RLS deny-by-default (`prisma/migrations/20260927200000_rls_baseline`)** — ตาราง app ทุกตัว (รวม GiftCode/AdminUser/tokens) `ENABLE ROW LEVEL SECURITY` + REVOKE จาก `anon`/`authenticated`/`supabase_realtime_admin` (guard การมี role เพราะ CI ใช้ Postgres ธรรมดา); **ไม่มี permissive policy ใด ๆ** — ทุก access ต้องไหลผ่าน Next API; **ไม่ใช้ FORCE** (จะผูก owner = role ที่ Prisma connect แล้วแอปพัง); CI concurrency job เพิ่ม step verify ว่าทุกตาราง rowsecurity=true และ client role ไม่มี privilege เหลือ
+- **[Medium] Admin logout await revocation (`AdminTopBar.tsx`)** — เดิม fire-and-forget + navigate ทันที → refresh token ถูกขโมยยัง valid; ตอนนี้ await revocation (bounded 4s + keepalive) ก่อนเคลียร์ + navigate; ปุ่ม disabled ระหว่างทำ; ยังคงทำต่อ: ย้าย refresh token ไป HttpOnly cookie เพื่อปิดปัญหานี้ถาวร (รวมกับข้อ XSS ด้วย)
+- **[Medium] Rate-limit degrade (ค้าง)** — ตาม report: high-risk routes ควร fail-closed/degraded เมื่อ shared limiter ตาย + แยก low-risk read ที่ fail-open ได้ — ยังไม่ทำ ต้องระวัง lockout ปลอมจาก limiter outage
+
 ## CI pipeline (`.github/workflows/ci.yml`)
 
-| Job                         | ทำอะไร                                                                  | ผูกกับ gate                                                                                       |
-| --------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Lint & Typecheck            | `eslint .` + `tsc --noEmit`                                             | —                                                                                                 |
-| Security Audit              | `npm audit --audit-level=high` (blocking)                               | —                                                                                                 |
-| Unit Tests                  | `npm test` (vitest ~198 tests)                                          | R1–R6, authz matrix, PII, outbox, backup codes, recovery, Omise real (concurrency skip อัตโนมัติ) |
-| Concurrency (DB races)      | Postgres 16 service + migrate + `next dev -p 4200` + `NK_TEST_BASE_URL` | Concurrency                                                                                       |
-| Build                       | `next build` ด้วย env ปลอม                                              | —                                                                                                 |
-| report-build-status, deploy | ของ Vercel (Git integration)                                            | —                                                                                                 |
+| Job                         | ทำอะไร                                                                  | ผูกกับ gate                                                                                                    |
+| --------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Lint & Typecheck            | `eslint .` + `tsc --noEmit`                                             | —                                                                                                              |
+| Security Audit              | `npm audit --audit-level=high` (blocking)                               | —                                                                                                              |
+| Unit Tests                  | `npm test` (vitest ~203 tests)                                          | R1–R6, authz matrix, PII, outbox, backup codes, recovery, Omise real, JSON-LD XSS (concurrency skip อัตโนมัติ) |
+| Concurrency (DB races)      | Postgres 16 service + migrate + `next dev -p 4200` + `NK_TEST_BASE_URL` | Concurrency                                                                                                    |
+| Build                       | `next build` ด้วย env ปลอม                                              | —                                                                                                              |
+| report-build-status, deploy | ของ Vercel (Git integration)                                            | —                                                                                                              |
 
 ทุก push บน `master` = CI 8 checks + deploy prod อัตโนมัติ
 
