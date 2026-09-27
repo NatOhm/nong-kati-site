@@ -32,7 +32,8 @@ DO $$
 DECLARE
   t text;
   table_names text[] := ARRAY[
-    'Category', 'Product', 'ProductAlias', 'InventorySnapshot', 'StockMove',
+    'Category', 'Product', 'ProductAlias', 'ProductVariant',
+    'InventorySnapshot', 'StockMove',
     'Cart', 'CartItem', 'Customer', 'WishlistItem', 'TopUpLog', 'Coupon',
     'CouponRedemption', 'Order', 'OrderItem', 'GiftCode', 'CodeUploadBatch',
     'PaymentAttempt', 'Invoice', 'Refund', 'SiteSetting', 'AdminUser',
