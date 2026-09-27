@@ -190,7 +190,15 @@ jobs:
           done
           echo "prod server did not become ready"; tail -50 smoke-server.log; exit 1
       - name: Run browser smoke tests
-        run: E2E_BASE_URL=http://127.0.0.1:4200 npx playwright test e2e/smoke.spec.ts
+        run: |
+          set -o pipefail
+          E2E_BASE_URL=http://127.0.0.1:4200 npx playwright test e2e/smoke.spec.ts 2>&1 | tee /tmp/pw-output.log
+      - name: Emit smoke failure annotations
+        if: failure()
+        run: |
+          grep -E "✘|✗|Error:|Timed out|TimeoutError|expected|locator|resolved to|passed|failed" /tmp/pw-output.log | tail -60 | while IFS= read -r line; do
+            echo "::error::${line:0:400}"
+          done
       - name: Verify deployed SHA matches the commit under test
         run: |
           body=$(curl -s http://127.0.0.1:4200/api/v1/version)
