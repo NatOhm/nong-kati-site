@@ -39,7 +39,11 @@ DECLARE
     'AdminChallengeConsumed', 'AdminSession', 'AuditLog', 'Tag', 'ProductTag',
     'SupportTicket', 'NotificationRead', 'MagicLinkToken',
     'PasswordResetToken', 'PhoneOtpToken', 'DataSubjectRequest',
-    'HeroSlide', 'EmailOutbox', 'AdminBackupCode'
+    'HeroSlide', 'EmailOutbox', 'AdminBackupCode',
+    -- Prisma's own migration-history table (created by `migrate deploy`
+    -- itself, owner-only access, never read by clients) — included so the
+    -- CI verification "every public table has RLS" holds exactly.
+    '_prisma_migrations'
   ];
 BEGIN
   FOREACH t IN ARRAY table_names LOOP
