@@ -193,16 +193,27 @@ Playwright เลือก target ตาม `E2E_BASE_URL` > localhost:4200 (dev
 - **เคส regression:** recovery commit → 200 + ไม่มี record, recovery fail → 500 `RECONCILIATION_REQUIRED` + แถว evidence พร้อม trigger/ref/error, ALREADY_CLAIMED race → 409 + ไม่มี record, unexpected failure → 5xx + record เสมอ, `recordPaymentReconciliation` เองต้อง never-throw
 - **การตรวจฝั่งคน:** query แถวได้ด้วย `listReconciliationRecords()` (lib เดียวกัน) — ควรผูกเข้าหน้า admin audit viewer ถัดไป
 
+## Real Omise/Opn adapter — `tests/omise-real-adapter.test.ts` (audit fix #1, 2026-09-27)
+
+- **กฎ (external audit #1):** ต้องมี e-payment จริง ไม่ใช่ mock ตลอดชีวิต — adapter เดิม throw `Real Omise API not implemented` นอก mock mode ทำให้ prod PromptPay เป็น 503 ถาวร (ลูกค้าเหลือทางเดียวคือโอนเงิน+ส่งสลิป) ตอนนี้ implement จริงแล้ว:
+  - **PromptPay charge** — `POST {base}/charges` แบบ form-encoded (Omise ไม่รับ JSON สำหรับ nested source): `amount` เป็น **สตางค์** (LD-11 server-authoritative), `source[type]=promptpay` inline, `metadata[order_number]`; QR PNG อยู่หลัง secret-key auth → adapter **ดาวน์โหลดเอง server-side** แล้วส่งเป็น data URI ให้ browser; pending charge ที่ไม่มี scannable_code = typed error ไม่ใช่ checkout พัง
+  - **Card charge + refund** — `card=token` + `return_uri` (3DS ผ่าน `authorize_uri`), refund `POST /charges/{id}/refunds`
+  - **Auth + errors** — HTTP Basic `skey_xxx:` server-only; typed errors `OMISE_NOT_CONFIGURED/OMISE_TIMEOUT/OMISE_NETWORK_ERROR/OMISE_API_ERROR` (แปะ failure_code จาก gateway) — ไม่มี naked fetch exception หลุดออกไป
+  - **Webhook signature สองแบบ** — รับทั้ง modern `t=<unix>,v1=<hex>` (HMAC บน `t+rawBody` — แบบที่ Opn ส่งจริงปัจจุบัน) และ legacy plain-hex; malformed header = false เสมอ (review L8 คงเดิม); ห้ามลืม: mock mode ยังผ่อน signature — **ห้าม**เปิด `NK_PAYMENT_MOCK=true` ใน prod (constructor ก็ fail-closed อยู่แล้ว)
+  - **initiate route** — มี key จริง → charge จริง; ไม่มี key ใน prod → constructor throw → 503 fail-closed เหมือนเดิม; `PAYMENT_UNAVAILABLE` (not-implemented gate) เก็บไว้แค่เผื่อ deploy เก่า
+- **เคส regression:** charge body ถูกต้อง (satang/source/metadata/auth header), QR มาเป็น data URI, pending ไร้ scannable_code → typed error, 4xx → `OMISE_API_ERROR` พร้อม code, network fail → `OMISE_NETWORK_ERROR`, 3DS `authorize_uri`, refund path, signature ทั้งสองแบบรับ/ปฏิเสธถูกต้อง (รวม uppercase hex, tampered body, garbage), webhook payload normalization (charge.complete/failed/unknown/junk), **prod + NK_PAYMENT_MOCK=true ต้องเดิน real path** (offline-safe ผ่าน dead port → `OMISE_NETWORK_ERROR`)
+- **Sandbox check (คนรัน):** `node tmp/omise-sandbox-test.js` ด้วย `NK_OMISE_SECRET_KEY`/`NK_OMISE_WEBHOOK_SECRET` sandbox keys + dev server — สร้าง charge จริง, ดาวน์โหลด QR (`DUMP_QR=1` เซฟไฟล์ไว้สแกนจ่ายจริงได้), ยิง webhook ทั้ง signature ถูก/ผิด; **คีย์จริงใส่ใน Vercel เท่านั้น: `NK_OMISE_SECRET_KEY`/`NK_OMISE_PUBLIC_KEY`/`NK_OMISE_WEBHOOK_SECRET`** (ต้องตั้ง webhook URL ใน dashboard ของ Opn ด้วย)
+
 ## CI pipeline (`.github/workflows/ci.yml`)
 
-| Job                         | ทำอะไร                                                                  | ผูกกับ gate                                                                                         |
-| --------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| Lint & Typecheck            | `eslint .` + `tsc --noEmit`                                             | —                                                                                                   |
-| Security Audit              | `npm audit --audit-level=high` (blocking)                               | —                                                                                                   |
-| Unit Tests                  | `npm test` (vitest ~187 tests)                                          | R1–R6, authz matrix, PII, email outbox, backup codes, payment recovery (concurrency skip อัตโนมัติ) |
-| Concurrency (DB races)      | Postgres 16 service + migrate + `next dev -p 4200` + `NK_TEST_BASE_URL` | Concurrency                                                                                         |
-| Build                       | `next build` ด้วย env ปลอม                                              | —                                                                                                   |
-| report-build-status, deploy | ของ Vercel (Git integration)                                            | —                                                                                                   |
+| Job                         | ทำอะไร                                                                  | ผูกกับ gate                                                                                       |
+| --------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Lint & Typecheck            | `eslint .` + `tsc --noEmit`                                             | —                                                                                                 |
+| Security Audit              | `npm audit --audit-level=high` (blocking)                               | —                                                                                                 |
+| Unit Tests                  | `npm test` (vitest ~198 tests)                                          | R1–R6, authz matrix, PII, outbox, backup codes, recovery, Omise real (concurrency skip อัตโนมัติ) |
+| Concurrency (DB races)      | Postgres 16 service + migrate + `next dev -p 4200` + `NK_TEST_BASE_URL` | Concurrency                                                                                       |
+| Build                       | `next build` ด้วย env ปลอม                                              | —                                                                                                 |
+| report-build-status, deploy | ของ Vercel (Git integration)                                            | —                                                                                                 |
 
 ทุก push บน `master` = CI 8 checks + deploy prod อัตโนมัติ
 

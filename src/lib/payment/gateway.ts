@@ -43,9 +43,9 @@ export interface WebhookEvent {
   /** Charge status */
   status: 'successful' | 'failed' | 'expired';
   /** Failure message if failed */
-  failureMessage?: string;
+  failureMessage?: string | undefined;
   /** Failure code if failed */
-  failureCode?: string;
+  failureCode?: string | undefined;
   /** Raw event data (sanitized) */
   rawData?: Record<string, unknown>;
 }

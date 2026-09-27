@@ -23,9 +23,13 @@ function getGateway(): OmiseAdapter {
 
 /**
  * POST /api/v1/payments/initiate — create a PromptPay charge for an order.
- * In mock mode (no NK_OMISE_SECRET_KEY) this yields a mock QR; the payment
- * attempt row is always persisted so the status endpoint and webhook can
- * find it. Fires the new-order Discord notification (fire-and-forget).
+ * Audit #1: the real Opn/Omise integration is implemented — with real keys
+ * this creates a live PromptPay charge (amount in satang, server-
+ * authoritative) and returns the bank QR (downloaded server-side behind
+ * secret-key auth, handed to the browser as a data URI). Mock mode
+ * (NK_PAYMENT_MOCK=true, nonproduction only) still simulates for staging.
+ * The payment attempt row is always persisted so the status endpoint and
+ * webhook can find it. Fires the new-order Discord notification.
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
   let body: unknown;
@@ -65,10 +69,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     if (err instanceof GatewayUnavailableError) {
       return NextResponse.json({ error: { code: 'SERVICE_UNAVAILABLE' } }, { status: 503 });
     }
-    // Review H2: production keys are configured but the real Omise/Opn
-    // integration is not implemented yet — this is a deliberate gate, not
-    // an unexpected 502. Clients show the manual-slip guidance instead of
-    // retrying a dead endpoint. (Wallet payment is unaffected.)
+    // Audit #1: the real integration exists, so any failure here is a
+    // genuine gateway/config problem, not a "not implemented" gate. The
+    // legacy marker stays mapped to the deliberate-gate response in case an
+    // old deployment pin surfaces it.
     const msg = err instanceof Error ? err.message : '';
     if (msg.includes('not implemented')) {
       return NextResponse.json({ error: { code: 'PAYMENT_UNAVAILABLE' } }, { status: 503 });

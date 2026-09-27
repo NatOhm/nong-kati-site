@@ -75,26 +75,24 @@ describe('OmiseAdapter mode selection (H2)', () => {
   it('mock mode is ignored in production even with NK_PAYMENT_MOCK=true', async () => {
     (process.env as { NODE_ENV: string }).NODE_ENV = 'production';
     process.env['NK_PAYMENT_MOCK'] = 'true';
+    const savedBase = process.env['NK_OMISE_API_BASE'];
+    // Audit #1: the real integration exists now, so "production ignores the
+    // mock flag" is proven by the REAL code path taking an actual HTTP trip:
+    // point it at a dead local port (offline-safe) and expect a typed
+    // OMISE_NETWORK_ERROR — not a chrg_mock_* charge, not the old
+    // "not implemented" gate.
+    process.env['NK_OMISE_API_BASE'] = 'http://127.0.0.1:1';
     const adapter = makeAdapter();
-    // Production + valid keys → real mode → real charge path throws (gated).
-    // createPromptPayCharge is sync-thrown inside an async fn → returns a rejected
-    // promise; call it and let vitest record the rejection via expect().rejects.
-    const rejected = adapter
-      .createPromptPayCharge({
+    await expect(
+      adapter.createPromptPayCharge({
         amountSatang: 2500,
         orderNumber: 'NK-TEST-1',
         currency: 'THB',
         description: 'test',
-      })
-      .then(
-        () => {
-          throw new Error('should have thrown');
-        },
-        (e: unknown) => {
-          expect((e as Error).message).toMatch(/not implemented/);
-        },
-      );
-    await rejected;
+      }),
+    ).rejects.toThrow(/OMISE_NETWORK_ERROR|OMISE_TIMEOUT/);
+    if (savedBase === undefined) delete process.env['NK_OMISE_API_BASE'];
+    else process.env['NK_OMISE_API_BASE'] = savedBase;
   });
 
   it('production without credentials fails closed at construction', () => {
