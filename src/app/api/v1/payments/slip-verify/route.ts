@@ -4,6 +4,7 @@ import { claimOrderForConfirmation, getOrderById } from '@/api/orders';
 import { prisma } from '@/lib/db';
 import { getNotificationSettings, notifyPaymentConfirmed, notifyStockLow } from '@/lib/notify';
 import { fulfilOrder, scheduleOutboxDrain } from '@/lib/fulfilment';
+import { recordPaymentReconciliation } from '@/lib/paymentReconciliation';
 import { getClientIp, checkRateLimit } from '@/lib/rateLimit';
 import { isSlipVerificationEnabled, verifySlip } from '@/lib/payment/slipok';
 import { isValidSlipUploadToken } from '@/lib/slipSecurity';
@@ -183,8 +184,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     if (msg === 'INSUFFICIENT_STOCK') {
       // Same recovery as the webhook: commit manual-fulfilment state (the
       // transaction above rolled back claim+attempt, so redo it committed).
-      await prisma
-        .$transaction(async (tx) => {
+      // Audit #4: the recovery MUST be awaited and its outcome verified
+      // BEFORE answering — a swallowed failure here used to 200 while the
+      // verified payment was recorded NOWHERE (order pending, attempt
+      // pending, no evidence row). ALREADY_CLAIMED = the admin button or a
+      // racing verify won → the payment is already being handled → 409.
+      try {
+        await prisma.$transaction(async (tx) => {
           await tx.paymentAttempt.update({
             where: { id: attempt.id },
             data: {
@@ -203,8 +209,37 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             },
           });
           if (claimed.count !== 1) throw new Error('ALREADY_CLAIMED');
-        })
-        .catch(() => undefined);
+        });
+      } catch (recoveryErr) {
+        const recMsg = recoveryErr instanceof Error ? recoveryErr.message : String(recoveryErr);
+        if (recMsg === 'ALREADY_CLAIMED') {
+          const cur = await prisma.order.findUnique({
+            where: { id: order.id },
+            select: { status: true },
+          });
+          if (cur && cur.status !== 'pending_payment') {
+            return NextResponse.json({ error: 'ORDER_NOT_PAYABLE' }, { status: 409 });
+          }
+          // Status still pending but the guard did not match — treat as a
+          // genuine recovery failure, not a race win.
+        }
+        await recordPaymentReconciliation({
+          trigger: 'slip_verify_recovery_failed',
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          paymentRef: result.ref,
+          paymentAttemptId: attempt.id,
+          failureReason: 'INSUFFICIENT_STOCK',
+          recoveryError: recMsg,
+        });
+        return NextResponse.json(
+          {
+            error: 'RECONCILIATION_REQUIRED',
+            message: 'ตรวจสลิปผ่านแต่ระบบบันทึกสถานะไม่สำเร็จ — ทีมงานจะตรวจสอบและดำเนินการให้เอง',
+          },
+          { status: 500 },
+        );
+      }
       // Audit #2: schedule an outbox drain even on this degraded path —
       // there may be queued mails (previous successes) worth delivering.
       await scheduleOutboxDrain();
@@ -213,11 +248,25 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         message: 'ชำระเงินถูกตรวจแล้ว — สินค้าเซ็นต์ไม่พอ แอดมินจะจัดส่งโค้ดให้เร็วที่สุด',
       });
     }
+    // Audit #4: an unexpected failure rolled the WHOLE confirmation back —
+    // the verified payment is recorded nowhere (attempt still pending), and
+    // unlike the gateway path there is NO automatic redelivery. Leave a
+    // reconciliation trail so the money cannot vanish unrecorded, then be
+    // honest: 5xx, never a success-shaped answer.
+    await recordPaymentReconciliation({
+      trigger: 'slip_verify_recovery_failed',
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      paymentRef: result.ref,
+      paymentAttemptId: attempt.id,
+      failureReason: msg,
+      recoveryError: 'no_recovery_attempted',
+    });
     console.error('[slip-verify] fulfilment failure:', msg);
     return NextResponse.json(
       {
         error: 'FULFILMENT_FAILED',
-        message: 'ตรวจสลิปผ่านแต่ส่งโค้ดไม่สำเร็จ — แอดมินจะดำเนินการให้',
+        message: 'ตรวจสลิปผ่านแต่ส่งโค้ดไม่สำเร็จ — ทีมงานจะตรวจสอบและดำเนินการให้เอง',
       },
       { status: 500 },
     );

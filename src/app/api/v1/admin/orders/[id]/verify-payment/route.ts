@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { checkPermission } from '@/lib/rbac';
 import { claimOrderForConfirmation, getOrderById } from '@/api/orders';
 import { fulfilOrder, scheduleOutboxDrain } from '@/lib/fulfilment';
+import { recordPaymentReconciliation } from '@/lib/paymentReconciliation';
 import { getNotificationSettings, notifyPaymentConfirmed, notifyStockLow } from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
@@ -63,14 +64,38 @@ export async function POST(
           return null;
         }
         // Shortage again → back to pending_manual_fulfilment for another round.
+        // Audit #4: this is a one-write recovery — it MUST be awaited and
+        // verified before answering. If it fails, record reconciliation
+        // evidence and answer 5xx; a swallowed failure here used to 200 while
+        // the order state was lost with the rolled-back transaction.
         if (e instanceof Error && e.message === 'INSUFFICIENT_STOCK') {
-          await prisma.order.update({
-            where: { id },
-            data: {
-              status: 'pending_manual_fulfilment',
-              manualFulfilmentReason: 'INSUFFICIENT_STOCK',
-            },
-          });
+          try {
+            await prisma.order.update({
+              where: { id, status: 'pending_manual_fulfilment' },
+              data: {
+                status: 'pending_manual_fulfilment',
+                manualFulfilmentReason: 'INSUFFICIENT_STOCK',
+              },
+            });
+          } catch (recoveryErr) {
+            await recordPaymentReconciliation({
+              trigger: 'admin_resume_recovery_failed',
+              orderId: id,
+              orderNumber: existing.orderNumber,
+              paymentRef: null,
+              paymentAttemptId: null,
+              failureReason: 'INSUFFICIENT_STOCK (resume)',
+              recoveryError:
+                recoveryErr instanceof Error ? recoveryErr.message : String(recoveryErr),
+            });
+            return NextResponse.json(
+              {
+                error: 'RECONCILIATION_REQUIRED',
+                message: 'บันทึกสถานะไม่สำเร็จ — ทีมงานจะตรวจสอบและดำเนินการให้เอง',
+              },
+              { status: 500 },
+            ) as unknown as ReturnType<typeof fulfilOrder>;
+          }
           return NextResponse.json({
             status: 'pending_manual_fulfilment',
             message: 'ยังส่งมอบไม่ได้ — โค้ดยังไม่พอ โปรดเติมสต๊อกเพิ่มแล้วกดส่งมอบอีกครั้ง',
@@ -148,9 +173,11 @@ export async function POST(
     // pending_payment, coupon un-counted). Commit the recovery unit:
     // re-claim (counts the coupon once), settle the attempt, park the order
     // for restock-and-resume — same shape as the slip-verify recovery.
+    // Audit #4: the recovery is awaited and its outcome VERIFIED before the
+    // 200; a failure records reconciliation evidence and answers 5xx.
     if (msg === 'INSUFFICIENT_STOCK') {
-      await prisma
-        .$transaction(
+      try {
+        await prisma.$transaction(
           async (tx) => {
             const recl = await claimOrderForConfirmation(id, tx);
             if (!recl) throw new Error('ALREADY_CLAIMED');
@@ -167,8 +194,47 @@ export async function POST(
             });
           },
           { isolationLevel: 'Serializable' },
-        )
-        .catch(() => undefined);
+        );
+      } catch (recoveryErr) {
+        const recMsg = recoveryErr instanceof Error ? recoveryErr.message : String(recoveryErr);
+        if (recMsg === 'ALREADY_CLAIMED') {
+          const cur = await prisma.order.findUnique({
+            where: { id },
+            select: { status: true },
+          });
+          if (cur && cur.status === 'completed') {
+            // A racer finished the real fulfilment — nothing to recover.
+            return NextResponse.json(
+              { error: 'ALREADY_CONFIRMED', status: 'completed' },
+              { status: 409 },
+            );
+          }
+          if (cur && cur.status === 'pending_manual_fulfilment') {
+            // A racer parked it for restock-and-resume — recovery succeeded,
+            // just not by us.
+            return NextResponse.json({
+              status: 'pending_manual_fulfilment',
+              message: 'ชำระเงินยืนยันแล้ว แต่โค้ดไม่พอ — โปรดเติมสต๊อกแล้วกดส่งมอบอีกครั้ง',
+            });
+          }
+        }
+        await recordPaymentReconciliation({
+          trigger: 'admin_verify_recovery_failed',
+          orderId: id,
+          orderNumber: existing.orderNumber,
+          paymentRef: null,
+          paymentAttemptId: null,
+          failureReason: 'INSUFFICIENT_STOCK',
+          recoveryError: recMsg,
+        });
+        return NextResponse.json(
+          {
+            error: 'RECONCILIATION_REQUIRED',
+            message: 'บันทึกสถานะไม่สำเร็จ — ทีมงานจะตรวจสอบและดำเนินการให้เอง',
+          },
+          { status: 500 },
+        );
+      }
       return NextResponse.json(
         {
           status: 'pending_manual_fulfilment',
@@ -177,6 +243,18 @@ export async function POST(
         { status: 200 },
       );
     }
+    // Audit #4: an unexpected failure rolled the whole confirmation back —
+    // the slip/transfer is unrecorded in order state (nothing auto-retries
+    // an admin action). Leave reconciliation evidence, then answer honestly.
+    await recordPaymentReconciliation({
+      trigger: 'admin_verify_recovery_failed',
+      orderId: id,
+      orderNumber: existing.orderNumber,
+      paymentRef: null,
+      paymentAttemptId: null,
+      failureReason: msg,
+      recoveryError: 'no_recovery_attempted',
+    });
     console.error('[verify-payment] confirmation transaction failed:', msg);
     return NextResponse.json({ error: 'FULFILMENT_FAILED' }, { status: 500 });
   }

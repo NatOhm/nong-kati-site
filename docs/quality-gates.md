@@ -183,16 +183,26 @@ Playwright เลือก target ตาม `E2E_BASE_URL` > localhost:4200 (dev
 - **เคส regression:** เก็บ hash ไม่ใช่ plaintext, ชุดใหม่ลบชุดเก่า, consume ครั้งเดียว (ครั้งที่สอง fail), รหัสคนอื่นใช้ไม่ได้, `setup2fa` ต้อง persist (เคสเก่าที่โยนทิ้ง = แดง), confirm ด้วยรหัสสำรองที่ยังไม่ใช้ = session + สถานะ used, ใช้แล้ว/ผิด = lockout เดิม, TOTP ล้วนไม่แตะตารางรหัสสำรอง, challenge ถูกใช้ไป/บัญชี locked ต้อง fail ก่อน verification เสมอ
 - **งานค้างฝั่งคน (ทบทวนทุกครั้ง):** แอดมินที่ enroll 2FA **ก่อน** commit นี้ยังไม่มีรหัสสำรองใน DB (เคสเก่าไม่เคยเก็บ) — เข้าสู่ระบบครั้งถัดไปยังใช้ TOTP ได้ปกติ; ถ้าต้องการรหัสสำรอง ให้ reset 2FA ผ่าน super-admin เพื่อ enroll ใหม่
 
+## Recovery หลัง fulfilment fail — `tests/payment-recovery.test.ts` (audit fix #4, 2026-09-27)
+
+- **กฎ (external audit #4):** เมื่อเงินถูกพิสูจน์แล้วว่าได้รับ (SlipOK ตรวจสลิปผ่าน / webhook แจ้ง charge.complete) แต่ confirmation tx fail และ **recovery tx ก็ commit ไม่ได้ด้วย** ห้ามกลืนความล้มเหลวแล้วตอบ 200 เด็ดขาด — เคสเก่า `.catch(() => undefined)` กลืนแล้วตอบ `pending_manual_fulfilment` ทั้งที่ order ยัง pending_payment + attempt ยัง pending + **ไม่มีร่องรอยอะไรเลย** (เงินหายจากระบบโดยไม่มีหลักฐาน):
+  - **Recovery ต้อง awaited + ตรวจผลก่อนตอบ** — success-shaped response (200) ได้เฉพาะหลัง recovery commit จริง (verified ผ่าน outcome); ตอบ 200 โดยไม่รู้ผล = โกหก
+  - **Recovery fail → 5xx + reconciliation record** — `recordPaymentReconciliation` (lib/paymentReconciliation.ts) เขียนแถว `AuditLog` action `payment_reconciliation_required` (actor system) พร้อม trigger/orderId/ref/attemptId/recoveryError — เงินที่พิสูจน์แล้วต้องไม่หายไร้ร่องรอย; ถ้าแม้แต่ record เขียนไม่ได้ = console.error ดัง ๆ เป็น trail สุดท้าย; route ตอบ `RECONCILIATION_REQUIRED` (500) หรือ `FULFILMENT_FAILED` (500) — ไม่มี success-shape
+  - **ALREADY_CLAIMED ≠ failure** — แยก race ที่แพ้ออกจาก failure จริงด้วยการอ่านสถานะ order ปัจจุบัน: completed/pending_manual_fulfilment = มีคนจัดการแล้ว (ตอบตามสถานะ ไม่มี record), ยัง pending_payment = failure จริง → record + 5xx
+  - **ครอบ 3 path:** slip-verify (recovery + unexpected-fulfilment-failure fallback), admin verify-payment (fresh + resume + unexpected fallback), omise webhook (retries 3 ครั้งหมด → record ก่อน return 200 ต่อ LD-10 — gateway ต้องได้ 200 แต่เราต้องมีหลักฐานฝั่งเรา)
+- **เคส regression:** recovery commit → 200 + ไม่มี record, recovery fail → 500 `RECONCILIATION_REQUIRED` + แถว evidence พร้อม trigger/ref/error, ALREADY_CLAIMED race → 409 + ไม่มี record, unexpected failure → 5xx + record เสมอ, `recordPaymentReconciliation` เองต้อง never-throw
+- **การตรวจฝั่งคน:** query แถวได้ด้วย `listReconciliationRecords()` (lib เดียวกัน) — ควรผูกเข้าหน้า admin audit viewer ถัดไป
+
 ## CI pipeline (`.github/workflows/ci.yml`)
 
-| Job                         | ทำอะไร                                                                  | ผูกกับ gate                                                                       |
-| --------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| Lint & Typecheck            | `eslint .` + `tsc --noEmit`                                             | —                                                                                 |
-| Security Audit              | `npm audit --audit-level=high` (blocking)                               | —                                                                                 |
-| Unit Tests                  | `npm test` (vitest ~179 tests)                                          | R1–R6, authz matrix, PII, email outbox, backup codes (concurrency skip อัตโนมัติ) |
-| Concurrency (DB races)      | Postgres 16 service + migrate + `next dev -p 4200` + `NK_TEST_BASE_URL` | Concurrency                                                                       |
-| Build                       | `next build` ด้วย env ปลอม                                              | —                                                                                 |
-| report-build-status, deploy | ของ Vercel (Git integration)                                            | —                                                                                 |
+| Job                         | ทำอะไร                                                                  | ผูกกับ gate                                                                                         |
+| --------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Lint & Typecheck            | `eslint .` + `tsc --noEmit`                                             | —                                                                                                   |
+| Security Audit              | `npm audit --audit-level=high` (blocking)                               | —                                                                                                   |
+| Unit Tests                  | `npm test` (vitest ~187 tests)                                          | R1–R6, authz matrix, PII, email outbox, backup codes, payment recovery (concurrency skip อัตโนมัติ) |
+| Concurrency (DB races)      | Postgres 16 service + migrate + `next dev -p 4200` + `NK_TEST_BASE_URL` | Concurrency                                                                                         |
+| Build                       | `next build` ด้วย env ปลอม                                              | —                                                                                                   |
+| report-build-status, deploy | ของ Vercel (Git integration)                                            | —                                                                                                   |
 
 ทุก push บน `master` = CI 8 checks + deploy prod อัตโนมัติ
 

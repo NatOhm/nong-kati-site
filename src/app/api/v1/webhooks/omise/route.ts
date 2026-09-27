@@ -17,6 +17,7 @@ import { OmiseAdapter } from '@/lib/payment/omise';
 import { prisma } from '@/lib/db';
 import { getOrderById, claimOrderForConfirmation } from '@/api/orders';
 import { fulfilOrder, scheduleOutboxDrain } from '@/lib/fulfilment';
+import { recordPaymentReconciliation } from '@/lib/paymentReconciliation';
 import { getNotificationSettings, notifyPaymentConfirmed, notifyStockLow } from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
@@ -195,7 +196,19 @@ async function handleChargeSucceeded(chargeId: string, gatewayAmount: number): P
             await new Promise((r) => setTimeout(r, 80));
             continue;
           }
-          throw txErr;
+          // Audit #4: all retries failed. Returning 200 here (LD-10) is fine
+          // for the GATEWAY, but the verified payment must not vanish
+          // unrecorded — leave a reconciliation evidence row for operators.
+          await recordPaymentReconciliation({
+            trigger: 'webhook_recovery_failed',
+            orderId: order.id,
+            orderNumber: order.orderNumber,
+            paymentRef: chargeId,
+            paymentAttemptId: attempt.id,
+            failureReason: 'INSUFFICIENT_STOCK',
+            recoveryError: txErr instanceof Error ? txErr.message : String(txErr),
+          });
+          return;
         }
       }
       console.error('[Webhook] Could not record manual-fulfilment state for', chargeId);
