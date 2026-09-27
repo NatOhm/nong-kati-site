@@ -174,16 +174,25 @@ Playwright เลือก target ตาม `E2E_BASE_URL` > localhost:4200 (dev
 - **เคส regression:** provider fail-closed (`re_mock_key` ไม่นับเป็น configured), enqueue ซ้ำ = no-op, race = upsert ไม่ duplicate, enqueue fail กลาง tx → fulfilment reject, worker fail → pending+backoff → failed+lastError, stale `sending` ถูก re-claim, แถวที่ยังไม่ถึง `availableAt` ไม่ถูกส่ง, route 503 เมื่อ delivery fail, drain endpoint ต้องมี token
 - **งานค้างฝั่งคน (ทบทวนทุกครั้ง):** prod ยังไม่มี `NK_RESEND_API_KEY`/`NK_RESEND_FROM_EMAIL` ใน Vercel — ก่อนหน้านี้ระบบจะปลอมว่าส่งสำเร็จ ตอนนี้จะ fail-closed ตามธรรมชาติ: อีเมลทุกฉบับจะ **ค้าง pending ใน outbox พร้อม retry อัตโนมัติ** จนกว่าจะใส่ key จริง (ไม่มีแถวไหนหาย) — ใส่ key แล้ว drain จะส่งทุกฉบับที่ค้างให้เอง
 
+## 2FA backup codes — `tests/admin-backup-codes.test.ts` (audit fix #9, 2026-09-27)
+
+- **กฎ (external audit #9):** รหัสสำรอง 2FA ของแอดมินต้องเป็น recovery path จริง ไม่ใช่ของประดับ — เคสเก่า `setup2fa` generate 10 codes ส่งเข้า UI แต่**ไม่เก็บอะไรเลย** และ `confirm2fa` รับเฉพาะ TOTP 6 หลัก ตอนนี้:
+  - **Hash-only at rest** — `AdminBackupCode` เก็บเฉพาะ SHA-256 ของรหัสแบบ normalize (ตัดช่องว่าง/ขีด, uppercase) plaintext มีอยู่ครั้งเดียวใน setup response; ทุก setup/regeneration **ลบชุดเก่าทิ้ง** (replace-any — hash ตายห้ามสะสมไว้ verify ได้)
+  - **ใช้ตอนล็อกอินได้จริง** — `confirm2fa` รับ TOTP 6 หลัก **หรือ** รหัสสำรอง XXXX-XXXX (รูปทรงไม่ซ้นกัน — TOTP เป็นเลขล้วน รหัสสำรองมีตัวอักษร); การ consume เป็น **CAS เดียว** ด้วย guarded `updateMany` บน `codeHash + usedAt:null` → ใช้ได้ครั้งเดียวต่อหนึ่งรหัส, แพ้ race = ล็อกอินไม่สำเร็จ, รหัสที่ใช้แล้ว/ไม่รู้จัก = **เข้า 5-strike TOTP lockout เดิม** (รหัสหมดอายุต้องไม่กลายเป็น replay oracle)
+  - **UI** — ช่อง 2FA รับได้ทั้งสองรูปแบบ (maxLength 9) + คำอธิบายชัดว่าใช้แทนรหัส 6 หลักได้ครั้งเดียว; route shape-check ยอมรับทั้งแบบมี/ไม่มีขีด
+- **เคส regression:** เก็บ hash ไม่ใช่ plaintext, ชุดใหม่ลบชุดเก่า, consume ครั้งเดียว (ครั้งที่สอง fail), รหัสคนอื่นใช้ไม่ได้, `setup2fa` ต้อง persist (เคสเก่าที่โยนทิ้ง = แดง), confirm ด้วยรหัสสำรองที่ยังไม่ใช้ = session + สถานะ used, ใช้แล้ว/ผิด = lockout เดิม, TOTP ล้วนไม่แตะตารางรหัสสำรอง, challenge ถูกใช้ไป/บัญชี locked ต้อง fail ก่อน verification เสมอ
+- **งานค้างฝั่งคน (ทบทวนทุกครั้ง):** แอดมินที่ enroll 2FA **ก่อน** commit นี้ยังไม่มีรหัสสำรองใน DB (เคสเก่าไม่เคยเก็บ) — เข้าสู่ระบบครั้งถัดไปยังใช้ TOTP ได้ปกติ; ถ้าต้องการรหัสสำรอง ให้ reset 2FA ผ่าน super-admin เพื่อ enroll ใหม่
+
 ## CI pipeline (`.github/workflows/ci.yml`)
 
-| Job                         | ทำอะไร                                                                  | ผูกกับ gate                                                         |
-| --------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| Lint & Typecheck            | `eslint .` + `tsc --noEmit`                                             | —                                                                   |
-| Security Audit              | `npm audit --audit-level=high` (blocking)                               | —                                                                   |
-| Unit Tests                  | `npm test` (vitest ~167 tests)                                          | R1–R6, authz matrix, PII, email outbox (concurrency skip อัตโนมัติ) |
-| Concurrency (DB races)      | Postgres 16 service + migrate + `next dev -p 4200` + `NK_TEST_BASE_URL` | Concurrency                                                         |
-| Build                       | `next build` ด้วย env ปลอม                                              | —                                                                   |
-| report-build-status, deploy | ของ Vercel (Git integration)                                            | —                                                                   |
+| Job                         | ทำอะไร                                                                  | ผูกกับ gate                                                                       |
+| --------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Lint & Typecheck            | `eslint .` + `tsc --noEmit`                                             | —                                                                                 |
+| Security Audit              | `npm audit --audit-level=high` (blocking)                               | —                                                                                 |
+| Unit Tests                  | `npm test` (vitest ~179 tests)                                          | R1–R6, authz matrix, PII, email outbox, backup codes (concurrency skip อัตโนมัติ) |
+| Concurrency (DB races)      | Postgres 16 service + migrate + `next dev -p 4200` + `NK_TEST_BASE_URL` | Concurrency                                                                       |
+| Build                       | `next build` ด้วย env ปลอม                                              | —                                                                                 |
+| report-build-status, deploy | ของ Vercel (Git integration)                                            | —                                                                                 |
 
 ทุก push บน `master` = CI 8 checks + deploy prod อัตโนมัติ
 

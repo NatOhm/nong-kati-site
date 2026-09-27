@@ -19,6 +19,8 @@ export default function AdminLoginPage(): React.JSX.Element {
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(false);
   const [totpCode, setTotpCode] = useState('');
+  // Audit #9: the backup codes handed out at setup are REAL one-time login
+  // codes now — the 2FA box accepts either a 6-digit TOTP or XXXX-XXXX.
   const [challengeToken, setChallengeToken] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -279,8 +281,13 @@ export default function AdminLoginPage(): React.JSX.Element {
               <p className="font-mono text-sm font-bold text-fg-brand">{setupData.secretBase32}</p>
             </div>
 
+            {/* Audit #9: these are REAL one-time login codes — each replaces
+                the 6-digit TOTP once, then dies. */}
             <div className="rounded-md bg-surface p-3">
-              <p className="mb-2 text-xs text-fg-placeholder">รหัสสำรอง (ใช้เมื่อสูญหาย)</p>
+              <p className="mb-2 text-xs text-fg-placeholder">
+                รหัสสำรอง (ใช้แทนรหัส 6 หลักได้เมื่อสูญหาย Authenticator —
+                ใช้ได้ครั้งเดียวต่อหนึ่งรหัส)
+              </p>
               <div className="grid grid-cols-2 gap-1">
                 {setupData.backupCodes.map((code) => (
                   <p key={code} className="font-mono text-xs text-fg-muted">
@@ -295,14 +302,14 @@ export default function AdminLoginPage(): React.JSX.Element {
                 type="text"
                 value={totpCode}
                 onChange={(e) => setTotpCode(e.target.value)}
-                placeholder="กรอกรหัส 6 หลัก"
-                maxLength={6}
+                placeholder="รหัส 6 หลัก หรือรหัสสำรอง XXXX-XXXX"
+                maxLength={9}
                 className="w-full rounded-md border border-line bg-surface px-3 py-2.5 text-center font-mono text-lg tracking-widest text-fg focus:ring-2 focus:ring-peach-500"
               />
               {error && <p className="text-sm text-fg-error">{error}</p>}
               <button
                 type="submit"
-                disabled={loading || totpCode.length !== 6}
+                disabled={loading || totpCode.trim().length < 6}
                 className="w-full rounded-md bg-peach-500 px-5 py-2.5 text-sm font-semibold text-fg hover:bg-peach-400 disabled:opacity-50"
               >
                 {loading ? 'กำลังยืนยัน...' : 'ยืนยัน'}
@@ -318,7 +325,9 @@ export default function AdminLoginPage(): React.JSX.Element {
             className="space-y-4 rounded-md border border-line-subtle bg-surface p-6"
           >
             <h2 className="text-lg font-semibold text-fg">ยืนยันตัวตน</h2>
-            <p className="text-sm text-fg-placeholder">กรอกรหัส 6 หลักจาก Authenticator App</p>
+            <p className="text-sm text-fg-placeholder">
+              กรอกรหัส 6 หลักจาก Authenticator App หรือรหัสสำรอง (XXXX-XXXX)
+            </p>
 
             {error && (
               <div className="border-error bg-error rounded-md border px-3 py-2 text-sm text-fg-error">
@@ -330,15 +339,15 @@ export default function AdminLoginPage(): React.JSX.Element {
               type="text"
               value={totpCode}
               onChange={(e) => setTotpCode(e.target.value)}
-              placeholder="กรอกรหัส 6 หลัก"
-              maxLength={6}
+              placeholder="รหัส 6 หลัก หรือรหัสสำรอง XXXX-XXXX"
+              maxLength={9}
               autoFocus
               className="w-full rounded-md border border-line bg-surface px-3 py-2.5 text-center font-mono text-lg tracking-widest text-fg focus:ring-2 focus:ring-peach-500"
             />
 
             <button
               type="submit"
-              disabled={loading || totpCode.length !== 6}
+              disabled={loading || totpCode.trim().length < 6}
               className={cn(
                 'w-full rounded-md px-5 py-2.5 text-sm font-semibold transition-colors',
                 loading

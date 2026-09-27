@@ -31,6 +31,60 @@ import {
 } from '@/lib/jwt';
 import { ROLE_PERMISSIONS, type AdminRole, type Permission } from '@/types/auth';
 
+// ─── 2FA backup codes (external audit #9, 2026-09-27) ───────────────
+// The old setup flow generated ten codes and shipped them to the UI without
+// persisting anything — they LOOKED like a recovery path but verified
+// nothing, and confirm2fa accepted only the 6-digit TOTP. Now the setup
+// stores ONLY SHA-256 hashes (the plaintext exists exactly once, in the
+// setup response), and confirm2fa accepts either the TOTP or a code,
+// consumed exactly once via a guarded usedAt update.
+
+/** Normalize a backup code the same way before hashing and before use. */
+function normalizeBackupCode(code: string): string {
+  return code
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, '');
+}
+
+/**
+ * Generate ten fresh recovery codes and store ONLY their hashes for the
+ * user. Replace-any semantics: every enrollment/regeneration wipes the
+ * previous set (dead hashes must never accumulate and keep verifying).
+ */
+export async function storeBackupCodes(adminUserId: string): Promise<string[]> {
+  const codes = generateBackupCodes();
+  await prisma.$transaction([
+    prisma.adminBackupCode.deleteMany({ where: { adminUserId } }),
+    prisma.adminBackupCode.createMany({
+      data: codes.map((code) => ({
+        adminUserId,
+        codeHash: hashToken(normalizeBackupCode(code)),
+      })),
+    }),
+  ]);
+  return codes;
+}
+
+/** How many unused codes remain (profile/settings display). */
+export async function countUnusedBackupCodes(adminUserId: string): Promise<number> {
+  return prisma.adminBackupCode.count({ where: { adminUserId, usedAt: null } });
+}
+
+/**
+ * Try to consume a recovery code. The guarded updateMany (codeHash +
+ * unused) IS the one-time CAS — a racer that loses sees count 0 and the
+ * login fails with TOTP_INVALID. Returns the remaining unused count.
+ */
+export async function consumeBackupCode(adminUserId: string, rawCode: string): Promise<boolean> {
+  const codeHash = hashToken(normalizeBackupCode(rawCode));
+  const consumed = await prisma.adminBackupCode.updateMany({
+    where: { adminUserId, codeHash, usedAt: null },
+    data: { usedAt: new Date() },
+  });
+  return consumed.count === 1;
+}
+
 export interface AdminUser {
   id: string;
   email: string;
@@ -361,6 +415,11 @@ export async function setup2fa(challengeToken: string): Promise<{
     await prisma.adminUser.update({ where: { id: user.id }, data: { totpSecret: secret } });
   }
 
+  // Audit #9: persist the recovery codes (hashes only) so the codes on this
+  // screen actually verify at login. Each setup/regeneration replaces the
+  // previous set; the plaintext lives only in this response.
+  const backupCodes = await storeBackupCodes(user.id);
+
   const totpUri = `otpauth://totp/Nong-Kati%3A${encodeURIComponent(user.email)}?secret=${secret}&issuer=Nong-Kati`;
 
   // Render the QR here: a PNG data URL needs no third-party host, no CSP
@@ -377,17 +436,22 @@ export async function setup2fa(challengeToken: string): Promise<{
     totpUri,
     qrDataUrl,
     secretBase32: secret,
-    backupCodes: generateBackupCodes(),
+    backupCodes,
   };
 }
 
 /**
- * Confirm 2FA — verify the TOTP code, activate 2FA, issue the session.
- * 08-auth.md §5.2 — Confirm step.
+ * Confirm 2FA — verify the TOTP code OR a one-time backup code, activate
+ * 2FA, issue the session. 08-auth.md §5.2/§5.3 — Confirm step.
+ *
+ * Audit #9: a valid UNUSED recovery code now logs in (hashed at rest,
+ * consumed atomically by the guarded usedAt update). Wrong anything —
+ * bad TOTP, unknown code, or already-used code — counts toward the same
+ * 5-strike TOTP lockout; a used code must not become a replay oracle.
  */
 export async function confirm2fa(
   challengeToken: string,
-  totpCode: string,
+  code: string,
 ): Promise<{
   success: boolean;
   accessToken?: string;
@@ -419,7 +483,17 @@ export async function confirm2fa(
     };
   }
 
-  const codeOk = await verifyTotpCode(user.totpSecret, totpCode);
+  const cleanCode = code.trim();
+  const isTotpShape = /^\d{6}$/.test(cleanCode);
+  const isBackupShape = /^[A-Z0-9]{8}$/.test(normalizeBackupCode(cleanCode));
+
+  // TOTP first; a 6-digit code can never look like a backup code (letters
+  // required in the XXXX-XXXX shape) and vice versa — no ambiguity.
+  let codeOk = isTotpShape ? await verifyTotpCode(user.totpSecret, cleanCode) : false;
+  if (!codeOk && !isTotpShape && isBackupShape) {
+    codeOk = await consumeBackupCode(user.id, cleanCode);
+  }
+
   if (!codeOk) {
     // Atomic increment — concurrent wrong codes must accumulate, not overwrite.
     const updated = await prisma.adminUser.updateMany({

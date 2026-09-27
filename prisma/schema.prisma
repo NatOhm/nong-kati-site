@@ -567,8 +567,27 @@ model AdminUser {
 
   sessions               AdminSession[]
   supportTicketsAnswered SupportTicket[]
+  backupCodes            AdminBackupCode[]
 
   @@index([email])
+}
+
+/// 2FA recovery codes (external audit #9, 2026-09-27): the setup step hands
+/// the admin ten one-time codes and stores ONLY their SHA-256 hashes here —
+/// the plaintext exists exactly once, in the setup response. Each login may
+/// present a code instead of the 6-digit TOTP; the guarded usedAt update is
+/// the one-time CAS, and wrong guesses feed the same 5-strike TOTP lockout.
+model AdminBackupCode {
+  id          String    @id @default(cuid())
+  adminUserId String
+  codeHash    String    @unique // SHA-256 of the normalized plaintext code
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  adminUser AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  @@index([adminUserId])
+  @@index([usedAt])
 }
 
 /// One row per consumed login-challenge JWT (sha256 of the token). Step-1

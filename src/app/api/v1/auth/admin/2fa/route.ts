@@ -8,6 +8,9 @@ export const dynamic = 'force-dynamic';
  * POST /api/v1/auth/admin/2fa — step 2: TOTP (08-auth.md §5.2).
  * Body {challengeToken, action: 'setup'} hands out QR/secret/backup codes;
  * body {challengeToken, code} verifies the code and issues the session.
+ * Audit #9: `code` may be the 6-digit TOTP or one of the one-time backup
+ * codes (XXXX-XXXX) — the shape check below just rejects obvious junk;
+ * the real verification/consumption lives in confirm2fa.
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
   let body: unknown;
@@ -27,8 +30,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json(setup, { status: setup.success ? 200 : 401 });
   }
 
-  const code = typeof b['code'] === 'string' ? b['code'] : '';
-  if (!/^\d{6}$/.test(code)) {
+  const code = typeof b['code'] === 'string' ? b['code'].trim() : '';
+  const codeShape =
+    /^\d{6}$/.test(code) || // TOTP
+    /^[A-Za-z0-9]{4}-[A-Za-z0-9]{4}$/.test(code) || // backup code as printed
+    /^[A-Za-z0-9]{8}$/.test(code); // backup code without the dash
+  if (!codeShape) {
     return NextResponse.json({ error: 'TOTP_INVALID' }, { status: 401 });
   }
 

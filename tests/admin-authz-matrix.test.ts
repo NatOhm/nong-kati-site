@@ -287,10 +287,13 @@ let mods: Record<string, Record<string, unknown>>;
 
 beforeEach(async () => {
   if (!mods) {
+    // The one-time route sweep imports every admin route module (~50 files);
+    // on a cold worker that can legitimately exceed the 10s default, and a
+    // hook timeout here fails the coverage gate without a code regression.
     mods = await importAllRoutes();
     buildRoutePatterns();
   }
-});
+}, 60_000);
 
 /**
  * Module keys use the real `[param]` route segments (which differ per route:
