@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { createOrder } from '@/api/orders';
-import { getManualTransferInfo } from '@/lib/data';
 import { getCustomerFromToken } from '@/api/customerAuth';
+import { getManualTransferInfo } from '@/lib/data';
+import { hasUsableChannel, resolvePaymentChannels } from '@/lib/paymentChannels';
 import { isOpnConfigured } from '@/lib/payment/omise';
 import { prisma } from '@/lib/db';
 
@@ -85,10 +86,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // PromptPay unreachable), and manual-only environments keep working.
   // Wallet-only customers are unaffected either way (wallet payment does
   // not need an external channel).
+  const sessionCookie = req.cookies.get(COOKIE)?.value ?? null;
   const [manualInfo, opnReady] = await Promise.all([getManualTransferInfo(), isOpnConfigured()]);
   const manualUsable =
     manualInfo.enabled && Boolean(manualInfo.accountName) && Boolean(manualInfo.accountNumber);
-  if (!manualUsable && !opnReady) {
+  const channels = await resolvePaymentChannels({
+    manualUsable,
+    opnReady,
+    customerSessionCookie: sessionCookie,
+  });
+  if (!hasUsableChannel(channels)) {
     return NextResponse.json({ error: { code: 'NO_PAYMENT_CHANNEL' } }, { status: 503 });
   }
 

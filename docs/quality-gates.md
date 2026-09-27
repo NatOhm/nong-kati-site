@@ -239,6 +239,27 @@ browser-session เมื่อไม่จดจำ) ที่ JS อ่าน�
 
 Test: 14 เคส — Bearer/cookie resolution, HttpOnly+markers, browser-session cookie, clear ครบทุกชื่อ, rotation ไม่ echo token, dead refresh เคลียร์ cookie, logout เคลียร์แม้ไม่มี body, strict 503/fail-open, build-info 401/token/RLS drift
 
+## Roadmap hardening (2026-09-27, §1–§6) — `tests/roadmap-hardening.test.ts`
+
+**§1 ปิดช่องโหว่ครบวงจร:**
+
+- **CSP enforced + nonce (default ON ใน prod):** middleware ออก `script-src 'self' 'nonce-<per-request>'` **ไม่มี `unsafe-inline`** — Next.js รับ nonce จาก request CSP header (official pattern) ส่วน theme pre-paint init ย้ายเป็น static file `/theme-init.js` (`<Script strategy="beforeInteractive">`) JSON-LD เป็น data-only script ไม่กระทบ Escape hatch: `NK_CSP_UNSAFE_INLINE=true` คืนพฤติกรรมเดิมโดยไม่ต้องแก้โค้ด, staging ยังใช้ `NK_CSP_REPORT_ONLY=true` ได้
+- **Migration `20260927300000_revoke_stale_admin_sessions`:** revoke AdminSession ที่ยังมีชีวิตทั้งหมด (kill session ที่อาจรั่วจาก XSS ก่อน deploy cookies) — แอดมินต้อง login ใหม่หนึ่งครั้ง
+
+**§2 เมล reliable:** Resend รับ `Idempotency-Key` (outbox ส่ง key ของแถวให้ provider — ยิงซ้ำไม่มีวันได้เมลซ้ำ) + outbox ที่หมดทางหายใจ (8 attempts) เขียน audit row `email_outbox_dead_letter` = alert ที่มองเห็นนอก log (never-throw)
+
+**§4 gate = union:** `src/lib/paymentChannels.ts` — `resolvePaymentChannels()` รวม **Opn / manual transfer / wallet** (wallet = มี customer session ที่ valid) ไม่มีช่องทางใดเลย → 503 NO_PAYMENT_CHANNEL (matrix ครบใน test: Opn-only / manual-only / wallet-only / ว่าง)
+
+**§5 release identity:** `GET /api/v1/version` — public, ตอบ `{gitSha, gitRef}` เท่านั้น (GIT_SHA inject จาก vercel.json); ตัวเต็ม (migration/RLS) ยังอยู่หลัง auth ที่ `/api/v1/internal/build-info`
+
+**§6 operations:**
+
+- `GET /api/v1/admin/reconciliation` (perm `orders:read`) — queue ของ operator: payment reconciliation rows (**resolved ดูจากสถานะ order ปัจจุบัน**), email dead letters, และ **webhook-gaps** (order `pending_payment` ที่มี attempt `succeeded` = เงินเข้าแต่ order ค้าง)
+- `GET /api/v1/internal/ops-health` (internal token/admin JWT) — สัญญาณ uptime: paid-unfulfilled, dead letters, open reconciliations, stuck-sending emails, migration state, limiter mode (shared/memory/strict)
+- §3 state machine: คงสถานะ `pending_payment → completed | pending_manual_fulfilment | refunded` เดิม (reconciliation row คือ exceptional state อยู่แล้ว) — การเพิ่ม enum กลางคันจะทำให้ทุก consumer ต้องรู้สถานะใหม่โดยไม่มีผลประโยชน์เชิงความปลอดภัย
+
+Test: 14 เคส + static guards (ไม่มี inline script ใน layout, migration SQL รูปแบบถูก, gate ใหม่)
+
 ## CI pipeline (`.github/workflows/ci.yml`)
 
 | Job                         | ทำอะไร                                                                  | ผูกกับ gate                                                                                                    |

@@ -34,6 +34,49 @@ import { sendEmailWithRetry } from '@/lib/email/resend';
 /** Delivery attempt budget per row before it parks as failed. */
 export const MAX_OUTBOX_ATTEMPTS = 8;
 
+/**
+ * Dead-letter alert (roadmap §2): an outbox row that exhausted every retry
+ * is an UNDELIVERED customer email — codes, password reset, order confirm.
+ * Beyond logs, drop a best-effort AuditLog row (action
+ * `email_outbox_dead_letter`) so it shows up in the admin audit trail and
+ * the ops health endpoint; the outbox row itself stays retryable.
+ */
+export function recordOutboxDeadLetter(
+  outboxId: string,
+  idempotencyKey: string,
+  toEmail: string,
+  attempts: number,
+  error: string,
+): void {
+  // The alert must NEVER break the delivery loop — every failure mode
+  // (sync throw, rejected write) collapses into a console trail.
+  try {
+    void prisma.auditLog
+      .create({
+        data: {
+          actorType: 'system',
+          actorId: 'email-outbox',
+          actorEmail: 'system@nong-kati.local',
+          action: 'email_outbox_dead_letter',
+          tableName: 'EmailOutbox',
+          recordId: outboxId,
+          metadata: { idempotencyKey, toEmail, attempts, error },
+        },
+      })
+      .catch((err: unknown) => {
+        console.error(
+          `[email-outbox] FAILED to record dead-letter for ${outboxId}:`,
+          err instanceof Error ? err.message : err,
+        );
+      });
+  } catch (err) {
+    console.error(
+      `[email-outbox] FAILED to record dead-letter for ${outboxId}:`,
+      err instanceof Error ? err.message : err,
+    );
+  }
+}
+
 /** Rows to drain per invocation. */
 const BATCH_SIZE = 20;
 
@@ -154,7 +197,15 @@ export async function processDueEmails(limit: number = BATCH_SIZE): Promise<{
   for (const row of claimed) {
     const current = await prisma.emailOutbox.findUnique({
       where: { id: row.id },
-      select: { id: true, toEmail: true, subject: true, html: true, text: true, attempts: true },
+      select: {
+        id: true,
+        toEmail: true,
+        subject: true,
+        html: true,
+        text: true,
+        attempts: true,
+        idempotencyKey: true,
+      },
     });
     if (!current) {
       continue;
@@ -165,6 +216,10 @@ export async function processDueEmails(limit: number = BATCH_SIZE): Promise<{
       subject: current.subject,
       html: current.html,
       ...(current.text !== null ? { text: current.text } : {}),
+      // Provider-side dedup: a lost success (network blip after Resend
+      // accepted the send) retried with the same key can never duplicate
+      // the email — Resend recognizes the key.
+      idempotencyKey: current.idempotencyKey,
     });
 
     if (result.success) {
@@ -195,6 +250,20 @@ export async function processDueEmails(limit: number = BATCH_SIZE): Promise<{
       `[email-outbox] delivery ${exhausted ? 'parked as FAILED' : 'retry scheduled'} ` +
         `id=${current.id} to=${current.toEmail} attempts=${attempts} error=${result.error ?? '?'}`,
     );
+    if (exhausted) {
+      // Roadmap §2 — alerts for permanently failed entries: a dead-letter
+      // row is an UNDELIVERED customer email (codes, password reset, …),
+      // so it must be visible outside logs. Best-effort audit row (same
+      // pattern as payment reconciliation); the outbox row itself remains
+      // the retryable source of truth (admin re-runs reset it).
+      recordOutboxDeadLetter(
+        current.id,
+        current.idempotencyKey,
+        current.toEmail,
+        attempts,
+        result.error ?? 'UNKNOWN_ERROR',
+      );
+    }
   }
 
   return { processed: claimed.length, sent, failed };
@@ -205,8 +274,7 @@ export async function processDueEmails(limit: number = BATCH_SIZE): Promise<{
  * floating promise can be frozen away once the handler returns). Resolves
  * `next/server` at runtime so bundling this module into client graphs
  * stays safe (same indirection as writeAuditLog).
- */
-async function nextAfter(): Promise<((cb: () => Promise<unknown>) => void) | null> {
+ */ async function nextAfter(): Promise<((cb: () => Promise<unknown>) => void) | null> {
   try {
     const load = new Function('m', 'return import(m)') as (
       m: string,

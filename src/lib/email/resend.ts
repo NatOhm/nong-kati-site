@@ -57,7 +57,7 @@ interface ResendSendResponse {
 }
 
 /** One POST to the Resend API. Throws on network failure / non-2xx. */
-async function resendSend(options: EmailOptions): Promise<string> {
+async function resendSend(options: EmailOptions & { idempotencyKey?: string }): Promise<string> {
   const apiKey = process.env['NK_RESEND_API_KEY'];
   const from = process.env['NK_RESEND_FROM_EMAIL'];
 
@@ -68,6 +68,14 @@ async function resendSend(options: EmailOptions): Promise<string> {
     throw new Error('EMAIL_NOT_CONFIGURED: NK_RESEND_FROM_EMAIL is not set');
   }
 
+  // Roadmap §2 — provider-side idempotency: same key = same email, Resend
+  // deduplicates its retries (and ours) on their side.
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+  };
+  if (options.idempotencyKey) headers['Idempotency-Key'] = options.idempotencyKey;
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
@@ -75,10 +83,7 @@ async function resendSend(options: EmailOptions): Promise<string> {
   try {
     res = await fetch(RESEND_ENDPOINT, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
         from,
         to: [options.to],
@@ -113,7 +118,9 @@ async function resendSend(options: EmailOptions): Promise<string> {
  * no retries (configuration errors cannot heal by retrying).
  * 10-digital-code.md §9.2 — Retried 3× exponential backoff (2s, 4s, 8s).
  */
-export async function sendEmail(options: EmailOptions): Promise<EmailResult> {
+export async function sendEmail(
+  options: EmailOptions & { idempotencyKey?: string },
+): Promise<EmailResult> {
   if (!isEmailDeliveryConfigured()) {
     const missing = process.env['NK_RESEND_API_KEY'] ? 'NK_RESEND_FROM_EMAIL' : 'NK_RESEND_API_KEY';
     console.error(`[Email] NOT CONFIGURED — set ${missing} (mock success is no longer returned)`);
@@ -145,7 +152,7 @@ export async function sendEmail(options: EmailOptions): Promise<EmailResult> {
  * 10-digital-code.md §9.2 — notification_logs retry pattern.
  */
 export async function sendEmailWithRetry(
-  options: EmailOptions,
+  options: EmailOptions & { idempotencyKey?: string },
   maxRetries: number = 3,
 ): Promise<EmailResult> {
   let lastError: string | undefined;

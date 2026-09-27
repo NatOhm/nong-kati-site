@@ -159,7 +159,11 @@ describe('HIGH-3 — order creation gate is the union of channels', () => {
     const fs = await import('node:fs');
     const src = fs.readFileSync('src/app/api/v1/orders/route.ts', 'utf8');
     expect(src).toContain('isOpnConfigured');
-    expect(src).toContain('!manualUsable && !opnReady');
+    // Roadmap §4: the gate is now the full union via resolvePaymentChannels
+    // (Opn OR manual OR wallet) — no single-channel conjunction remains.
+    expect(src).toContain('resolvePaymentChannels');
+    expect(src).toContain('hasUsableChannel');
+    expect(src).not.toContain('!manualUsable && !opnReady');
     // The legacy single-channel hard gate is gone.
     expect(src).not.toContain('if (!manualInfo.enabled');
   });

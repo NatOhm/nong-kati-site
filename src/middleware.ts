@@ -2,48 +2,49 @@
  * Next.js Middleware — 13-security.md §8 Security Headers.
  * Applied to every response. CSP, HSTS, X-Frame-Options, etc.
  *
- * CSP report-only rollout: set NK_CSP_REPORT_ONLY=true in staging first.
+ * CSP rollout (production roadmap §1):
+ *  - Production (default): ENFORCED policy with a per-request `'nonce-…'`
+ *    in script-src and NO 'unsafe-inline' — the closing move of the
+ *    JSON-LD XSS saga. Next.js picks the nonce up from the request CSP
+ *    header (official pattern) and applies it to its own bootstrap
+ *    scripts; JSON-LD blocks are data-only `<script type="application/
+ *    ld+json">` and need no nonce. The one former inline script
+ *    (theme pre-paint init) now loads from /theme-init.js.
+ *  - Escape hatch: NK_CSP_UNSAFE_INLINE=true restores the old
+ *    unsafe-inline policy without a redeploy of code (env rollback).
+ *  - Staging: NK_CSP_REPORT_ONLY=true switches to the report-only header.
+ *  - Dev: 'unsafe-eval' for React Refresh stays available.
  */
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { applyRateLimit } from '@/lib/rateLimit';
 
-// ─── CSP Policy ─────────────────────────────────────────
-// 13-security.md §8 — locked values
-// Dev mode needs 'unsafe-eval' for React Refresh (HMR)
 const isDev = process.env.NODE_ENV === 'development';
-const evalRule = isDev ? " 'unsafe-eval'" : '';
 
-const CSP_DIRECTIVES = [
-  "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${evalRule} https://www.google.com https://www.gstatic.com`,
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "font-src 'self' https://fonts.gstatic.com",
-  "img-src 'self' https://cdn.nong-kati.co.th data: https://www.google.com https://api.qrserver.com",
-  "connect-src 'self' https://api.omise.co https://*.2c2p.com https://www.google-analytics.com",
-  'frame-src https://js.omise.co https://pay.omise.co https://*.2c2p.com https://www.google.com',
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-  'upgrade-insecure-requests',
-].join('; ');
+function buildCsp(nonce: string | undefined): string {
+  const evalRule = isDev ? " 'unsafe-eval'" : '';
+  // Nonce policy in production; unsafe-inline otherwise (dev + escape hatch).
+  const inlineScriptRule = nonce && !isDev ? ` 'nonce-${nonce}'` : " 'unsafe-inline'";
+  return [
+    "default-src 'self'",
+    `script-src 'self'${inlineScriptRule}${evalRule} https://www.google.com https://www.gstatic.com`,
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com",
+    "img-src 'self' https://cdn.nong-kati.co.th data: https://www.google.com https://api.qrserver.com",
+    "connect-src 'self' https://api.omise.co https://*.2c2p.com https://www.google-analytics.com",
+    'frame-src https://js.omise.co https://pay.omise.co https://*.2c2p.com https://www.google.com',
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    'upgrade-insecure-requests',
+  ].join('; ');
+}
 
-const CSP_REPORT_DIRECTIVES = [
-  "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${evalRule} https://www.google.com https://www.gstatic.com`,
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "font-src 'self' https://fonts.gstatic.com",
-  "img-src 'self' https://cdn.nong-kati.co.th data: https://www.google.com https://api.qrserver.com",
-  "connect-src 'self' https://api.omise.co https://*.2c2p.com https://www.google-analytics.com",
-  'frame-src https://js.omise.co https://pay.omise.co https://*.2c2p.com https://www.google.com',
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-  'report-uri /api/v1/csp-report',
-].join('; ');
+function buildReportCsp(nonce: string | undefined): string {
+  return `${buildCsp(nonce)}; report-uri /api/v1/csp-report`;
+}
 
 // ─── Route Groups ───────────────────────────────────────
 
@@ -73,6 +74,23 @@ function isWebhookRoute(pathname: string): boolean {
 export async function middleware(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
 
+  // ─── CSP mode + nonce ────────────────────────────────
+  const reportOnly = process.env['NK_CSP_REPORT_ONLY'] === 'true';
+  const escapeHatch = process.env['NK_CSP_UNSAFE_INLINE'] === 'true';
+  const enforceNonce = !isDev && !escapeHatch;
+  const nonce = enforceNonce ? btoa(crypto.randomUUID()) : undefined;
+  const cspHeader = reportOnly ? 'Content-Security-Policy-Report-Only' : 'Content-Security-Policy';
+  const cspValue = reportOnly ? buildReportCsp(nonce) : buildCsp(nonce);
+
+  // Request headers carrying the nonce: Next.js reads the CSP from here and
+  // applies the nonce to its own inline bootstrap scripts automatically.
+  let requestHeaders = request.headers;
+  if (nonce) {
+    requestHeaders = new Headers(request.headers);
+    requestHeaders.set('x-nonce', nonce);
+    requestHeaders.set('Content-Security-Policy', cspValue);
+  }
+
   // ─── Rate limiting (API routes) ───────────────────
   // Sliding-window limiter from 13-security.md §5 — shared Upstash counter
   // when configured (serverless-safe), per-instance memory otherwise.
@@ -86,29 +104,19 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
       'unknown';
     limited = await applyRateLimit(pathname, ip);
     limited.headers.set('X-RateLimit-Scoped-By', 'ip');
-    if (limited.status === 429) return limited;
+    if (limited.status === 429) {
+      limited.headers.set(cspHeader, cspValue);
+      return limited;
+    }
   }
 
-  const response = limited ?? NextResponse.next();
-
-  // Use report-only CSP in staging
-  const reportOnly = process.env['NK_CSP_REPORT_ONLY'] === 'true';
-  // NK_CSP_STRICT=true (production review CRITICAL-1 follow-up): enforce the
-  // policy WITHOUT 'unsafe-inline' in script-src. JSON-LD blocks are
-  // data-only <script type="application/ld+json"> and unaffected; enable
-  // this only after verifying no inline runtime script needs it (Next.js
-  // injects inline bootstrap scripts — verify in preview first). Default:
-  // enforced-with-unsafe-inline (or report-only when NK_CSP_REPORT_ONLY=true).
-  const strict = process.env['NK_CSP_STRICT'] === 'true' && !isDev;
-  const buildCsp = (directives: string): string =>
-    strict
-      ? directives.replace("script-src 'self' 'unsafe-inline'", "script-src 'self'")
-      : directives;
-  const cspHeader = reportOnly ? 'Content-Security-Policy-Report-Only' : 'Content-Security-Policy';
-  const cspValue = buildCsp(reportOnly ? CSP_REPORT_DIRECTIVES : CSP_DIRECTIVES);
+  const response =
+    limited ??
+    (nonce ? NextResponse.next({ request: { headers: requestHeaders } }) : NextResponse.next());
 
   // ─── Core Security Headers (all routes) ───────────
   response.headers.set(cspHeader, cspValue);
+  if (nonce) response.headers.set('x-nonce', nonce);
   response.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
   response.headers.set('X-Frame-Options', 'DENY');
   response.headers.set('X-Content-Type-Options', 'nosniff');

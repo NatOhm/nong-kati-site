@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Script from 'next/script';
 import { JetBrains_Mono, Mitr, Noto_Sans_Thai_Looped } from 'next/font/google';
 
 import { MascotProvider } from '@/providers/MascotProvider';
@@ -51,8 +52,11 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-/** No-FOUC: apply the stored/system theme — and the remembered motion choice — before first paint. */
-const themeInitScript = `(function(){try{var t=localStorage.getItem('nk-theme');if(t!=='dark'&&t!=='light'){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','light');}try{var m=localStorage.getItem('nk-motion');if(m==='on'||m==='off'){document.documentElement.setAttribute('data-motion',m);}}catch(e){}})();`; /** 14-seo.md §13.1 — single sitewide lang="th", no per-page override. */
+/** No-FOUC: apply the stored/system theme — and the remembered motion choice — before first paint.
+ * Roadmap §1 (CSP): loaded from /theme-init.js instead of an inline script so the
+ * enforced nonce CSP (no 'unsafe-inline') never blocks it. Keep in sync with
+ * public/theme-init.js. */
+/** 14-seo.md §13.1 — single sitewide lang="th", no per-page override. */
 export default async function RootLayout({
   children,
 }: {
@@ -65,7 +69,10 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        {/* beforeInteractive = injected into <head> and executed before React
+            hydrates — keeps the no-FOUC guarantee without an inline script
+            (which the enforced nonce CSP forbids). */}
+        <Script src="/theme-init.js" strategy="beforeInteractive" />
       </head>
       <body className="text-thai font-ui">
         {/* Shared SVG paint-server defs (one document-wide registry — the
