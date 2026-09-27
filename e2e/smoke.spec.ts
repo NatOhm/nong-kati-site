@@ -94,61 +94,32 @@ test.describe('home page under enforced CSP', () => {
 });
 
 /**
- * Guest checkout → order creation. Cart is seeded via localStorage (v2
- * schema from CartProvider), the contact form walks step 1, and the order
- * is verified through the API + its confirmation page (§2 definition of
- * done: "the order link works").
+ * Guest checkout → order creation, driven through the real UI: product
+ * page → add to cart → contact form. The order is then verified through
+ * the API payload + its confirmation page (§2 definition of done: "the
+ * order link works").
  */
 test.describe('checkout flow creates an order', () => {
-  test('guest checkout: seeded cart → contact form → pending_payment order', async ({ page }) => {
+  test('guest checkout: product → cart → contact form → pending_payment order', async ({
+    page,
+  }) => {
     test.setTimeout(180_000); // compile headroom when pointed at `next dev`
 
     const orderCapture = captureOrderCreation(page);
 
-    await page.goto('/checkout');
+    // 1. Walk the REAL add-to-cart path (product page → add button) instead
+    //    of seeding localStorage: the persisted cart is only accepted when
+    //    its sessionKey matches 'nk_cart_session', and the provider's
+    //    persist effect races any direct seeding — driving the UI is
+    //    deterministic and covers the actual customer path.
+    await page.goto('/product/hbo-max-7-4k');
+    const addBtn = page.getByRole('button', { name: 'เพิ่มลงตะกร้า' });
+    await expect(addBtn).toBeVisible({ timeout: 30_000 });
+    await expect(addBtn).toBeEnabled();
+    await addBtn.click();
 
-    // Seed the cart exactly as CartProvider persists it (key nk_cart:v2 +
-    // per-tab session key), then reload so the provider hydrates it.
-    await page.evaluate(() => {
-      // Seed id formula: `${slug}-${label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`
-      // (Thai chars each become a dash — verified against prisma/seed.ts).
-      const variantId = 'hbo-max-7-4k-7-----4k---4-';
-      const item = {
-        id: 'smoke-item-1',
-        variantId,
-        skuCode: '7 วัน 4K (÷4)',
-        productNameTh: 'HBO Max 7 วัน 4K',
-        productNameEn: 'HBO Max 7 วัน 4K',
-        productSlug: 'hbo-max-7-4k',
-        thumbnailUrl: null,
-        denominationThb: 25,
-        unitPriceThb: 25,
-        vatAmountThb: 0,
-        quantity: 1,
-        lineTotalThb: 25,
-        inStock: true,
-        availableQuantity: 10,
-        maxQuantity: 10,
-      };
-      // The stored cart is only accepted when its sessionKey matches the
-      // one getSessionKey() keeps under 'nk_cart_session' — set both.
-      const sessionKey = crypto.randomUUID();
-      const cart = {
-        cartId: null,
-        sessionKey,
-        items: [item],
-        summary: {
-          subtotalThb: 25,
-          vatAmountThb: 1.75,
-          totalAmountThb: 25,
-          itemCount: 1,
-          discountAmountThb: 0,
-        },
-      };
-      localStorage.setItem('nk_cart_session', sessionKey);
-      localStorage.setItem('nk_cart:v2', JSON.stringify(cart));
-    });
-    await page.reload();
+    // 2. Straight to checkout with a filled cart.
+    await page.goto('/checkout');
 
     // Step 1 — contact form (ContactForm ids are useId-derived; the TOS
     // checkbox id ends with "-tos").
