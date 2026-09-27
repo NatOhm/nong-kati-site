@@ -38,6 +38,21 @@ function captureOrderCreation(page: import('@playwright/test').Page): {
   return { body: () => created };
 }
 
+/**
+ * The script-src directive of an enforced CSP: nonce'd, no 'unsafe-inline'.
+ * Scoped to script-src ON PURPOSE — style-src keeps 'unsafe-inline' (Tailwind
+ * utilities) and must not trip this gate (same false positive the static
+ * CSP test hit before it was scoped).
+ */
+function scriptSrcDirective(csp: string): string {
+  return (
+    csp
+      .split(';')
+      .map((d) => d.trim())
+      .find((d) => d.startsWith('script-src')) ?? ''
+  );
+}
+
 /** Home page must not just return HTML — the framework must boot. */
 test.describe('home page under enforced CSP', () => {
   test('loads, ships an enforced CSP, and hydrates interactive UI', async ({ page }) => {
@@ -53,8 +68,9 @@ test.describe('home page under enforced CSP', () => {
     // 1. The enforced nonce policy is present (production roadmap §1).
     const csp = response?.headers()['content-security-policy'] ?? '';
     expect(csp, 'CSP header must be present').not.toBe('');
-    expect(csp).toContain("script-src 'self' 'nonce-");
-    expect(csp).not.toContain("'unsafe-inline'");
+    const scriptSrc = scriptSrcDirective(csp);
+    expect(scriptSrc, 'script-src must carry the per-request nonce').toContain("'nonce-");
+    expect(scriptSrc, "script-src must not allow 'unsafe-inline'").not.toContain("'unsafe-inline'");
     expect(csp).toContain("frame-ancestors 'none'");
 
     // 2. Seed data is actually reachable through the real catalog query.
@@ -176,7 +192,10 @@ test.describe('API security headers', () => {
     expect(Object.keys(body).sort()).toEqual(['gitRef', 'gitSha']);
 
     const csp = res.headers()['content-security-policy'] ?? '';
-    expect(csp).toContain("script-src 'self' 'nonce-");
+    expect(scriptSrcDirective(csp), "script-src must be nonce'd").toContain("'nonce-");
+    expect(scriptSrcDirective(csp), "script-src must not allow 'unsafe-inline'").not.toContain(
+      "'unsafe-inline'",
+    );
   });
 
   test('manual-info channel reflects the seeded setting', async ({ request }) => {
