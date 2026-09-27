@@ -46,6 +46,19 @@ const REQUEST_TIMEOUT_MS = 15_000;
 /** PromptPay QR PNG is fetched server-side (secret-key protected). */
 const QR_DOWNLOAD_TIMEOUT_MS = 10_000;
 
+/**
+ * Cheap capability probe for order-creation gating (production review
+ * HIGH-3): true when a usable payment channel exists — mock mode (deliberate
+ * nonproduction choice) or real Opn credentials. Must NOT construct the
+ * adapter (its constructor throws without credentials); this only reads env.
+ */
+export function isOpnConfigured(): boolean {
+  if (process.env.NODE_ENV !== 'production' && process.env['NK_PAYMENT_MOCK'] === 'true') {
+    return true;
+  }
+  return Boolean(process.env['NK_OMISE_SECRET_KEY'] && process.env['NK_OMISE_WEBHOOK_SECRET']);
+}
+
 export class OmiseAdapter implements PaymentGateway {
   private secretKey: string;
   private webhookSecret: string;
@@ -249,6 +262,41 @@ export class OmiseAdapter implements PaymentGateway {
     }
     const status = normalizeChargeStatus(refund['status']);
     return { refundId, status: status === 'failed' ? 'failed' : status };
+  }
+
+  /**
+   * Independent charge verification (production review HIGH-6): retrieve the
+   * charge by ID through the authenticated Opn API so a webhook event is
+   * never trusted on its payload alone — amount, currency, livemode and
+   * metadata are read back from the source of truth. GET (no body).
+   */
+  async retrieveCharge(chargeId: string): Promise<Record<string, unknown>> {
+    if (!this.secretKey) {
+      throw new Error('OMISE_NOT_CONFIGURED: NK_OMISE_SECRET_KEY is not set');
+    }
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    try {
+      const res = await fetch(`${this.apiBase}/charges/${encodeURIComponent(chargeId)}`, {
+        headers: {
+          Authorization: `Basic ${Buffer.from(`${this.secretKey}:`).toString('base64')}`,
+        },
+        signal: controller.signal,
+      });
+      const parsed = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      if (!res.ok) {
+        const code = typeof parsed['code'] === 'string' ? parsed['code'] : 'unknown';
+        throw new Error(`OMISE_API_ERROR: charge lookup ${res.status} ${code}`);
+      }
+      return parsed;
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        throw new Error('OMISE_TIMEOUT: charge lookup did not respond in time');
+      }
+      throw err instanceof Error ? err : new Error(String(err));
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   // ─── Real API plumbing ───────────────────────────────────

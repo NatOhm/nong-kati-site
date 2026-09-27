@@ -297,6 +297,7 @@ describe('enqueueEmail — tx-bound + idempotent', () => {
 describe('fulfilOrder fault injection — broken outbox rolls back the fulfilment', () => {
   const ORDER = {
     id: 'ord-fault',
+    confirmationUuid: 'cu-ord-fault',
     orderNumber: 'NK-1001',
     customerEmail: 'cust@test.local',
     status: 'payment_confirmed',
@@ -357,9 +358,18 @@ describe('fulfilOrder fault injection — broken outbox rolls back the fulfilmen
     expect(outbox[0]?.idempotencyKey).toBe('code_delivery:ord-fault');
     expect(outbox[0]?.toEmail).toBe('cust@test.local');
 
+    // Production review HIGH-1: the email payload MUST carry the actual
+    // allocated codes and a link that resolves (confirmationUuid, not the
+    // internal order id which the order page does not accept).
+    expect(outbox[0]?.html).toContain('TEST-CODE-0001');
+    expect(outbox[0]?.html).toContain('/orders/cu-ord-fault');
+    expect(outbox[0]?.html).not.toContain('/orders/ord-fault');
+
     // A repeat confirmation (webhook redelivery / admin re-press) enqueues
     // nothing new — the unique idempotency key absorbs it.
-    await enqueueCodeDeliveryEmail(TX, ORDER);
+    await enqueueCodeDeliveryEmail(TX, ORDER, [
+      { code: 'TEST-CODE-0001', productName: 'HBO Max 7 วัน', denomination: 25 },
+    ]);
     expect(outbox).toHaveLength(1);
   });
 });

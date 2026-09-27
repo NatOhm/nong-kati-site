@@ -81,7 +81,7 @@ describe('slip-verify recovery claims through the shared helper (production revi
     const fs = await import('node:fs');
     const src = fs.readFileSync('src/app/api/v1/payments/slip-verify/route.ts', 'utf8');
     const recovery = src.slice(src.indexOf('INSUFFICIENT_STOCK') /* first marker */);
-    expect(recovery).toContain('claimOrderForConfirmation(order.id, tx)');
+    expect(recovery).toContain('claimOrderForConfirmation(order.id, tx, { paidExternally: true })');
     // No bare order-status write inside the recovery transaction.
     expect(recovery).not.toMatch(/tx\.order\.updateMany\(/);
     expect(recovery).toContain("manualFulfilmentReason: 'INSUFFICIENT_STOCK'");

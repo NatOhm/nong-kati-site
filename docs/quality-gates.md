@@ -212,6 +212,17 @@ Playwright เลือก target ตาม `E2E_BASE_URL` > localhost:4200 (dev
 - **[Medium] Admin logout await revocation (`AdminTopBar.tsx`)** — เดิม fire-and-forget + navigate ทันที → refresh token ถูกขโมยยัง valid; ตอนนี้ await revocation (bounded 4s + keepalive) ก่อนเคลียร์ + navigate; ปุ่ม disabled ระหว่างทำ; ยังคงทำต่อ: ย้าย refresh token ไป HttpOnly cookie เพื่อปิดปัญหานี้ถาวร (รวมกับข้อ XSS ด้วย)
 - **[Medium] Rate-limit degrade (ค้าง)** — ตาม report: high-risk routes ควร fail-closed/degraded เมื่อ shared limiter ตาย + แยก low-risk read ที่ fail-open ได้ — ยังไม่ทำ ต้องระวัง lockout ปลอมจาก limiter outage
 
+## Production-review round 2 (2026-09-27, report ที่ faa515a) — `tests/review-fixes.test.ts`
+
+- **[CRITICAL] Breadcrumb JSON-LD XSS** — รอบก่อน escape เฉพาะ `StructuredData` แต่ `Breadcrumb` ยังใช้ `JSON.stringify` ดิบ (`category` จาก attacker-controlled เข้า breadcrumb) — ปิดจบด้วย static guard ใน `tests/review-fixes.test.ts` ที่สแกนว่า **ห้ามมี `dangerouslySetInnerHTML={{ __html: JSON.stringify(` หลงเหลือ** ใน component ใด ๆ อีก; ตัวสแกนชุดนี้ต้องขยายเมื่อเพิ่ม JSON-LD ใหม่; **ค้างฝั่งโครงสร้าง:** admin refresh token ยังอยู่ localStorage (ต้องย้าย HttpOnly) และ CSP ยัง permit unsafe-inline
+- **[High] เมลส่งโค้ดจริง** — `enqueueCodeDeliveryEmail(tx, order, delivered)` รับ plaintext codes จาก fulfilment แล้ว render ทุกโค้ด (template รับ `codes: string[]` ต่อบรรทัด); ลิงก์ใช้ `/orders/<confirmationUuid>` (id ภายใน = 404); `siteUrl()` fail-closed ใน production เมื่อไม่ตั้ง `NEXT_PUBLIC_SITE_URL` (เดิมตก localhost) — test assert ทั้ง codes/URL/id ใน outbox row
+- **[High] coupon ห้ามกลืนเงินที่โอนแล้ว** — `claimOrderForConfirmation(..., { paidExternally: true })` สำหรับ path ที่เงินออกไปแล้วจริง (webhook จาก Opn / slip-verify / admin ที่ถือสลิป): coupon หมดอายุ/ถูกปิด/แพ้ usage race = **จด usage ตามจริง + log ดัง** แต่ไม่ throw (wallet/admin strict paths คงเดิม) — ทดสอบทั้ง strict/non-strict ครบ
+- **[High] ประตูสร้าง order เป็น union** — Opn ตั้งค่าครบ **หรือ** manual transfer เปิด = สร้างได้ (เดิมต้องมี manual เสมอ → Opn-only ถูกล็อก); `isOpnConfigured()` probe แบบไม่ construct adapter; ไม่มีช่องทางเลย = 503 เหมือนเดิม
+- **[High] webhook ตรวจ charge อิสระ** — signature ไม่ผ่าน ≠ ทิ้ง event อีกต่อไป: `retrieveCharge()` ดึง charge จาก Opn API แล้ว verify **livemode/amount/status** ก่อนใช้ (ตาม model ที่ Opn แนะนำ); payload จาก webhook ถูกแทนด้วยข้อมูลจาก source of truth; ปลอมไม่ได้ (id ไม่รู้จัก/ยอดไม่ตรง/livemode คลาด = discard)
+- **[High] migration ติด deploy gate** — vercel `buildCommand` รัน `prisma migrate deploy` ก่อน build (ต้องมี `DATABASE_URL` แบบ direct ใน build env); migration ล้ม = deploy ล้ม
+- **[Med] Build job depend ครบ** — `needs: [lint, test, audit, concurrency-tests]` — check ใดตก build (และ deploy ที่ตามมา) ไม่เกิด
+- **ค้างต้องทำฝั่งคน/infra:** ย้าย admin refresh token → HttpOnly cookie; CSP enforce ตัด unsafe-inline; DNS `nong-kati.com`/`.co.th` (ยัง NXDOMAIN ทั้งคู่) + ตั้ง `NEXT_PUBLIC_SITE_URL` เป็น domain จริง; ยืนยันว่า Vercel Production ชี้ branch master; Upstash Redis ใน prod (rate limit ยัง degrade ต่อ instance); pin actions เป็น commit SHA; branch protection
+
 ## CI pipeline (`.github/workflows/ci.yml`)
 
 | Job                         | ทำอะไร                                                                  | ผูกกับ gate                                                                                                    |

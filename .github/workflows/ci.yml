@@ -132,7 +132,10 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [lint, test]
+    # Production review MEDIUM-2: the build (and the deploy that follows it)
+    # must be gated by EVERY other check — a failing security audit or DB
+    # concurrency/RLS run must not promote an artifact.
+    needs: [lint, test, audit, concurrency-tests]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

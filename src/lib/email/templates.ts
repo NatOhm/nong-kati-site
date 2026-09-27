@@ -15,7 +15,9 @@ export interface OrderConfirmationData {
     productNameTh: string;
     denomination: number;
     quantity: number;
-    code?: string;
+    /** Plaintext codes allocated to this line (production review HIGH-1:
+     * the delivery email MUST carry every purchased code). */
+    codes?: string[];
   }>;
   subtotalThb: number;
   vatAmountThb: number;
@@ -42,26 +44,28 @@ export function orderConfirmationTemplate(data: OrderConfirmationData): {
   html: string;
 } {
   const itemsHtml = data.items
-    .map(
-      (item) => `
+    .map((item) => {
+      // Every allocated code renders its own row — one per unit.
+      const codeRows = (item.codes ?? [])
+        .map(
+          (code) => `
+    <tr>
+      <td colspan="3" style="padding: 8px 12px; background: #f8f8f8; font-family: monospace; font-size: 14px; letter-spacing: 0.1em;">
+        โค้ด: ${code}
+      </td>
+    </tr>
+  `,
+        )
+        .join('');
+      return `
     <tr>
       <td style="padding: 12px; border-bottom: 1px solid #eee;">${item.productNameTh}</td>
       <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: center;">${item.quantity}</td>
       <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: right;">${formatThb(item.denomination * item.quantity)}</td>
     </tr>
-    ${
-      item.code
-        ? `
-    <tr>
-      <td colspan="3" style="padding: 8px 12px; background: #f8f8f8; font-family: monospace; font-size: 14px; letter-spacing: 0.1em;">
-        โค้ด: ${item.code}
-      </td>
-    </tr>
-    `
-        : ''
-    }
-  `,
-    )
+    ${codeRows}
+  `;
+    })
     .join('');
 
   return {

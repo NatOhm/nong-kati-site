@@ -181,8 +181,12 @@ describe('POST /api/v1/payments/slip-verify — recovery honesty (audit #4)', ()
     expect(body.status).toBe('pending_manual_fulfilment');
     // Production review (Medium): the recovery claims through the SHARED
     // helper (coupon usage counted), then parks the order — the bare
-    // updateMany that skipped coupon accounting is gone.
-    expect(ordersMock.claimOrderForConfirmation).toHaveBeenCalledWith('ord-sv', expect.anything());
+    // updateMany that skipped coupon accounting is gone. HIGH-2: the claim
+    // honors the charged coupon snapshot (paidExternally) because the bank
+    // already verified this transfer.
+    expect(ordersMock.claimOrderForConfirmation).toHaveBeenCalledWith('ord-sv', expect.anything(), {
+      paidExternally: true,
+    });
     expect(prismaMock.order.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'ord-sv' },

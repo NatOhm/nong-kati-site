@@ -1,6 +1,8 @@
 import { Fragment } from 'react';
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
+
+import { serializeJsonLd } from '@/components/data-display/StructuredData';
 import { cn } from '@/utils/cn';
 
 export interface BreadcrumbItem {
@@ -33,9 +35,13 @@ export function Breadcrumb({ items, className }: BreadcrumbProps): React.JSX.Ele
 
   return (
     <nav aria-label="Schema.org breadcrumb" className={className}>
+      {/* CRITICAL-1 (production review): every inline JSON-LD block MUST go
+          through serializeJsonLd — a bare JSON.stringify lets a stored
+          `</script>` in category/label names terminate the element and
+          execute on the public origin. See StructuredData.tsx. */}
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
       />
       <ol className="flex items-center gap-1 text-sm">
         {items.map((item, index) => {

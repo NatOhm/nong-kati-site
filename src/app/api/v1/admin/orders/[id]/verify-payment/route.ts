@@ -128,7 +128,10 @@ export async function POST(
   try {
     const result = await prisma.$transaction(
       async (tx) => {
-        const claimedInTx = await claimOrderForConfirmation(id, tx);
+        // Production review HIGH-2: the admin has the customer's transfer in
+        // hand — honor the charged coupon snapshot rather than strand a paid
+        // order on a later coupon change.
+        const claimedInTx = await claimOrderForConfirmation(id, tx, { paidExternally: true });
         if (!claimedInTx) throw new Error('NOT_PAYABLE');
         // Strict: any fulfilment failure (stock hole, lost code race)
         // rethrows and rolls the whole confirmation back.

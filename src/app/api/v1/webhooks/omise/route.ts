@@ -14,6 +14,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { OmiseAdapter } from '@/lib/payment/omise';
+import type { WebhookEvent } from '@/lib/payment/gateway';
 import { prisma } from '@/lib/db';
 import { getOrderById, claimOrderForConfirmation } from '@/api/orders';
 import { fulfilOrder, scheduleOutboxDrain } from '@/lib/fulfilment';
@@ -37,20 +38,80 @@ function getGateway(): OmiseAdapter {
 class WebhookAlreadyConfirmedError extends Error {}
 class InsufficientStockError extends Error {}
 
+/**
+ * Production review HIGH-6: independent verification per Opn's documented
+ * model — GET the charge with the secret key and confirm amount, status and
+ * livemode match the event before trusting it. Returns the refreshed event
+ * (source-of-truth fields win over the webhook payload) or null when the
+ * charge does not validate. Also REWRITES event.status from the retrieved
+ * charge so downstream logic never acts on a stale/mutated payload.
+ */
+async function verifyChargeAgainstOpn(event: WebhookEvent): Promise<WebhookEvent | null> {
+  if (!event.chargeId) return null;
+  try {
+    const charge = await getGateway().retrieveCharge(event.chargeId);
+    const status = String(charge['status'] ?? '');
+    const amount = Number(charge['amount'] ?? 0);
+    const livemode = charge['livemode'] === true;
+    const expectedLive = process.env.NODE_ENV === 'production';
+    if (livemode !== expectedLive) {
+      console.error(`[Webhook] livemode mismatch: charge=${livemode} env=${expectedLive}`);
+      return null;
+    }
+    if (event.amount > 0 && amount !== event.amount) {
+      console.error(`[Webhook] amount mismatch: event=${event.amount} opn=${amount}`);
+      return null;
+    }
+    return {
+      ...event,
+      status:
+        status === 'successful'
+          ? 'successful'
+          : status === 'failed'
+            ? 'failed'
+            : status === 'expired'
+              ? 'expired'
+              : event.status,
+      amount,
+      rawData: { ...(event.rawData ?? {}), retrieved: true },
+    };
+  } catch (err) {
+    console.error(
+      '[Webhook] charge verification failed:',
+      err instanceof Error ? err.message : err,
+    );
+    return null;
+  }
+}
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
   // Step 1: Read raw body (before signature check)
   const rawBody = Buffer.from(await request.arrayBuffer());
   const signatureHeader = request.headers.get('x-omise-signature') ?? '';
 
-  // Step 2: Verify signature (LD-07)
+  // Step 2: Verify signature (LD-07). Production review HIGH-6: when the
+  // signature does NOT verify we no longer discard the event — Opn's
+  // documented verification model is to RETRIEVE the charge independently,
+  // so an unverifiable event goes through the authenticated lookup and is
+  // processed only if the source of truth confirms it. A fabricated event
+  // still cannot pass (unknown charge ids fail the lookup; amounts/status
+  // must match), but a genuine Opn event can never be silently dropped.
+  const event = getGateway().parseWebhookEvent(rawBody);
   const isValid = getGateway().verifyWebhookSignature(rawBody, signatureHeader);
-  if (!isValid) {
-    console.error('[Webhook] Invalid signature from', request.headers.get('x-forwarded-for'));
-    return NextResponse.json({ received: true });
+  if (!isValid && (event.key === 'charge.complete' || event.key === 'charge.failed')) {
+    const verified = await verifyChargeAgainstOpn(event);
+    if (!verified) {
+      console.error(
+        '[Webhook] Signature invalid AND charge verification failed — discarding event from',
+        request.headers.get('x-forwarded-for'),
+      );
+      return NextResponse.json({ received: true });
+    }
+    // Source-of-truth fields replace the webhook payload for routing.
+    Object.assign(event, verified);
   }
 
-  // Step 3-4: Parse and route
-  const event = getGateway().parseWebhookEvent(rawBody);
+  // Step 3-4: Route
 
   if (event.key === 'charge.complete' || event.key === 'charge.failed') {
     if (event.status === 'successful') {
@@ -107,7 +168,10 @@ async function handleChargeSucceeded(chargeId: string, gatewayAmount: number): P
         where: { id: attempt.id },
         data: { status: 'succeeded', webhookReceivedAt: new Date(), webhookSignatureValid: true },
       });
-      const c = await claimOrderForConfirmation(order.id, tx);
+      // Production review HIGH-2: an externally-verified payment must not be
+      // rejected because coupon state changed after the QR was issued — the
+      // claim honors the charged coupon snapshot instead of throwing.
+      const c = await claimOrderForConfirmation(order.id, tx, { paidExternally: true });
       if (!c) throw new WebhookAlreadyConfirmedError(order.orderNumber); // duplicate lost the race
       const fulfilment = await fulfilOrder(order.id, tx);
       if (fulfilment.error === 'INSUFFICIENT_STOCK')

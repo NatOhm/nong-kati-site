@@ -158,7 +158,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             gatewayResponse: result.raw as object,
           },
         });
-        const claimed = await claimOrderForConfirmation(order.id, tx);
+        // Production review HIGH-2: the bank verified this transfer (SlipOK);
+        // coupon state changes after QR issuance cannot strand the money.
+        const claimed = await claimOrderForConfirmation(order.id, tx, { paidExternally: true });
         if (!claimed) throw new Error('ALREADY_CLAIMED');
         const fulfilment = await fulfilOrder(order.id, tx);
         if (fulfilment.error === 'INSUFFICIENT_STOCK') throw new Error('INSUFFICIENT_STOCK');
@@ -207,7 +209,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
               slipVerifiedBy: 'slipok:auto',
             },
           });
-          const claimed = await claimOrderForConfirmation(order.id, tx);
+          const claimed = await claimOrderForConfirmation(order.id, tx, { paidExternally: true });
           if (!claimed) throw new Error('ALREADY_CLAIMED');
           await tx.order.update({
             where: { id: order.id },

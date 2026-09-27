@@ -14,6 +14,24 @@
  * (10-digital-code.md §12).
  */
 
+/**
+ * Canonical site origin for links sent to customers (emails, schema).
+ * Production review HIGH-1: the old `?? 'http://localhost:3000'` fallback
+ * produced localhost links in production mail when NEXT_PUBLIC_SITE_URL was
+ * unset. Non-production keeps the dev default; production FAILS CLOSED —
+ * a missing site URL must break loudly at build/deploy, not quietly link
+ * customers to http://localhost:3000.
+ */
+export function siteUrl(): string {
+  const configured = process.env['NEXT_PUBLIC_SITE_URL'];
+  if (configured && configured.length > 0) return configured.replace(/\/+$/, '');
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'NEXT_PUBLIC_SITE_URL is required in production (customer-facing links would point at localhost)',
+    );
+  }
+  return 'http://localhost:3000';
+}
 import { prisma } from '@/lib/db';
 import { decryptCode } from '@/lib/crypto/giftCode';
 import { enqueueEmail, scheduleOutboxDrain } from '@/lib/email/outbox';
@@ -39,6 +57,7 @@ export async function enqueueCodeDeliveryEmail(
   tx: PrismaTx,
   order: {
     id: string;
+    confirmationUuid: string;
     orderNumber: string;
     customerEmail: string;
     items: Array<{ productNameTh: string; denominationThb: unknown; quantity: number }>;
@@ -46,17 +65,33 @@ export async function enqueueCodeDeliveryEmail(
     vatAmountThb: unknown;
     totalAmountThb: unknown;
   },
+  /** Plaintext codes allocated by the fulfilment transaction — the whole
+   * point of this email (production review HIGH-1: the payload used to drop
+   * them, so customers paid and received nothing by mail). */
+  delivered: { code: string; productName: string; denomination: number }[],
 ): Promise<void> {
-  const siteUrl = process.env['NEXT_PUBLIC_SITE_URL'] ?? 'http://localhost:3000';
-  const confirmationUrl = `${siteUrl}/orders/${order.id}`;
-  const template = orderConfirmationTemplate({
-    orderNumber: order.orderNumber,
-    customerEmail: order.customerEmail,
-    items: order.items.map((item) => ({
+  // HIGH-1: the order page resolves by confirmationUuid, not by internal id —
+  // the old /orders/<id> link 404'd for every customer.
+  const confirmationUrl = `${siteUrl()}/orders/${order.confirmationUuid}`;
+  // Match allocated codes to their order line (product name + denomination)
+  // and render one code row per unit — every purchased code appears exactly
+  // once in the email.
+  const lines = order.items.map((item) => {
+    const mine = delivered.filter(
+      (d) =>
+        d.productName === item.productNameTh && d.denomination === Number(item.denominationThb),
+    );
+    return {
       productNameTh: item.productNameTh,
       denomination: Number(item.denominationThb),
       quantity: item.quantity,
-    })),
+      ...(mine.length > 0 ? { codes: mine.map((d) => d.code) } : {}),
+    };
+  });
+  const template = orderConfirmationTemplate({
+    orderNumber: order.orderNumber,
+    customerEmail: order.customerEmail,
+    items: lines,
     subtotalThb: Number(order.subtotalThb),
     vatAmountThb: Number(order.vatAmountThb),
     totalAmountThb: Number(order.totalAmountThb),
@@ -177,7 +212,9 @@ export async function fulfilOrder(
       // Audit #2: promise the customer their codes INSIDE the same unit —
       // delivery itself is decoupled (outbox worker), but the row commits
       // or rolls back with the codes themselves. Idempotent per order.
-      await enqueueCodeDeliveryEmail(tx, order);
+      // Production review HIGH-1: the plaintext codes go INTO the payload
+      // (they never did before) and the link uses confirmationUuid.
+      await enqueueCodeDeliveryEmail(tx, order, delivered);
 
       return delivered;
     };

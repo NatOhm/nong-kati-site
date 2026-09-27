@@ -435,6 +435,7 @@ export async function updateOrderStatus(
 export async function claimOrderForConfirmation(
   orderId: string,
   tx?: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+  opts?: { paidExternally?: boolean },
 ): Promise<Order | null> {
   const db = tx ?? prisma;
   const claimed = await db.order.updateMany({
@@ -446,6 +447,17 @@ export async function claimOrderForConfirmation(
   // and both the global limit and per-customer limit are enforced HERE at
   // the claim boundary — not at order creation (orders are created before
   // payment and may never be paid; concurrent orders could exceed limits).
+  //
+  // Production review HIGH-2: once the customer has PAID through an external
+  // channel (Opn charge verified by webhook, or a SlipOK-verified slip), the
+  // money is gone — rejecting the confirmation because coupon state changed
+  // afterwards (expired/deactivated/lost a usage race) strands a paid order
+  // with no reconciliation path. `paidExternally` switches the coupon step
+  // to HONOR-THE-SNAPSHOT: the discounted amount was computed and charged,
+  // so usage is still recorded (best-effort, never below zero) but no
+  // capacity check can fail the unit. Wallet/admin paths keep the strict
+  // checks (nothing external to reconcile; the customer can retry).
+  const strict = !opts?.paidExternally;
   const order = await db.order.findUnique({
     where: { id: orderId },
     select: { couponId: true, customerId: true },
@@ -456,25 +468,40 @@ export async function claimOrderForConfirmation(
       select: { usageLimit: true, perCustomerLimit: true, isActive: true },
     });
     if (!coupon || !coupon.isActive) {
-      throw new Error('COUPON_NO_LONGER_VALID');
-    }
-    // Global capacity: only increment when still under the limit (the
-    // conditional update is the atomic guard — racing claims lose here).
-    if (coupon.usageLimit !== null) {
-      const bumped = await db.coupon.updateMany({
-        where: { id: order.couponId, usageCount: { lt: coupon.usageLimit } },
-        data: { usageCount: { increment: 1 } },
-      });
-      if (bumped.count !== 1) throw new Error('COUPON_USAGE_LIMIT');
+      if (strict) throw new Error('COUPON_NO_LONGER_VALID');
+      console.error(
+        `[orders] coupon no longer active at confirmation of PAID order ${orderId} — honoring the charged snapshot (production review HIGH-2)`,
+      );
     } else {
-      await db.coupon.update({
-        where: { id: order.couponId },
-        data: { usageCount: { increment: 1 } },
-      });
+      // Global capacity: only increment when still under the limit (the
+      // conditional update is the atomic guard — racing claims lose here).
+      if (coupon.usageLimit !== null) {
+        const bumped = await db.coupon.updateMany({
+          where: { id: order.couponId, usageCount: { lt: coupon.usageLimit } },
+          data: { usageCount: { increment: 1 } },
+        });
+        if (bumped.count !== 1) {
+          if (strict) throw new Error('COUPON_USAGE_LIMIT');
+          // Paid externally: record the over-limit usage honestly (the
+          // discount WAS granted in the charged amount) rather than strand
+          // the money. usageCount can exceed the limit; the row documents
+          // it and reconciliation alerting can pick it up.
+          await db.coupon.update({
+            where: { id: order.couponId },
+            data: { usageCount: { increment: 1 } },
+          });
+          console.error(
+            `[orders] coupon ${order.couponId} usage over limit at confirmation of PAID order ${orderId} — recorded (HIGH-2)`,
+          );
+        }
+      } else {
+        await db.coupon.update({
+          where: { id: order.couponId },
+          data: { usageCount: { increment: 1 } },
+        });
+      }
     }
     // Per-customer cap + idempotency: one redemption row per (coupon, order).
-    // Duplicate redemption for the same order = replays; per-customer limit
-    // counts existing rows excluding this order's own row (retry-friendly).
     if (order.customerId) {
       try {
         await db.couponRedemption.create({
@@ -486,12 +513,15 @@ export async function claimOrderForConfirmation(
         // Row already exists for this order (retry after a later-step
         // failure) — keep the existing one, do not double-count.
       }
-      const per = coupon.perCustomerLimit ?? 1;
+      const per = coupon?.perCustomerLimit ?? 1;
       const mine = await db.couponRedemption.count({
         where: { couponId: order.couponId, customerId: order.customerId },
       });
       if (mine > per) {
-        throw new Error('COUPON_PER_CUSTOMER_LIMIT');
+        if (strict) throw new Error('COUPON_PER_CUSTOMER_LIMIT');
+        console.error(
+          `[orders] per-customer coupon cap exceeded at confirmation of PAID order ${orderId} — recorded (HIGH-2)`,
+        );
       }
     }
   }
