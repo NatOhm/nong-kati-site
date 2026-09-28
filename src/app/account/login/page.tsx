@@ -521,6 +521,18 @@ export default function LoginPage(): React.JSX.Element {
             สมัครสมาชิก
           </Link>
         </p>
+
+        {/* Staff entry point — admins are customer-account holders too but
+            sign in through the separate 2FA back office. Mobile has no admin
+            nav entry at all, so this quiet link is the only path in. */}
+        <p className="mt-2 text-center text-xs">
+          <Link
+            href="/management/login"
+            className="inline-flex min-h-[44px] items-center text-fg-placeholder hover:text-fg-brand"
+          >
+            เข้าสู่ระบบแอดมิน
+          </Link>
+        </p>
       </div>
     </div>
   );
