@@ -1,15 +1,21 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Shield, Eye, EyeOff } from 'lucide-react';
 
-import { setAdminRemembered } from '@/lib/adminSession';
+import { hasAdminSession, setAdminRemembered } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
 
 /**
  * Admin Login page — per UF-09.
  * Two-factor mandatory: email+password → TOTP 2FA.
+ *
+ * Ease-of-access pass: admins who still hold a live session land straight on
+ * the dashboard, the last successful login email is prefilled (secret-free —
+ * the password is never stored), and every field carries the autocomplete
+ * hints password managers need, so the common case is two taps.
  */
 export default function AdminLoginPage(): React.JSX.Element {
   const router = useRouter();
@@ -30,6 +36,35 @@ export default function AdminLoginPage(): React.JSX.Element {
     secretBase32: string;
     backupCodes: string[];
   } | null>(null);
+  const emailRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    // Prefill the remembered email, then put the cursor where the admin
+    // actually types next: the password field.
+    const last = window.localStorage.getItem('nk_admin_email');
+    if (last) {
+      setEmail(last);
+      passwordRef.current?.focus();
+    } else {
+      emailRef.current?.focus();
+    }
+
+    // A live session skips the form entirely. The presence marker alone is
+    // NOT enough — a stale flag with a dead refresh cookie would bounce
+    // login → dashboard → login forever — so confirm with /me first and
+    // only then hand off to the dashboard.
+    if (!hasAdminSession()) return;
+    let cancelled = false;
+    fetch('/api/v1/auth/admin/me', { credentials: 'same-origin' })
+      .then((r) => {
+        if (!cancelled && r.ok) router.replace('/management/dashboard');
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   // Step 1: Login with credentials
   const handleCredentialsSubmit = useCallback(
@@ -164,7 +199,7 @@ export default function AdminLoginPage(): React.JSX.Element {
         setLoading(false);
       }
     },
-    [challengeToken, totpCode, remember],
+    [challengeToken, totpCode, remember, email, router],
   );
 
   return (
@@ -198,8 +233,11 @@ export default function AdminLoginPage(): React.JSX.Element {
                 อีเมล
               </label>
               <input
+                ref={emailRef}
                 id="admin-email"
+                name="email"
                 type="email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -213,8 +251,11 @@ export default function AdminLoginPage(): React.JSX.Element {
               </label>
               <div className="relative">
                 <input
+                  ref={passwordRef}
                   id="admin-password"
+                  name="password"
                   type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -270,6 +311,7 @@ export default function AdminLoginPage(): React.JSX.Element {
               <div className="rounded-md bg-surface p-4">
                 {/* Server-rendered PNG data URL — no external image host, so the
                     QR can never fail to load because of a blocked domain. */}
+                {/* eslint-disable-next-line @next/next/no-img-element -- admin-upload/data-URL source: served immutable via /api/v1/images or inline QR; next/image optimizer has no remote pattern for these hosts */}
                 <img src={setupData.qrDataUrl} alt="QR Code 2FA" width={200} height={200} />
               </div>
             </div>
@@ -340,6 +382,8 @@ export default function AdminLoginPage(): React.JSX.Element {
               placeholder="รหัส 6 หลัก หรือรหัสสำรอง XXXX-XXXX"
               maxLength={9}
               autoFocus
+              autoComplete="one-time-code"
+              aria-label="รหัสยืนยัน 2FA"
               className="w-full rounded-md border border-line bg-surface px-3 py-2.5 text-center font-mono text-lg tracking-widest text-fg focus:ring-2 focus:ring-peach-500"
             />
 
@@ -357,6 +401,16 @@ export default function AdminLoginPage(): React.JSX.Element {
             </button>
           </form>
         )}
+
+        {/* Escape hatch back to the storefront. */}
+        <p className="mt-6 text-center">
+          <Link
+            href="/"
+            className="inline-flex min-h-[44px] items-center text-sm text-fg-placeholder hover:text-fg-brand"
+          >
+            ← กลับหน้าร้าน
+          </Link>
+        </p>
       </div>
     </div>
   );

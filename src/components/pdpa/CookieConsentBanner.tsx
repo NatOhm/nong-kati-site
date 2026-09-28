@@ -7,6 +7,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { Settings, ShieldCheck } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
@@ -49,12 +50,19 @@ export function CookieConsentBanner(): React.JSX.Element | null {
   const [analytics, setAnalytics] = useState(false);
   const [marketing, setMarketing] = useState(false);
 
+  // Management is the staff back office — the storefront consent question
+  // (analytics/marketing tracking) does not belong over operator actions,
+  // and the fixed banner used to block the reconciliation action buttons.
+  const pathname = usePathname();
+  const onManagement = pathname?.startsWith('/management') ?? false;
+
   useEffect(() => {
+    if (onManagement) return;
     const existing = getStoredConsent();
     if (!existing) {
       setVisible(true);
     }
-  }, []);
+  }, [onManagement]);
 
   // Audit #5: on mobile the consent banner sits above the bottom taskbar and
   // together they cover ~18% of the first viewport. While consent is open the
@@ -113,7 +121,7 @@ export function CookieConsentBanner(): React.JSX.Element | null {
     }
   };
 
-  if (!visible) return null;
+  if (!visible || onManagement) return null;
 
   return (
     <div className="fixed inset-x-0 bottom-[4.25rem] z-50 border border-line-subtle bg-surface-base px-3 py-3 shadow-clay-sm md:bottom-0 md:border-x-0 md:border-b-0 md:border-t md:px-6 md:py-4 lg:bottom-0">
@@ -164,7 +172,7 @@ export function CookieConsentBanner(): React.JSX.Element | null {
             <label className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-fg-secondary">คุกกี้ที่จำเป็น</p>
-                <p className="text-fg-muted text-xs">
+                <p className="text-xs text-fg-muted">
                   จำเป็นสำหรับเว็บไซต์ทำงานได้ ไม่สามารถปิดได้
                 </p>
               </div>
@@ -178,7 +186,7 @@ export function CookieConsentBanner(): React.JSX.Element | null {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-fg-secondary">คุกกี้เพื่อการวิเคราะห์</p>
-                <p className="text-fg-muted text-xs">ช่วยเราเข้าใจวิธีที่ผู้เข้าชมใช้เว็บไซต์</p>
+                <p className="text-xs text-fg-muted">ช่วยเราเข้าใจวิธีที่ผู้เข้าชมใช้เว็บไซต์</p>
               </div>
               <button
                 type="button"
@@ -208,7 +216,7 @@ export function CookieConsentBanner(): React.JSX.Element | null {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-fg-secondary">คุกกี้เพื่อการตลาด</p>
-                <p className="text-fg-muted text-xs">ใช้สำหรับแสดงโฆษณาที่เกี่ยวข้อง</p>
+                <p className="text-xs text-fg-muted">ใช้สำหรับแสดงโฆษณาที่เกี่ยวข้อง</p>
               </div>
               <button
                 type="button"
