@@ -21,7 +21,8 @@
  *    server TTL (12h) still bounds it.
  */
 
-import type { NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+import { checkAdminAuthMutation } from '@/lib/adminCsrf';
 
 export const ADMIN_ACCESS_COOKIE = 'nk_admin_at';
 export const ADMIN_REFRESH_COOKIE = 'nk_admin_rt';
@@ -113,6 +114,27 @@ export function setAdminSessionCookies(
     path: '/',
     ...(options.refreshMaxAgeSeconds !== undefined ? { maxAge: options.refreshMaxAgeSeconds } : {}),
   });
+}
+
+/**
+ * CSRF gate for admin auth mutations (login / 2fa confirm / refresh /
+ * logout). Returns a JSON error response when the request must be rejected.
+ *
+ * - Origin check applies to EVERY mutation (incl. first-time logins with no
+ *   CSRF cookie yet — the classic login-CSRF vector).
+ * - The double-submit layer applies only to cookie-authenticated callers
+ *   (bearer-token API clients are immune to cookie-attach CSRF and skip it).
+ */
+export function guardAdminAuthMutation(
+  req: Parameters<typeof checkAdminAuthMutation>[0],
+  authenticatedByCookie: boolean,
+): NextResponse | null {
+  const result = checkAdminAuthMutation(req, authenticatedByCookie);
+  if (result.ok) return null;
+  return NextResponse.json(
+    { error: result.error ?? 'CSRF_TOKEN_INVALID' },
+    { status: result.error === 'ORIGIN_MISMATCH' ? 403 : 409 },
+  );
 }
 
 /** Drop every admin session cookie (logout / expired refresh). */

@@ -79,6 +79,16 @@ export function setAdminRemembered(remember: boolean): void {
 // ─── Refresh ─────────────────────────────────────────────
 
 /**
+ * Echo the double-submit CSRF token: the middleware seeds a non-HttpOnly
+ * `nk_csrf` cookie; auth mutations must carry its value in x-csrf-token
+ * (see lib/adminCsrf.ts).
+ */
+function csrfHeader(): Record<string, string> {
+  const token = readCookie('nk_csrf');
+  return token ? { 'x-csrf-token': token } : {};
+}
+
+/**
  * Refresh the session via the API. Returns true on success (HttpOnly cookies
  * rotated server-side). Single-flight: concurrent callers share the request.
  */
@@ -89,7 +99,7 @@ export function refreshAdminSession(): Promise<boolean> {
     try {
       const res = await fetch('/api/v1/auth/admin/refresh', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...csrfHeader() },
         body: JSON.stringify({}),
       });
       if (!res.ok) return false;
@@ -134,7 +144,7 @@ export async function clearAdminSession(): Promise<void> {
   try {
     await fetch('/api/v1/auth/admin/logout', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...csrfHeader() },
       body: JSON.stringify({}),
       keepalive: true,
       signal: AbortSignal.timeout(4_000),

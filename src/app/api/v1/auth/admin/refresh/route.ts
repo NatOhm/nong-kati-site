@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { refreshAdminSession } from '@/api/adminAuth';
 import {
   clearAdminSessionCookies,
+  guardAdminAuthMutation,
   getAdminRefreshToken,
   setAdminSessionCookies,
 } from '@/lib/adminRequest';
@@ -33,6 +34,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const b = (body ?? {}) as Record<string, unknown>;
   const bodyToken = typeof b['refreshToken'] === 'string' ? b['refreshToken'] : undefined;
   const { token: refreshToken, cookieSourced } = getAdminRefreshToken(req, bodyToken);
+
+  // CSRF: a cookie-authenticated browser refresh must prove same-origin
+  // (origin check) AND echo the middleware-seeded nk_csrf cookie in the
+  // x-csrf-token header (double-submit). Bearer-token API clients skip the
+  // echo layer — they are immune to cookie-auto-attach CSRF.
+  const csrfBlock = guardAdminAuthMutation(req, cookieSourced);
+  if (csrfBlock) return csrfBlock;
+
   if (!refreshToken) {
     return NextResponse.json({ error: 'REFRESH_TOKEN_REQUIRED' }, { status: 400 });
   }

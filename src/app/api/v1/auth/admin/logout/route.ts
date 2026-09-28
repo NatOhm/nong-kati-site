@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { adminLogout } from '@/api/adminAuth';
-import { clearAdminSessionCookies, getAdminRefreshToken } from '@/lib/adminRequest';
+import {
+  clearAdminSessionCookies,
+  guardAdminAuthMutation,
+  getAdminRefreshToken,
+} from '@/lib/adminRequest';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +25,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const b = (body ?? {}) as Record<string, unknown>;
   const bodyToken = typeof b['refreshToken'] === 'string' ? b['refreshToken'] : undefined;
   const { token: refreshToken, cookieSourced } = getAdminRefreshToken(req, bodyToken);
+
+  // CSRF: mirror the refresh route — origin check for everyone, plus the
+  // double-submit echo for cookie-authenticated callers. Logout is
+  // idempotent, so the gate protects session integrity, not data loss.
+  const csrfBlock = guardAdminAuthMutation(req, cookieSourced);
+  if (csrfBlock) return csrfBlock;
+
   if (!refreshToken) {
     // Nothing to revoke — still clear whatever cookies exist.
     const res = NextResponse.json({ error: 'REFRESH_TOKEN_REQUIRED' }, { status: 400 });

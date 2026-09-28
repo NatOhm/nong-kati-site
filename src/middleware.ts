@@ -19,6 +19,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { applyRateLimit } from '@/lib/rateLimit';
+import { CSRF_COOKIE_NAME, generateCsrfToken } from '@/lib/adminCsrf';
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -126,6 +127,32 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     'Permissions-Policy',
     'camera=(), microphone=(), geolocation=(), payment=(self "https://js.omise.co")',
   );
+
+  // ─── Admin session cookies: never cacheable ───────
+  // Auth responses set/rotate HttpOnly credentials — a shared or proxy cache
+  // must never store them (mirrors the auth-routes no-store above).
+  const isAdminApi =
+    pathname.startsWith('/api/v1/auth/admin/') || pathname.startsWith('/api/v1/admin/');
+  if (isAdminApi) {
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+  }
+
+  // ─── CSRF cookie seed (double-submit pattern) ─────
+  // Non-HttpOnly `nk_csrf` so the admin login/2fa pages can echo it in the
+  // x-csrf-token header (see lib/adminCsrf.ts). Seeded once per client and
+  // refreshed after its 24h lifetime; it carries no session secret.
+  if (!request.cookies.has(CSRF_COOKIE_NAME)) {
+    response.cookies.set({
+      name: CSRF_COOKIE_NAME,
+      value: generateCsrfToken(),
+      httpOnly: false,
+      sameSite: 'lax',
+      secure: !isDev,
+      path: '/',
+      maxAge: 86400,
+    });
+  }
 
   // ─── Auth Routes — no-cache ───────────────────────
   if (isAuthRoute(pathname)) {

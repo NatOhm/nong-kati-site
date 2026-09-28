@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { confirm2fa, setup2fa } from '@/api/adminAuth';
-import { setAdminSessionCookies } from '@/lib/adminRequest';
+import { guardAdminAuthMutation, setAdminSessionCookies } from '@/lib/adminRequest';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,6 +24,14 @@ export const dynamic = 'force-dynamic';
  * every successful response.
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  // CSRF: same posture as login — origin check only. The caller presents a
+  // short-lived challenge token, not session cookies, so the double-submit
+  // layer has nothing to protect here; the origin check still blocks a
+  // cross-site page from silently completing a login into the admin's
+  // browser.
+  const csrfBlock = guardAdminAuthMutation(req, false);
+  if (csrfBlock) return csrfBlock;
+
   let body: unknown;
   try {
     body = await req.json();

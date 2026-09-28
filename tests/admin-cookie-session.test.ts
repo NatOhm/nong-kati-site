@@ -239,7 +239,16 @@ describe('auth routes', () => {
     const deadHash = createHash('sha256').update('dead-token').digest('hex');
     hoisted.state.sessions.push({ tokenHash: deadHash, revokedAt: new Date(), adminUser: {} });
 
-    const req = makeReq({ cookie: 'nk_admin_rt=dead-token' }, {});
+    // Cookie-authenticated browser refresh now ALSO requires the CSRF echo
+    // (double-submit, tests/admin-csrf.test.ts) — mirror a real browser that
+    // holds both the session cookie and the seeded nk_csrf.
+    const req = makeReq(
+      {
+        cookie: 'nk_admin_rt=dead-token; nk_csrf=csrf-token-abc',
+        'x-csrf-token': 'csrf-token-abc',
+      },
+      {},
+    );
     const res = await POST(req as never);
     expect(res.status).toBe(401);
     const map = cookieMap(res as unknown as NextResponse);
@@ -249,7 +258,13 @@ describe('auth routes', () => {
 
   it('logout route clears cookies even without a body token', async () => {
     const { POST } = await import('@/app/api/v1/auth/admin/logout/route');
-    const req = makeReq({ cookie: 'nk_admin_rt=some-token' }, {});
+    const req = makeReq(
+      {
+        cookie: 'nk_admin_rt=some-token; nk_csrf=csrf-token-abc',
+        'x-csrf-token': 'csrf-token-abc',
+      },
+      {},
+    );
     const res = await POST(req as never);
     expect(res.status).toBe(200);
     const map = cookieMap(res as unknown as NextResponse);
