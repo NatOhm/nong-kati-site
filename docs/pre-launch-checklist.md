@@ -48,8 +48,14 @@ Consolidated from:
       20×429). Admin-auth rules corrected to the real `/api/v1/auth/admin/*`
       paths. Per-account brute force is additionally covered by the DB
       lockout (5 fails → 15-min lock, verified in E2E).
-- [ ] CSRF double-submit cookie on /auth/refresh endpoints — `src/lib/csrf.ts`
-      exists with the full pattern but has **zero consumers**; not wired.
+- [x] CSRF double-submit cookie on /auth/refresh endpoints — **wired
+      2026-09-28**: middleware seeds a non-HttpOnly `nk_csrf` cookie; every
+      admin auth mutation (login / 2fa / refresh / logout) runs the origin
+      check, and cookie-authenticated refresh+logout must echo it in
+      `x-csrf-token` (`src/lib/adminCsrf.ts`, 403 ORIGIN_MISMATCH / 409
+      CSRF_TOKEN_*). Unit-tested in `tests/admin-csrf.test.ts` and proven
+      live against `next start` (cross-site Origin → 403; missing/mismatched
+      echo → 409; clean API client → passes).
 - [x] Brute-force lockout verified: admin 5 fails → 15-min lock persisted in
       DB (E2E). _(customer login lockout not separately exercised — same
       adminLogin pattern not present on the customer path; see gap note)_
