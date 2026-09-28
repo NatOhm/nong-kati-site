@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { cn } from '@/utils/cn';
+import { CategoryIcon } from './CategoryIcon';
 
 export interface AppTileProps {
   name: string;
@@ -53,8 +54,9 @@ export function AppTile({
             loading="lazy"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-5xl" aria-hidden>
-            {icon ?? '🎮'}
+          <div className="flex h-full w-full items-center justify-center" aria-hidden>
+            {/* Category.icon is a lucide *name* — never render the raw string. */}
+            <CategoryIcon name={icon} size={56} className="text-peach-300/80" />
           </div>
         )}
         {/* จำนวน pill — bottom-right of the artwork, mockup style */}

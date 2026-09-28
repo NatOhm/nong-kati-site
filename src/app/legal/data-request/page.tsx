@@ -23,7 +23,7 @@ export default function DataRequestPage(): React.JSX.Element {
         <DataRequestForm />
       </div>
 
-      <p className="text-clay-9000 mt-4 text-xs">
+      <p className="text-fg-muted mt-4 text-xs">
         เราจะดำเนินการคำขอภายใน 30 วันทำการ หากมีคำถาม กรุณาติดต่อ{' '}
         <a href="mailto:privacy@nong-kati.co.th" className="text-fg-brand hover:text-fg-brand">
           privacy@nong-kati.co.th

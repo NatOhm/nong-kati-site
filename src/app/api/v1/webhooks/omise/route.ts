@@ -120,7 +120,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       await handleChargeFailed(event.chargeId, event.failureMessage, event.failureCode);
     }
   } else {
-    console.log('[Webhook] Unknown event:', event.key);
+    console.warn('[Webhook] Unknown event:', event.key);
   }
 
   // LD-10: Always return 200
@@ -137,7 +137,7 @@ async function handleChargeSucceeded(chargeId: string, gatewayAmount: number): P
     return;
   }
   if (attempt.status === 'succeeded') {
-    console.log('[Webhook] Duplicate webhook for charge:', chargeId);
+    console.warn('[Webhook] Duplicate webhook for charge:', chargeId);
     return;
   }
 
@@ -208,7 +208,7 @@ async function handleChargeSucceeded(chargeId: string, gatewayAmount: number): P
     }
   } catch (e) {
     if (e instanceof WebhookAlreadyConfirmedError) {
-      console.log('[Webhook] Order already confirmed:', e.message);
+      console.info('[Webhook] Order already confirmed:', e.message);
       return;
     }
     if (e instanceof InsufficientStockError) {
@@ -298,5 +298,5 @@ async function handleChargeFailed(
     data: { status: 'failed', failureReason: failureCode ?? failureMessage ?? 'UNKNOWN' },
   });
   // Order stays pending_payment (retriable).
-  console.log(`[Webhook] Payment failed for ${chargeId}: ${failureCode} - ${failureMessage}`);
+  console.warn(`[Webhook] Payment failed for ${chargeId}: ${failureCode} - ${failureMessage}`);
 }

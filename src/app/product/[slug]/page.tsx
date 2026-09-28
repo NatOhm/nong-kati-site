@@ -13,6 +13,7 @@ import { ProductDetailClient } from '@/components/product/ProductDetailClient';
 import { formatThb } from '@/utils/format';
 
 import { getProductBySlug, getProductWishCount, getMostWishedProducts } from '@/lib/data';
+import { publicOrigin } from '@/lib/siteConfig';
 import { WishCounterBadge } from '@/components/product/WishCounterBadge';
 import { AlsoWished } from '@/components/product/AlsoWished';
 
@@ -29,16 +30,21 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
     return { title: 'สินค้า' };
   }
 
+  // Metadata runs BEFORE any Suspense boundary flushes, so calling
+  // notFound() here (and not only in the component) is what actually yields
+  // a genuine 404 status — after streaming has begun Next can no longer set
+  // the status code and a missing product would ship as a soft-404 HTTP 200.
   if (!product) {
-    return { title: 'ไม่พบสินค้า' };
+    notFound();
   }
 
-  const siteUrl = process.env['NEXT_PUBLIC_SITE_URL'] || 'https://nong-kati.com';
+  const siteUrl = publicOrigin();
   const productUrl = `${siteUrl}/product/${slug}`;
 
   return {
     title: `${product.name} — ซื้อบัตรออนไลน์`,
-    description: product.shortDescription || `ซื้อ ${product.name} ออนไลน์ ส่งโค้ดทันที`,
+    description:
+      product.shortDescription || `ซื้อ ${product.name} ออนไลน์ โอนเงินแล้วทีมงานยืนยันและส่งโค้ด`,
     openGraph: {
       title: product.name,
       description: product.shortDescription || `ซื้อ ${product.name} ออนไลน์`,
@@ -56,16 +62,19 @@ export default async function ProductPage({
   let product: Awaited<ReturnType<typeof getProductBySlug>> = null;
   try {
     product = await getProductBySlug(slug);
-    if (!product) notFound();
   } catch {
-    // DB unavailable — render error state
+    // DB unavailable — render a retryable error state. NOTE: `notFound()` is
+    // deliberately OUTSIDE this try — it throws Next's own control-flow
+    // error, which a catch here would swallow and turn a missing product
+    // into a fake "system down" page (audit 2026-09-28: soft-404 with
+    // misleading copy + HTTP 200).
     return (
       <>
         <FacebookLayout>
           <PageShell>
             <section className="py-16 text-center">
-              <h1 className="text-2xl font-bold text-fg">ไม่พบสินค้า</h1>
-              <p className="mt-4 text-fg-placeholder">ไม่สามารถโหลดข้อมูลได้ในขณะนี้</p>
+              <h1 className="text-2xl font-bold text-fg">โหลดสินค้าไม่สำเร็จ</h1>
+              <p className="mt-4 text-fg-muted">ลองรีเฟรชอีกครั้ง หรือกลับมาใหม่ภายหลัง</p>
               <Link href="/" className="mt-4 inline-block text-fg-brand hover:underline">
                 กลับหน้าหลัก
               </Link>
@@ -76,7 +85,8 @@ export default async function ProductPage({
       </>
     );
   }
-  const siteUrl = process.env['NEXT_PUBLIC_SITE_URL'] || 'https://nong-kati.com';
+  if (!product) notFound();
+  const siteUrl = publicOrigin();
   const productUrl = `${siteUrl}/product/${slug}`;
   const totalStock = product.variants.reduce((sum, v) => sum + v.stock, 0);
   // Social proof: real wishlist table (both degrade gracefully to empty).

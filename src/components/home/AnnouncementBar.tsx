@@ -9,10 +9,13 @@ interface AnnouncementContent {
   enabled: boolean;
 }
 
+// Audit 2026-09-28: the old fallback advertised a sitewide sale that does not
+// exist — a fabricated promotion shown on every page until the admin sets a
+// real one. With no announcement configured the bar renders nothing.
 const FALLBACK: AnnouncementContent = {
-  message: `🎉 โปรโมชั่นพิเศษ! ส่วนลดทุกบัตรในหน้าร้าน`,
-  href: '/search',
-  enabled: true,
+  message: '',
+  href: null,
+  enabled: false,
 };
 
 /**

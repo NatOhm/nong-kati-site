@@ -102,8 +102,10 @@ export function HamsterGrassScene({ className }: { className?: string }): React.
 
   return (
     <div className={cn('absolute inset-x-0 bottom-0 z-0', className)}>
-      {/* Rolling clay hills */}
-      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-28">
+      {/* Rolling clay hills — overflow-hidden keeps the oversized hill
+          ellipses from widening the page on 320px phones (audit: horizontal
+          overflow at xs). */}
+      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-28 overflow-hidden">
         {/* back hill */}
         <div className="absolute bottom-6 left-[8%] h-24 w-72 rounded-[100%] bg-jade-200/50 dark:bg-jade-900/40" />
         <div className="absolute bottom-4 right-[6%] h-28 w-96 rounded-[100%] bg-jade-200/40 dark:bg-jade-900/30" />

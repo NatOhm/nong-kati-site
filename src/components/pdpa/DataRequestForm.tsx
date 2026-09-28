@@ -102,7 +102,7 @@ export function DataRequestForm(): React.JSX.Element {
               />
               <div>
                 <p className="text-sm text-fg">{type.label}</p>
-                <p className="text-clay-9000 text-xs">{type.description}</p>
+                <p className="text-fg-muted text-xs">{type.description}</p>
               </div>
             </label>
           ))}
@@ -116,7 +116,7 @@ export function DataRequestForm(): React.JSX.Element {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          className="placeholder:text-clay-9000 w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg focus:border-line-brand"
+          className="placeholder:text-fg-muted w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg focus:border-line-brand"
           placeholder="your@email.com"
         />
       </div>
@@ -128,7 +128,7 @@ export function DataRequestForm(): React.JSX.Element {
           onChange={(e) => setDetails(e.target.value)}
           required
           rows={4}
-          className="placeholder:text-clay-9000 w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg focus:border-line-brand"
+          className="placeholder:text-fg-muted w-full rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg focus:border-line-brand"
           placeholder="กรุณาระบุรายละเอียดเพิ่มเติม..."
         />
       </div>

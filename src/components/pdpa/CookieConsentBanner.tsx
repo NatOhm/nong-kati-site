@@ -164,7 +164,7 @@ export function CookieConsentBanner(): React.JSX.Element | null {
             <label className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-fg-secondary">คุกกี้ที่จำเป็น</p>
-                <p className="text-clay-9000 text-xs">
+                <p className="text-fg-muted text-xs">
                   จำเป็นสำหรับเว็บไซต์ทำงานได้ ไม่สามารถปิดได้
                 </p>
               </div>
@@ -178,7 +178,7 @@ export function CookieConsentBanner(): React.JSX.Element | null {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-fg-secondary">คุกกี้เพื่อการวิเคราะห์</p>
-                <p className="text-clay-9000 text-xs">ช่วยเราเข้าใจวิธีที่ผู้เข้าชมใช้เว็บไซต์</p>
+                <p className="text-fg-muted text-xs">ช่วยเราเข้าใจวิธีที่ผู้เข้าชมใช้เว็บไซต์</p>
               </div>
               <button
                 type="button"
@@ -208,7 +208,7 @@ export function CookieConsentBanner(): React.JSX.Element | null {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-fg-secondary">คุกกี้เพื่อการตลาด</p>
-                <p className="text-clay-9000 text-xs">ใช้สำหรับแสดงโฆษณาที่เกี่ยวข้อง</p>
+                <p className="text-fg-muted text-xs">ใช้สำหรับแสดงโฆษณาที่เกี่ยวข้อง</p>
               </div>
               <button
                 type="button"

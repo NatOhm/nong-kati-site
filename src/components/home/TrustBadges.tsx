@@ -10,9 +10,12 @@ const BADGES = [
     color: 'bg-jade-500/15 text-jade-700',
   },
   {
+    // Audit 2026-09-28: the old copy promised codes "within 60 seconds" —
+    // the production path is transfer → slip upload → human verification,
+    // so the promise was fabricated. Describe what actually happens.
     icon: <Zap size={24} className="text-fg-brand" />,
-    title: 'ส่งโค้ดทันที',
-    desc: 'ภายใน 60 วินาทีหลังชำระเงิน',
+    title: 'ได้โค้ดหลังยืนยัน',
+    desc: 'ทีมงานตรวจสลิปแล้วส่งโค้ดทันที',
     color: 'bg-peach-100 text-fg-brand',
   },
   {

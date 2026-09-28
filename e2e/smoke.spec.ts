@@ -94,6 +94,59 @@ test.describe('home page under enforced CSP', () => {
 });
 
 /**
+ * Regression (audit 2026-09-28): build-prerendered routes used to ship their
+ * HTML without the per-request nonce, so the enforced CSP blocked Next's
+ * inline bootstrap scripts and /account/login rendered as an EMPTY page in
+ * the production build (CI never hit these routes). The gate now walks two
+ * of them and proves the JS layer is alive: enforced CSP present, zero
+ * nonce-less inline scripts, and a client control that only exists after
+ * hydration actually responds.
+ */
+test.describe('prerendered routes under enforced CSP', () => {
+  for (const path of ['/account/login', '/legal/privacy-policy'] as const) {
+    test(`${path}: enforced CSP + every inline script carries the nonce`, async ({ page }) => {
+      const consoleErrors: string[] = [];
+      page.on('console', (msg) => {
+        if (msg.type() === 'error') consoleErrors.push(msg.text());
+      });
+      page.on('pageerror', (err) => consoleErrors.push(String(err)));
+
+      const response = await page.goto(path);
+      expect(response?.status()).toBe(200);
+
+      const csp = response?.headers()['content-security-policy'] ?? '';
+      expect(csp, 'CSP header must be present (enforced, not report-only)').toContain('script-src');
+      expect(scriptSrcDirective(csp), 'script-src must carry the nonce').toContain("'nonce-");
+
+      // Browsers strip the nonce attribute from the live DOM once a script
+      // executes, so the check must run against the RAW served HTML.
+      const html = await (await page.request.get(path)).text();
+      const inlineOpenTags = html.match(/<script(?![^>]*\bsrc=)[^>]*>/g) ?? [];
+      expect(inlineOpenTags.length, 'page must ship inline bootstrap scripts').toBeGreaterThan(0);
+      const nonceless = inlineOpenTags.filter((t) => !/\bnonce=/.test(t));
+      expect(
+        nonceless,
+        'every inline script must carry the per-request nonce (prerender bake-in)',
+      ).toEqual([]);
+
+      expect(
+        consoleErrors.filter((e) => /Content Security Policy|Refused to (load|execute)/i.test(e)),
+      ).toEqual([]);
+    });
+  }
+
+  test('/account/login hydrates: the password toggle responds after mount', async ({ page }) => {
+    await page.goto('/account/login');
+    const toggle = page.getByRole('button', { name: 'แสดงรหัสผ่าน' });
+    await expect(toggle, 'client island must be interactive (JS booted)').toBeVisible({
+      timeout: 30_000,
+    });
+    await toggle.click();
+    await expect(page.getByRole('button', { name: 'ซ่อนรหัสผ่าน' })).toBeVisible();
+  });
+});
+
+/**
  * Guest checkout → order creation, driven through the real UI: product
  * page → add to cart → contact form. The order is then verified through
  * the API payload + its confirmation page (§2 definition of done: "the

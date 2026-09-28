@@ -1,10 +1,11 @@
 import { MetadataRoute } from 'next';
 
 import { getAllCategorySlugs, getAllProductSlugs } from '@/lib/data';
+import { publicOrigin } from '@/lib/siteConfig';
 
 export const dynamic = 'force-dynamic';
 
-const BASE_URL = process.env['NEXT_PUBLIC_SITE_URL'] || 'https://nong-kati.com';
+const BASE_URL = publicOrigin();
 
 /**
  * 14-seo.md §7 — Dynamic sitemap.xml.

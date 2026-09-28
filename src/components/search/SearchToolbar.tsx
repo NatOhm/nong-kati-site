@@ -142,54 +142,58 @@ export function SearchToolbar({
             )}
           </div>
 
-          {/* Pager: 1/N + square arrows */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm tabular-nums text-fg-muted" aria-live="polite">
-              {page}/{Math.max(totalPages, 1)}
-            </span>
-            <button
-              type="button"
-              aria-label="หน้าก่อนหน้า"
-              disabled={!canPrev}
-              onClick={() => canPrev && go({ page: String(page - 1) })}
-              className={arrowCls(canPrev)}
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
+          {/* Pager: 1/N + square arrows — meaningless with zero results
+              (an empty search showed a false "1/1"), so it renders only
+              when a result set exists. */}
+          {totalPages > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm tabular-nums text-fg-muted" aria-live="polite">
+                {page}/{Math.max(totalPages, 1)}
+              </span>
+              <button
+                type="button"
+                aria-label="หน้าก่อนหน้า"
+                disabled={!canPrev}
+                onClick={() => canPrev && go({ page: String(page - 1) })}
+                className={arrowCls(canPrev)}
               >
-                <path d="m15 18-6-6 6-6" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              aria-label="หน้าถัดไป"
-              disabled={!canNext}
-              onClick={() => canNext && go({ page: String(page + 1) })}
-              className={arrowCls(canNext)}
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="m15 18-6-6 6-6" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                aria-label="หน้าถัดไป"
+                disabled={!canNext}
+                onClick={() => canNext && go({ page: String(page + 1) })}
+                className={arrowCls(canNext)}
               >
-                <path d="m9 18 6-6-6-6" />
-              </svg>
-            </button>
-          </div>
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="m9 18 6-6-6-6" />
+                </svg>
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

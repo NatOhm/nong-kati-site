@@ -11,9 +11,23 @@ import { MobileBottomNav } from '@/components/home/MobileBottomNav';
 import { ThemeVars } from '@/components/layout/ThemeVars';
 import { ClayIconDefs } from '@/components/ui/ClayIconDefs';
 import { getAppearance } from '@/lib/data';
+import { publicOrigin } from '@/lib/siteConfig';
 import { ToastMount } from './ToastMount';
 
 import './globals.css';
+
+/**
+ * Audit (2026-09-28) — CRITICAL: routes that Next prerenders at build time
+ * (account, legal, 404, …) bake their HTML into `.next` WITHOUT the per-request
+ * CSP nonce, so the enforced nonce policy blocked Next's own inline bootstrap
+ * scripts on those pages — the browser executed no JS at all and
+ * /account/login rendered as an empty shell in the production build.
+ * Forcing dynamic rendering makes every request server-rendered with the
+ * request nonce applied. The storefront data functions already degrade
+ * gracefully on DB hiccups, so the cost is an ISR-shaped latency increase,
+ * not correctness.
+ */
+export const dynamic = 'force-dynamic';
 
 // Rounded, friendly faces: Mitr for display, Noto Sans Thai Looped for UI body.
 const mitr = Mitr({
@@ -40,14 +54,14 @@ const jetbrainsMono = JetBrains_Mono({
 // 14-seo.md §2.1 — root metadata defaults. <NK_DOMAIN> resolved at M10 per that
 // document's placeholder convention; a safe local fallback is used until then.
 export const metadata: Metadata = {
-  // Canonical production origin — localhost fallback only affects local dev.
-  metadataBase: new URL(process.env['NEXT_PUBLIC_SITE_URL'] ?? 'https://nong-kati.vercel.app'),
+  // Canonical production origin — shared helper (lib/siteConfig).
+  metadataBase: new URL(publicOrigin()),
   title: {
     template: '%s — Nong-Kati',
     default: 'ซื้อบัตรเกม Netflix Steam และอื่นๆ — Nong-Kati',
   },
   description:
-    'ซื้อ gift card ออนไลน์ ส่งโค้ดทันที ครอบคลุม เกม สตรีมมิ่ง และ อีคอมเมิร์ซ ราคาดี จ่ายผ่าน PromptPay หรือโอนเงิน',
+    'ซื้อ gift card เกม สตรีมมิ่ง และอีคอมเมิร์ซ ราคาดี โอนเงินพร้อมส่งสลิปยืนยัน ทีมงานยืนยันแล้วส่งโค้ดถึงอีเมล',
   applicationName: 'Nong-Kati',
   robots: { index: true, follow: true },
 };

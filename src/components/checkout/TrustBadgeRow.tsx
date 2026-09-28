@@ -9,7 +9,7 @@ export interface TrustBadgeRowProps {
 
 const BADGES = [
   { icon: Lock, label: 'SSL Secured' },
-  { icon: Zap, label: 'ส่งโค้ดทันที' },
+  { icon: Zap, label: 'ได้โค้ดหลังยืนยันการชำระเงิน' },
   { icon: Shield, label: 'คืนเงินหากโค้ดไม่ถูกต้อง' },
 ];
 

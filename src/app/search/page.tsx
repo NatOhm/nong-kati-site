@@ -51,7 +51,7 @@ export async function generateMetadata({ searchParams }: SearchPageProps): Promi
     title: query ? `ค้นหา "${query}"` : `สินค้าทั้งหมด`,
     description: query
       ? `ผลการค้นหา "${query}" — ซื้อบัตรเกม สตรีมมิ่ง และอีคอมเมิร์ซ ออนไลน์`
-      : 'เลือกซื้อสินค้าทั้งหมด gift card ออนไลน์ ส่งโค้ดทันที',
+      : 'เลือกซื้อสินค้าทั้งหมด gift card ออนไลน์ โอนเงินแล้วทีมงานยืนยันและส่งโค้ด',
     robots: { index: false, follow: true },
     other: category ? { category } : {},
   };
@@ -151,7 +151,7 @@ export default async function SearchPage({
                         : 'border-line bg-surface text-fg-secondary hover:border-peach-400 hover:text-fg-brand'
                     }`}
                   >
-                    {cat.name} <span className="text-clay-9000">({cat.productCount})</span>
+                    {cat.name} <span className="text-fg-muted">({cat.productCount})</span>
                   </Link>
                 ))}
               </div>

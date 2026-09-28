@@ -147,7 +147,7 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
                   onKeyDown={(e) => {
                     if (e.key === 'Escape') setSuggestions([]);
                   }}
-                  className="placeholder:text-clay-9000 w-48 bg-transparent text-sm text-fg lg:w-64"
+                  className="placeholder:text-fg-muted w-48 bg-transparent text-sm text-fg lg:w-64"
                 />
               </div>
 

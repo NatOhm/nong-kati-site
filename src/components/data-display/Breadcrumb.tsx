@@ -4,6 +4,7 @@ import { ChevronRight } from 'lucide-react';
 
 import { serializeJsonLd } from '@/components/data-display/StructuredData';
 import { cn } from '@/utils/cn';
+import { publicOrigin } from '@/lib/siteConfig';
 
 export interface BreadcrumbItem {
   label: string;
@@ -27,9 +28,7 @@ export function Breadcrumb({ items, className }: BreadcrumbProps): React.JSX.Ele
       '@type': 'ListItem',
       position: index + 1,
       name: item.label,
-      ...(item.href
-        ? { item: `${process.env['NEXT_PUBLIC_SITE_URL'] || 'https://nong-kati.com'}${item.href}` }
-        : {}),
+      ...(item.href ? { item: `${publicOrigin()}${item.href}` } : {}),
     })),
   };
 

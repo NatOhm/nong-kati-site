@@ -44,10 +44,10 @@ export async function Footer(): Promise<React.JSX.Element> {
           <div>
             <Logo />
             <p className="mt-3 text-sm text-fg-muted">
-              {store.description ?? 'ซื้อง่าย จ่ายเร็ว ได้โค้ดทันที'}
+              {store.description ?? 'ซื้อง่าย จ่ายเร็ว โค้ดถึงมือหลังทีมงานยืนยันการชำระเงิน'}
             </p>
             {(store.phone || store.email || store.line) && (
-              <ul className="mt-3 space-y-0 text-sm text-fg-muted">
+              <ul className="mt-3 space-y-1 text-sm text-fg-muted">
                 {store.phone && (
                   <li className="flex min-h-[36px] items-center">
                     โทร{' '}

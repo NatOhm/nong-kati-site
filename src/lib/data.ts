@@ -663,22 +663,23 @@ export interface AnnouncementContent {
  * malformed, so the bar never breaks the page render.
  */
 export async function getAnnouncement(): Promise<AnnouncementContent> {
-  const fallback: AnnouncementContent = {
-    message: '🎉 โปรโมชั่นพิเศษ! HBO Max 7 วัน ลดเหลือ ฿25',
-    href: '/product/hbo-max-7-4k-4',
-    enabled: true,
-  };
+  // No fabricated fallback (audit 2026-09-28): the old default announced a
+  // specific discount — pointing at a stale product slug — on every page
+  // until an admin happened to configure a real announcement. With nothing
+  // configured the bar simply does not render.
+  const disabled: AnnouncementContent = { message: '', href: null, enabled: false };
   try {
     const row = await prisma.siteSetting.findUnique({ where: { key: 'announcement' } });
-    if (!row) return fallback;
+    if (!row) return disabled;
     const parsed = JSON.parse(row.value) as Partial<AnnouncementContent>;
+    if (typeof parsed.message !== 'string' || parsed.message.trim() === '') return disabled;
     return {
-      message: typeof parsed.message === 'string' ? parsed.message : fallback.message,
+      message: parsed.message,
       href: typeof parsed.href === 'string' ? parsed.href : null,
       enabled: parsed.enabled !== false,
     };
   } catch {
-    return fallback;
+    return disabled;
   }
 }
 

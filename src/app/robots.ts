@@ -1,18 +1,19 @@
 import { MetadataRoute } from 'next';
 
+import { publicOrigin } from '@/lib/siteConfig';
+
 /**
  * 14-seo.md §8 — robots.txt rules.
  */
 export default function robots(): MetadataRoute.Robots {
-  // Canonical production origin (must match the live deployment domain).
-  const baseUrl = process.env['NEXT_PUBLIC_SITE_URL'] || 'https://nong-kati.vercel.app';
+  const baseUrl = publicOrigin();
 
   return {
     rules: [
       {
         userAgent: '*',
         allow: '/',
-        disallow: ['/api/', '/admin/'],
+        disallow: ['/api/', '/admin/', '/dev/'],
       },
     ],
     sitemap: `${baseUrl}/sitemap.xml`,

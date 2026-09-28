@@ -26,15 +26,16 @@ import {
   getHeroSlides,
   getStorefrontStats,
 } from '@/lib/data';
+import { publicOrigin } from '@/lib/siteConfig';
 
 export const metadata: Metadata = {
   // No manual brand suffix — the root template appends "— Nong-Kati" (audit #12).
   title: 'ซื้อบัตรเกม Netflix Steam และอีคอมเมิร์ซ',
   description:
-    'ซื้อ gift card ออนไลน์ ส่งโค้ดทันที ครอบคลุม เกม สตรีมมิ่ง และ อีคอมเมิร์ซ ราคาดี โอนเงินพร้อมส่งสลิปยืนยัน',
+    'ซื้อ gift card เกม สตรีมมิ่ง และอีคอมเมิร์ซ ราคาดี โอนเงินพร้อมส่งสลิปยืนยัน ทีมงานยืนยันแล้วส่งโค้ดถึงอีเมล',
   openGraph: {
     title: 'Nong-Kati — ซื้อบัตรเกม สตรีมมิ่ง และอีคอมเมิร์ซ',
-    description: 'ส่งโค้ดทันที ราคาดี โอนเงินพร้อมส่งสลิปยืนยัน',
+    description: 'ราคาดี โอนเงินพร้อมส่งสลิปยืนยัน ทีมงานยืนยันแล้วส่งโค้ดถึงอีเมล',
     type: 'website',
     locale: 'th_TH',
   },
@@ -70,8 +71,8 @@ export default async function HomePage(): Promise<React.JSX.Element> {
         type="organization"
         data={{
           name: 'Nong-Kati',
-          url: process.env['NEXT_PUBLIC_SITE_URL'] || 'https://nong-kati.com',
-          description: 'ซื้อ gift card ออนไลน์ ส่งโค้ดทันที',
+          url: publicOrigin(),
+          description: 'ซื้อ gift card ออนไลน์ โอนเงินแล้วทีมงานยืนยันและส่งโค้ด',
         }}
       />
 
@@ -257,13 +258,15 @@ export default async function HomePage(): Promise<React.JSX.Element> {
 
         {/* Stats — real counts, plain numbers, horizontal, at the bottom (client ask).
             Hidden entirely during an outage: zero rows read as “no business”
-            (audit round 2 #4) — they return with the data. */}
+            (audit round 2 #4) — they return with the data.
+            Audit 2026-09-28: a fresh shop legitimately starts at 0 ลูกค้า /
+            0 ขายแล้ว — “ลูกค้า 0” reads as “nobody shops here” and the old
+            count-up animation froze at a fabricated zero on jank. Show only
+            the numbers that say something real about the shop today. */}
         {stats && (
           <StatsCounter
             stats={[
-              { value: stats.customers, label: 'ลูกค้า' },
               { value: stats.products, label: 'สินค้า' },
-              { value: stats.itemsSold, label: 'ขายแล้ว' },
               { value: stats.stock, label: 'สต๊อก' },
             ]}
           />

@@ -58,7 +58,7 @@ export function CheckoutShell({
                       'font-medium',
                       isCurrent && 'text-fg-brand',
                       isDone && !isCurrent && 'cursor-pointer text-fg-secondary',
-                      !isDone && !isCurrent && 'text-clay-9000',
+                      !isDone && !isCurrent && 'text-fg-muted',
                     )}
                     aria-disabled={!isClickable && !isCurrent}
                   >
