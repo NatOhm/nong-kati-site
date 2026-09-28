@@ -38,6 +38,7 @@ export function CartItem({ item, onUpdateQty, onRemove }: CartItemProps): React.
       {/* Thumbnail */}
       <div className="h-12 w-12 shrink-0 overflow-hidden rounded bg-surface">
         {item.thumbnailUrl ? (
+// eslint-disable-next-line @next/next/no-img-element -- admin-upload/data-URL source: served immutable via /api/v1/images or inline QR; next/image optimizer has no remote pattern for these hosts
           <img
             src={item.thumbnailUrl}
             alt={item.productNameTh}

@@ -35,6 +35,7 @@ export function SearchResultCard({
       {/* Thumbnail */}
       <div className="h-10 w-10 shrink-0 overflow-hidden rounded bg-surface">
         {imageUrl ? (
+// eslint-disable-next-line @next/next/no-img-element -- admin-upload/data-URL source: served immutable via /api/v1/images or inline QR; next/image optimizer has no remote pattern for these hosts
           <img src={imageUrl} alt={name} className="h-full w-full object-cover" loading="lazy" />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-peach-100 to-clay-200 text-lg opacity-40">

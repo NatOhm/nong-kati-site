@@ -71,7 +71,7 @@ export function useCardBuy(input: CardBuyInput): {
       });
       resetTimer.current = setTimeout(() => setBuyState('idle'), 1600);
     }, 450);
-  }, [canDirectAdd, buyState, addItem, input]);
+  }, [canDirectAdd, buyState, addItem, input, toast]);
 
   return { canDirectAdd, buyState, handleBuy };
 }

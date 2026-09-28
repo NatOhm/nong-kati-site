@@ -167,6 +167,7 @@ export function QuickViewModal({
             <div className="flex items-center gap-3">
               <div className="shadow-inset-sm flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-surface-sunken">
                 {product.imageUrl ? (
+// eslint-disable-next-line @next/next/no-img-element -- admin-upload/data-URL source: served immutable via /api/v1/images or inline QR; next/image optimizer has no remote pattern for these hosts
                   <img src={product.imageUrl} alt="" className="h-full w-full object-cover" />
                 ) : (
                   <span className="text-2xl opacity-40">🎮</span>

@@ -23,23 +23,23 @@ export const options = {
   scenarios: {
     flash_sale: {
       executor: 'constant-arrival-rate',
-      rate: 100,              // 100 requests per minute
-      timeUnit: '1m',         // = ~1.67 req/s
+      rate: 100, // 100 requests per minute
+      timeUnit: '1m', // = ~1.67 req/s
       duration: '10m',
       preAllocatedVUs: 50,
       maxVUs: 100,
     },
   },
   thresholds: {
-    http_req_failed: ['rate<0.01'],           // <1% failure rate
-    http_req_duration: ['p(95)<2000'],        // p95 < 2s
+    http_req_failed: ['rate<0.01'], // <1% failure rate
+    http_req_duration: ['p(95)<2000'], // p95 < 2s
     errors: ['rate<0.01'],
   },
 };
 
 // ─── Test Scenarios ─────────────────────────────────────
 
-export default function () {
+export default function flashSaleScenario() {
   const scenario = Math.random();
 
   if (scenario < 0.4) {
@@ -100,9 +100,7 @@ function completeCheckout() {
   const orderPayload = JSON.stringify({
     email: `loadtest_${Date.now()}@example.com`,
     phone: '0812345678',
-    items: [
-      { variant_id: 'var-st-100', quantity: 1 },
-    ],
+    items: [{ variant_id: 'var-st-100', quantity: 1 }],
     consent_terms: true,
   });
 

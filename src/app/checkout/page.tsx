@@ -222,35 +222,60 @@ export default function CheckoutPage(): React.JSX.Element {
         setLoading(false);
       }
     },
-    [cart, paymentMethod, couponApplied],
+    [cart, couponApplied],
   );
 
-  // Initiate payment
-  const handleInitiatePayment = useCallback(async (orderId: string) => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const result = await apiInitiatePayment(orderId);
-
-      setPaymentState({
-        attemptId: result.paymentAttemptId,
-        qrImageUrl: result.qrImageUrl as string | undefined,
-        qrExpiresAt: result.qrExpiresAt ? new Date(result.qrExpiresAt) : undefined,
-        gatewayRef: result.gatewayRef as string | undefined,
-        status: 'pending',
-      } as any);
-
-      // Start polling for PromptPay
-      if (result.qrExpiresAt) {
-        startPaymentPolling(result.paymentAttemptId);
+  // Poll payment status (every 3 seconds for PromptPay)
+  const startPaymentPolling = useCallback((attemptId: string) => {
+    const interval = setInterval(async () => {
+      try {
+        const status = await apiPollPayment(attemptId);
+        if (status.status === 'succeeded') {
+          clearInterval(interval);
+          setPaymentState((prev) => (prev ? { ...prev, status: 'succeeded' } : null));
+          // Redirect to confirmation
+          if (status.confirmationUuid) {
+            window.location.href = `/checkout/confirmation/${status.confirmationUuid}`;
+          }
+        }
+      } catch {
+        // transient poll failure — retry on next tick
       }
-    } catch (err) {
-      setError(friendlyOrderError(err));
-    } finally {
-      setLoading(false);
-    }
+    }, 3000);
+
+    // Stop polling after 15 minutes (QR expiry)
+    setTimeout(() => clearInterval(interval), 15 * 60 * 1000);
   }, []);
+
+  // Initiate payment
+  const handleInitiatePayment = useCallback(
+    async (orderId: string) => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const result = await apiInitiatePayment(orderId);
+
+        setPaymentState({
+          attemptId: result.paymentAttemptId,
+          qrImageUrl: result.qrImageUrl as string | undefined,
+          qrExpiresAt: result.qrExpiresAt ? new Date(result.qrExpiresAt) : undefined,
+          gatewayRef: result.gatewayRef as string | undefined,
+          status: 'pending',
+        } as any);
+
+        // Start polling for PromptPay
+        if (result.qrExpiresAt) {
+          startPaymentPolling(result.paymentAttemptId);
+        }
+      } catch (err) {
+        setError(friendlyOrderError(err));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [startPaymentPolling],
+  );
 
   /**
    * Pay with wallet credit. On ANY failure (insufficient balance, race,
@@ -297,28 +322,6 @@ export default function CheckoutPage(): React.JSX.Element {
       setWalletBusy(false);
     }
   }, [order, walletBusy, clearCart, handleInitiatePayment]);
-
-  // Poll payment status (every 3 seconds for PromptPay)
-  const startPaymentPolling = useCallback((attemptId: string) => {
-    const interval = setInterval(async () => {
-      try {
-        const status = await apiPollPayment(attemptId);
-        if (status.status === 'succeeded') {
-          clearInterval(interval);
-          setPaymentState((prev) => (prev ? { ...prev, status: 'succeeded' } : null));
-          // Redirect to confirmation
-          if (status.confirmationUuid) {
-            window.location.href = `/checkout/confirmation/${status.confirmationUuid}`;
-          }
-        }
-      } catch {
-        // transient poll failure — retry on next tick
-      }
-    }, 3000);
-
-    // Stop polling after 15 minutes (QR expiry)
-    setTimeout(() => clearInterval(interval), 15 * 60 * 1000);
-  }, []);
 
   // Handle QR expiry
   const handleQrExpire = useCallback(() => {

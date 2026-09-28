@@ -82,6 +82,7 @@ export function ProductCard({
         >
           <div className="relative aspect-square overflow-hidden bg-surface">
             {imageUrl ? (
+// eslint-disable-next-line @next/next/no-img-element -- admin-upload/data-URL source: served immutable via /api/v1/images or inline QR; next/image optimizer has no remote pattern for these hosts
               <img
                 src={imageUrl}
                 alt={name}

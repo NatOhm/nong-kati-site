@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { X, ShoppingCart } from 'lucide-react';
 import { cn } from '@/utils/cn';
@@ -38,11 +38,11 @@ export function CartDrawer({
     if (isOpen) setClosing(false);
   }, [isOpen]);
 
-  const requestClose = () => {
+  const requestClose = useCallback(() => {
     if (closing) return;
     setClosing(true);
     setTimeout(onClose, 250);
-  };
+  }, [closing, onClose]);
 
   // Close on Escape + lock body scroll
   useEffect(() => {
@@ -57,7 +57,6 @@ export function CartDrawer({
       document.removeEventListener('keydown', handleEsc);
       document.body.style.overflow = '';
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, requestClose]);
 
   if (!isOpen) return <></>;

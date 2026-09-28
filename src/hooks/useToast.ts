@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import type { ToastData, ToastType } from '@/components/feedback/Toast';
 
@@ -49,6 +49,18 @@ function dismiss(id: string, immediate = false): void {
   setTimeout(() => dismiss(id, true), 250);
 }
 
+/**
+ * Module-level, referentially stable — the push functions only touch the
+ * module store, never component state. Returning a fresh object per render
+ * forced every consumer to re-memoize on every render.
+ */
+const toast = {
+  success: (title: string, options?: ToastOptions) => push('success', title, options),
+  error: (title: string, options?: ToastOptions) => push('error', title, options),
+  warning: (title: string, options?: ToastOptions) => push('warning', title, options),
+  info: (title: string, options?: ToastOptions) => push('info', title, options),
+};
+
 export function useToast(): UseToastResult {
   const [toasts, setToasts] = useState<ToastData[]>(toastState);
 
@@ -58,22 +70,6 @@ export function useToast(): UseToastResult {
       listeners = listeners.filter((l) => l !== setToasts);
     };
   }, []);
-
-  const toast = {
-    success: useCallback(
-      (title: string, options?: ToastOptions) => push('success', title, options),
-      [],
-    ),
-    error: useCallback(
-      (title: string, options?: ToastOptions) => push('error', title, options),
-      [],
-    ),
-    warning: useCallback(
-      (title: string, options?: ToastOptions) => push('warning', title, options),
-      [],
-    ),
-    info: useCallback((title: string, options?: ToastOptions) => push('info', title, options), []),
-  };
 
   return { toasts, dismiss, toast };
 }

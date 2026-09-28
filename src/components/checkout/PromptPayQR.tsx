@@ -39,6 +39,7 @@ export function PromptPayQR({
       {/* QR Code */}
       <div className="mx-auto mb-4 flex w-fit flex-col items-center gap-4">
         <div data-allow-hardcoded-white className="rounded-lg bg-white p-4 shadow-code-glow">
+          {/* eslint-disable-next-line @next/next/no-img-element -- admin-upload/data-URL source: served immutable via /api/v1/images or inline QR; next/image optimizer has no remote pattern for these hosts */}
           <img
             src={qrDataUrl}
             alt={`PromptPay QR Code สำหรับคำสั่งซื้อ ${formatThb(amount)}`}

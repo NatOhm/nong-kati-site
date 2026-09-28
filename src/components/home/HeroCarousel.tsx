@@ -82,6 +82,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlideContent[] }): React.
               const media =
                 s.imageUrl && s.label ? (
                   <div className="relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- admin-upload/data-URL source: served immutable via /api/v1/images or inline QR; next/image optimizer has no remote pattern for these hosts */}
                     <img
                       src={s.imageUrl}
                       alt={s.alt}
@@ -94,6 +95,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlideContent[] }): React.
                     </span>
                   </div>
                 ) : s.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- admin-upload source: served immutable via /api/v1/images; next/image has no remote pattern for these hosts
                   <img
                     src={s.imageUrl}
                     alt={s.alt}

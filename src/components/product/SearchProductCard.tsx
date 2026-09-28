@@ -83,6 +83,7 @@ export function SearchProductCard({
           className="relative block aspect-square overflow-hidden bg-surface-sunken"
         >
           {imageUrl ? (
+// eslint-disable-next-line @next/next/no-img-element -- admin-upload/data-URL source: served immutable via /api/v1/images or inline QR; next/image optimizer has no remote pattern for these hosts
             <img
               src={imageUrl}
               alt={name}
