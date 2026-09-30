@@ -24,6 +24,7 @@ export async function getDeliveredCodes(orderId: string): Promise<CustomerCode[]
     select: {
       codeEncrypted: true,
       nonce: true,
+      keyVersion: true,
       orderItem: {
         select: { productNameTh: true, denominationThb: true },
       },
@@ -31,7 +32,7 @@ export async function getDeliveredCodes(orderId: string): Promise<CustomerCode[]
   });
 
   return rows.map((row) => ({
-    code: decryptCode(row.codeEncrypted, row.nonce),
+    code: decryptCode(row.codeEncrypted, row.nonce, row.keyVersion),
     productName: row.orderItem?.productNameTh ?? '',
     denomination: Number(row.orderItem?.denominationThb ?? 0),
   }));

@@ -33,6 +33,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       id: true,
       codeEncrypted: true,
       nonce: true,
+      keyVersion: true,
       deliveredAt: true,
       order: { select: { orderNumber: true, status: true } },
       orderItem: {
@@ -44,7 +45,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   return NextResponse.json({
     codes: rows.map((row) => ({
       id: row.id,
-      code: decryptCode(row.codeEncrypted, row.nonce),
+      code: decryptCode(row.codeEncrypted, row.nonce, row.keyVersion),
       product: row.orderItem?.productNameTh ?? '',
       denomination: Number(row.orderItem?.denominationThb ?? 0),
       orderNumber: row.order?.orderNumber ?? '',

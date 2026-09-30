@@ -57,7 +57,7 @@ export function deliverCodes(input: CodeDeliveryInput): DeliveryResult {
 
   // Step 2: Decrypt codes (§8.2) — in memory only
   const decryptedCodes = assignment.codes.map((codeAssignment) => {
-    const plainCode = decryptCode(codeAssignment.codeEncrypted, codeAssignment.nonce);
+    const plainCode = decryptCode(codeAssignment.codeEncrypted, codeAssignment.nonce, codeAssignment.keyVersion);
     return {
       code: plainCode,
       productName: input.productNameTh,

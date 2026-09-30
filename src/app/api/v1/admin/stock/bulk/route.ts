@@ -206,12 +206,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       if (!variant) throw new Error('VARIANT_DELETED');
 
       const rows = plan.codes.map((code) => {
-        const { ciphertext, nonce } = encryptCode(code);
+        const { ciphertext, nonce, keyVersion } = encryptCode(code);
         return {
           variantId: plan.variantId,
           codeEncrypted: ciphertext,
           codeHash: hashCode(code),
           nonce,
+          keyVersion,
           status: 'available',
           uploadedById: adminId,
         };

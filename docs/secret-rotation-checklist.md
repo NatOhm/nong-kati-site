@@ -115,13 +115,53 @@ Do it in a low-traffic window.
 and decrypt with it. The safe pattern: introduce a new key as `keyVersion 2`, re-encrypt every row,
 then make version 2 the active key — with a dry-run first.
 
-**One-time code change (I can do this on request):** add `NK_GIFT_CODE_ENCRYPTION_KEY_V2` support
-+ a `scripts/re-encrypt-gift-codes.mjs` that:
-1. dry-runs (decrypt with V1 key → re-encrypt with V2 → verify roundtrip → report count, changes nothing);
-2. writes `UPDATE`s in a single transaction, bumping `keyVersion` to 2;
-3. is idempotent (skips rows already at keyVersion 2).
-Then the run order is: deploy build with dual-key support → run dry-run → run real pass → swap
-`NK_GIFT_CODE_ENCRYPTION_KEY` to the new value in Infisical → restart → spot-check a delivered code.
+**Shipped tooling (in code since Oct 1, 2026):** `src/lib/crypto/giftCode.ts` now supports a
+two-version key ring, and `scripts/re-encrypt-gift-codes.mjs` does the rotation:
+
+- **App changes:** `decryptCode` uses the row's `keyVersion` (1 → `NK_GIFT_CODE_ENCRYPTION_KEY`,
+  2 → `NK_GIFT_CODE_ENCRYPTION_KEY_V2`, which **falls back to the base variable when unset** —
+  that makes the final Infisical swap seamless). `encryptCode` stamps new rows with
+  `NK_GIFT_CODE_ACTIVE_KEY_VERSION` (default 1) and returns the version for inserts; every
+  insert path (bulk paste, dev-seed, CSV import) persists it.
+- **Script:** dry-runs by default (decrypt V1 → re-encrypt V2 → roundtrip-verify → report,
+  writes nothing), applies everything in **one transaction** with `--apply` (any failure aborts
+  the whole pass — never half-rotated), and is **idempotent** (rows already at keyVersion 2 are
+  skipped, so re-running is safe). `codeHash` is untouched (key-independent). Refuses to start
+  if V2 == V1, if keys are malformed, or if a probe row fails to decrypt with the local keys.
+
+Run order:
+
+```bash
+# 0. Generate the new key FIRST and store it in your password manager:
+#      openssl rand -hex 32
+
+# 1. Dry run (no writes) — needs the current key in .env.local and the new one passed in:
+NK_GIFT_CODE_ENCRYPTION_KEY_V2=<new key> node scripts/re-encrypt-gift-codes.mjs
+
+# 2. Deploy this build to the server (dual-key support must be live before the swap):
+#      docs/deploy-hostatom-manual.md  (or: bash scripts/deploy-artifact.sh)
+
+# 3. Add the new key to Infisical as NK_GIFT_CODE_ENCRYPTION_KEY_V2 → Restart App → 3 curls.
+#    (Adding V2 to Infisical is safe any time — the app only reads it for keyVersion-2 rows.)
+
+# 4. Real pass — one transaction, idempotent:
+NK_GIFT_CODE_ENCRYPTION_KEY_V2=<new key> node scripts/re-encrypt-gift-codes.mjs --apply
+
+# 5. Swap: Infisical NK_GIFT_CODE_ENCRYPTION_KEY = <the same new value> → Restart App →
+#    3 curls + spot-check a delivered code on /account (โค้ดที่ซื้อ) + one guest order page.
+#    After this swap the app needs only the base variable (V2 falls back to it);
+#    NK_GIFT_CODE_ENCRYPTION_KEY_V2 can then be DELETED from Infisical.
+#    Optional during the window before the swap: NK_GIFT_CODE_ACTIVE_KEY_VERSION=2 so new
+#    uploads are stamped 2 — after the swap, leave it unset (default 1 = the same key material).
+```
+
+> **Rollback before the swap (step 5):** nothing to do — the old key still decrypts everything
+> (`keyVersion` 1 rows are untouched, and the V1 value is still in Infisical + your manager).
+> **Rollback after the swap:** restore BOTH Infisical vars — base = old key,
+> `NK_GIFT_CODE_ENCRYPTION_KEY_V2` = new key — then restart. Version-2 rows decrypt via the V2
+> variable again, new rows go back to version 1, and no re-encryption is needed. Keeping the V2
+> var in Infisical costs nothing (the app ignores it for version-1 rows); deleting it is the
+> final cleanup step once you're confident the rotation is permanent.
 
 **Supabase (SQL Editor) fallback — verification query after any rotation:**
 ```sql

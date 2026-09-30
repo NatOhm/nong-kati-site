@@ -77,12 +77,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const toCreate = 2 - existing;
     for (let i = 0; i < toCreate; i++) {
       const plain = `seed${stamp}-${i}:test1234`;
-      const { ciphertext, nonce } = encryptCode(plain);
+      const { ciphertext, nonce, keyVersion } = encryptCode(plain);
       await prisma.giftCode.create({
         data: {
           variantId: variant.id,
           codeEncrypted: ciphertext,
           nonce,
+          keyVersion,
           codeHash: hashCode(plain),
           status: 'available',
         },

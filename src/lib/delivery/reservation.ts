@@ -56,7 +56,7 @@ interface MockGiftCode {
  */
 export function initMockCodes(variantId: string, codes: string[]): void {
   for (const code of codes) {
-    const { ciphertext, nonce } = encryptCode(code);
+    const { ciphertext, nonce, keyVersion } = encryptCode(code);
     const hash = hashCode(code);
 
     mockCodeStore.set(hash.toString('hex'), {
@@ -65,7 +65,7 @@ export function initMockCodes(variantId: string, codes: string[]): void {
       codeEncrypted: ciphertext,
       codeHash: hash,
       nonce,
-      keyVersion: 1,
+      keyVersion,
       status: 'available',
       orderId: null,
       orderItemId: null,

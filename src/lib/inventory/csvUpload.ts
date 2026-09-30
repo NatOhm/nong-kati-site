@@ -24,6 +24,8 @@ export interface ProcessedRow {
   codeHash: Buffer;
   codeEncrypted: Buffer;
   nonce: Buffer;
+  /** Key version used for the encryption (accepted rows only). */
+  keyVersion?: number;
   expiresAt: Date | null;
   status: 'accepted' | 'rejected';
   rejectReason?: string;
@@ -158,7 +160,7 @@ export function processCsvRows(
     }
 
     // Encrypt
-    const { ciphertext, nonce } = encryptCode(code);
+    const { ciphertext, nonce, keyVersion } = encryptCode(code);
 
     // Accept
     seenHashes.add(hashHex);
@@ -167,6 +169,7 @@ export function processCsvRows(
       codeHash: hash,
       codeEncrypted: ciphertext,
       nonce,
+      keyVersion,
       expiresAt,
       status: 'accepted',
     });

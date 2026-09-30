@@ -148,7 +148,7 @@ export async function fulfilOrder(
           where: { variantId: item.variantId, status: 'available' },
           orderBy: { createdAt: 'asc' },
           take: needed,
-          select: { id: true, codeEncrypted: true, nonce: true },
+          select: { id: true, codeEncrypted: true, nonce: true, keyVersion: true },
         });
         if (candidates.length < needed) {
           throw new Error('INSUFFICIENT_STOCK');
@@ -166,7 +166,7 @@ export async function fulfilOrder(
           });
           if (updated.count !== 1) throw new Error('INSUFFICIENT_STOCK'); // lost the race
           delivered.push({
-            code: decryptCode(c.codeEncrypted, c.nonce),
+            code: decryptCode(c.codeEncrypted, c.nonce, c.keyVersion),
             productName: item.productNameTh,
             denomination: Number(item.denominationThb),
           });
