@@ -18,6 +18,12 @@ Sessions expire in minutes — re-SSO right before each Plesk step.
 
 ## Step 0 — Build + stage the bundle (local, Git Bash)
 
+> **Automated:** `bash scripts/deploy-artifact.sh` does Step 0 **and** Step 1 in one go, prints
+> the BUILD_ID fingerprint, the Step-2 one-liner with the raw URL already filled in, and the
+> verification curls. Variants: `SKIP_BUILD=1` (reuse a fresh build), `DRY_RUN=1`
+> (build + stage only, no push). The commands below are the same flow spelled out manually —
+> use them as fallback or to understand what the script does.
+
 ```bash
 cd "<project root>"                       # webapp/nong-kati/nong-kati
 export NEXT_PUBLIC_SITE_URL=https://nongkatistore.com   # baked at build time — required
@@ -37,11 +43,15 @@ cat .next/BUILD_ID
 ## Step 1 — Publish the bundle to GitHub
 
 The server can't upload via File Manager reliably at 31 MB and has no SFTP; instead it **pulls**
-the bundle from a GitHub raw URL. Keep a dedicated branch:
+the bundle from a GitHub raw URL. Keep a dedicated branch. `scripts/deploy-artifact.sh` does this
+via a temporary git index (orphan commit containing **only** the tarball) — it never touches your
+working tree, index or current branch. Manual equivalent:
 
 ```bash
-git branch -f deploy-artifact && \
-git push origin deploy-artifact --force
+git add -f deploy-bundle.tar.gz && \
+git commit -m "deploy bundle <BUILD_ID>" && \
+git push origin 'HEAD:deploy-artifact' --force && \
+git reset HEAD~1                       # unstage from your working branch again
 ```
 
 Raw URL (used in Step 2):
