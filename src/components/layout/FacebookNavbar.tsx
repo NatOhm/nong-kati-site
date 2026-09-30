@@ -73,7 +73,10 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
     <>
       {/* Slightly darker than the page base — anchors the chrome without going dark */}
       <nav className="sticky top-0 z-50 border-b border-line bg-surface-nav shadow-clay-sm backdrop-blur-md">
-        <div className="mx-auto flex h-14 items-center justify-between px-4 md:h-16 md:px-6">
+        {/* overflow-hidden is the reflow safety net (WCAG 1.4.10 audit): the
+            justify-between row must never push the document wider than the
+            viewport — the widest cluster still fits from lg up. */}
+        <div className="mx-auto flex h-14 items-center justify-between overflow-hidden px-4 md:h-16 md:px-6">
           {/* Left: Logo + Search */}
           <div className="flex items-center gap-3">
             {/* Mobile menu button - opens sidebar drawer.
@@ -147,7 +150,7 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
                   onKeyDown={(e) => {
                     if (e.key === 'Escape') setSuggestions([]);
                   }}
-                  className="placeholder:text-fg-muted w-48 bg-transparent text-sm text-fg lg:w-64"
+                  className="w-48 bg-transparent text-sm text-fg placeholder:text-fg-muted lg:w-64"
                 />
               </div>
 
@@ -241,13 +244,17 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
                 logout (client ask). Phones use the taskbar บัญชี button. */}
             <ProfileMenu />
 
-            {/* Light/dark (md+) — phone users switch via device/system theme */}
-            <div className="hidden md:block">
+            {/* Light/dark (lg+) — phone/tablet users switch via device/system
+                theme. lg, not md: with the md navbar just opened (768–1023px)
+                this cluster overflowed the bar and forced a horizontal scroll
+                (WCAG 1.4.10 audit, 2026-09-28). */}
+            <div className="hidden lg:block">
               <ThemeToggle />
             </div>
 
-            {/* Motion on/off (md+) — overrides the OS reduce-motion setting */}
-            <div className="hidden md:block">
+            {/* Motion on/off (lg+) — overrides the OS reduce-motion setting;
+                same 768–1023px squeeze as the theme toggle above. */}
+            <div className="hidden lg:block">
               <MotionToggle />
             </div>
           </div>

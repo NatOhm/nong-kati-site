@@ -8,6 +8,7 @@ import { DataRequestForm } from '@/components/pdpa/DataRequestForm';
 
 export const metadata: Metadata = {
   title: 'ขอจัดการข้อมูลส่วนบุคคล',
+  alternates: { canonical: '/legal/data-request' },
   description: 'ส่งคำขอเข้าถึง แก้ไข ลบ หรือโอนย้ายข้อมูลส่วนบุคคลของคุณ',
 };
 
@@ -23,7 +24,7 @@ export default function DataRequestPage(): React.JSX.Element {
         <DataRequestForm />
       </div>
 
-      <p className="text-fg-muted mt-4 text-xs">
+      <p className="mt-4 text-xs text-fg-muted">
         เราจะดำเนินการคำขอภายใน 30 วันทำการ หากมีคำถาม กรุณาติดต่อ{' '}
         <a href="mailto:privacy@nong-kati.co.th" className="text-fg-brand hover:text-fg-brand">
           privacy@nong-kati.co.th

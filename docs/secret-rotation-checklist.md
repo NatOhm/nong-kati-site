@@ -1,0 +1,156 @@
+# Secret Rotation Checklist — concrete click-paths (site stays up at every step)
+
+Turns §4.A of [hostatom-live.md](hostatom-live.md) into executable steps. Facts verified in code
+before writing (Oct 1, 2026):
+
+- **Prisma uses only `DATABASE_URL`** (`prisma/schema.prisma` datasource). `DATABASE_DIRECT_URL` was
+  deleted from Infisical on Sep 30 and the app boots + passes health checks — nothing needs it today.
+- **JWT**: `src/lib/jwt.ts` — min 32 chars, throws in production if missing (fail-closed). Rotation
+  invalidates every existing session (admin + customers) — announced, expected.
+- **Gift codes**: `src/lib/crypto/giftCode.ts` reads **one** key (`NK_GIFT_CODE_ENCRYPTION_KEY`) via
+  `getKey()`; every `GiftCode` row stores `keyVersion` (default 1). `NK_GIFT_CODE_ENCRYPTION_KEY_V1`
+  exists only in Infisical — **no code reads it**. ⚠️ Therefore you CANNOT blind-rotate the gift
+  key: all stored ciphertexts decrypt with the current key. The safe path is the paired re-encrypt
+  script in `scripts/` (below).
+- Slips: `NK_SLIP_TOKEN_SECRET` falls back to `NK_JWT_SECRET`; it is not set separately in Infisical,
+  so rotating JWT covers it.
+
+**Where things live:** secrets = Infisical project `nong-kati` (id `80151198-…`), environment
+**Production** → app reads them at boot via machine identity (server.js). Only the 5 `INFISICAL_*`
+bootstrap vars + `VERCEL_GIT_COMMIT_REF=master` sit in Plesk. After ANY change below:
+Plesk → Node.js → **Restart App** → verify before moving on.
+
+**Verify after every step:**
+```bash
+curl -s https://nongkatistore.com/api/v1/version      # {"gitSha":"3e236c2f…","gitRef":"master"}
+curl -s https://nongkatistore.com/api/v1/health       # healthy + database ok
+curl -s -o /dev/null -w "%{http_code}\n" https://nongkatistore.com/api/v1/products   # 200
+```
+
+---
+
+## Step 0 — Snapshot (before touching anything)
+
+1. **Export Infisical secrets list (names only)**: Infisical → project **nong-kati** → Production →
+   ⋯ menu → nothing to export for names; just screenshot the name column (values stay hidden).
+2. **DB backup**: Supabase dashboard → project → **Database → Backups** → note the latest automatic
+   backup timestamp. (PITR, if enabled, covers you for point-in-time restore.)
+3. Confirm current site is green: run the three curl checks above.
+
+---
+
+## Step 1 — Rotate Infisical machine identity (the burned one)
+
+This is the credential that was displayed in the Plesk panel and chat. Highest priority.
+
+**Infisical:**
+1. app.infisical.com → org → project **nong-kati** → **Settings → Access Control → Machine Identities**
+   (left nav under project settings).
+2. Find the old identity (the one whose client ID is `6be89e56-…` — shown in Plesk). **Do not delete
+   it yet.** Click **⋯ → Edit role** → set role to **No Access** (or remove it from the project
+   members) — this instantly cuts its ability to read secrets.
+3. **Create → Machine Identity** → name `hostatom-thsv93-app` → Add to project **nong-kati** →
+   role **Secrets Reader** (read-only) → Universal Auth → **Create**. Copy the **Client ID** and
+   **Client Secret** now (shown once) into your password manager.
+
+**Plesk (thsv93):**
+4. clientarea → product 74879 → **Manage Domains** (SSO) → **Node.js** → Dashboard → Custom
+   environment variables → **specify** → change `INFISICAL_CLIENT_ID` + `INFISICAL_CLIENT_SECRET`
+   to the new values → **OK**.
+5. **Restart App**. Verify: the three curls + homepage. If boot fails (fail-closed), re-check the
+   two values — the app exits rather than serving without secrets.
+
+**Infisical (cleanup):**
+6. Once verified, delete the old identity (Machine Identities → ⋯ → Delete).
+
+> Rollback: set role of old identity back and/or paste old values into Plesk. Both credentials
+> remain valid until the old one is deleted, so you can flip back at any time before deletion.
+
+---
+
+## Step 2 — Rotate the database password (Supabase)
+
+Prisma uses only `DATABASE_URL` (pooler :6543). No staging, no second consumer.
+
+**Supabase:**
+1. supabase.com/dashboard → your project (the one `DATABASE_URL` points at) → **Project Settings → Database →
+   Database password** → **Reset database password** → generate → copy.
+   ⚠️ This instantly invalidates the old password; the live app keeps its pooled connections
+   (open connections survive), but new connections fail until step 4 — do 2–4 quickly.
+2. Copy the **Connection string (pooler, port 6543)** and substitute the new password.
+
+**Infisical:**
+3. Project **nong-kati** → Production → `DATABASE_URL` row → pencil icon → paste the new full URL
+   (keep `?pgbouncer=true`) → **Save commit**.
+
+**Plesk:**
+4. Node.js → **Restart App** → verify the three curls **and** log in as a test customer / open
+   `/products` (exercises real queries).
+
+> If anything stalls: reset the password back in Supabase (set it to the previous value — you kept
+> it in your password manager) → restart → investigate calmly.
+
+---
+
+## Step 3 — Rotate `NK_JWT_SECRET`
+
+Consequence: **every user session dies** (all logged-in customers + admin). Expect support pings.
+Do it in a low-traffic window.
+
+1. Generate: `openssl rand -hex 32` (or your password manager's generator). 64 hex chars ≥ 32-char
+   minimum. Store in password manager.
+2. Infisical → Production → `NK_JWT_SECRET` → edit → paste → save.
+3. Plesk → Node.js → **Restart App**.
+4. Verify: three curls; then **log in as admin** (2FA prompt will appear since sessions reset) and
+   as a test customer; confirm `/dashboard` renders.
+5. Users simply log in again — no data loss (sessions only).
+
+> Slip tokens (`NK_SLIP_TOKEN_SECRET`) fall back to this value in code; rotation covers them.
+
+---
+
+## Step 4 — Rotate the gift-code key (requires re-encrypt — script provided)
+
+**Never just swap the secret.** All existing `GiftCode` rows were encrypted with the current key
+and decrypt with it. The safe pattern: introduce a new key as `keyVersion 2`, re-encrypt every row,
+then make version 2 the active key — with a dry-run first.
+
+**One-time code change (I can do this on request):** add `NK_GIFT_CODE_ENCRYPTION_KEY_V2` support
++ a `scripts/re-encrypt-gift-codes.mjs` that:
+1. dry-runs (decrypt with V1 key → re-encrypt with V2 → verify roundtrip → report count, changes nothing);
+2. writes `UPDATE`s in a single transaction, bumping `keyVersion` to 2;
+3. is idempotent (skips rows already at keyVersion 2).
+Then the run order is: deploy build with dual-key support → run dry-run → run real pass → swap
+`NK_GIFT_CODE_ENCRYPTION_KEY` to the new value in Infisical → restart → spot-check a delivered code.
+
+**Supabase (SQL Editor) fallback — verification query after any rotation:**
+```sql
+SELECT keyVersion, count(*) FROM "GiftCode" GROUP BY keyVersion;
+-- Expect: 2 | <total rows>  (0 rows left at version 1 after the pass)
+```
+
+---
+
+## Step 5 — Panel passwords & other credentials
+
+| Credential | Where | How |
+|---|---|---|
+| Hostatom clientarea | support.hostatom.com → Hello menu → **Change Password** (or Security settings) | rotate, store in manager |
+| Plesk thsv93 login | Via clientarea SSO or direct login → **My Profile → Change Password** | rotate |
+| Plesk thsv51 login | Same path on the old panel (also its `nongka` system user password if it has one) | rotate |
+| Supabase account | supabase.com → Account → Password | rotate |
+| Infisical account | app.infisical.com → avatar → **Settings → Security** → change password (+ review active sessions/devices) | rotate |
+| Git deploy key on old box | thsv51 Plesk → **Git** (last commit `69a4da4`) → repo settings → remove/revoke the deploy key | revoke — this is the leftover CI credential |
+| SSH key `natnithichai.s@gmail.com` | Only in thsv93 `~/.ssh/authorized_keys` (SSH shell is disabled anyway). Leave or remove from Plesk → **Websites & Domains → SSH Access** if unused | optional |
+
+---
+
+## Step 6 — Post-rotation hygiene
+
+1. Re-run the three curls + login test one final time.
+2. Infisical → **Audit Log** (project view): confirm the last events are only your rotations.
+3. Plesk → Node.js → Dashboard: confirm env list contains only the 6 expected vars (5 × INFISICAL_*
+   + VERCEL_GIT_COMMIT_REF) — new identity values, no leftovers.
+4. `backups/` (customer PII JSONs): copy off-machine encrypted (§4.D of hostatom-live.md), then
+   delete local copies.
+5. Mark this checklist done in hostatom-live.md §4.A (link to this doc).

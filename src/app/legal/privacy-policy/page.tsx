@@ -7,6 +7,7 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'นโยบายความเป็นส่วนตัว',
+  alternates: { canonical: '/legal/privacy-policy' },
   description: 'นโยบายความเป็นส่วนตัวของ Nong-Kati ตาม พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562',
 };
 
@@ -14,7 +15,7 @@ export default function PrivacyPolicyPage(): React.JSX.Element {
   return (
     <div className="mx-auto max-w-3xl px-4 py-12">
       <h1 className="mb-6 text-2xl font-bold text-fg">นโยบายความเป็นส่วนตัว</h1>
-      <p className="text-fg-muted mb-4 text-xs">อัปเดตล่าสุด: 24 สิงหาคม 2569</p>
+      <p className="mb-4 text-xs text-fg-muted">อัปเดตล่าสุด: 24 สิงหาคม 2569</p>
 
       <div className="space-y-6 text-sm leading-relaxed text-fg-muted">
         <section>

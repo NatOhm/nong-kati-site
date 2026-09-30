@@ -38,7 +38,9 @@ export const metadata: Metadata = {
     description: 'ราคาดี โอนเงินพร้อมส่งสลิปยืนยัน ทีมงานยืนยันแล้วส่งโค้ดถึงอีเมล',
     type: 'website',
     locale: 'th_TH',
+    url: './',
   },
+  alternates: { canonical: './' },
 };
 
 export default async function HomePage(): Promise<React.JSX.Element> {

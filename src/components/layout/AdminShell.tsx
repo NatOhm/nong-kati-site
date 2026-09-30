@@ -28,6 +28,11 @@ export function AdminShell({
   className,
 }: AdminShellProps): React.JSX.Element {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // Mobile drawer (< md): the fixed rail used to pin itself over the whole
+  // phone viewport, squeezing the page content to a sliver (visual audit
+  // 2026-09-28) — the hamburger now opens the sidebar as an off-canvas
+  // drawer instead.
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   // Pages may pass static props; the signed-in admin's real identity (from
   // the DB via /me) wins once loaded. Keeps role-gated sidebar/nav accurate
   // for limited accounts without every page fetching its own profile.
@@ -53,11 +58,13 @@ export function AdminShell({
 
   return (
     <div className="admin-shell flex h-screen overflow-hidden bg-surface-base">
-      {/* Sidebar */}
+      {/* Sidebar — rail on md+, off-canvas drawer below md */}
       <AdminSidebar
         role={staffRole}
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        mobileOpen={mobileNavOpen}
+        onCloseMobile={() => setMobileNavOpen(false)}
       />
 
       {/* Main content */}
@@ -68,7 +75,7 @@ export function AdminShell({
           staffRole={staffRole}
           notificationCount={notificationCount}
           breadcrumbs={breadcrumbs ?? []}
-          onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+          onSidebarToggle={() => setMobileNavOpen(true)}
         />
 
         {/* Page content */}

@@ -43,6 +43,7 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
   return {
     title: `${category.name} — ซื้อบัตรออนไลน์`,
     description: `ซื้อ ${category.name} ออนไลน์ ราคาดี โอนเงินแล้วทีมงานยืนยันและส่งโค้ด`,
+    alternates: { canonical: categoryUrl },
     openGraph: {
       title: category.name,
       description: `ซื้อ ${category.name} ออนไลน์ โอนเงินแล้วทีมงานยืนยันและส่งโค้ด`,

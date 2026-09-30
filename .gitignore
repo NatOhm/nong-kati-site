@@ -20,3 +20,10 @@ artifacts/
 # Git worktrees
 .worktrees/
 .nk-totp-qr.*
+
+# Data backups (contain customer PII — never commit)
+backups/
+
+# Deploy artifacts (deploy-hostatom.sh)
+.deploy-stage/
+deploy-bundle.tar.gz

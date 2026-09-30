@@ -45,6 +45,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
     title: `${product.name} — ซื้อบัตรออนไลน์`,
     description:
       product.shortDescription || `ซื้อ ${product.name} ออนไลน์ โอนเงินแล้วทีมงานยืนยันและส่งโค้ด`,
+    alternates: { canonical: productUrl },
     openGraph: {
       title: product.name,
       description: product.shortDescription || `ซื้อ ${product.name} ออนไลน์`,
@@ -144,7 +145,7 @@ export default async function ProductPage({
               <div className="relative overflow-hidden rounded-2xl border border-line-subtle bg-surface shadow-clay-sm">
                 <div className="aspect-[16/9] w-full">
                   {product.imageUrl ? (
-// eslint-disable-next-line @next/next/no-img-element -- admin-upload/data-URL source: served immutable via /api/v1/images or inline QR; next/image optimizer has no remote pattern for these hosts
+                    // eslint-disable-next-line @next/next/no-img-element -- admin-upload/data-URL source: served immutable via /api/v1/images or inline QR; next/image optimizer has no remote pattern for these hosts
                     <img
                       src={product.imageUrl}
                       alt={product.name}

@@ -53,6 +53,7 @@ export async function generateMetadata({ searchParams }: SearchPageProps): Promi
       ? `ผลการค้นหา "${query}" — ซื้อบัตรเกม สตรีมมิ่ง และอีคอมเมิร์ซ ออนไลน์`
       : 'เลือกซื้อสินค้าทั้งหมด gift card ออนไลน์ โอนเงินแล้วทีมงานยืนยันและส่งโค้ด',
     robots: { index: false, follow: true },
+    alternates: { canonical: '/search' },
     other: category ? { category } : {},
   };
 }

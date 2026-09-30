@@ -13,6 +13,7 @@ import s from './manual.module.css';
 
 export const metadata: Metadata = {
   title: 'คู่มือการใช้งานหลังบ้าน',
+  alternates: { canonical: '/docs/manual' },
   description: 'คู่มือแอดมิน Nong-Kati: เติมสต๊อกโค้ด, เครดิตลูกค้า, ยืนยันสลิป, ส่งโค้ดให้ลูกค้า',
   robots: { index: false, follow: false },
 };

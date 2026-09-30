@@ -46,7 +46,14 @@ export function FacebookLayout({ children }: FacebookLayoutProps) {
 
         {/* Main content - centered in the remaining space, with a clay grass-field
             scene under the content and a 550ms ease-out transition on navigation */}
-        <main id="main-content" className="relative min-w-0 flex-1 bg-surface-base pb-16 lg:pb-0">
+        {/* tabIndex={-1} makes the landmark focusable so fragment navigation
+            from the skip link actually moves keyboard focus there (SPA jumps
+            don't do it on their own). */}
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="relative min-w-0 flex-1 bg-surface-base pb-16 outline-none lg:pb-0"
+        >
           <HamsterGrassScene />
           <div className="relative mx-auto max-w-[1440px]">
             <PageTransition>{children}</PageTransition>

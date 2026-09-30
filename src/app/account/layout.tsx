@@ -89,7 +89,11 @@ function AccountLayoutInner({
         >
           ข้ามไปยังเนื้อหาหลัก
         </a>
-        <main id="main-content">{children}</main>
+        {/* tabIndex={-1}: fragment navigation from the skip link must move
+            focus to the landmark (SPA jumps don't do it on their own). */}
+        <main id="main-content" tabIndex={-1} className="outline-none">
+          {children}
+        </main>
       </>
     );
   }
@@ -171,8 +175,8 @@ function AccountLayoutInner({
             </nav>
           </aside>
 
-          {/* Main Content */}
-          <main id="main-content" className="flex-1">
+          {/* Main Content — focusable skip-link target (same spec as above) */}
+          <main id="main-content" tabIndex={-1} className="flex-1 outline-none">
             {children}
           </main>
         </div>
