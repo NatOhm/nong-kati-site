@@ -15,6 +15,11 @@ before writing (Oct 1, 2026):
 - Slips: `NK_SLIP_TOKEN_SECRET` falls back to `NK_JWT_SECRET`; it is not set separately in Infisical,
   so rotating JWT covers it.
 
+**Progress — Oct 1, 2026:** Step 1 ✅ identity rotated (new identity live and verified; deleting the
+old one is the last cleanup action). Step 4 ✅ gift key rotated end-to-end (48 rows → `keyVersion 2`
+in one transaction, base key swapped, verification green). **Still open: Steps 2, 3, 5** and the
+Step-6 hygiene items (old-identity deletion, audit-log glance, backups off-machine).
+
 **Where things live:** secrets = Infisical project `nong-kati` (id `80151198-…`), environment
 **Production** → app reads them at boot via machine identity (server.js). Only the 5 `INFISICAL_*`
 bootstrap vars + `VERCEL_GIT_COMMIT_REF=master` sit in Plesk. After ANY change below:

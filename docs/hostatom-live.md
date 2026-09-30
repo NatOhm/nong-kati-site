@@ -83,9 +83,11 @@ The site appeared "stuck on the old build" for hours. Root cause was **not** a s
 ```
 
 - Deploy artifact: GitHub `NatOhm/nong-kati-site` branch `deploy-artifact` → `deploy-bundle.tar.gz`.
-- Infisical (prod) secrets by name: `DATABASE_URL`, `GIT_REF`, `GIT_SHA`, `NEXT_PUBLIC_SITE_URL`,
-  `NK_GIFT_CODE_ENCRYPTION_KEY`, `NK_GIFT_CODE_ENCRYPTION_KEY_V1`, `NK_JWT_SECRET`,
-  `NK_PAYMENT_MOCK`, `VERCEL_GIT_COMMIT_REF`. (`DATABASE_DIRECT_URL` was removed — see §4.A.)
+- Infisical (prod) secrets by name: `DATABASE_URL`, `DATABASE_DIRECT_URL` (re-added), `GIT_REF`,
+  `GIT_SHA`, `NEXT_PUBLIC_SITE_URL`, `NK_GIFT_CODE_ENCRYPTION_KEY` (now the version-2 material),
+  `NK_GIFT_CODE_ENCRYPTION_KEY_V2` (redundant copy kept as rollback hatch),
+  `NK_GIFT_CODE_ENCRYPTION_KEY_V1` (unused duplicate — delete anytime), `NK_JWT_SECRET`,
+  `NK_PAYMENT_MOCK`, `VERCEL_GIT_COMMIT_REF`.
 - Useful one-liners:
   ```bash
   curl -s https://nongkatistore.com/api/v1/version
@@ -105,14 +107,18 @@ reveal-all, chat transcript). Treat them as burned. Safe order (site never goes 
 1. **Infisical machine identity** (`INFISICAL_CLIENT_SECRET`, shown in the Node.js panel):
    create a *new* identity/secret in Infisical → paste into Plesk **Custom environment variables** →
    **Restart App** → verify `/api/v1/health` → then disable the old identity.
+   ✅ **Swapped & verified Oct 1, 2026** (4 clean fail-closed boots on the new identity).
+   Remaining: DELETE the old `6be89e56-…` identity in Infisical — still pending.
 2. **Database password** (Supabase): rotate in Supabase → update `DATABASE_URL` in Infisical →
    Restart App → health check. ⚠️ `DATABASE_DIRECT_URL` was deleted from Infisical; the app runs fine
    on the pooler URL, but if you ever need schema push/migrations from the server, re-add a direct
    (:5432) URL as the *Prisma* direct URL (panel or Infisical, your choice).
 3. **`NK_JWT_SECRET`**: rotate → all user sessions/tokens invalidate (acceptable; announce if needed).
-4. **Gift-code keys** (`NK_GIFT_CODE_ENCRYPTION_KEY` / `_V1`): ⚠️ existing gift codes in the DB are
-   encrypted with the current key. Confirm the code path supports key versioning before rotating, or
-   plan a re-encrypt migration. Do **not** blind-rotate.
+4. **Gift-code key**: ✅ **DONE Oct 1, 2026** — dual-key support shipped (`src/lib/crypto/giftCode.ts`),
+   `scripts/re-encrypt-gift-codes.mjs --apply` re-encrypted all 48 rows to `keyVersion 2` in one
+   transaction, base key swapped in Infisical, post-verify green (census 2|48, delivered code
+   decrypts with the new key). Old key stays in the password manager for the restore-both-vars
+   rollback trick documented in the checklist.
 5. **Panel passwords**: Hostatom clientarea, both Plesk logins.
 6. Hostatom's `git` deployment on the old box may hold a repo token — revoke when decommissioning.
 
