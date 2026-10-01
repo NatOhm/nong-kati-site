@@ -53,11 +53,18 @@ function warn(msg) {
 }
 
 // ── Env loading (no dotenv dependency; .env.local wins, matching Next.js) ──
+// Values may be quoted or bare — an earlier quoted-only regex silently skipped
+// unquoted .env.local lines and let a stale .env fill the same vars instead.
 for (const f of ['.env.local', '.env']) {
   try {
     for (const line of readFileSync(new URL(`../${f}`, import.meta.url), 'utf8').split(/\r?\n/)) {
-      const m = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*"(.*?)"?\s*$/);
-      if (m && process.env[m[1]] === undefined && m[2] !== '') process.env[m[1]] = m[2];
+      const m = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
+      if (!m) continue;
+      let val = m[2];
+      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.slice(1, -1);
+      }
+      if (process.env[m[1]] === undefined && val !== '') process.env[m[1]] = val;
     }
   } catch {
     /* file may not exist */

@@ -112,12 +112,15 @@ reveal-all, chat transcript). Treat them as burned. Safe order (site never goes 
 1. **Infisical machine identity** (`INFISICAL_CLIENT_SECRET`, shown in the Node.js panel):
    create a *new* identity/secret in Infisical → paste into Plesk **Custom environment variables** →
    **Restart App** → verify `/api/v1/health` → then disable the old identity.
-   ⚠️ **Correction (Oct 1, 2026, deploy `13bdf58`):** the swap is **not** in effect — the Plesk
-   Node.js panel env still authenticates with the OLD identity (`INFISICAL_CLIENT_ID = 6be89e56-…`,
-   read off the panel that day) and the app boots green with it. **Do NOT delete or downgrade the
-   old identity yet.** Real remaining work: paste the new identity's ID/secret into Plesk →
-   Restart App → verify the three curls → only then delete the old identity (checklist Step 1,
-   steps 4–6). Execution plan: [infisical-identity-swap-plesk.md](infisical-identity-swap-plesk.md).
+   ✅ **RESOLVED Oct 2, 2026 — it was a secret rotation, not an identity swap.** Infisical holds
+   exactly ONE machine identity, `hostatom-prod` (created Sep 29), and Plesk's `6be89e56-…` client
+   ID is *its* client ID — the "old vs new identity" framing was wrong in both the original note
+   and the later correction. The real exposure was the repeatedly-displayed client SECRET: rotated
+   Oct 2 by adding a second Universal-Auth client secret to `hostatom-prod`, pasting it into the
+   Plesk panel env, and Restart App — the fail-closed boot verified green on the new secret (three
+   curls + slip-verify + homepage). The burned `2018***` secret is now unused; remove it in
+   Infisical after the 24–48 h soak. Details and live status:
+   [infisical-identity-swap-plesk.md](infisical-identity-swap-plesk.md).
 2. **Database password** (Supabase): rotate in Supabase → update `DATABASE_URL` in Infisical →
    Restart App → health check. ⚠️ `DATABASE_DIRECT_URL` was deleted from Infisical; the app runs fine
    on the pooler URL, but if you ever need schema push/migrations from the server, re-add a direct
@@ -179,15 +182,16 @@ machine) or Cloudflare; then old-box decommission below.
 
 > **Expected `INFISICAL_CLIENT_ID` prefix (single source of truth):** `6be89e56` — as of Oct 1,
 > 2026. Every deploy's Step-4 identity check (see deploy-hostatom-manual.md) compares the Plesk
-> panel against this line. When the identity swap
-> ([infisical-identity-swap-plesk.md](infisical-identity-swap-plesk.md)) lands, update THIS line
-> (and the topology box above) — nowhere else.
+> panel against this line. NOTE: this prefix is the client ID of the one-and-only identity
+> `hostatom-prod` and did **not** change in the Oct 2 secret rotation (only the paired secret
+> changed). It would only change if a *new identity* were ever created.
 
 | Date | Commit (ref) | BUILD_ID | Notes |
 |---|---|---|---|
 | Oct 1, 2026 | `13bdf58` on `master` | `s3L0ijro_1BuotgUhnbfv` | Client-feedback fixes: `createOrder` rejects zero-stock variants (HTTP 409 `OUT_OF_STOCK`, probed live), CSP `img-src` gained `blob:` so slip previews render on every bill, Slip2Go auto-verify live (`NK_SLIP2GO_SECRET`; SlipOK kept as fallback; `GET /api/v1/payments/slip-verify` → `{"enabled":true}`); +13 regression tests (`tests/client-feedback-fixes.test.ts`, full suite 276 ✓). Flow: `scripts/deploy-artifact.sh` → Plesk Run-Now (5 s, task not saved) → Restart App. Infisical: `GIT_SHA` → `13bdf58…`, `NK_SLIP2GO_SECRET` added; all seven live checks green. Open: client must whitelist `147.50.254.11` in the Slip2Go dashboard (until then a verify call 401s with `401007` → the adapter falls back to the manual admin path) and should store the key in a password manager; delete `httpdocs/extract-check.txt` via File Manager. |
-| Oct 1, 2026 | — (DB cleanup) | — | Client-approved purge of stale test data via `scripts/purge-test-orders.mjs` (dry-run default, one transaction, status guard): orders **NK-2026-000069** (฿25 QA) + **NK-2026-000071** (฿1.00, incl. its private `slip:` SiteSetting image) and the **test-5hxv** product (8 variants, 5 leftover gift codes) hard-deleted; customer accounts kept. Post-verify: both orders 404, catalog healthy, dashboard totals unchanged. NOTE: local `.env.local` DATABASE_URL is stale after the Supabase rotation — scripts must take the current URL from Infisical. |
+| Oct 1, 2026 | — (DB cleanup) | — | Client-approved purge of stale test data via `scripts/purge-test-orders.mjs` (dry-run default, one transaction, status guard): orders **NK-2026-000069** (฿25 QA) + **NK-2026-000071** (฿1.00, incl. its private `slip:` SiteSetting image) and the **test-5hxv** product (8 variants, 5 leftover gift codes) hard-deleted; customer accounts kept. Post-verify: both orders 404, catalog healthy, dashboard totals unchanged. NOTE: `.env.local` held the PRE-rotation DB password (same shape, different value — silent auth failures looked like "stale file"). Fixed Oct 1: `.env.local` + the `.env` Prisma-CLI helper re-synced from Infisical; the purge script's env-loader regex also fixed (quoted-only values made bare `.env.local` lines lose to `.env`). |
 | Oct 1, 2026 | — (E2E test) | — | **Slip flow E2E on production — PASS.** Created a real ฿25 guest probe order (unpaid), uploaded a generated 8×8 PNG through the real `POST /api/v1/payments/slip-upload` with the checkout capability token (200 `slip_received`, private `slip:` key minted), fetched it back through the authorized `slip-download` route (200, `image/png`, `private, no-store`), and rendered it as a blob `<img>` — the exact mechanism of the admin `SlipImageView` — under the live CSP header: decoded 8×8, **zero `img-src` violations** (the client-reported broken-image bug is confirmed fixed end-to-end). Probe order + its slip + 1 orphaned slip row (left by the morning purge — `slipImageUrl` stores the route path, not the `slip:` key) then purged; script upgraded with `--order`/`--slug`/`--sweep-orphan-slips` and correct route→key mapping. Two notes for the client: deleted order numbers **can be reused** by the allocator (probe reused NK-2026-000069), and hard-deleting an order in SQL must also clean its `slip:` SiteSetting row. |
+| Oct 2, 2026 | — (secret rotation) | — | **Infisical client-secret rotation for Plesk — done.** Discovery: only one machine identity exists (`hostatom-prod`, ID `bcf6ab49-…`; its Universal-Auth client ID IS the panel's `6be89e56-…`). Added a second client secret to `hostatom-prod` (desc: "Plesk thsv93 rotation Oct 2026"), pasted it into Plesk Node.js env (client ID unchanged), Restart App, fail-closed boot verified green (version `13bdf58`, health `database: ok`, products 200, slip-verify enabled, homepage 0 turbopack). Burned `2018***` secret now unused — remove from Infisical after a 24–48 h soak; rollback until then = re-paste the old value. New secret must live in the password manager. |
 
 ---
 
