@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { createOrder } from '@/api/orders';
+import { createOrder, orderErrorStatus } from '@/api/orders';
 import { getCustomerFromToken } from '@/api/customerAuth';
 import { getManualTransferInfo } from '@/lib/data';
 import { hasUsableChannel, resolvePaymentChannels } from '@/lib/paymentChannels';
@@ -10,20 +10,6 @@ import { prisma } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 const COOKIE = 'nk_session';
-
-/** Map internal error codes to HTTP status. */
-function statusFor(code: string): number {
-  switch (code) {
-    case 'CART_EMPTY':
-    case 'TOS_NOT_ACCEPTED':
-    case 'INVALID_EMAIL':
-    case 'INVALID_QUANTITY':
-    case 'VARIANT_NOT_FOUND':
-      return 400;
-    default:
-      return 500;
-  }
-}
 
 /**
  * GET /api/v1/orders — the signed-in customer's order history (profile
@@ -146,6 +132,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json(result, { status: 201 });
   } catch (err) {
     const code = err instanceof Error ? err.message : 'ORDER_CREATE_FAILED';
-    return NextResponse.json({ error: { code } }, { status: statusFor(code) });
+    return NextResponse.json({ error: { code } }, { status: orderErrorStatus(code) });
   }
 }

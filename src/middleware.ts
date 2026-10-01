@@ -32,7 +32,7 @@ function buildCsp(nonce: string | undefined): string {
     `script-src 'self'${inlineScriptRule}${evalRule} https://www.google.com https://www.gstatic.com`,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' https://cdn.nong-kati.co.th data: https://www.google.com https://api.qrserver.com",
+    "img-src 'self' blob: https://cdn.nong-kati.co.th data: https://www.google.com https://api.qrserver.com",
     "connect-src 'self' https://api.omise.co https://*.2c2p.com https://www.google-analytics.com",
     'frame-src https://js.omise.co https://pay.omise.co https://*.2c2p.com https://www.google.com',
     "object-src 'none'",

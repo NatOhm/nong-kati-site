@@ -6,6 +6,7 @@ import { getNotificationSettings, notifyPaymentConfirmed, notifyStockLow } from 
 import { fulfilOrder, scheduleOutboxDrain } from '@/lib/fulfilment';
 import { recordPaymentReconciliation } from '@/lib/paymentReconciliation';
 import { getClientIp, checkRateLimit } from '@/lib/rateLimit';
+import { isSlip2GoEnabled, verifySlip2Go } from '@/lib/payment/slip2go';
 import { isSlipVerificationEnabled, verifySlip } from '@/lib/payment/slipok';
 import { isValidSlipUploadToken } from '@/lib/slipSecurity';
 
@@ -13,9 +14,17 @@ export const dynamic = 'force-dynamic';
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // SlipOK accepts up to ~10MB; we cap tighter
 
+/**
+ * Automatic verification is on when EITHER provider is configured — the
+ * client's merchant account is Slip2Go; SlipOK remains a drop-in fallback.
+ */
+function isSlipAutoVerifyEnabled(): boolean {
+  return isSlip2GoEnabled() || isSlipVerificationEnabled();
+}
+
 /** GET — feature probe for the checkout page (panel renders only when on). */
 export async function GET(): Promise<NextResponse> {
-  return NextResponse.json({ enabled: isSlipVerificationEnabled() });
+  return NextResponse.json({ enabled: isSlipAutoVerifyEnabled() });
 }
 
 /**
@@ -35,7 +44,7 @@ export async function GET(): Promise<NextResponse> {
  * quota, so abuse has a real cost).
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  if (!isSlipVerificationEnabled()) {
+  if (!isSlipAutoVerifyEnabled()) {
     return NextResponse.json({ error: 'SLIP_VERIFY_UNAVAILABLE' }, { status: 503 });
   }
 
@@ -101,8 +110,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
   const expected = Number(order.totalAmountThb);
 
-  // ── Ask SlipOK ──────────────────────────────────────────
-  const result = await verifySlip({ imageBase64, expectedAmountThb: expected });
+  // ── Ask the configured provider (Slip2Go preferred, SlipOK fallback) ──
+  const result = isSlip2GoEnabled()
+    ? await verifySlip2Go({ imageBase64, expectedAmountThb: expected })
+    : await verifySlip({ imageBase64, expectedAmountThb: expected });
 
   if (!result.ok) {
     // Mapped, honest errors — the customer can fix and retry. Every branch

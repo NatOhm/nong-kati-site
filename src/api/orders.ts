@@ -187,6 +187,27 @@ export async function checkCoupon(code: string, subtotalThb: number): Promise<Co
   return { ok: true, discountThb, couponId: coupon.id };
 }
 
+/**
+ * HTTP status for a createOrder failure code. Lives here (not the route) so
+ * route files keep exporting only handlers, and tests can pin the mapping.
+ */
+export function orderErrorStatus(code: string): number {
+  switch (code) {
+    case 'CART_EMPTY':
+    case 'TOS_NOT_ACCEPTED':
+    case 'INVALID_EMAIL':
+    case 'INVALID_QUANTITY':
+    case 'VARIANT_NOT_FOUND':
+      return 400;
+    case 'OUT_OF_STOCK':
+      // Conflict, not a client mistake: the item was sellable when added but
+      // the stock moved before checkout (persisted cart / direct API call).
+      return 409;
+    default:
+      return 500;
+  }
+}
+
 // ─── Create order ────────────────────────────────────────
 
 /**
@@ -238,6 +259,13 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
     if (!v) throw new Error('VARIANT_NOT_FOUND');
     if (!Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 50) {
       throw new Error('INVALID_QUANTITY');
+    }
+    // Client report 2026-10-01: a persisted cart (or a direct API call) could
+    // order a variant whose stock hit 0 after the item was added — the UI
+    // disables it but createOrder never re-checked. Reject before any write;
+    // the fulfilment-time GiftCode guard stays as the second line of defense.
+    if (v.stock < item.quantity) {
+      throw new Error('OUT_OF_STOCK');
     }
 
     const unit = tierPrice(Number(v.price), tier, {
