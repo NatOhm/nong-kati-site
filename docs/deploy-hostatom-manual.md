@@ -86,7 +86,9 @@ What it does: fresh-download bundle → wipe old `.next` → extract → drop ta
 ## Step 3 — Verify the extract
 
 File Manager → `httpdocs/extract-check.txt` → content must equal the Step-0 BUILD_ID exactly
-(current live build: `GwVbcafjEaeLp2mM2mb4d`).
+(current live build as of Oct 1, 2026: `s3L0ijro_1BuotgUhnbfv`, git SHA `13bdf58…` — see the deploy
+log in [hostatom-live.md](hostatom-live.md) §5; always trust the BUILD_ID the script just printed
+over this line).
 
 **Only if dependencies changed** also run a deps task (this is the slow one, 5–15 min):
 
@@ -99,7 +101,18 @@ cd httpdocs && /opt/plesk/node/20/bin/npm ci --omit=dev && /opt/plesk/node/20/bi
 ## Step 4 — Restart the app
 
 Usually `tmp/restart.txt` already did it on first request. Escalate only if Step 5 shows the old
-build:
+build.
+
+> **Identity check (do this while you're on the Node.js dashboard for the restart):** in
+> "Custom environment variables", the `INFISICAL_CLIENT_ID` value must start with the prefix
+> recorded in [hostatom-live.md](hostatom-live.md) §3 ("Expected INFISICAL_CLIENT_ID prefix").
+> - **Matches** → proceed with the restart.
+> - **Differs** → STOP before restarting: someone edited the panel env (or you're on the wrong
+>   subscription). Confirm the change is intentional (e.g. the identity swap in
+>   [infisical-identity-swap-plesk.md](infisical-identity-swap-plesk.md) landed and the doc wasn't
+>   updated) — then update the §3 line and continue. An unexpected identity in the panel means the
+>   app's next boot will authenticate as whatever that identity can read; never deploy on top of
+>   an unexplained env change.
 
 - **A.** Plesk → **Node.js** → Dashboard → **Restart App** (first request after restart is slow).
 - **B. Console kill** (when A doesn't take): Plesk → Node.js → **Run Node.js commands**, run:

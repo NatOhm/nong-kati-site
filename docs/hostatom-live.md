@@ -1,7 +1,9 @@
 # Hostatom Cutover — Handoff (Sep 30, 2026)
 
-Status: **LIVE on the new server.** Everything in this repo remains **uncommitted** (sponsored-task rules).
-This doc records what was done, the current topology, and the ordered to-do list. **No secret values appear in this file.**
+Status: **LIVE on the new server.** Work is committed locally on `master` (5 commits incl. the
+Oct 1, 2026 client-feedback deploy `13bdf58`; not pushed to a public remote — the `deploy-artifact`
+branch carries only build bundles). This doc records what was done, the current topology, and the
+ordered to-do list. **No secret values appear in this file.**
 
 ---
 
@@ -67,8 +69,9 @@ The site appeared "stuck on the old build" for hours. Root cause was **not** a s
    │ Passenger + nginx · Node 20.20.2 · app root /httpdocs        │
    │ startup server.js (fail-closed Infisical boot-loader)        │
    │ Panel env: 5 × INFISICAL_* + VERCEL_GIT_COMMIT_REF=master    │
+   │ Expected INFISICAL_CLIENT_ID prefix: 6be89e56 (see §5 note)  │
    │ All other secrets ← Infisical project 80151198-f2df-…, prod  │
-   │ Build GwVbcafjEaeLp2mM2mb4d (git SHA 3e236c2f…)              │
+   │ Build s3L0ijro_1BuotgUhnbfv (git SHA 13bdf58…, Oct 1 2026)    │
    │ LE cert: apex + www, auto-renew, HSTS on                     │
    └──────────────────────────────────────────────────────────────┘
                         │  mail/webmail/ns glue
@@ -87,7 +90,9 @@ The site appeared "stuck on the old build" for hours. Root cause was **not** a s
   `GIT_SHA`, `NEXT_PUBLIC_SITE_URL`, `NK_GIFT_CODE_ENCRYPTION_KEY` (now the version-2 material),
   `NK_GIFT_CODE_ENCRYPTION_KEY_V2` (redundant copy kept as rollback hatch),
   `NK_GIFT_CODE_ENCRYPTION_KEY_V1` (unused duplicate — delete anytime), `NK_JWT_SECRET`,
-  `NK_PAYMENT_MOCK`, `VERCEL_GIT_COMMIT_REF`.
+  `NK_PAYMENT_MOCK`, `NK_SLIP2GO_SECRET` (added Oct 1, 2026 — Slip2Go slip auto-verify;
+  `NK_SLIP_OK_*` exist only as local `.env.local` placeholders, not in Infisical),
+  `VERCEL_GIT_COMMIT_REF`.
 - Useful one-liners:
   ```bash
   curl -s https://nongkatistore.com/api/v1/version
@@ -107,8 +112,12 @@ reveal-all, chat transcript). Treat them as burned. Safe order (site never goes 
 1. **Infisical machine identity** (`INFISICAL_CLIENT_SECRET`, shown in the Node.js panel):
    create a *new* identity/secret in Infisical → paste into Plesk **Custom environment variables** →
    **Restart App** → verify `/api/v1/health` → then disable the old identity.
-   ✅ **Swapped & verified Oct 1, 2026** (4 clean fail-closed boots on the new identity).
-   Remaining: DELETE the old `6be89e56-…` identity in Infisical — still pending.
+   ⚠️ **Correction (Oct 1, 2026, deploy `13bdf58`):** the swap is **not** in effect — the Plesk
+   Node.js panel env still authenticates with the OLD identity (`INFISICAL_CLIENT_ID = 6be89e56-…`,
+   read off the panel that day) and the app boots green with it. **Do NOT delete or downgrade the
+   old identity yet.** Real remaining work: paste the new identity's ID/secret into Plesk →
+   Restart App → verify the three curls → only then delete the old identity (checklist Step 1,
+   steps 4–6). Execution plan: [infisical-identity-swap-plesk.md](infisical-identity-swap-plesk.md).
 2. **Database password** (Supabase): rotate in Supabase → update `DATABASE_URL` in Infisical →
    Restart App → health check. ⚠️ `DATABASE_DIRECT_URL` was deleted from Infisical; the app runs fine
    on the pooler URL, but if you ever need schema push/migrations from the server, re-add a direct
@@ -147,6 +156,9 @@ machine) or Cloudflare; then old-box decommission below.
   2. Plesk → Scheduled Task → Run Now with the chroot-safe one-liner (relative paths, `curl -k`):
      `cd httpdocs && curl -fsSLk -o bundle.tar.gz <raw-url> && rm -rf .next && tar -xzf bundle.tar.gz && rm -f bundle.tar.gz && touch tmp/restart.txt`
   3. Verify `BUILD_ID` + `/api/v1/version` after first request.
+
+  > `bash scripts/deploy-artifact.sh` automates 1–2 and prints the Run-Now one-liner plus the
+  > verification curls — used for the Oct 1, 2026 deploy (`13bdf58`).
 - **Plesk console pitfalls** (learned the hard way):
   - "Run Node.js commands" wraps input in `npm exec`; single quotes get mangled — avoid `'` in JS,
     avoid regexes (backslashes get eaten), write results to a file and read via File Manager.
@@ -158,8 +170,25 @@ machine) or Cloudflare; then old-box decommission below.
 ### E. Nice-to-haves
 - Long-poll/CDN layer later (the app is dynamic; consider Cloudflare in front once DNS is moved).
 - Update `docs/deploy-hostatom-manual.md` to match the working scheduled-task flow (it predates it).
-- Commit this work when the sponsored-task window allows (still **uncommitted**).
+- ✅ Work committed locally on `master` (5 commits incl. `13bdf58`); not pushed to a public remote.
+- ✅ `docs/deploy-hostatom-manual.md` now documents the automated `scripts/deploy-artifact.sh` flow.
 
 ---
 
-*Written by Buffy (Codebuff) · Sep 30, 2026 · All work uncommitted per task rules.*
+## 5. Deploy & ops log
+
+> **Expected `INFISICAL_CLIENT_ID` prefix (single source of truth):** `6be89e56` — as of Oct 1,
+> 2026. Every deploy's Step-4 identity check (see deploy-hostatom-manual.md) compares the Plesk
+> panel against this line. When the identity swap
+> ([infisical-identity-swap-plesk.md](infisical-identity-swap-plesk.md)) lands, update THIS line
+> (and the topology box above) — nowhere else.
+
+| Date | Commit (ref) | BUILD_ID | Notes |
+|---|---|---|---|
+| Oct 1, 2026 | `13bdf58` on `master` | `s3L0ijro_1BuotgUhnbfv` | Client-feedback fixes: `createOrder` rejects zero-stock variants (HTTP 409 `OUT_OF_STOCK`, probed live), CSP `img-src` gained `blob:` so slip previews render on every bill, Slip2Go auto-verify live (`NK_SLIP2GO_SECRET`; SlipOK kept as fallback; `GET /api/v1/payments/slip-verify` → `{"enabled":true}`); +13 regression tests (`tests/client-feedback-fixes.test.ts`, full suite 276 ✓). Flow: `scripts/deploy-artifact.sh` → Plesk Run-Now (5 s, task not saved) → Restart App. Infisical: `GIT_SHA` → `13bdf58…`, `NK_SLIP2GO_SECRET` added; all seven live checks green. Open: client must whitelist `147.50.254.11` in the Slip2Go dashboard (until then a verify call 401s with `401007` → the adapter falls back to the manual admin path) and should store the key in a password manager; delete `httpdocs/extract-check.txt` via File Manager. |
+| Oct 1, 2026 | — (DB cleanup) | — | Client-approved purge of stale test data via `scripts/purge-test-orders.mjs` (dry-run default, one transaction, status guard): orders **NK-2026-000069** (฿25 QA) + **NK-2026-000071** (฿1.00, incl. its private `slip:` SiteSetting image) and the **test-5hxv** product (8 variants, 5 leftover gift codes) hard-deleted; customer accounts kept. Post-verify: both orders 404, catalog healthy, dashboard totals unchanged. NOTE: local `.env.local` DATABASE_URL is stale after the Supabase rotation — scripts must take the current URL from Infisical. |
+| Oct 1, 2026 | — (E2E test) | — | **Slip flow E2E on production — PASS.** Created a real ฿25 guest probe order (unpaid), uploaded a generated 8×8 PNG through the real `POST /api/v1/payments/slip-upload` with the checkout capability token (200 `slip_received`, private `slip:` key minted), fetched it back through the authorized `slip-download` route (200, `image/png`, `private, no-store`), and rendered it as a blob `<img>` — the exact mechanism of the admin `SlipImageView` — under the live CSP header: decoded 8×8, **zero `img-src` violations** (the client-reported broken-image bug is confirmed fixed end-to-end). Probe order + its slip + 1 orphaned slip row (left by the morning purge — `slipImageUrl` stores the route path, not the `slip:` key) then purged; script upgraded with `--order`/`--slug`/`--sweep-orphan-slips` and correct route→key mapping. Two notes for the client: deleted order numbers **can be reused** by the allocator (probe reused NK-2026-000069), and hard-deleting an order in SQL must also clean its `slip:` SiteSetting row. |
+
+---
+
+*Written by Buffy (Codebuff) · Sep 30, 2026 · Updated Oct 1, 2026 — deploy `13bdf58` recorded above; work committed locally on `master`.*

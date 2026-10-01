@@ -15,10 +15,21 @@ before writing (Oct 1, 2026):
 - Slips: `NK_SLIP_TOKEN_SECRET` falls back to `NK_JWT_SECRET`; it is not set separately in Infisical,
   so rotating JWT covers it.
 
-**Progress — Oct 1, 2026:** Step 1 ✅ identity rotated (new identity live and verified; deleting the
-old one is the last cleanup action). Step 4 ✅ gift key rotated end-to-end (48 rows → `keyVersion 2`
-in one transaction, base key swapped, verification green). **Still open: Steps 2, 3, 5** and the
-Step-6 hygiene items (old-identity deletion, audit-log glance, backups off-machine).
+**Progress — Oct 1, 2026:** Step 1 ⚠️ **in progress — see the correction below** (the Plesk env
+still uses the OLD identity; the new one is created but not yet wired in). Step 4 ✅ gift key
+rotated end-to-end (48 rows → `keyVersion 2` in one transaction, base key swapped, verification
+green). **Still open: Steps 1 (finish), 2, 3, 5** and the Step-6 hygiene items (old-identity
+deletion LAST, audit-log glance, backups off-machine).
+
+> **⚠️ Correction — Oct 1, 2026 (deploy `13bdf58`):** the progress line above (and the matching
+> "✅ Swapped & verified" note in hostatom-live.md §4.A) claimed the swap was done and only the
+> old-identity deletion remained. **That was wrong.** The Node.js panel env (read directly on
+> Oct 1) still shows `INFISICAL_CLIENT_ID = 6be89e56-…` — the OLD identity — and the app boots green with it. The new identity exists but was never wired into Plesk.
+> Therefore: **do NOT delete (or set No Access on) the old identity** — that would kill the
+> running site at its next boot (fail-closed `server.js`). First execute checklist Step 1
+> steps 4–6 (paste new ID/secret into Plesk → Restart App → verify), and only then delete it.
+> Full execution plan with rollback paths and a soak phase:
+> [infisical-identity-swap-plesk.md](infisical-identity-swap-plesk.md).
 
 **Where things live:** secrets = Infisical project `nong-kati` (id `80151198-…`), environment
 **Production** → app reads them at boot via machine identity (server.js). Only the 5 `INFISICAL_*`
@@ -27,7 +38,7 @@ Plesk → Node.js → **Restart App** → verify before moving on.
 
 **Verify after every step:**
 ```bash
-curl -s https://nongkatistore.com/api/v1/version      # {"gitSha":"3e236c2f…","gitRef":"master"}
+curl -s https://nongkatistore.com/api/v1/version      # {"gitSha":"13bdf58…","gitRef":"master"}
 curl -s https://nongkatistore.com/api/v1/health       # healthy + database ok
 curl -s -o /dev/null -w "%{http_code}\n" https://nongkatistore.com/api/v1/products   # 200
 ```
@@ -67,6 +78,11 @@ This is the credential that was displayed in the Plesk panel and chat. Highest p
 
 **Infisical (cleanup):**
 6. Once verified, delete the old identity (Machine Identities → ⋯ → Delete).
+
+> **Status Oct 1, 2026:** steps 1–3 done (new identity created); **step 4 is the blocker** — the
+> Plesk panel env still holds the old `6be89e56-…` values, so the swap has NOT happened. Do not
+> delete the old identity until steps 4–6 are complete. Execute via
+> [infisical-identity-swap-plesk.md](infisical-identity-swap-plesk.md).
 
 > Rollback: set role of old identity back and/or paste old values into Plesk. Both credentials
 > remain valid until the old one is deleted, so you can flip back at any time before deletion.
@@ -196,6 +212,11 @@ SELECT keyVersion, count(*) FROM "GiftCode" GROUP BY keyVersion;
 2. Infisical → **Audit Log** (project view): confirm the last events are only your rotations.
 3. Plesk → Node.js → Dashboard: confirm env list contains only the 6 expected vars (5 × INFISICAL_*
    + VERCEL_GIT_COMMIT_REF) — new identity values, no leftovers.
+   ⚠️ As of Oct 1, 2026 this check **fails by design** until Step 1 is finished: the panel still
+   shows the old `6be89e56-…` client ID. Completing Step 1 steps 4–6 (swap + restart + verify)
+   is what makes this pass. The single source of truth for the expected client-ID prefix is the
+   §5 note in hostatom-live.md — every deploy's Step-4 identity check reads that line, so update
+   it as part of this swap.
 4. `backups/` (customer PII JSONs): copy off-machine encrypted (§4.D of hostatom-live.md), then
    delete local copies.
 5. Mark this checklist done in hostatom-live.md §4.A (link to this doc).

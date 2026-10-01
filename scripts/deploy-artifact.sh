@@ -128,6 +128,9 @@ cd httpdocs && curl -fsSLk -o deploy-bundle.tar.gz $RAW_URL && rm -rf .next && t
     (only if deps changed: cd httpdocs && /opt/plesk/node/20/bin/npm ci --omit=dev && /opt/plesk/node/20/bin/npx prisma generate && echo DEPS_OK > extract-check.txt)
 
  4. Restart: Node.js → Restart App  (fallback: console kill one-liner in the manual §Step 4)
+    IDENTITY CHECK while on the Node.js dashboard: Custom environment variables →
+    INFISICAL_CLIENT_ID must start with the prefix in docs/hostatom-live.md §5. If it differs,
+    STOP and reconcile before restarting (see deploy-hostatom-manual.md Step 4).
 
  5. Verification curls:
 
