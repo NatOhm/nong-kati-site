@@ -105,8 +105,11 @@ Consolidated from:
       Serializable) — ปิดช่องออเดอร์จ่ายแล้วค้าง pending
 - [x] slip-verify ต้องมี capability token ก่อนยิง SlipOK/กินโควตา
 - [x] Magic Link: ไม่ส่งเมลถ้าไม่มีบัญชี (ไม่ enumerate) + throttle 10/15น ต่อ IP
-- [ ] Real Omise gateway ยังไม่ implement (PromptPay/บัตร ตอบ 503 ตามดีไซน์ —
-      prod ใช้โอนเงิน+สลิป) — รอ sandbox keys
+- [~] Real Omise/PromptPay gateway — **โค้ด implement ครบแล้ว** (`src/lib/payment/omise.ts`,
+      `OmiseAdapter implements PaymentGateway`; ต่อกับ `payments/initiate` +
+      `webhooks/omise`; `orders` อ่าน `isOpnConfigured`; เทสต์ `omise-real-adapter`
+      เขียว) — **ยังเปิดใช้จริงไม่ได้จนกว่าจะใส่ sandbox keys** (prod ใช้โอนเงิน+สลิป)
+      — แก้เมื่อ 2026-10-03
 - [ ] คูปอง per-customer limit ยัง raceable เชิง concurrency (กันด้วย
       Serializable รอบ claim เท่านั้น) — ควรมี DB constraint/advisory lock
 - [ ] Supabase RLS/Auth/Storage advisors — ตรวจไม่ได้จาก environment นี้ (ต้อง
@@ -132,9 +135,9 @@ Consolidated from:
 - [x] JSON-LD: Product on product detail pages — `"@type":"Product"`
       verified on /product/hbo-max-7-4k-4
 - [x] JSON-LD: BreadcrumbList on product pages — verified in served HTML
-- [ ] Canonical URLs set correctly — `<link rel="canonical">` **not emitted**
-      on any page yet (metadataBase is now correct, so adding
-      `alternates: { canonical: '/' }` per page is the remaining step)
+- [x] Canonical URLs set correctly — `<link rel="canonical">` emit ผ่าน `alternates`
+      ในทุกหน้าที่มี `generateMetadata` (10 ไฟล์: หน้าแรก, /search, category,
+      product, legal 5 หน้า, /docs/manual) — ไม่มีหน้าไหนตกหล่น — ยืนยัน 2026-10-03
 - [x] `hreflang` not needed (Thai-only) — confirmed single-locale
 - [x] Images have `alt` attributes — homepage: zero imgs missing alt;
       ProductCard renders `alt={name}`
