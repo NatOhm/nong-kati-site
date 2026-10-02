@@ -67,6 +67,29 @@ jobs:
       - run: npx prisma generate
       - run: npm test
 
+  # ─── Client Doc Consistency ───────────────────────────
+  # The client-facing docs are a deliverable, and they drifted silently
+  # four times: a tally that never matched its own table, and three
+  # "not built" claims for code that had already shipped.
+  # tests/client-docs-consistency.test.ts catches those and is already
+  # picked up by the `test` job's glob. This job runs it on its own so a
+  # stale doc fails as a named, self-describing check instead of an
+  # anonymous "Unit Tests" red. It needs no database, no prisma generate
+  # and no browser — only node:fs and the markdown — so it is the cheapest
+  # gate here and reports independently of the rest of the pipeline.
+  doc-consistency:
+    name: Client Doc Consistency
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4 (pinned)
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4 (pinned)
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Ledger, tally and shipped-capability gates
+        run: npx vitest run tests/client-docs-consistency.test.ts
+
   # ─── Concurrency Tests (real DB + real dev server) ────
   # Races the auth paths for real: 20 parallel refreshes of one refresh
   # token (CAS rotation must yield exactly one winner), 20 distinct tokens
@@ -224,7 +247,7 @@ jobs:
     # Production review MEDIUM-2: the build (and the deploy that follows it)
     # must be gated by EVERY other check — a failing security audit or DB
     # concurrency/RLS run must not promote an artifact.
-    needs: [lint, test, audit, concurrency-tests, browser-smoke]
+    needs: [lint, test, doc-consistency, audit, concurrency-tests, browser-smoke]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4 (pinned)
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4 (pinned)
