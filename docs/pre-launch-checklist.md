@@ -110,13 +110,21 @@ Consolidated from:
       `webhooks/omise`; `orders` อ่าน `isOpnConfigured`; เทสต์ `omise-real-adapter`
       เขียว) — **ยังเปิดใช้จริงไม่ได้จนกว่าจะใส่ sandbox keys** (prod ใช้โอนเงิน+สลิป)
       — แก้เมื่อ 2026-10-03
-- [ ] คูปอง per-customer limit ยัง raceable เชิง concurrency — **ยืนยัน 2026-10-03**:
-      `orders.ts:468` `const db = tx ?? prisma` — เมื่อ `createOrder` ถูกเรียกโดยไม่มี
-      transaction count-then-create จะทำงานที่ Read Committed; `CouponRedemption`
-      มี `orderId @unique` + `@@index([couponId, customerId])` แต่ **ไม่มี unique
-      (couponId, customerId)** ให้ DB เป็นตัวกันซ้ำ — ต่างจาก `usageLimit` ที่ปลอดภัย
-      เพราะใช้ conditional update เป็น atomic guard (คูปองซ้ำจากลูกค้าเดียวกัน
-      แบบพร้อมกัน 2 ออเดอร์จะผ่านทั้งคู่ ทำให้เกิน `perCustomerLimit`)
+- [x] คูปอง per-customer limit race — **ปิดแล้ว 2026-10-03**: จุดเดียวที่ยัง race คือ
+      `pay-wallet/route.ts` ซึ่งเรียก `claimOrderForConfirmation` แบบ strict
+      (ที่ `route.ts:125`) — ตอนนี้ transaction เป็น `isolationLevel: 'Serializable'`
+      (`route.ts:56`) และ retry เมื่อเจอ P2034 write-conflict ผ่าน `runWalletPayment`
+      (`route.ts:82`, 3 ครั้ง) ลูกค้าคนเดียวกันที่กดจ่าย 2 ออเดอร์พร้อมกันจะผ่าน
+      `perCustomerLimit` แค่ฝั่งเดียว อีกฝั่งถูก abort แล้ว retry มาเจอแถว
+      `CouponRedemption` ของอีกฝั่ง → ได้ 409 `COUPON_PER_CUSTOMER_LIMIT` — claim มี 7 จุด:
+      3 จุดแบบ strict (`verify-payment:186`, `omise:223`, `pay-wallet`) เป็น Serializable
+      ครบแล้ว อีก 4 จุดเป็น `paidExternally` (soft — cap แค่ log ไม่ throw) เป็น
+      Serializable 2 จุด แต่ `slip-verify:223` กับ `omise:174` ยังเป็น Read Committed
+      ซึ่งกระทบแค่ความแม่นยำของ count ใน audit ไม่ใช่การให้ส่วนลดเกิน
+      — **ตั้งใจไม่ใช้ `@@unique([couponId, customerId])`**: constraint อ่านค่า
+      `perCustomerLimit` (ที่แอดมินตั้งได้, `null` = ไม่จำกัด) ไม่ได้ จึงกด cap ทุกคูปอง
+      ให้เหลือ 1 และ error ยังถูก catch ที่ `orders.ts:540` กลืนเป็น idempotent retry
+      — เทสต์ `wallet-coupon-race` เขียว 5 เคส
 - [ ] Supabase RLS/Auth/Storage advisors — ตรวจไม่ได้จาก environment นี้ (ต้อง
       access Supabase dashboard แบบ read-only)
 
