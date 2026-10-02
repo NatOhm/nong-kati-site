@@ -15,21 +15,25 @@ before writing (Oct 1, 2026):
 - Slips: `NK_SLIP_TOKEN_SECRET` falls back to `NK_JWT_SECRET`; it is not set separately in Infisical,
   so rotating JWT covers it.
 
-**Progress — Oct 1, 2026:** Step 1 ⚠️ **in progress — see the correction below** (the Plesk env
-still uses the OLD identity; the new one is created but not yet wired in). Step 4 ✅ gift key
-rotated end-to-end (48 rows → `keyVersion 2` in one transaction, base key swapped, verification
-green). **Still open: Steps 1 (finish), 2, 3, 5** and the Step-6 hygiene items (old-identity
-deletion LAST, audit-log glance, backups off-machine).
+**Progress — Oct 2, 2026:** Step 1 ✅ **RESOLVED — reframed as a client-SECRET rotation**
+(Infisical holds ONE identity, `hostatom-prod`, whose Universal-Auth client ID is the Plesk
+panel's `6be89e56-…`; the "old identity awaiting swap" story was wrong in both directions). New
+secret added to the identity, wired into Plesk, fail-closed boot verified green. Remaining in
+step 6 of Step 1: **remove the burned `2018***` secret** from `hostatom-prod` after the 24–48 h
+soak. Step 4 ✅ gift key rotated end-to-end. **Still open: Steps 2, 3, 5** and the remaining
+Step-6 hygiene items (old-secret removal, audit-log glance, backups off-machine).
 
-> **⚠️ Correction — Oct 1, 2026 (deploy `13bdf58`):** the progress line above (and the matching
-> "✅ Swapped & verified" note in hostatom-live.md §4.A) claimed the swap was done and only the
-> old-identity deletion remained. **That was wrong.** The Node.js panel env (read directly on
-> Oct 1) still shows `INFISICAL_CLIENT_ID = 6be89e56-…` — the OLD identity — and the app boots green with it. The new identity exists but was never wired into Plesk.
-> Therefore: **do NOT delete (or set No Access on) the old identity** — that would kill the
-> running site at its next boot (fail-closed `server.js`). First execute checklist Step 1
-> steps 4–6 (paste new ID/secret into Plesk → Restart App → verify), and only then delete it.
-> Full execution plan with rollback paths and a soak phase:
-> [infisical-identity-swap-plesk.md](infisical-identity-swap-plesk.md).
+> **Resolution — Oct 2, 2026:** the Oct 1 "correction" below was itself mistaken. Opening
+> `hostatom-prod` in Infisical showed its Universal-Auth **Client ID = `6be89e56-…`** — the very
+> value the panel displays. There was never an old/new identity pair; the burned material was the
+> client SECRET (shown in panel screenshots/chat). Rotated Oct 2 via Infisical's multi-secret
+> support: added a new client secret to the same identity → pasted into Plesk → Restart App →
+> verified. See hostatom-live.md §4.A/§5.
+>
+> **Historical correction — Oct 1, 2026:** an earlier entry claimed the identity swap was done
+> and only old-identity deletion remained; at that time the panel genuinely showed the old
+> secret (`2018…`) and the identity detail page had not been checked. Lesson recorded: verify
+> identity↔client-ID mapping on the identity page before declaring a mismatch.
 
 **Where things live:** secrets = Infisical project `nong-kati` (id `80151198-…`), environment
 **Production** → app reads them at boot via machine identity (server.js). Only the 5 `INFISICAL_*`
@@ -79,10 +83,9 @@ This is the credential that was displayed in the Plesk panel and chat. Highest p
 **Infisical (cleanup):**
 6. Once verified, delete the old identity (Machine Identities → ⋯ → Delete).
 
-> **Status Oct 1, 2026:** steps 1–3 done (new identity created); **step 4 is the blocker** — the
-> Plesk panel env still holds the old `6be89e56-…` values, so the swap has NOT happened. Do not
-> delete the old identity until steps 4–6 are complete. Execute via
-> [infisical-identity-swap-plesk.md](infisical-identity-swap-plesk.md).
+> **Status Oct 2, 2026:** rotation executed via a SECOND client secret on the single existing
+> identity (steps 4–5 done and verified); remaining cleanup = delete the burned `2018***` secret
+> from `hostatom-prod` after the soak. Details: [infisical-identity-swap-plesk.md](infisical-identity-swap-plesk.md).
 
 > Rollback: set role of old identity back and/or paste old values into Plesk. Both credentials
 > remain valid until the old one is deleted, so you can flip back at any time before deletion.

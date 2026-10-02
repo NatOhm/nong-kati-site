@@ -1,5 +1,19 @@
 # Infisical Machine-Identity Swap for Plesk (thsv93) — execution plan
 
+> **✅ EXECUTED Oct 2, 2026 — outcome differed from the plan.** Investigation found exactly ONE
+> machine identity, `hostatom-prod` (ID `bcf6ab49-3bbe-49e7-b49d-99af8e82f964`, created Sep 29,
+> delete-protected, last login minutes before), and its Universal-Auth Client ID is
+> **`6be89e56-…` — the value in the Plesk panel.** The "old vs new identity" premise of this plan
+> was wrong; the real task was rotating the repeatedly-exposed client SECRET. Executed via
+> Infisical's multi-secret support: **Add Client Secret** on `hostatom-prod` (desc "Plesk thsv93
+> rotation Oct 2026") → paste into Plesk Node.js env (client ID unchanged) → Restart App →
+> fail-closed boot verified green (three curls, slip-verify enabled, homepage 0 turbopack).
+> Remaining: after a 24–48 h soak, **remove the burned `2018***` secret** in
+> Identity → Authentication → Universal Auth → ⋯ on that secret row; store the new secret in the
+> password manager. The phases below are kept as the general procedure (and their rollback
+> discipline was followed), with the identity-vs-secret mapping lesson noted in
+> secret-rotation-checklist.md.
+
 **Goal:** replace the OLD Infisical machine identity (`6be89e56-…`) still wired into the Plesk
 Node.js panel env with the NEW identity (`hostatom-thsv93-app`), verify, soak, then retire the old
 one. Written Oct 1, 2026 after deploy `13bdf58` — during that deploy the Plesk Node.js panel was
