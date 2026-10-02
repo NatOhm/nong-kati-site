@@ -22,7 +22,51 @@ const COOKIE = 'nk_session';
  * STOCK specifically returns to pending_payment with the wallet untouched
  * (order goes to pending_manual_fulfilment via the shared claim+fulfil flow
  * only when payment already succeeded — wallet deducts first, so no).
+ * The transaction runs SERIALIZABLE and retries on write-conflict (see
+ * runWalletPayment below) so that two claims racing on the same coupon +
+ * customer cannot both clear the per-customer cap.
  */
+type WalletTx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
+/**
+ * Serializable wrapper with retry on write-conflict.
+ *
+ * The coupon per-customer cap is a read-then-act check: claimOrderForConfirmation
+ * counts CouponRedemption rows for (couponId, customerId) and compares that
+ * count against the coupon's VARIABLE perCustomerLimit (admin-settable, null =
+ * unlimited — see model Coupon in prisma/schema.prisma). Under READ COMMITTED two
+ * wallet claims racing on the same coupon + customer can both read a count under
+ * the cap, both insert, and both commit — the cap is silently over-granted. No
+ * unique constraint can close this: a @@unique([couponId, customerId]) would
+ * hard-cap every coupon at ONE (ignoring perCustomerLimit > 1) and its violation
+ * would be swallowed by the idempotency catch in claimOrderForConfirmation, which
+ * treats "Unique constraint" as an already-recorded retry.
+ *
+ * SERIALIZABLE makes the losing transaction fail with P2034 instead of
+ * double-granting; re-running it re-reads the winner's redemption row and the
+ * cap then rejects it with COUPON_PER_CUSTOMER_LIMIT.
+ *
+ * Mirrors runStaffMutation (api/adminStaff.ts). The other claim call sites —
+ * verify-payment, slip-verify and omise — already run Serializable; this was the
+ * only STRICT (non-paidExternally) call site still on READ COMMITTED.
+ */
+async function runWalletPayment<T>(fn: (tx: WalletTx) => Promise<T>): Promise<T> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return await prisma.$transaction(fn, { isolationLevel: 'Serializable' });
+    } catch (e) {
+      const isConflict =
+        typeof e === 'object' &&
+        e !== null &&
+        'code' in e &&
+        (e as { code?: string }).code === 'P2034';
+      if (!isConflict || attempt === 2) throw e;
+      await new Promise((r) => setTimeout(r, 50 * (attempt + 1)));
+    }
+  }
+  throw new Error('unreachable'); // loop always returns or throws
+}
+
 export async function POST(
   req: NextRequest,
   ctx: { params: Promise<{ id: string }> },
@@ -35,7 +79,7 @@ export async function POST(
   const { id } = await ctx.params;
 
   try {
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await runWalletPayment(async (tx) => {
       // Lock the order row while we decide (prevents double-pay races).
       const order = await tx.order.findUnique({
         where: { id },
