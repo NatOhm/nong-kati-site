@@ -152,9 +152,9 @@ Consolidated from:
 
 - [x] All P0 E2E specs pass (Playwright) — **เปลี่ยนจาก [ ] 2026-09-26**:
       มี Playwright gates ถาวรแล้ว — contrast (8 เทสต์ ทั้งสองธีม), landmarks + H1 (4), touch targets 44px (6) = 18/18 ผ่านบน dev และ CI ทุก push —
-      ส่วน E2E purchase-flow จริง (สั่ง→จ่าย→รับโค้ด) ยังไม่มี spec (ดูข้อถัดไป)
-- [ ] P0 purchase-flow E2E (สั่งซื้อ→โอน+สลิป→ยืนยัน→รับโค้ด) — ยังไม่มี spec
-      อัตโนมัติ; รอเปิดบัญชีโอนเงินจริงแล้วค่อยเขียนให้ตรง flow จริง
+      ส่วน E2E purchase-flow จริง (สั่ง→จ่าย→รับโค้ด) มี spec แล้ว แต่ยังรันไม่ได้เพราะรอเปิดใช้ Slip2Go (ดูข้อถัดไป)
+- [~] P0 purchase-flow E2E — spec: e2e/purchase-flow.spec.ts (tsc-clean; unrun until Slip2Go whitelist + NK_SLIP2GO_SECRET stored by client)
+      ครอบคลุม: เพิ่มสินค้า → checkout → อัปโหลดสลิป → แอดมินยืนยัน → ได้รหัสโค้ด → เปิดหน้ายืนยันผ่าน UUID
 - [x] Full integration suite green (Vitest) — **เปลี่ยนจาก [ ]**: tests/ =
       security-fixes (14) + phone-otp (18) + security-remediations (10) =
       **42/42 ผ่าน** (26 ก.ย.)
