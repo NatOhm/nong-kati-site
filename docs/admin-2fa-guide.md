@@ -88,12 +88,14 @@ Details worth knowing:
 At enrollment the system generates **10 one-time recovery codes**
 (`XXXX-XXXX`). They are shown once, on the setup screen.
 
-> **Known limitation (be honest with staff):** backup codes are issued and
-> displayed, but the login form does **not yet accept them** — it only
-> verifies 6-digit TOTP codes. Until a backup-code sign-in path is added,
-> treat the printed codes as a placeholder and use the recovery procedure
-> in §6 if the authenticator is lost. This is tracked as a gap to close
-> before staff accounts are handed out.
+> **Fixed 2026-10-03 (verified, not merely claimed):** backup codes **are**
+> accepted at sign-in. `consumeBackupCode` (`src/api/adminAuth.ts:79`) hashes
+> the code and claims the row with `updateMany` guarded on `usedAt: null`, so
+> a code can only ever be spent once; `confirm2fa` calls it
+> (`adminAuth.ts:494`). `tests/admin-backup-codes.test.ts` covers single-use,
+> cross-user rejection, and that reuse feeds the TOTP lockout. Keep the
+> printed codes — they are real recovery credentials now, and
+> `countUnusedBackupCodes` tracks how many remain.
 
 ## 6. Lost phone / recovery
 
@@ -190,15 +192,14 @@ Error codes at step 2: `TOTP_INVALID` (wrong code),
 
 ## 10. Notes for the next developer pass
 
-- **Backup codes are not consumable yet** — `confirm2fa` only calls
-  `verifyTotpCode`; `generateBackupCodes` output is display-only. Either
-  hash-and-store codes on `AdminUser` and accept them in `confirm2fa`, or
-  stop showing them to avoid false confidence.
-- **QR generation uses an external service** — the login page builds QR
-  images via `api.qrserver.com`, which means the enrollment `otpauth://`
-  URI (containing the secret) is sent to a third party. Before real staff
-  accounts exist, generate the QR locally (e.g. the `qrcode` npm package)
-  so the secret never leaves the server response.
+- ~~**Backup codes are not consumable yet**~~ **FIXED** — codes are hashed
+  into `AdminBackupCode` and claimed atomically on sign-in. See §5 and
+  `tests/admin-backup-codes.test.ts`.
+- ~~**QR generation uses an external service**~~ **FIXED 2026-10-03** — the
+  `api.qrserver.com` dependency was replaced by local QR generation (it
+  rendered blank whenever that host was unreachable). One leftover:
+  `src/middleware.ts:35` still allows `https://api.qrserver.com` in CSP
+  `img-src` even though nothing requests it — safe to trim.
 - **~~Seeded shared secret~~ FIXED 2026-09-22** — the shared test seed is
   gone: every account now carries its **own unique TOTP secret**, generated
   fresh by `scripts/create-admin.ts` (rotation also revokes all sessions).

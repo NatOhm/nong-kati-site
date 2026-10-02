@@ -110,8 +110,13 @@ Consolidated from:
       `webhooks/omise`; `orders` อ่าน `isOpnConfigured`; เทสต์ `omise-real-adapter`
       เขียว) — **ยังเปิดใช้จริงไม่ได้จนกว่าจะใส่ sandbox keys** (prod ใช้โอนเงิน+สลิป)
       — แก้เมื่อ 2026-10-03
-- [ ] คูปอง per-customer limit ยัง raceable เชิง concurrency (กันด้วย
-      Serializable รอบ claim เท่านั้น) — ควรมี DB constraint/advisory lock
+- [ ] คูปอง per-customer limit ยัง raceable เชิง concurrency — **ยืนยัน 2026-10-03**:
+      `orders.ts:468` `const db = tx ?? prisma` — เมื่อ `createOrder` ถูกเรียกโดยไม่มี
+      transaction count-then-create จะทำงานที่ Read Committed; `CouponRedemption`
+      มี `orderId @unique` + `@@index([couponId, customerId])` แต่ **ไม่มี unique
+      (couponId, customerId)** ให้ DB เป็นตัวกันซ้ำ — ต่างจาก `usageLimit` ที่ปลอดภัย
+      เพราะใช้ conditional update เป็น atomic guard (คูปองซ้ำจากลูกค้าเดียวกัน
+      แบบพร้อมกัน 2 ออเดอร์จะผ่านทั้งคู่ ทำให้เกิน `perCustomerLimit`)
 - [ ] Supabase RLS/Auth/Storage advisors — ตรวจไม่ได้จาก environment นี้ (ต้อง
       access Supabase dashboard แบบ read-only)
 
@@ -194,9 +199,15 @@ Consolidated from:
 - [x] Admin login with 2FA works — 28/28 E2E (credentials → TOTP → session,
       single-use challenge, lockout, RBAC, rotation, change-password)
 - [ ] Admin order list/detail/resend/refund works — list + detail +
-      **verify-payment** verified against real DB (และแข็งขึ้น 2026-09-26:
+      **verify-payment** verified against real DB (และแข็งขึ้ง 2026-09-26:
       transaction เดียวพร้อม recovery state); resend-email and refund
       endpoints not implemented yet
+      _(ยืนยัน 2026-10-03: ฝั่ง client `adminResendOrderEmail` /
+      `adminRefundOrder` — `src/api/adminOrders.ts:247,358` — อ่านจาก
+      `mockOrders.find(...)` และ **ไม่มี route ฝั่งเซิร์ฟเวอร์** เลย
+      (`admin/orders/[id]/resend-email`, `admin/orders/[id]/refund`) —
+      กดแล้วเงียบ ไม่ error; `src/types/auth.ts:189` ยังมี permission ของ
+      route ที่ไม่มีอยู่จริง)_
 - [ ] CSV code upload pipeline works (parse → dedup → encrypt → insert) —
       upload route exists (`/api/v1/admin/upload`); end-to-end CSV run not
       exercised this pass
@@ -234,6 +245,7 @@ Consolidated from:
       returns `{"status":"healthy"}`, orders API 401-guarded, admin APIs 401
 - [ ] Monitoring alerts configured (Sentry, uptime) — `NK_SENTRY_DSN` env var
       exists but no Sentry SDK is installed in the app; no uptime monitor
+      _(ยืนยัน 2026-10-03: grep `Sentry` ใน `src/` = 0 hit, ค่าใน `.env.example` ว่าง)_
 - [x] Post-deploy smoke test: `GET /api/v1/health` returns 200 — verified on
       production (`status: healthy`, `database: ok`)
 
@@ -245,9 +257,11 @@ Consolidated from:
 - [x] ≥ 30 SKUs live — 37 products
 - [x] PDPA pages live — consent banner + 4 legal pages + data-request page
 - [ ] ≥ 1 real paid order — test orders only so far (all cleaned up) —
-      **BLOCKER ปัจจุบัน**: บัญชีโอนเงินในแอดมิน (การตั้งค่า → โอนเงินแมนนวล)
-      ยังไม่ถูกเปิด (`manual-info.enabled = false` บน prod ณ 26 ก.ย.) —
-      ลูกค้าไม่มีช่องทางจ่ายที่มองเห็นจนกว่าจะเปิด
+      ยังไม่ถูกเปิด — **ยืนยันซ้ำ 2026-10-03**: `GET /api/v1/payments/manual-info`
+      บน prod ตอบ `enabled:false, accountName:null, accountNumber:null` ทำให้
+      `manualUsable=false` (`orders/route.ts:78`) — ถ้าไม่มี Omise keys
+      (`NK_OMISE_SECRET_KEY` + `NK_OMISE_WEBHOOK_SECRET`) ด้วย `POST /api/v1/orders`
+      จะตอบ **503 NO_PAYMENT_CHANNEL** = ลูกค้าจ่ายไม่ได้เลย
 - [ ] Zero unresolved OWASP Top 10 findings — see §1: CSRF wiring, DB-backed
       audit log, enforced CSP, and the Next 15 upgrade remain
 
