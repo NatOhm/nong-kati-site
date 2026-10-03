@@ -93,6 +93,14 @@ no CA certs (`curl` needs `-k`), absolute `/var/www/...` paths fail.
 cd httpdocs && curl -fsSLk -o deploy-bundle.tar.gz https://raw.githubusercontent.com/NatOhm/nong-kati-site/deploy-artifact/deploy-bundle.tar.gz && rm -rf .next && tar -xzf deploy-bundle.tar.gz && rm -f deploy-bundle.tar.gz && touch tmp/restart.txt && echo BUILD_ID_ON_DISK: > extract-check.txt && cat .next/BUILD_ID >> extract-check.txt
 ```
 
+> **⚠️ The command must contain ZERO double-quote characters.** The runner wraps it in a
+> double-quoted string before handing it to the shell, so any inner `"` truncates the command.
+> Symptom: `-: -c: line 1: unexpected EOF while looking for matching '"'`, reported as
+> *"completed with error in 0 seconds"* — the shell dies before `curl` ever runs, so the server
+> never touches GitHub and no file appears. This silently ate two days of deploys on Oct 3.
+> Corollary: never use `curl -w "code=%{http_code}"` here. Put the value in a file instead
+> (`-o head.txt`, or `-w` output appended with a plain `echo`), or drop `-w` entirely.
+
 3. Click **Run Now** (≈6 s). **Do not click OK/Save** — leave the task unsaved so it doesn't fire
    on a schedule later. (If your Plesk build insists on saving, delete the task after the run.)
 
@@ -179,6 +187,17 @@ File Manager → delete `extract-check.txt` (and any debug files the run created
   the `httpdocs` row.
 - **Node.js panel shows env var values in cleartext** — never screenshot that page (this is how a
   secret got burned; rotation checklist: `docs/secret-rotation-checklist.md`).
+- **The scheduled-task "OK" button does not always submit** (the panel's JS binds
+  `plesk.form.submit`, which is missing on some Obsidian builds). Symptom: you edit the command,
+  click OK, land back on the list, and the stored command is *unchanged*. Workaround: set the
+  value, then submit the form directly — append a hidden `send=1` input and call `form.submit()`
+  (the form already carries `forgery_protection_token`). Always re-read the task row afterwards
+  to confirm the command actually changed.
+- **Deleting a scheduled task: the control is `#buttonRemoveTask`, an `<a>`, not a `<button>`**,
+  and it opens a `#modalDialogBox` confirmation whose button is `button[data-action="yes"]`.
+  Selecting rows needs the checkboxes checked *and* the `<tr>` to carry class `selected`.
+- **The chroot has no `date`.** A `cmd1 && date && cmd2` chain silently skips everything after
+  `date`; use `;` separators between probe steps instead of `&&`.
 
 ## Rollback
 

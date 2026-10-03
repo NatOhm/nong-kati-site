@@ -70,11 +70,22 @@ curl -s -o /dev/null -w "%{http_code}\n" https://nongkatistore.com/api/v1/produc
 
 ## Step 1 — Rotate Infisical machine identity (the burned one)
 
+> **RESOLVED Oct 4, 2026** (third rotation). A new client secret was added to the existing
+> identity `hostatom-prod` (Universal Auth), the human pasted it into Plesk, and the boot was
+> verified by **use-count**: the new secret went 0 → 1 while the previous stayed flat. No
+> identity was created or deleted — only the *secret* paired with the unchanged client ID
+> (`6be89e56-…`) was replaced, which is what `infisical-secret-rotation-oct3.md` prescribes.
+> Do **not** follow the older "create `hostatom-thsv93-app`" steps below; that plan was
+> superseded because only one identity ever existed. Remaining: delete the long-dead
+> `2018***` secret, and delete `58dc***` only after the soak.
+
 This is the credential that was displayed in the Plesk panel and chat. Highest priority.
 
 **Infisical:**
-1. app.infisical.com → org → project **nong-kati** → **Settings → Access Control → Machine Identities**
-   (left nav under project settings).
+1. app.infisical.com → org **NatOhm** → project **nong-kati** → sidebar → **Administration →
+   Access Control** → **Machine Identities** tab → `hostatom-prod` → *Auth method actions* →
+   **View Auth Method**. (The older "Settings → Access Control" path 404s in the current UI,
+   and **Manage Access** on the secrets page is a Pro upsell.)
 2. Find the old identity (the one whose client ID is `6be89e56-…` — shown in Plesk). **Do not delete
    it yet.** Click **⋯ → Edit role** → set role to **No Access** (or remove it from the project
    members) — this instantly cuts its ability to read secrets.
