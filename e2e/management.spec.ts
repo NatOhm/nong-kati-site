@@ -2,6 +2,8 @@ import { test, expect } from '@playwright/test';
 import crypto from 'node:crypto';
 import { PrismaClient } from '@prisma/client';
 
+import { totp } from './helpers';
+
 /**
  * Management smoke (roadmap §6/§7 closure for the back office): the admin
  * must be able to reach the back office through the REAL 2FA login, see the
@@ -85,26 +87,6 @@ test.describe('management back office smoke', () => {
   test.afterAll(async () => {
     await prisma.$disconnect();
   });
-
-  /** RFC 6238 TOTP (30s step, SHA-1, 6 digits) — same as checklist-e2e. */
-  function totp(secretB32: string, offsetSteps = 0): string {
-    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-    let bits = '';
-    for (const char of secretB32.replace(/=+$/, '')) {
-      const val = alphabet.indexOf(char.toUpperCase());
-      if (val < 0) continue;
-      bits += val.toString(2).padStart(5, '0');
-    }
-    const bytes = Buffer.alloc(Math.floor(bits.length / 8));
-    for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(bits.slice(i * 8, i * 8 + 8), 2);
-    const buf = Buffer.alloc(8);
-    buf.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 1000 / 30) + offsetSteps));
-    const h = crypto.createHmac('sha1', bytes).update(buf).digest();
-    const off = (h[h.length - 1] ?? 0) & 0x0f;
-    const b = (i: number) => h[off + i] ?? 0;
-    const code = (((b(0) & 0x7f) << 24) | (b(1) << 16) | (b(2) << 8) | b(3)) % 1000000;
-    return String(code).padStart(6, '0');
-  }
 
   test('admin login (2FA) → reconciliation queue → rerun-fulfilment completes a stranded paid order', async ({
     page,

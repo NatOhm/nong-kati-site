@@ -199,7 +199,7 @@ jobs:
       - run: npx prisma migrate deploy
       - name: Seed catalog + payment channel
         run: node scripts/seed-smoke.mjs
-      - name: Seed management smoke fixtures (admin + stranded order + codes)
+      - name: Seed management smoke fixtures (admin + stranded order + completed order + codes)
         run: node scripts/seed-management-smoke.mjs
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
@@ -217,7 +217,7 @@ jobs:
       - name: Run browser smoke tests
         run: |
           set -o pipefail
-          E2E_BASE_URL=http://127.0.0.1:4200 npx playwright test e2e/smoke.spec.ts e2e/management.spec.ts 2>&1 | tee /tmp/pw-output.log
+          E2E_BASE_URL=http://127.0.0.1:4200 npx playwright test e2e/smoke.spec.ts e2e/management.spec.ts e2e/order-refund-resend.spec.ts 2>&1 | tee /tmp/pw-output.log
       - name: Emit smoke failure annotations
         if: failure()
         run: |

@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import crypto from 'node:crypto';
 
 /**
  * Composite WCAG 2.x relative-luminance contrast scanner, evaluated inside
@@ -253,4 +254,35 @@ export function contrastRatio(fg: string, bg: string, pageBg: string): number {
   const hi = Math.max(luminance(f), luminance(b));
   const lo = Math.min(luminance(f), luminance(b));
   return Math.round(((hi + 0.05) / (lo + 0.05)) * 100) / 100;
+}
+
+/**
+ * RFC 6238 TOTP (30s step, SHA-1, 6 digits) from a base32 secret — the same
+ * scheme the seeded smoke admin's `totpSecret` stores, so a spec can complete
+ * the real 2FA login without an enrollment detour.
+ *
+ * Lives here rather than in each spec because a second copy is a second
+ * chance to be subtly wrong in exactly one place, which reads as "that spec
+ * is flaky" rather than "the helper is wrong".
+ *
+ * `offsetSteps` is a deliberate escape hatch for a code that expires mid-fill:
+ * -1 is the previous step, which is still inside the server's ±1 window.
+ */
+export function totp(secretB32: string, offsetSteps = 0): string {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = '';
+  for (const char of secretB32.replace(/=+$/, '')) {
+    const val = alphabet.indexOf(char.toUpperCase());
+    if (val < 0) continue;
+    bits += val.toString(2).padStart(5, '0');
+  }
+  const bytes = Buffer.alloc(Math.floor(bits.length / 8));
+  for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(bits.slice(i * 8, i * 8 + 8), 2);
+  const buf = Buffer.alloc(8);
+  buf.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 1000 / 30) + offsetSteps));
+  const h = crypto.createHmac('sha1', bytes).update(buf).digest();
+  const off = (h[h.length - 1] ?? 0) & 0x0f;
+  const b = (i: number) => h[off + i] ?? 0;
+  const code = (((b(0) & 0x7f) << 24) | (b(1) << 16) | (b(2) << 8) | b(3)) % 1000000;
+  return String(code).padStart(6, '0');
 }

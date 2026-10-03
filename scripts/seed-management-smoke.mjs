@@ -13,6 +13,12 @@
  * 3. Gift codes on the order's variant, encrypted with the runtime
  *    NK_GIFT_CODE_ENCRYPTION_KEY, so the operator's rerun-fulfilment can
  *    actually complete and deliver.
+ * 4. A second, already-COMPLETED order with one DELIVERED code
+ *    (`NK-...-RFND01`). The stranded order above cannot exercise the admin
+ *    refund or resend controls: a refund is only valid from `completed`, and
+ *    the resend button only renders for `completed` / `refunded`. Without this
+ *    the order-detail modal's refund and resend paths have no fixture at all,
+ *    which is how they shipped with no browser coverage.
  *
  * Run: node scripts/seed-management-smoke.mjs
  */
@@ -163,6 +169,71 @@ async function main() {
     });
   }
   console.log(`[mgmt-smoke] gift codes ready (created ${need}, available ${availableCodes})`);
+
+  // ── 4. Refund fixture — a COMPLETED order with a DELIVERED code ─────
+  // Written straight to the final state rather than produced by clicking
+  // through fulfilment: the spec needs a deterministic starting point, and
+  // the fulfilment path itself is already covered by management.spec.ts.
+  const refundOrderNumber = `NK-${new Date().getFullYear()}-RFND01`;
+  const refundOrder = await prisma.order.upsert({
+    where: { orderNumber: refundOrderNumber },
+    update: {
+      status: 'completed',
+      customerEmail: 'mgmt-smoke-refund@test.local',
+    },
+    create: {
+      orderNumber: refundOrderNumber,
+      customerEmail: 'mgmt-smoke-refund@test.local',
+      status: 'completed',
+      paymentMethod: 'manual_transfer',
+      subtotalThb: totalThb,
+      vatAmountThb: 0,
+      totalAmountThb: totalThb,
+      tosAcceptedAt: new Date(),
+      confirmationUuid: crypto.randomUUID(),
+      items: {
+        create: [
+          {
+            variantId: variant.id,
+            productNameTh: variant.product.name,
+            productNameEn: variant.product.name,
+            skuCode: variant.product.sku ?? variant.id,
+            denominationThb: totalThb,
+            quantity: 1,
+            unitPriceThb: totalThb,
+            unitPriceExVat: totalThb,
+            unitVatAmount: 0,
+            lineTotalThb: totalThb,
+            deliveryStatus: 'delivered',
+            deliveredAt: new Date(),
+          },
+        ],
+      },
+    },
+  });
+
+  // One delivered code attached to the order. The refund endpoint voids
+  // `reserved`/`delivered` codes, and this is what proves it did — an order
+  // with no codes would let a broken void step pass unnoticed.
+  const delivered = await prisma.giftCode.count({
+    where: { orderId: refundOrder.id, status: { in: ['reserved', 'delivered'] } },
+  });
+  if (delivered < 1) {
+    const plain = `RFNDSMOKE-${crypto.randomBytes(6).toString('hex').toUpperCase()}`;
+    const enc = encryptCode(plain);
+    await prisma.giftCode.create({
+      data: {
+        variantId: variant.id,
+        orderId: refundOrder.id,
+        codeEncrypted: enc.ciphertext,
+        codeHash: hashCode(plain),
+        nonce: enc.nonce,
+        status: 'delivered',
+      },
+    });
+  }
+  console.log(`[mgmt-smoke] refund fixture ${refundOrderNumber} (${refundOrder.id}) completed`);
+
   console.log(`[mgmt-smoke] admin login: ${admin.email} / ${PASSWORD} (TOTP from DB secret)`);
 }
 
