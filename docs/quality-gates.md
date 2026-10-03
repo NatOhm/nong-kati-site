@@ -33,6 +33,7 @@
 | Q1    | This inventory itself — every tests/ file is documented | `tests/quality-gates-coverage.test.ts` | `npm test` (vitest) | Unit Tests             |
 | RF    | Admin refund — authz, validation, atomic Refund+void+audit | `tests/admin-refund.test.ts`       | `npm test` (vitest)  | Unit Tests             |
 | RL    | Customer resend-email cap (3/order/hour, no quota burn on a failed email match) | `tests/customer-resend-rate-limit.test.ts` | `npm test` (vitest) | Unit Tests |
+| AR    | Admin resend-email — error contract (EMAIL_SEND_FAILED, not a transport string) | `tests/admin-resend-email.test.ts` | `npm test` (vitest) | Unit Tests |
 | CC    | Coupon cap under REAL concurrency (8 simultaneous claims) | `tests/coupon-cap-concurrency.test.ts` | vitest + live server | **(ยังไม่ต่อ CI — ดูหัวข้อข้างล่าง)** |
 | E1    | Disabled-state affordance (WCAG 1.4.1)                | `e2e/disabled-state.spec.ts`       | `npm run test:e2e`   | (local/preview)        |
 | E2    | No hardcoded white in dark mode                       | `e2e/no-hardcoded-white.spec.ts`   | `npm run test:e2e`   | (local/preview)        |
@@ -330,13 +331,23 @@ Test: 14 เคส + static guards (ไม่มี inline script ใน layout,
 - **admin path ไม่โดนจำกัด** — route หลังบ้านเรียก `sendOrderConfirmationEmail` ตรง ๆ (ไม่ผ่าน `resendOrderEmail`) เพราะผู้ดูแลที่กำลังแก้ปัญหาส่งไม่ถูกคุม และจุดนี้ทำให้ admin กับ customer ไม่แชร์โควตากัน
 - **ที่ยังต้องเติมที่ route:** cap ต่อ order กันการยิงซ้ำไป order เดิมไม่ได้ ยังต้องมี per-IP limit (key ด้วย `getClientIp(req)`) ตาม pattern ของ magic-link / forgot-password ไม่งั้นยิงกระจายหลาย order จาก IP เดียวได้
 
+## Admin resend-email — error contract (2026-10-03) — `tests/admin-resend-email.test.ts`
+
+Route เดิมตอบ provider outage ด้วย `result.error` ดิบในช่อง `error` แต่ค่านั้นเป็น **ข้อความระดับ transport** จาก `lib/email/resend.ts` (`EMAIL_NOT_CONFIGURED: …`, `EMAIL_PROVIDER_ERROR: Resend 422 …`) ไม่ใช่ code ของ API นี้ ส่วน modal ในหลังบ้านแตก error ด้วย `msg.includes('EMAIL_SEND_FAILED')` → **ไม่มีวัน match** ข้อความที่เขียนไว้เจาะจงว่า "ผู้ให้บริการอีเมลอาจมีปัญหา" จึงเป็น dead code และทุก outage ไปตกที่ข้อความกลาง ๆ "ลองใหม่"
+
+- **ทำไมถึงรอดมานาน:** ไม่มีอะไรแดง ก็จริง — route ยังตอบ 502 และยังไม่กล่าวอ้างว่าส่งสำเร็จ แค่**ความเจาะจงของข้อความที่ผู้ใช้เห็นหายไป** และหายเฉพาะในเคสที่เขียนข้อความนั้นไว้เพื่อ
+- **ทางแก้:** `error` ต้องเป็น code ของ route (`EMAIL_SEND_FAILED`) ส่วนข้อความจริงของ provider ย้ายไป `detail` + log ฝั่งเซิร์ฟเวอร์ (ตัด 300 ตัวอักษร) ตามแบบเดียวกับที่ `settings/email-test` ทำ (`SMTP_NOT_CONFIGURED` + `detail`)
+- **gate 8 เคส:** ไม่มี token → 401 · role ที่ไม่มี `orders:write` → 403 และไม่ส่งเมล · order ไม่มี → 404 · ส่งสำเร็จ → 200 และ `sentTo` เป็น **อีเมลของออเดอร์เอง** เสมอ (ไม่ใช่ที่ผู้เรียกกรอก) · provider outage → `EMAIL_SEND_FAILED` + `detail` · provider ไม่ได้ตั้งค่า → ยังเป็น `EMAIL_SEND_FAILED` ไม่ใช่ชื่อ env var · **ข้อความ provider ที่มีคำว่า `FORBIDDEN` ปนอยู่ก็ยังต้องตอบ `EMAIL_SEND_FAILED`** · ข้อความยาวเกินถูกตัด
+- **เคส `FORBIDDEN` ปนคือหัวใจของบั๊ก:** client แตก error ด้วย `includes(...)` ถ้าเอาข้อความ provider ไปใส่ `error` ตรง ๆ คำว่าใด ๆ ในนั้นจะพา UI ไปเข้าข้อความของ error อื่น — เคสนี้คือไปโทษว่าแอดมินไม่มีสิทธิ์ ทั้งที่จริงเป็นแค่ outage
+- **ไม่ mock ตัวตรวจสิทธิ์:** ใช้ JWT จริงผ่าน `checkPermission` จริง — `verifyAdminJwt` อ่านแถว `admin_users` สดทุกครั้ง (ถ้าโดนลดสิทธิ์ token เดิมตายทันที) การ mock ทิ้งไปก็คือการถอดส่วนที่ควรตรวจออก ปลอดแค่ prisma, การหาออเดอร์ และการส่งเมล
+
 ## CI pipeline (`.github/workflows/ci.yml`)
 
 | Job                         | ทำอะไร                                                                  | ผูกกับ gate                                                                                                    |
 | --------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
 | Lint & Typecheck            | `eslint .` + `tsc --noEmit`                                             | —                                                                                                              |
 | Security Audit              | `npm audit --audit-level=high` (blocking)                               | —                                                                                                              |
-| Unit Tests                  | `npm test` (vitest ~332 เคส)                                          | R1–R6, authz matrix, PII, outbox, backup codes, recovery, Omise real, JSON-LD XSS (concurrency skip อัตโนมัติ) |
+| Unit Tests                  | `npm test` (vitest ~340 เคส)                                          | R1–R6, authz matrix, PII, outbox, backup codes, recovery, Omise real, JSON-LD XSS (concurrency skip อัตโนมัติ) |
 | Concurrency (DB races)      | Postgres 16 service + migrate + `next dev -p 4200` + `NK_TEST_BASE_URL` | Concurrency                                                                                                    |
 | Browser Smoke (CSP + checkout) | Postgres 16 + migrate + seed สินค้า/ช่องทางโอน + seed management fixture (admin+TOTP / stranded order / completed order + delivered code / codes) + **prod build** `next start` + Playwright (`e2e/smoke.spec.ts` + `e2e/management.spec.ts` + `e2e/order-refund-resend.spec.ts`) — ฝั่งร้าน: หน้าแรกโหลดใต้ CSP nonce จริง + hydrate, prerendered routes ต้องมี inline script ครบ nonce, guest checkout ถึง order `pending_payment` ที่ลิงก์ confirmation เปิดได้, `/api/v1/version` ต้องรายงาน SHA ของ commit ที่ทดสอบ — ฝั่งหลังบ้าน: admin login ด้วย TOTP จริง → หน้า reconciliation → rerun-fulfilment ซ่อมออเดอร์ที่เงินเข้าแต่ค้างส่งมอบจน `completed` + ปิดรับ rerun ซ้ำ (ALREADY_SETTLED) + modal จัดการออเดอร์ (E6): คืนเงิน — ไม่ใส่เลขอ้างอิงเกตเวย์แล้วไม่เขียน DB · บันทึกจริงแล้วได้ `Refund` row + โค้ดเป็น `voided` + audit `refund_issued` + ออเดอร์เป็น `refunded` + คืนซ้ำได้ 409; resend — ต้องรายงานว่าส่งไม่สำเร็จ (job นี้ไม่มี email provider อยู่ดี ๆ จึงพิสูจน์ว่าไม่มีการโกหกว่าส่งสำเร็จ) | §6/§7/§8 smoke สุดท้าย |
 | Build                       | `next build` ด้วย env ปลอม                                              | —                                                                                                              |

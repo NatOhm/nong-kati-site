@@ -233,6 +233,10 @@ Consolidated from:
         ผู้เรียกถือ permission แล้ว และปลายทางคือ `customerEmail` ของออเดอร์เสมอ
         — มีปุ่มใน UI แล้วที่ order detail modal ของหลังบ้าน (ปุ่ม resend โผล่เฉพาะ
         order ที่ `completed`/`refunded`)
+      - error contract แก้แล้ว 2026-10-03: ตอน provider ล้ม route เดิมยัด
+        ข้อความดิบจาก provider ใส่ช่อง `error` ทำให้ UI ที่แตกด้วย
+        `includes('EMAIL_SEND_FAILED')` ไม่มีวัน match — ข้อความเฉพาะที่เขียนไว้
+        เป็น dead code ตอนนี้ตอบ `EMAIL_SEND_FAILED` และย้ายข้อความจริงไป `detail`
       - ทั้งสอง route อยู่ใน `ROUTE_COVERAGE` แล้ว (authz matrix เช็คทุก role)
       - เทสต์ `admin-refund` 15 เคส เขียว + ยืนยันด้วย mutation (ถอด `tx`
         ออกจาก audit แล้วแดง, ถอด `Serializable` แล้วแดง)
