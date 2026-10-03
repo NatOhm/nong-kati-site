@@ -31,3 +31,11 @@ backups/
 # Deploy artifacts (deploy-hostatom.sh)
 .deploy-stage/
 deploy-bundle.tar.gz
+
+# Production health monitor runtime state (scripts/monitor-health.mjs).
+# Local scratch state — the scheduled workflow keeps its own copy in the
+# Actions cache, and nothing here belongs in git.
+.prod-health/
+.prod-health-state.json
+.prod-health-history.ndjson
+.tmp-monitor/

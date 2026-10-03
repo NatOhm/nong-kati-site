@@ -1,0 +1,136 @@
+# ─── Nong-Kati — Production Health Monitor ───────────────
+# Watches the LIVE site on Hostatom/Plesk (not a preview build):
+#   node scripts/monitor-health.mjs
+# It records process uptime across checks, classifies an uptime reset as an
+# expected Passenger idle reap or a real unexpected restart, and exits
+# non-zero on an alert so this job goes red.
+#
+# WHY A SCHEDULE IN CI: production runs on shared hosting we cannot install a
+# daemon on. GitHub cron is the only always-on scheduler available to us, and
+# the site is publicly reachable, so an external checker is the whole job.
+#
+# ALERTING: a non-zero exit fails the job, which notifies the repo owner by
+# email and leaves a red run on the repo. Set the PRODUCTION_ALERT_WEBHOOK
+# secret to also POST to Slack/Discord/Line (body: {"text": "..."}).
+# Adding a paid third party is deliberately NOT required — see
+# docs/production-health-monitoring.md for the UptimeRobot/Healthchecks
+# options and why the built-in uptime checker cannot see restarts at all.
+#
+# EVERY 10 MINUTES, not 5: the only thing this can catch that a 30-minute
+# check would miss is "down for 10 minutes instead of 30", and GitHub
+# schedules on shared runners are already delayed by minutes under load.
+# The idle-reap classifier compares against idleReapSeconds=180, which is
+# independent of this interval.
+
+name: Production Health Monitor
+
+on:
+  schedule:
+    # Every 10 minutes, 24/7. GitHub disables scheduled workflows on repos
+    # with 60 days of inactivity — the watchdog is only as alive as the repo.
+    - cron: '*/10 * * * *'
+  # Manual trigger: run it before/after a deploy, or when the alert email
+  # itself is the thing you are suspicious of.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # One monitor at a time; a queued run would compare its uptime against a
+  # state file a newer run has already advanced, producing a phantom restart.
+  group: prod-health-monitor
+  cancel-in-progress: false
+
+jobs:
+  health:
+    name: Health + restart check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      # Optional. Unset in most repos — the job still alerts via the red run.
+      PRODUCTION_ALERT_WEBHOOK: ${{ secrets.PRODUCTION_ALERT_WEBHOOK }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4 (pinned)
+
+      # No setup-node and no `npm ci`: the monitor imports only node: builtins,
+      # so the job starts in seconds and cannot break because a dependency did.
+      - name: Restore previous uptime state
+        id: state
+        uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93a26806 # v4 (pinned)
+        with:
+          path: .prod-health
+          # The trailing - keys to "the most recent cache whose prefix matches",
+          # which is how a rolling state survives across ephemeral runners.
+          key: prod-health-state-${{ github.run_id }}
+          restore-keys: |
+            prod-health-state-
+
+      - name: Check production health
+        id: check
+        run: |
+          set -o pipefail
+          node scripts/monitor-health.mjs \
+            --url https://nongkatistore.com \
+            --state .prod-health/state.json \
+            --history .prod-health/history.ndjson \
+            --webhook "$PRODUCTION_ALERT_WEBHOOK" 2>&1 | tee monitor.log
+          status=${PIPESTATUS[0]}
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit $status
+
+      - name: Explain the failure on the run page
+        if: failure()
+        run: |
+          # Without this the run is just "Process completed with exit code 1",
+          # which is the same message for "site is down", "network hiccup" and
+          # "the monitor is misconfigured". Name the actual verdict.
+          if [ ! -s monitor.log ]; then
+            echo "::error title=production monitor produced no output::the monitor died before reporting — likely a runner-level kill. Nothing about production can be concluded from this run."
+            exit 0
+          fi
+          strip_ansi() { sed -e 's/\x1b\[[0-9;]*[A-Za-z]//g'; }
+          verdict=$(strip_ansi < monitor.log | grep -E '^(✖|⚠)' | head -3 || true)
+          if [ -n "$verdict" ]; then
+            echo "$verdict" | while IFS= read -r line; do
+              echo "::error title=nongkatistore.com health::${line:0:300}"
+            done
+          else
+            echo "::error title=nongkatistore.com health::monitor exited non-zero without a recognisable verdict line; see monitor.log."
+          fi
+
+      - name: Persist state for the next run
+        if: always()
+        uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93a26806 # v4 (pinned)
+        with:
+          path: .prod-health
+          key: prod-health-state-${{ github.run_id }}
+
+      # Dead-man's switch. The job can be perfectly GREEN while the SCHEDULE
+      # is dead — cron disabled, repo inactive, Actions quota spent. Only an
+      # external watchdog notices "nothing has pinged in 20 minutes".
+      # healthchecks.io is the free tier that fits a cron job; it alerts when a
+      # ping is MISSED, which is the one failure mode GitHub cannot self-report.
+      - name: Ping healthchecks.io
+        if: always()
+        env:
+          HEALTHCHECKS_PING_URL: ${{ secrets.HEALTHCHECKS_PING_URL }}
+        run: |
+          if [ -z "$HEALTHCHECKS_PING_URL" ]; then
+            echo "HEALTHCHECKS_PING_URL not set — skipping (optional)."
+            exit 0
+          fi
+          # `|| true`: a dead watchdog endpoint must not fail the job that is
+          # already reporting the real outage.
+          curl -fsS --max-time 10 "$HEALTHCHECKS_PING_URL" || echo "ping failed (non-fatal)"
+
+      - name: Upload uptime history
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4 (pinned)
+        with:
+          name: prod-health-history
+          path: |
+            .prod-health/
+            monitor.log
+          retention-days: 30
+          if-no-files-found: ignore
