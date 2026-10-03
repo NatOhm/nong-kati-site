@@ -241,31 +241,6 @@ export async function adminGetOrder(orderId: string): Promise<AdminOrderDetail |
 }
 
 /**
- * Resend code delivery email.
- * 07-api.md §22 — POST /admin/orders/:id/resend-email
- */
-export async function adminResendOrderEmail(
-  orderId: string,
-  adminId: string,
-  adminEmail: string,
-): Promise<{ success: boolean }> {
-  const order = mockOrders.find((o) => o.id === orderId);
-  if (!order) return { success: false };
-
-  await writeAuditLog({
-    actorType: 'admin',
-    actorId: adminId,
-    actorEmail: adminEmail,
-    action: 'resend_email',
-    tableName: 'store.orders',
-    recordId: orderId,
-    metadata: { orderNumber: order.orderNumber },
-  });
-
-  return { success: true };
-}
-
-/**
  * Manually assign a code to a pending_manual_fulfilment order item.
  * 07-api.md §22 — POST /admin/orders/:id/assign-code
  */
@@ -349,79 +324,4 @@ export async function adminUpdateOrderNotes(
   });
 
   return { success: true };
-}
-
-/**
- * Issue a refund for an order.
- * 07-api.md §22 — POST /admin/orders/:id/refund
- */
-export async function adminRefundOrder(
-  orderId: string,
-  params: {
-    reason: string;
-    gatewayRefundReference: string;
-    refundAmountThb: number;
-    voidCodes: boolean;
-  },
-  adminId: string,
-  adminEmail: string,
-): Promise<{
-  success: boolean;
-  data?: {
-    orderId: string;
-    status: string;
-    refundedAt: Date;
-    codesVoided: number;
-  };
-  error?: string;
-}> {
-  const order = mockOrders.find((o) => o.id === orderId);
-  if (!order) {
-    return { success: false, error: 'ORDER_NOT_FOUND' };
-  }
-
-  if (order.status === 'refunded') {
-    return { success: false, error: 'ALREADY_REFUNDED' };
-  }
-
-  if (params.refundAmountThb > order.totalAmountThb) {
-    return { success: false, error: 'REFUND_AMOUNT_EXCEEDS_ORDER' };
-  }
-
-  if (!params.gatewayRefundReference) {
-    return { success: false, error: 'GATEWAY_REF_REQUIRED' };
-  }
-
-  const previousStatus = order.status;
-  order.status = 'refunded';
-
-  await writeAuditLog({
-    actorType: 'admin',
-    actorId: adminId,
-    actorEmail: adminEmail,
-    action: 'refund_issued',
-    tableName: 'store.orders',
-    recordId: orderId,
-    diff: {
-      before: { status: previousStatus },
-      after: { status: 'refunded' },
-    },
-    metadata: {
-      orderNumber: order.orderNumber,
-      gatewayRefundReference: params.gatewayRefundReference,
-      refundAmountThb: params.refundAmountThb,
-      reason: params.reason,
-      voidCodes: params.voidCodes,
-    },
-  });
-
-  return {
-    success: true,
-    data: {
-      orderId,
-      status: 'refunded',
-      refundedAt: new Date(),
-      codesVoided: params.voidCodes ? order.itemCount : 0,
-    },
-  };
 }

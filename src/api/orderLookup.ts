@@ -60,11 +60,28 @@ export async function resendOrderEmail(
     return { success: false, error: 'NOT_FOUND' };
   }
 
-  // Build confirmation URL
+  return sendOrderConfirmationEmail(order);
+}
+
+/**
+ * Render and send the order-confirmation email for an order.
+ *
+ * Shared by the customer resend (07-api.md §10) and the admin resend
+ * (07-api.md §22) so there is exactly one implementation of what that email
+ * contains and how it is retried — a second copy would drift silently.
+ *
+ * The admin path is permission-gated and low-frequency, so it needs no
+ * per-sender rate limit. The CUSTOMER path does: `resendOrderEmail` above is
+ * documented as "3 resends per order per hour" but NO rate limit is
+ * implemented in its body — do not mount a customer-facing resend route from
+ * this helper until that is added.
+ */
+export async function sendOrderConfirmationEmail(
+  order: Order,
+): Promise<{ success: boolean; error?: string }> {
   const siteUrl = process.env['NEXT_PUBLIC_SITE_URL'] ?? 'http://localhost:3000';
   const confirmationUrl = `${siteUrl}/orders/${order.confirmationUuid}`;
 
-  // Generate email
   const template = orderConfirmationTemplate({
     orderNumber: order.orderNumber,
     customerEmail: order.customerEmail,
@@ -79,7 +96,6 @@ export async function resendOrderEmail(
     confirmationUrl,
   });
 
-  // Send with retry (3× exponential backoff)
   const result = await sendEmailWithRetry({
     to: order.customerEmail,
     subject: template.subject,
@@ -89,6 +105,5 @@ export async function resendOrderEmail(
   if (!result.success) {
     return { success: false, error: result.error as string };
   }
-
   return { success: true };
 }
