@@ -39,6 +39,7 @@
 | E3    | Duplicate DOM ids (ทั้งไซต์ผ่าน sitemap)              | `e2e/duplicate-ids.spec.ts`        | `npm run test:e2e`   | (local/preview)        |
 | E4    | Text contrast ≥ 4.5:1 (WCAG 1.4.3)                    | `e2e/contrast.spec.ts`             | `npm run test:e2e`   | (local/preview)        |
 | E5    | Touch targets 44px + stats consistency                | `e2e/touch-targets.spec.ts`        | `npm run test:e2e`   | (local/preview)        |
+| E6    | Admin refund + resend controls on the order detail modal | `e2e/order-refund-resend.spec.ts` | `npm run test:e2e`   | **Browser Smoke** (run ใน CI ด้วย) |
 
 **วิธีรัน:**
 
@@ -173,6 +174,17 @@ Playwright เลือก target ตาม `E2E_BASE_URL` > localhost:4200 (dev
 
 - **กฎ:** ที่ viewport 390×844 — element ที่แตะได้ต้องมี box ≥ **40px** ส่วน controls ที่ audit กำหนดชัด (taskbar, ตะกร้าใน header, password toggle, consent actions) ต้อง ≥ **44px** (padding ขยาย hit area นับเป็นเป้าหมายได้) + homepage stats ห้ามโชว์ 0 ทั้งที่ catalogue มีสินค้า
 - **วิธีแก้เมื่อแดง:** เพิ่ม padding/min-h ของปุ่มหรือ hit area แทนย่อไอคอน; stats แดง = ตัวนับดึงข้อมูลผิด source ให้แก้ที่ data ไม่ใช่ปิด band ทิ้ง
+
+### E6 — Admin refund + resend (modal จัดการออเดอร์) — `e2e/order-refund-resend.spec.ts` (5 เคส)
+
+ต่างจาก E1–E5 ตรงที่ **รันใน CI จริง** (job Browser Smoke) ไม่ใช่แค่ local เพราะสองปุ่มนี้คือสิ่งที่พนักงานกดตอนเงินผิดแล้ว — ถ้าคืนเงินแล้วออเดอร์ไม่เปลี่ยนสถานะ หรือกดส่งเมลแล้วได้ข้อความว่าส่งสำเร็จทั้งที่ไม่มีอะไรออกไป ผู้ใช้จะเจอมันใน production ไม่ใช่ใน PR
+
+- **fixture ใหม่ `NK-…-RFND01`:** ออเดอร์สถานะ `completed` พร้อมโค้ด `delivered` 1 ใบ (เพิ่มใน `seed-management-smoke.mjs`) — ออเดอร์ค้างของ `management.spec.ts` ใช้แทนไม่ได้ เพราะคืนเงินได้เฉพาะจาก `completed` และปุ่ม resend ก็ render เฉพาะ `completed`/`refunded` ก่อนเพิ่ม fixture นี้สองปุ่มนี้ **ไม่มีอะไรให้กดจริง** ในเทสต์
+- **ยืนยันจากฐานข้อมูล ไม่ใช่จากข้อความบนจอ:** UI ขึ้น “บันทึกแล้ว” ทันทีที่ endpoint ตอบ 200 สิ่งที่ต้องจริงคือแถว `Refund` + สถานะที่พลิกเป็น `refunded` + โค้ดเป็น `voided` + audit row `refund_issued` ที่ชี้ refund id เดียวกัน (audit เขียนใน transaction เดียวกัน)
+- **5 เคส:** กดบันทึกโดยไม่ใส่เลขอ้างอิงเกตเวย์ → error ชัดเจนและ **ไม่มีอะไรเขียนลง DB** · บันทึกจริง (เว้นว่างยอด = ยอดรวม ซึ่งเคยพังเป็นส่ง `0`) · ออเดอร์ที่คืนแล้วซ่อนฟอร์มคืนเงินแต่ยังเหลือปุ่ม resend · resend รายงานว่า**ส่งไม่สำเร็จ**และไม่มีข้อความอ้างว่าส่งแล้ว · ยิง refund ซ้ำที่ endpoint เดิม → 409 `ALREADY_REFUNDED` และยังมีแถวเดียว
+- **leg ของ resend คือ “ความล้มเหลวอย่างซื่อสัตย์”:** job นี้ตั้งใจไม่มี `NK_RESEND_API_KEY` และ `lib/email/resend.ts` fail-closed (audit #2) — ถ้าตั้ง key จริงในอนาคต เคสนี้จะ skip อัตโนมัติแทนที่จะเดา การคืนเงินที่ไม่มีผู้ให้บริการเมลถือว่าผ่านได้เพราะ**ไม่มีการโกหกว่าส่งสำเร็จ** ซึ่งคือสิ่งที่ต้องกันไว้มากกว่า
+- **หมายเหตุ:** `sendEmailWithRetry` เดิน backoff 2s/4s/8s ตอนไม่มี credential (config error retry ไม่มีทางหาย) — ขานี้จึงใช้ timeout 60s และเวลารันเพิ่มราว 11s ต่อครั้ง
+- **สถานะการรัน:** เขียนแล้วยัง**ไม่เคยรันจริง** — เครื่อง dev นี้ไม่มี Postgres/Docker (ดูหัวข้อ CC) ยืนยันได้แค่ `tsc`, eslint, `playwright --list` (เจอครบ 5 เคส) และ seed script ผ่าน `node --check` การรันครั้งแรกจริง ๆ คือ job Browser Smoke ใน CI ซึ่งมี Postgres + production build — **อย่านับว่าผ่านจนกว่าจะเห็นผลรันในนั้น** เครื่องก่อน push
 
 ---
 
@@ -326,7 +338,7 @@ Test: 14 เคส + static guards (ไม่มี inline script ใน layout,
 | Security Audit              | `npm audit --audit-level=high` (blocking)                               | —                                                                                                              |
 | Unit Tests                  | `npm test` (vitest ~332 เคส)                                          | R1–R6, authz matrix, PII, outbox, backup codes, recovery, Omise real, JSON-LD XSS (concurrency skip อัตโนมัติ) |
 | Concurrency (DB races)      | Postgres 16 service + migrate + `next dev -p 4200` + `NK_TEST_BASE_URL` | Concurrency                                                                                                    |
-| Browser Smoke (CSP + checkout) | Postgres 16 + migrate + seed สินค้า/ช่องทางโอน + seed management fixture (admin+TOTP / stranded order / codes) + **prod build** `next start` + Playwright (`e2e/smoke.spec.ts` + `e2e/management.spec.ts`) — ฝั่งร้าน: หน้าแรกโหลดใต้ CSP nonce จริง + hydrate, prerendered routes ต้องมี inline script ครบ nonce, guest checkout ถึง order `pending_payment` ที่ลิงก์ confirmation เปิดได้, `/api/v1/version` ต้องรายงาน SHA ของ commit ที่ทดสอบ — ฝั่งหลังบ้าน: admin login ด้วย TOTP จริง → หน้า reconciliation → rerun-fulfilment ซ่อมออเดอร์ที่เงินเข้าแต่ค้างส่งมอบจน `completed` + ปิดรับ rerun ซ้ำ (ALREADY_SETTLED) | §6/§7/§8 smoke สุดท้าย |
+| Browser Smoke (CSP + checkout) | Postgres 16 + migrate + seed สินค้า/ช่องทางโอน + seed management fixture (admin+TOTP / stranded order / completed order + delivered code / codes) + **prod build** `next start` + Playwright (`e2e/smoke.spec.ts` + `e2e/management.spec.ts` + `e2e/order-refund-resend.spec.ts`) — ฝั่งร้าน: หน้าแรกโหลดใต้ CSP nonce จริง + hydrate, prerendered routes ต้องมี inline script ครบ nonce, guest checkout ถึง order `pending_payment` ที่ลิงก์ confirmation เปิดได้, `/api/v1/version` ต้องรายงาน SHA ของ commit ที่ทดสอบ — ฝั่งหลังบ้าน: admin login ด้วย TOTP จริง → หน้า reconciliation → rerun-fulfilment ซ่อมออเดอร์ที่เงินเข้าแต่ค้างส่งมอบจน `completed` + ปิดรับ rerun ซ้ำ (ALREADY_SETTLED) + modal จัดการออเดอร์ (E6): คืนเงิน — ไม่ใส่เลขอ้างอิงเกตเวย์แล้วไม่เขียน DB · บันทึกจริงแล้วได้ `Refund` row + โค้ดเป็น `voided` + audit `refund_issued` + ออเดอร์เป็น `refunded` + คืนซ้ำได้ 409; resend — ต้องรายงานว่าส่งไม่สำเร็จ (job นี้ไม่มี email provider อยู่ดี ๆ จึงพิสูจน์ว่าไม่มีการโกหกว่าส่งสำเร็จ) | §6/§7/§8 smoke สุดท้าย |
 | Build                       | `next build` ด้วย env ปลอม                                              | —                                                                                                              |
 | report-build-status, deploy | ของ Vercel (Git integration)                                            | —                                                                                                              |
 

@@ -236,6 +236,13 @@ Consolidated from:
       - ทั้งสอง route อยู่ใน `ROUTE_COVERAGE` แล้ว (authz matrix เช็คทุก role)
       - เทสต์ `admin-refund` 15 เคส เขียว + ยืนยันด้วย mutation (ถอด `tx`
         ออกจาก audit แล้วแดง, ถอด `Serializable` แล้วแดง)
+      - **มี browser coverage แล้ว (E6, รันใน CI):**
+        `e2e/order-refund-resend.spec.ts` 5 เคสกดผ่าน modal จริงต่อ production
+        build — คืนเงิน (ไม่ใส่เลขอ้างอิง → ไม่เขียน DB · บันทึกจริง → `Refund`
+        row + void โค้ด + audit + พลิกเป็น `refunded` · ยิงซ้ำ → 409) และ resend
+        (ต้องรายงานว่าส่งไม่สำเร็จ เพราะ job นี้ไม่มี provider — พิสูจน์ว่าไม่มีการ
+        โกหกว่าส่งถึงแล้ว) ต้องมี fixture ออเดอร์ `completed` เพิ่มใน
+        `seed-management-smoke.mjs` ถึงจะกดสองปุ่มนี้ได้เลย
       - ฝั่ง **ลูกค้า** `POST /orders/:id/resend-email` **ยังไม่มี route** แต่ตัว
         implementation มี rate limit จริงแล้ว (2026-10-03): `resendOrderEmail`
         บังคับ 3 ครั้ง **ต่อ order** ต่อชั่วโมง และ check **หลัง** ยืนยันอีเมล
