@@ -17,6 +17,10 @@ test-results/
 playwright-report/
 artifacts/
 
+# Browser-smoke build sentinel (written by ci.yml; *.log already covers the
+# build log itself)
+build-ok.flag
+
 # Git worktrees
 .worktrees/
 .nk-totp-qr.*

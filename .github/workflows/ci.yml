@@ -204,7 +204,50 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
       - name: Build production bundle
-        run: npm run build
+        run: |
+          set -o pipefail
+          # Teed to a file because the step's own log is only readable from the
+          # run page by someone with repo admin rights. Annotations are the
+          # only copy that reaches the checks API (and CI's failure-annotation
+          # step) without them.
+          npm run build 2>&1 | tee build-output.log && touch build-ok.flag
+      - name: Emit build failure annotations
+        if: failure()
+        run: |
+          # `failure()` is job-wide: without the sentinel this would also fire
+          # when a LATER step failed and the build was perfectly fine, printing
+          # confident nonsense about a build that never broke.
+          if [ -f build-ok.flag ]; then exit 0; fi
+
+          # A build killed at the runner level (OOM, out of disk, lost VM)
+          # writes NOTHING. Run #89 died in 10s against a 34-59s norm and every
+          # API surface reported only "exit code 1" — no clue what killed it.
+          # Name that case rather than staying silent, because it is exactly the
+          # one you cannot debug from the log.
+          if [ ! -s build-output.log ]; then
+            echo "::error title=next build produced no output::next build died before the compiler reported anything — the likely causes are a runner-level kill (OOM), out of disk, or a cancelled step. Normal build time is 35-60s."
+            exit 0
+          fi
+
+          # Next colourises its output; raw escape bytes render as garbage in
+          # annotations.
+          strip_ansi() { sed -e 's/\x1b\[[0-9;]*[A-Za-z]//g'; }
+
+          # 10, not 60: GitHub caps a step at 10 error annotations and silently
+          # drops the rest, so a longer list is a list nobody reads.
+          matches=$(strip_ansi < build-output.log | grep -nE "⨯|Error|error|Failed|failed|ENOENT|ENOSPC|EACCES|heap out of memory|ELIFECYCLE" | head -10 || true)
+          if [ -n "$matches" ]; then
+            echo "$matches" | while IFS= read -r line; do
+              echo "::error title=next build failed::${line:0:400}"
+            done
+          else
+            # No recognisable error line: emit the tail anyway. A silent step
+            # is what made run #89 undiagnosable in the first place.
+            echo "::error title=next build failed::no recognised error line in the output; last 10 lines follow (full log in the browser-smoke-artifacts artifact)."
+            strip_ansi < build-output.log | tail -10 | while IFS= read -r line; do
+              echo "::error title=next build failed::${line:0:400}"
+            done
+          fi
       - name: Start production server
         run: |
           nohup npx next start -p 4200 > smoke-server.log 2>&1 &
@@ -238,6 +281,7 @@ jobs:
             playwright-report/
             test-results/
             smoke-server.log
+            build-output.log
           if-no-files-found: ignore
 
   # ─── Build ────────────────────────────────────────────
