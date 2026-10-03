@@ -31,6 +31,7 @@
 | F1    | E2E fixture images are real, complete, non-degenerate | `tests/test-fixture-images.test.ts` | `npm test` (vitest)  | Unit Tests             |
 | CF    | Client-feedback round 2 (out-of-stock, CSP blob:, Slip2Go) | `tests/client-feedback-fixes.test.ts` | `npm test` (vitest) | Unit Tests             |
 | Q1    | This inventory itself — every tests/ file is documented | `tests/quality-gates-coverage.test.ts` | `npm test` (vitest) | Unit Tests             |
+| RF    | Admin refund — authz, validation, atomic Refund+void+audit | `tests/admin-refund.test.ts`       | `npm test` (vitest)  | Unit Tests             |
 | CC    | Coupon cap under REAL concurrency (8 simultaneous claims) | `tests/coupon-cap-concurrency.test.ts` | vitest + live server | **(ยังไม่ต่อ CI — ดูหัวข้อข้างล่าง)** |
 | E1    | Disabled-state affordance (WCAG 1.4.1)                | `e2e/disabled-state.spec.ts`       | `npm run test:e2e`   | (local/preview)        |
 | E2    | No hardcoded white in dark mode                       | `e2e/no-hardcoded-white.spec.ts`   | `npm run test:e2e`   | (local/preview)        |

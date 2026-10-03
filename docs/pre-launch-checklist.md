@@ -206,16 +206,38 @@ Consolidated from:
       order page; wrong email → 404, no enumeration — verified in browser)
 - [x] Admin login with 2FA works — 28/28 E2E (credentials → TOTP → session,
       single-use challenge, lockout, RBAC, rotation, change-password)
-- [ ] Admin order list/detail/resend/refund works — list + detail +
-      **verify-payment** verified against real DB (และแข็งขึ้ง 2026-09-26:
-      transaction เดียวพร้อม recovery state); resend-email and refund
-      endpoints not implemented yet
-      _(ยืนยัน 2026-10-03: ฝั่ง client `adminResendOrderEmail` /
-      `adminRefundOrder` — `src/api/adminOrders.ts:247,358` — อ่านจาก
-      `mockOrders.find(...)` และ **ไม่มี route ฝั่งเซิร์ฟเวอร์** เลย
-      (`admin/orders/[id]/resend-email`, `admin/orders/[id]/refund`) —
-      กดแล้วเงียบ ไม่ error; `src/types/auth.ts:189` ยังมี permission ของ
-      route ที่ไม่มีอยู่จริง)_
+- [~] Admin order list/detail/resend/refund — list + detail +
+      **verify-payment** verified against real DB (แข็งขึ้ง 2026-09-26:
+      transaction เดียวพร้อม recovery state); **resend-email + refund
+      implement แล้ว 2026-10-03**
+      _(เดิม: ฝั่ง client `adminResendOrderEmail` / `adminRefundOrder` —
+      `src/api/adminOrders.ts` — อ่านจาก `mockOrders.find(...)`) และ**ไม่มี route
+      ฝั่งเซิร์ฟเวอร์เลย**; ที่สำคัญกว่านั้น `adminRefundOrder` เขียน audit row
+      `refund_issued` จริง ๆ ทั้งที่แก้แค่ array ใน memory — audit log
+      จะบันทึกว่าคืนเงินแล้วทั้งที่ order ไม่เคยเปลี่ยน)_
+
+      - **`POST /api/v1/admin/orders/[id]/refund`** (`orders:refund`) — เป็น
+        transaction เดียวที่ `Serializable` (retry P2034) ได้แก่ void
+        GiftCode ของออเดอร์ → insert `Refund` → เดิน order
+        `completed → refunded` → เขียน audit row **ส่ง `tx` เข้าไปด้วย** ให้
+        rollback พร้อมกัน; `Refund.orderId` unique กันคืนซ้ำ (P2002 → 409)
+      - **record-only โดยเจตนา** — admin กดคืนเงินที่ gateway dashboard ก่อน
+        แล้วมาบันทึกที่นี่ พร้อม gateway reference เป็นหลักฐาน; route **ไม่เรียก
+        gateway** เลย เพื่อไม่ให้ retry หรือกดสองครั้งแล้วคืนเงินซ้ำ
+      - **ข้อจำกัดที่ต้องรู้:** void โค้ดได้แค่ฝั่งร้าน — โค้ดที่ส่งให้ลูกค้าไปแล้ว
+        ยังใช้ได้ (ดึงคืนไม่ได้) และ **ยังไม่คืน stock** เพราะ 07-api.md §22
+        ไม่ได้นิยาม semantics ของ restock — เดาผิดจะทำให้ stock เพี้ยน
+      - **`POST /api/v1/admin/orders/[id]/resend-email`** (`orders:write`) —
+        ส่งอีเมลยืนยันซ้ำ ใช้ `sendOrderConfirmationEmail` ตัวเดียวกับฝั่ง
+        ลูกค้า (แยก logic ไว้ที่เดียว ไม่ให้ drift); ไม่มี email-match check เพราะ
+        ผู้เรียกถือ permission แล้ว และปลายทางคือ `customerEmail` ของออเดอร์เสมอ
+        — ยัง**ไม่มีปุ่มใน UI** ต้องเพิ่มต่อ
+      - ทั้งสอง route อยู่ใน `ROUTE_COVERAGE` แล้ว (authz matrix เช็คทุก role)
+      - เทสต์ `admin-refund` 15 เคส เขียว + ยืนยันด้วย mutation (ถอด `tx`
+        ออกจาก audit แล้วแดง, ถอด `Serializable` แล้วแดง)
+      - ฝั่ง **ลูกค้า** `POST /orders/:id/resend-email` ยังไม่มี route และ
+        **ยังไม่มี rate limit จริง** (doc comment เขียนว่า 3 ครั้ง/ชม. แต่ body
+        ไม่มี) — ห้าม mount จนกว่าจะเพิ่ม rate limit
 - [ ] CSV code upload pipeline works (parse → dedup → encrypt → insert) —
       upload route exists (`/api/v1/admin/upload`); end-to-end CSV run not
       exercised this pass
