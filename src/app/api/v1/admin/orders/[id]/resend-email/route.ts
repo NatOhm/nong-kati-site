@@ -41,9 +41,19 @@ export async function POST(
 
   const result = await sendOrderConfirmationEmail(order);
   if (!result.success) {
-    // The send failed upstream (provider error after retries). Report it
-    // honestly rather than claiming a resend that never happened.
-    return fail(result.error ?? 'EMAIL_SEND_FAILED', 502);
+    // Report the failure honestly rather than claiming a resend that never
+    // happened — but report it as one of THIS API's codes.
+    //
+    // `result.error` is a transport string from lib/email/resend.ts
+    // (`EMAIL_NOT_CONFIGURED: …`, `EMAIL_PROVIDER_ERROR: …`), not a route
+    // code. Putting it in `error` meant the order modal's
+    // `msg.includes('EMAIL_SEND_FAILED')` branch could never match, so every
+    // outage fell through to the generic "try again" and the specific message
+    // written for it was unreachable. Normalise the code here and keep the
+    // provider text in `detail`, the way settings/email-test does.
+    const detail = (result.error ?? 'unknown email failure').slice(0, 300);
+    console.error(`[resend-email] ${order.orderNumber} → ${detail}`);
+    return NextResponse.json({ error: 'EMAIL_SEND_FAILED', detail }, { status: 502 });
   }
 
   return NextResponse.json({
