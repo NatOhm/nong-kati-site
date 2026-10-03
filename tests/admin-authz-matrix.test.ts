@@ -168,6 +168,20 @@ const ROUTE_COVERAGE: MatrixRow[] = [
     perm: 'orders:write',
     body: { verified: true },
   },
+  {
+    method: 'POST',
+    path: '/orders/ord-1/resend-email',
+    perm: 'orders:write',
+    body: {},
+  },
+  // record-only refund: 07-api.md §22. The gateway move happens in the
+  // provider dashboard; this records it, voids codes and writes the audit row.
+  {
+    method: 'POST',
+    path: '/orders/ord-1/refund',
+    perm: 'orders:refund',
+    body: { gatewayRefundReference: 're_test_1', refundAmountThb: 100 },
+  },
   // pricing
   { method: 'POST', path: '/pricing/bulk', perm: 'products:write', body: {} },
   // products
