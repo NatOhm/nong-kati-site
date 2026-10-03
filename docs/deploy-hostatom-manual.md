@@ -185,8 +185,26 @@ File Manager → delete `extract-check.txt` (and any debug files the run created
 - **Sessions expire in minutes** — re-SSO via clientarea → productdetails → "Manage Domains".
 - **File Manager opens at the home dir**, not httpdocs, when entered from some deep links — click
   the `httpdocs` row.
-- **Node.js panel shows env var values in cleartext** — never screenshot that page (this is how a
-  secret got burned; rotation checklist: `docs/secret-rotation-checklist.md`).
+- **Node.js panel shows env var values in cleartext** — never screenshot that page, and **never
+  read it by text content** (see the next bullet). Rotation checklist:
+  `docs/secret-rotation-checklist.md`.
+- **⚠️ Reading the Node.js page by TEXT CONTENT leaks every secret on it.** The panel does not put
+  the env list in form inputs — it renders one plain-text leaf per row, `- NAME: value`. So a
+  "harmless" inspection like `document.querySelectorAll('*')` filtered on the row text returns the
+  whole value, and returning `e.textContent` puts `INFISICAL_CLIENT_SECRET` into your transcript.
+  This burned a prefix of a freshly rotated secret on Oct 4, 2026, three days after a rotation
+  meant to undo the previous burn.
+  - **Safe:** select by attribute and return only names, counts, and booleans —
+    `input[name^="INFISICAL_"]`, `button[aria-label="Restart App"]`. For the client ID the runbook
+    sanctions, return `value.startsWith('6be89e56')`, never the value itself.
+  - **Unsafe:** anything matching on rendered text — `textContent`, `innerText`, a `body` dump,
+    `page.text()`, or a selector whose text contains `INFISICAL_`.
+  - This applies to screenshots and snapshots too: both capture whatever is rendered. Navigate by
+    **locator** (`button:has-text("Restart App")`), which resolves and clicks without serialising
+    the page into the conversation.
+  - Corollary: on a panel you must inspect, prefer the **public API** for anything secret-adjacent.
+    Verifying a rotation needs no panel read at all — compare the identity's client-secret
+    **use-count** before and after a restart (see `docs/infisical-secret-rotation-oct3.md`).
 - **The scheduled-task "OK" button does not always submit** (the panel's JS binds
   `plesk.form.submit`, which is missing on some Obsidian builds). Symptom: you edit the command,
   click OK, land back on the list, and the stored command is *unchanged*. Workaround: set the

@@ -76,6 +76,17 @@ Do **not** delete or disable the existing secrets yet.
 5. **Before restarting, sanity-check without reading secrets:** there should be exactly **5**
    `INFISICAL_*` rows, and the `INFISICAL_CLIENT_ID` should still start with `6be89e56`.
 
+   > **Do not perform this check by reading the page's text.** The panel renders the env list as
+   > plain-text rows (`- NAME: value`), not form inputs, so any text-based read returns the secret
+   > and puts it in your transcript — which is how the Oct 2, Oct 3 and Oct 4 incidents all
+   > happened. Select by attribute and return only counts and booleans
+   > (`input[name^="INFISICAL_"]`, and `value.startsWith('6be89e56')` rather than the value). Full
+   > details in [deploy-hostatom-manual.md](deploy-hostatom-manual.md) pitfalls.
+
+   A stronger check needs no panel read at all: record the identity's client-secret **use-count**
+   in Infisical before the restart, restart, then confirm the intended secret's count went up and
+   the others did not. That proves which secret the boot actually used without touching the panel.
+
 ### Step 3 — Restart the app
 
 Plesk → **Node.js** → Dashboard → **Restart App**. The first request afterwards is slow: that

@@ -76,8 +76,9 @@ curl -s -o /dev/null -w "%{http_code}\n" https://nongkatistore.com/api/v1/produc
 > identity was created or deleted — only the *secret* paired with the unchanged client ID
 > (`6be89e56-…`) was replaced, which is what `infisical-secret-rotation-oct3.md` prescribes.
 > Do **not** follow the older "create `hostatom-thsv93-app`" steps below; that plan was
-> superseded because only one identity ever existed. Remaining: delete the long-dead
-> `2018***` secret, and delete `58dc***` only after the soak.
+> superseded because only one identity ever existed. The long-dead `2018***` secret was
+> deleted Oct 4, 2026 (243 uses, unused for weeks). Remaining: delete `58dc***` only after
+> the 24–48 h soak plus one deploy — until then it is the only rollback.
 
 This is the credential that was displayed in the Plesk panel and chat. Highest priority.
 
