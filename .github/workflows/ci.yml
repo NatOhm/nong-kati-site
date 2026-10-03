@@ -305,9 +305,50 @@ jobs:
       - name: Emit smoke failure annotations
         if: failure()
         run: |
-          grep -E "✘|✗|Error:|Timed out|TimeoutError|expected|locator|resolved to|passed|failed" /tmp/pw-output.log | tail -60 | while IFS= read -r line; do
-            echo "::error::${line:0:400}"
-          done
+          log=/tmp/pw-output.log
+
+          # A run killed at the runner level writes nothing. Name that case
+          # rather than staying silent, for the same reason the build step
+          # does — silence is what makes a failure undiagnosable.
+          if [ ! -s "$log" ]; then
+            echo "::error title=playwright smoke::no output in $log — the test step produced nothing (runner kill, out of disk, or a cancelled step). The full log is in the browser-smoke-artifacts artifact."
+            exit 0
+          fi
+
+          strip_ansi() { sed -e 's/\x1b\[[0-9;]*[A-Za-z]//g'; }
+
+          # head -10, NOT a longer list: GitHub caps a step at 10 error
+          # annotations and silently drops the rest, so anything past 10 was
+          # never being read.
+          #
+          # head, not tail, because Playwright's list reporter prints the
+          # summary of which tests failed FIRST and the detail blocks after.
+          # Taking the tail spends the whole budget on the last failure and
+          # loses the list.
+          #
+          # -i matters more than the cap: the old pattern was case-sensitive,
+          # so `Expected: "refunded"` and `Received: "completed"` — the single
+          # most useful lines in an assertion failure — never matched at all.
+          #
+          # The count lines (`  3 failed`, `  12 passed`) match the pattern but
+          # say nothing; they cost budget and are visible in the fallback tail.
+          matches=$(
+            strip_ansi < "$log" \
+              | grep -Ei "✘|✗|error|timed out|timeout|expected|received|locator|resolved to" \
+              | grep -vE "^[[:space:]]*[0-9]+ (passed|failed|skipped|did not run)" \
+              | head -10 || true
+          )
+          if [ -n "$matches" ]; then
+            echo "$matches" | while IFS= read -r line; do
+              echo "::error title=playwright smoke::${line:0:400}"
+            done
+          else
+            # Nothing recognisable: show the tail rather than say nothing.
+            echo "::error title=playwright smoke::no recognised failure line in the run output; last 10 lines follow (full log in the browser-smoke-artifacts artifact)."
+            strip_ansi < "$log" | tail -10 | while IFS= read -r line; do
+              echo "::error title=playwright smoke::${line:0:400}"
+            done
+          fi
       - name: Verify deployed SHA matches the commit under test
         run: |
           body=$(curl -s http://127.0.0.1:4200/api/v1/version)
