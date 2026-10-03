@@ -157,25 +157,50 @@ guard ordering) and are expected to stay green.
 
 ---
 
-## 5. The gap this does NOT close
+## 5. The gap this does NOT close — and the attempt to close it
 
-**The suite mocks Prisma everywhere, so no test here runs a real Postgres `SERIALIZABLE`
-race.** `tests/wallet-coupon-race.test.ts` proves the _wiring_ — that the route requests
-`Serializable`, that `P2034` is retried and the retried attempt's result is the one
-returned, that non-conflicts are not retried, that three conflicts give up, and that the
-client-facing error codes are unchanged. It does not prove the database actually serialises
-under concurrency.
+**The suite mocks Prisma everywhere, so no committed test runs a real Postgres
+`SERIALIZABLE` race.** `tests/wallet-coupon-race.test.ts` proves the _wiring_ — that the
+route requests `Serializable`, that `P2034` is retried and the retried attempt's result is
+the one returned, that non-conflicts are not retried, that three conflicts give up, and that
+the client-facing error codes are unchanged. It does not prove the database actually
+serialises under concurrency.
 
-Closing that requires an integration test against a real Postgres (the repo already has a
-`Concurrency (DB races)` CI job per `docs/quality-gates.md`): two concurrent transactions
-claiming the same coupon + customer, asserting exactly one clears the cap and the other
-receives `COUPON_PER_CUSTOMER_LIMIT`.
+`tests/coupon-cap-concurrency.test.ts` was written to close exactly that gap: 8 simultaneous
+wallet claims by one customer on one coupon capped at 1, over real HTTP against real
+Postgres, asserting one 200 and seven 409 `COUPON_PER_CUSTOMER_LIMIT`, one redemption row,
+one spend row, and one debit.
 
-Also unverified by this change: behaviour under a real `SERIALIZABLE` retry storm, and
-whether the production database (Neon/Supabase) surfaces `P2034` the way Prisma reports it.
-Both need the integration test above.
+**It has never been executed.** It is typechecked — `tsc --noEmit` covers the test tree, which
+validated every prisma field name against the generated client and caught two wrong ones
+during writing — and its skip path is verified (1 skipped without `NK_TEST_BASE_URL`). But no
+assertion in it has ever run.
 
----
+The blocker is environmental, not a property of the test: this machine has no reachable
+Postgres. No local `psql`/`postgres`, port 5432 closed, no `DATABASE_URL`. Docker Desktop is
+installed and its `com.docker.backend` process launches, but the `docker-desktop` WSL2
+distribution stays `Stopped` and the backend times out reaching its own IPC
+(`context deadline exceeded` on `GET /forwards/list`), so the engine never becomes
+available. That needs WSL2/virtualisation intervention or a reboot on the host — not
+something a test change can work around.
+
+It is therefore **deliberately not wired into the `concurrency-tests` CI job**, which sits in
+`build`'s `needs`; an unproven test there risks a red build on its first run.
+
+To finish it, on a machine with a working engine:
+
+1. `docker run -d -e POSTGRES_PASSWORD=ci -e POSTGRES_USER=ci -e POSTGRES_DB=ci -p 5432:5432 postgres:16`
+2. `DATABASE_URL=... npx prisma migrate deploy`, then boot `next dev` with `NK_JWT_SECRET` and
+   `NK_GIFT_CODE_ENCRYPTION_KEY` set
+3. `NK_TEST_BASE_URL=http://127.0.0.1:4200 npx vitest run tests/coupon-cap-concurrency.test.ts`
+4. **Negative control before trusting it:** revert `isolationLevel: 'Serializable'` in
+   `runWalletPayment`, re-run, and confirm it fails with more than one 200. An assertion that
+   passes against the unfixed code proves nothing — the test uses 8 contenders rather than 2
+   precisely because two requests can serialise naturally and pass vacuously.
+5. Only then add it to `concurrency-tests`.
+
+Also still unverified: behaviour under a real `SERIALIZABLE` retry storm, and whether the
+production database surfaces `P2034` the way Prisma reports it.
 
 ## 6. Carried-forward backend findings (not re-verified in this pass)
 
@@ -201,5 +226,8 @@ covered by `tests/admin-backup-codes.test.ts`.
 
 - `docs/pre-launch-checklist.md` — the coupon item records this fix and why the constraint
   was rejected
-- `docs/quality-gates.md` — does **not** yet list `tests/wallet-coupon-race.test.ts` in its
-  gate table; that table is now incomplete
+- `docs/quality-gates.md` — lists this work as gate `W`, and
+  `tests/coupon-cap-concurrency.test.ts` as `CC` (flagged as not yet in CI). The gate
+  inventory is itself enforced by `tests/quality-gates-coverage.test.ts`, which fails if any
+  file under the test tree is undocumented, if the doc cites a file that no longer exists, or
+  if the overview table's columns disagree.
