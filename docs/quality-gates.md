@@ -185,7 +185,7 @@ Playwright เลือก target ตาม `E2E_BASE_URL` > localhost:4200 (dev
 - **5 เคส:** กดบันทึกโดยไม่ใส่เลขอ้างอิงเกตเวย์ → error ชัดเจนและ **ไม่มีอะไรเขียนลง DB** · บันทึกจริง (เว้นว่างยอด = ยอดรวม ซึ่งเคยพังเป็นส่ง `0`) · ออเดอร์ที่คืนแล้วซ่อนฟอร์มคืนเงินแต่ยังเหลือปุ่ม resend · resend รายงานว่า**ส่งไม่สำเร็จ**และไม่มีข้อความอ้างว่าส่งแล้ว · ยิง refund ซ้ำที่ endpoint เดิม → 409 `ALREADY_REFUNDED` และยังมีแถวเดียว
 - **leg ของ resend คือ “ความล้มเหลวอย่างซื่อสัตย์”:** job นี้ตั้งใจไม่มี `NK_RESEND_API_KEY` และ `lib/email/resend.ts` fail-closed (audit #2) — ถ้าตั้ง key จริงในอนาคต เคสนี้จะ skip อัตโนมัติแทนที่จะเดา การคืนเงินที่ไม่มีผู้ให้บริการเมลถือว่าผ่านได้เพราะ**ไม่มีการโกหกว่าส่งสำเร็จ** ซึ่งคือสิ่งที่ต้องกันไว้มากกว่า
 - **หมายเหตุ:** `sendEmailWithRetry` เดิน backoff 2s/4s/8s ตอนไม่มี credential (config error retry ไม่มีทางหาย) — ขานี้จึงใช้ timeout 60s และเวลารันเพิ่มราว 11s ต่อครั้ง
-- **สถานะการรัน:** เขียนแล้วยัง**ไม่เคยรันจริง** — เครื่อง dev นี้ไม่มี Postgres/Docker (ดูหัวข้อ CC) ยืนยันได้แค่ `tsc`, eslint, `playwright --list` (เจอครบ 5 เคส) และ seed script ผ่าน `node --check` การรันครั้งแรกจริง ๆ คือ job Browser Smoke ใน CI ซึ่งมี Postgres + production build — **อย่านับว่าผ่านจนกว่าจะเห็นผลรันในนั้น** เครื่องก่อน push
+- **สถานะการรัน:** **รันผ่านแล้วใน CI** — run #90 (`70fb2e9`, 2026-10-03) ผ่านทุก step ของ job Browser Smoke รวมถึง `Seed management smoke fixtures` (fixture `RFND01` ใหม่) และ `Run browser smoke tests` บน production build + Postgres จริง ก่อนหน้านั้นยืนยันได้แค่ `tsc` / eslint / `playwright --list` / `node --check` เพราะเครื่อง dev ไม่มี Docker (ดูหัวข้อ CC) — **ยังรันในเครื่องนี้ไม่ได้** ถ้าแก้ spec ต้องดูผลจาก CI รอบถัดไปด้วยเสมอ
 
 ---
 
