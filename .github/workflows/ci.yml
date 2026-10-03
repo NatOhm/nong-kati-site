@@ -159,7 +159,6 @@ jobs:
     env:
       DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
       NK_JWT_SECRET: ci-test-secret-0123456789abcdef0123456789abcdef
-      NK_ENCRYPTION_KEY: ci-test-encryption-key-32bytes!!
       NK_GIFT_CODE_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
       NK_OTP_DEV_MODE: '1'
       NEXT_PUBLIC_SITE_URL: http://127.0.0.1:4200
@@ -227,7 +226,6 @@ jobs:
       GIT_SHA: ${{ github.sha }}
       GIT_REF: ${{ github.ref_name }}
       NK_JWT_SECRET: ci-test-secret-0123456789abcdef0123456789abcdef
-      NK_ENCRYPTION_KEY: ci-test-encryption-key-32bytes!!
       NK_GIFT_CODE_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4 (pinned)
@@ -389,7 +387,6 @@ jobs:
           # 14 characters and src/lib/jwt.ts refuses to sign with anything
           # under 32 — a throw this job only avoided by never reaching it.
           NK_JWT_SECRET: ci-test-secret-0123456789abcdef0123456789abcdef
-          NK_ENCRYPTION_KEY: ci-test-encryption-key-32bytes!!
           NK_CSP_REPORT_ONLY: 'true'
           # Prerendering never queries these — CI has no database.
           DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
