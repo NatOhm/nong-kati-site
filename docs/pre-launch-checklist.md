@@ -231,13 +231,22 @@ Consolidated from:
         ส่งอีเมลยืนยันซ้ำ ใช้ `sendOrderConfirmationEmail` ตัวเดียวกับฝั่ง
         ลูกค้า (แยก logic ไว้ที่เดียว ไม่ให้ drift); ไม่มี email-match check เพราะ
         ผู้เรียกถือ permission แล้ว และปลายทางคือ `customerEmail` ของออเดอร์เสมอ
-        — ยัง**ไม่มีปุ่มใน UI** ต้องเพิ่มต่อ
+        — มีปุ่มใน UI แล้วที่ order detail modal ของหลังบ้าน (ปุ่ม resend โผล่เฉพาะ
+        order ที่ `completed`/`refunded`)
       - ทั้งสอง route อยู่ใน `ROUTE_COVERAGE` แล้ว (authz matrix เช็คทุก role)
       - เทสต์ `admin-refund` 15 เคส เขียว + ยืนยันด้วย mutation (ถอด `tx`
         ออกจาก audit แล้วแดง, ถอด `Serializable` แล้วแดง)
-      - ฝั่ง **ลูกค้า** `POST /orders/:id/resend-email` ยังไม่มี route และ
-        **ยังไม่มี rate limit จริง** (doc comment เขียนว่า 3 ครั้ง/ชม. แต่ body
-        ไม่มี) — ห้าม mount จนกว่าจะเพิ่ม rate limit
+      - ฝั่ง **ลูกค้า** `POST /orders/:id/resend-email` **ยังไม่มี route** แต่ตัว
+        implementation มี rate limit จริงแล้ว (2026-10-03): `resendOrderEmail`
+        บังคับ 3 ครั้ง **ต่อ order** ต่อชั่วโมง และ check **หลัง** ยืนยันอีเมล
+        ตรงกับออเดอร์ — ถ้าสลับลำดับ ผู้โจมตีที่เดา orderId จะกินโควตาของ
+        เจ้าของจนลูกค้าจริงติดล็อก (เทสต์ `customer-resend-rate-limit`
+        assert เคสนี้ตรง ๆ)
+      - **ที่ยังต้องเพิ่มตอน mount route:** per-IP limit (key ด้วย
+        `getClientIp(req)`) ตาม pattern ของ magic-link / forgot-password —
+        cap ต่อ order กันการยิงซ้ำไป order เดิมไม่ได้ ยังกันการกระจายยิง
+        หลาย order จาก IP เดียวไม่ได้; และ route ต้องแปลง `RATE_LIMITED`
+        เป็น 429 พร้อม header `Retry-After` จาก `retryAfterSec`
 - [ ] CSV code upload pipeline works (parse → dedup → encrypt → insert) —
       upload route exists (`/api/v1/admin/upload`); end-to-end CSV run not
       exercised this pass

@@ -32,6 +32,7 @@
 | CF    | Client-feedback round 2 (out-of-stock, CSP blob:, Slip2Go) | `tests/client-feedback-fixes.test.ts` | `npm test` (vitest) | Unit Tests             |
 | Q1    | This inventory itself — every tests/ file is documented | `tests/quality-gates-coverage.test.ts` | `npm test` (vitest) | Unit Tests             |
 | RF    | Admin refund — authz, validation, atomic Refund+void+audit | `tests/admin-refund.test.ts`       | `npm test` (vitest)  | Unit Tests             |
+| RL    | Customer resend-email cap (3/order/hour, no quota burn on a failed email match) | `tests/customer-resend-rate-limit.test.ts` | `npm test` (vitest) | Unit Tests |
 | CC    | Coupon cap under REAL concurrency (8 simultaneous claims) | `tests/coupon-cap-concurrency.test.ts` | vitest + live server | **(ยังไม่ต่อ CI — ดูหัวข้อข้างล่าง)** |
 | E1    | Disabled-state affordance (WCAG 1.4.1)                | `e2e/disabled-state.spec.ts`       | `npm run test:e2e`   | (local/preview)        |
 | E2    | No hardcoded white in dark mode                       | `e2e/no-hardcoded-white.spec.ts`   | `npm run test:e2e`   | (local/preview)        |
@@ -307,13 +308,23 @@ Test: 14 เคส + static guards (ไม่มี inline script ใน layout,
 - **ทำไมต้อง 8 ไม่ใช่ 2:** request 2 อันอาจ serialize กันเองโดยธรรมชาติ — อันหลังจะเห็นแถว redemption ของอันแรกแล้วถูกปฏิเสธถูกต้อง **แม้โค้ดยังไม่ได้แก้** เทสต์แบบนั้นผ่านได้เปล่าๆ 8 อันที่ค้างพร้อมกันทำให้เกิด overlap แทบจำเป็น ซึ่งคือสิ่งที่ให้ assert นี้อำนาจจับ regression ได้จริง
 - **stock ตั้งสูงกว่าจำนวน contender ตั้งใจ:** `pay-wallet` fulfil แบบ strict ถ้าของขาดจะได้ `INSUFFICIENT_STOCK` มาบังโค้ด coupon ที่เรากำลังจะ assert
 - **ต้องมีอะไร:** dev server + Postgres จริง (`NK_TEST_BASE_URL`) — ไม่มีก็ skip เงียบๆ เหมือน `admin-concurrency.test.ts` ไม่ทำให้ `npm test` แดง
+## Customer resend-email — 3 per order per hour (2026-10-03) — `tests/customer-resend-rate-limit.test.ts`
+
+`resendOrderEmail` มี doc comment สัญญาว่า “3 resends per order per hour” มานานแล้ว แต่ body ไม่ได้ enforce อะไรเลย — เดินจาก order lookup ไปหยุดที่ provider ทันที ถ้า mount เป็น route จริงคือ endpoint ส่งอีเมลไม่จำกัด และแย่กว่านั้นคือเป็น **amplification**: ใครก็ตามที่รู้ orderId ก็สั่งให้อีเมลลูกค้าถูกยิงซ้ำได้เรื่อย ๆ
+
+- **สิ่งที่สำคัญที่สุดคือ “ลำดับ” ไม่ใช่ตัวเลข:** quota ที่ check **ก่อน** ยืนยันอีเมล เป็นอาวุธ — ผู้โจมตีที่เดา orderId จะกินโควตาของเจ้าของจนหมด แล้วลูกค้าของจริงก็ติดล็อกตาม เคสนี้จึง assert เป็น “ยิงผิดอีเมล 10 ครั้ง โควตาของเจ้าของยังครบ 3” ไม่ใช่แค่ assert ว่า block ครบ 3
+- **ใช้ limiter ตัวจริงจาก `lib/rateLimit`** (ไม่ใช้ counter เขียนเอง) เทสต์จึงพิสูจน์ code path เดียวกับที่ route จะใช้
+- **`retryAfterSec` คือ “จำนวนวินาที” ไม่ใช่ epoch-ms** — `checkRateLimit` คืน `resetAt` มาเป็น timestamp ถ้าส่งตรง ๆ client จะถูกบอกให้รอ ~1.8 ล้านล้านวินาที (เทสต์จับได้: `toBeLessThanOrEqual(3600)` แดงทันทีถ้าแก้กลับไปส่ง `resetAt` ดิบ)
+- **admin path ไม่โดนจำกัด** — route หลังบ้านเรียก `sendOrderConfirmationEmail` ตรง ๆ (ไม่ผ่าน `resendOrderEmail`) เพราะผู้ดูแลที่กำลังแก้ปัญหาส่งไม่ถูกคุม และจุดนี้ทำให้ admin กับ customer ไม่แชร์โควตากัน
+- **ที่ยังต้องเติมที่ route:** cap ต่อ order กันการยิงซ้ำไป order เดิมไม่ได้ ยังต้องมี per-IP limit (key ด้วย `getClientIp(req)`) ตาม pattern ของ magic-link / forgot-password ไม่งั้นยิงกระจายหลาย order จาก IP เดียวได้
+
 ## CI pipeline (`.github/workflows/ci.yml`)
 
 | Job                         | ทำอะไร                                                                  | ผูกกับ gate                                                                                                    |
 | --------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
 | Lint & Typecheck            | `eslint .` + `tsc --noEmit`                                             | —                                                                                                              |
 | Security Audit              | `npm audit --audit-level=high` (blocking)                               | —                                                                                                              |
-| Unit Tests                  | `npm test` (vitest ~311 เคส)                                          | R1–R6, authz matrix, PII, outbox, backup codes, recovery, Omise real, JSON-LD XSS (concurrency skip อัตโนมัติ) |
+| Unit Tests                  | `npm test` (vitest ~332 เคส)                                          | R1–R6, authz matrix, PII, outbox, backup codes, recovery, Omise real, JSON-LD XSS (concurrency skip อัตโนมัติ) |
 | Concurrency (DB races)      | Postgres 16 service + migrate + `next dev -p 4200` + `NK_TEST_BASE_URL` | Concurrency                                                                                                    |
 | Browser Smoke (CSP + checkout) | Postgres 16 + migrate + seed สินค้า/ช่องทางโอน + seed management fixture (admin+TOTP / stranded order / codes) + **prod build** `next start` + Playwright (`e2e/smoke.spec.ts` + `e2e/management.spec.ts`) — ฝั่งร้าน: หน้าแรกโหลดใต้ CSP nonce จริง + hydrate, prerendered routes ต้องมี inline script ครบ nonce, guest checkout ถึง order `pending_payment` ที่ลิงก์ confirmation เปิดได้, `/api/v1/version` ต้องรายงาน SHA ของ commit ที่ทดสอบ — ฝั่งหลังบ้าน: admin login ด้วย TOTP จริง → หน้า reconciliation → rerun-fulfilment ซ่อมออเดอร์ที่เงินเข้าแต่ค้างส่งมอบจน `completed` + ปิดรับ rerun ซ้ำ (ALREADY_SETTLED) | §6/§7/§8 smoke สุดท้าย |
 | Build                       | `next build` ด้วย env ปลอม                                              | —                                                                                                              |
