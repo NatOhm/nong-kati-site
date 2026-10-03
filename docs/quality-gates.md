@@ -9,10 +9,29 @@
 ## ภาพรวม
 
 | #     | Gate                                                  | ไฟล์ test                          | ตัวรัน               | CI job                 |
-| ----- | ----------------------------------------------------- | ---------------------------------- | -------------------- | ---------------------- | --- | --- | ---------------------------------------- | --------------------------------- | ---------- | ---------- |
+| ----- | ----------------------------------------------------- | ---------------------------------- | -------------------- | ---------------------- |
 | R1–R6 | Design-token / duplicate-ID (static source scan)      | `tests/design-token-gates.test.ts` | `npm test` (vitest)  | Unit Tests             |
-| A     | Admin authz matrix (53 endpoints × no-auth + 6 roles) | `tests/admin-authz-matrix.test.ts` | `npm test`           | Unit Tests             |     | P   | PII masking (permission-scoped response) | `tests/admin-pii-masking.test.ts` | `npm test` | Unit Tests |
+| A     | Admin authz matrix (53 endpoints × no-auth + 6 roles) | `tests/admin-authz-matrix.test.ts` | `npm test`           | Unit Tests             |
+| P     | PII masking (permission-scoped response)              | `tests/admin-pii-masking.test.ts`  | `npm test`           | Unit Tests             |
+| W     | Coupon per-customer cap, wallet path (Serializable + P2034 retry) | `tests/wallet-coupon-race.test.ts` | `npm test` (vitest) | Unit Tests |
 | C     | Concurrency (DB races — refresh CAS, lockout)         | `tests/admin-concurrency.test.ts`  | vitest + live server | Concurrency (DB races) |
+| S1    | Admin auth-mutation CSRF (origin + double-submit)      | `tests/admin-csrf.test.ts`          | `npm test` (vitest)  | Unit Tests             |
+| S2    | Webhook signature length-safe + production review fixes | `tests/security-fixes.test.ts`     | `npm test` (vitest)  | Unit Tests             |
+| S3    | Secrets fail closed in prod, entropy floor, magic-link deliverability | `tests/security-remediations.test.ts` | `npm test` (vitest) | Unit Tests |
+| S4    | Same-origin redirect sanitiser                        | `tests/safe-redirect.test.ts`       | `npm test` (vitest)  | Unit Tests             |
+| I1    | Identity hardening (logout invalidation, atomic fail counters, PDPA persist) | `tests/identity-hardening.test.ts` | `npm test` (vitest) | Unit Tests             |
+| I2    | Lockout / lockout-expiry boundaries                   | `tests/lockout-expiry.test.ts`     | `npm test` (vitest)  | Unit Tests             |
+| PR    | Password reset — single-use token claim, revocation    | `tests/password-reset.test.ts`     | `npm test` (vitest)  | Unit Tests             |
+| O1    | Phone OTP sign-in (pure logic, no DB/network)          | `tests/phone-otp.test.ts`          | `npm test` (vitest)  | Unit Tests             |
+| M1    | Manual-transfer settings validator (incl. bank-QR URL allowlist) | `tests/manual-transfer-settings.test.ts` | `npm test` (vitest) | Unit Tests             |
+| AE    | Admin email test — fake SMTP + SSRF guard             | `tests/admin-email-test.test.ts`    | `npm test` (vitest)  | Unit Tests             |
+| SA    | Staff audit hardening (crypto temp password, tx-scoped audit) | `tests/staff-audit-hardening.test.ts` | `npm test` (vitest) | Unit Tests             |
+| X1    | JSON-LD XSS escaping                                  | `tests/jsonld-xss.test.ts`         | `npm test` (vitest)  | Unit Tests             |
+| D1    | Client-doc drift — 20 gates over 4 docs               | `tests/client-docs-consistency.test.ts` | `npm test` (vitest) | doc-consistency        |
+| F1    | E2E fixture images are real, complete, non-degenerate | `tests/test-fixture-images.test.ts` | `npm test` (vitest)  | Unit Tests             |
+| CF    | Client-feedback round 2 (out-of-stock, CSP blob:, Slip2Go) | `tests/client-feedback-fixes.test.ts` | `npm test` (vitest) | Unit Tests             |
+| Q1    | This inventory itself — every tests/ file is documented | `tests/quality-gates-coverage.test.ts` | `npm test` (vitest) | Unit Tests             |
+| CC    | Coupon cap under REAL concurrency (8 simultaneous claims) | `tests/coupon-cap-concurrency.test.ts` | vitest + live server | **(ยังไม่ต่อ CI — ดูหัวข้อข้างล่าง)** |
 | E1    | Disabled-state affordance (WCAG 1.4.1)                | `e2e/disabled-state.spec.ts`       | `npm run test:e2e`   | (local/preview)        |
 | E2    | No hardcoded white in dark mode                       | `e2e/no-hardcoded-white.spec.ts`   | `npm run test:e2e`   | (local/preview)        |
 | E3    | Duplicate DOM ids (ทั้งไซต์ผ่าน sitemap)              | `e2e/duplicate-ids.spec.ts`        | `npm run test:e2e`   | (local/preview)        |
@@ -270,6 +289,23 @@ Test: 14 เคส + static guards (ไม่มี inline script ใน layout,
   - INSUFFICIENT_STOCK → recovery park ที่ awaited+verified (ตาม audit #4); recovery พัง → evidence ใหม่ผ่าน `recordPaymentReconciliation` + 500 `RECONCILIATION_REQUIRED`; ความล้มเหลวอื่น → evidence + 500 `RERUN_FAILED` — ไม่มี success ปลอมแม้แต่บรรทัดเดียว
 - **เคส regression (11):** gate 401/403/404, ALREADY_SETTLED/UNEXPECTED_STATUS ไม่แตะ fulfilment, happy path (ส่งมอบ 2 โค้ด + settle + drain), resume ไม่ re-settle, race แพ้รายงานสถานะจริง, stock ไม่พอ → park กลับ, park พัง → evidence+500, unexpected → evidence+500
 
+## Coupon per-customer cap — wallet pay path (2026-10-03) — `tests/wallet-coupon-race.test.ts`
+
+`perCustomerLimit` เป็นค่าที่แอดมินตั้งได้ต่อคูปอง (`null` = ไม่จำกัด) และเดิมถูกenforce แบบ read-then-act ใน `claimOrderForConfirmation` (นับแถว `CouponRedemption` แล้วเทียบกับ limit) — ที่ Read Committed ลูกค้าคนเดียวกันกดจ่ายเงินกระเป๋า 2 ออเดอร์พร้อมกันจะอ่าน count เห็นค่าเดียวกันแล้วทั้งคู่ commit ได้ → เกิน `perCustomerLimit` (ต่างจาก `usageLimit` ที่ปลอดภัยเพราะใช้ conditional update เป็น atomic guard)
+
+- **ทางแก้:** `pay-wallet` รัน transaction ที่ `isolationLevel: 'Serializable'` และ retry เมื่อเจอ P2034 (`runWalletPayment`, mirror `runStaffMutation` ใน `api/adminStaff.ts`) — เป็นจุด claim แบบ strict จุดเดียวที่ยังเป็น Read Committed; call site อีก 6 จุดเป็น `paidExternally` (soft — cap แค่ log ไม่ throw) หรือ Serializable อยู่แล้ว
+- **gate 5 เคส:** transaction ขอ Serializable · P2034 ถูก retry แล้วคืนผลของรอบที่ retry · error ที่ไม่ใช่ P2034 ไม่ถูก retry · P2034 ครบ 3 รอบแล้วหยุด (ไม่วนไม่จบ) · balance guard ยังมาก่อน coupon check เสมอ · retry แล้วห้ามหักเงินซ้ำ (`customer.updateMany` + `topUpLog.create` รันครั้งเดียว)
+- **ไม่ได้ใช้ `@@unique([couponId, customerId])`:** constraint อ่านค่า `perCustomerLimit` ไม่ได้ จึงกด cap ทุกคูปองให้เหลือ 1 และ error จะถูก catch ที่ `orders.ts:540` กลืนเป็น idempotent retry — cap จะผ่านโดยไม่มีใครรู้ตัว
+- **ข้อจำกัดที่ต้องรู้:** เทสต์นี้ mock prisma จึงพิสูจน์แค่ "route ขอ Serializable + retry ถูก" **ไม่ได้** พิสูจน์ว่า DB serialize จริง — ต้องมี real-Postgres test ถึงจะปิด gap นี้
+## Coupon per-customer cap — REAL Postgres (2026-10-03) — `tests/coupon-cap-concurrency.test.ts`
+
+> **สถานะ: ยังไม่เคยรัน และยังไม่ได้ต่อเข้า CI.** เขียนขึ้นเพื่อปิด gap ที่ W ทิ้งไว้ (เทสต์ W mock prisma จึงพิสูจน์ได้แค่ว่า route "ขอ" Serializable — ไม่ได้พิสูจน์ว่า DB serialize จริง) แต่ยังไม่เคย execute แม้แต่ครั้งเดียว เพราะเครื่อง dev นี้ไม่มี Postgres (Docker daemon ไม่ทำงาน) — **อย่าคิดว่าผ่านจนกว่าจะเห็นผลรันจริง** รายการ gate จึงเขียนกำกับว่ายังไม่ต่อ CI โดยเจตนา การใส่เข้า job `Concurrency (DB races)` ต้องรันเขียวก่อน เพราะ job นั้นอยู่ใน `needs` ของ Build
+
+- **ทำอะไร:** ยิง `POST /api/v1/orders/[id]/pay-wallet` พร้อมกัน **8 request** โดยลูกค้า **คนเดียว** กดจ่ายคูปองเดียวที่ `perCustomerLimit = 1` แล้วยืนยันว่า cap ถูกบังคับจริงบน DB จริง
+- **assert:** สำเร็จพอดี 1 · อีก 7 ต้องได้ 409 `COUPON_PER_CUSTOMER_LIMIT` (code เดียวกับที่ checkout UI ใช้ fallback ไป PromptPay โดยไม่ใช้คูปอง) · `CouponRedemption` มี 1 แถว · `usageCount` = 1 · `TopUpLog` แบบ `wallet_spend` มี 1 แถว · wallet ถูกหักครั้งเดียวเท่ายอด 1 ออเดอร์ · ออเดอร์ที่ไม่ผ่านต้องกลับเป็น `pending_payment` ครบ (เงินหักแล้วทิ้งจะแย่กว่าบั๊กเดิม)
+- **ทำไมต้อง 8 ไม่ใช่ 2:** request 2 อันอาจ serialize กันเองโดยธรรมชาติ — อันหลังจะเห็นแถว redemption ของอันแรกแล้วถูกปฏิเสธถูกต้อง **แม้โค้ดยังไม่ได้แก้** เทสต์แบบนั้นผ่านได้เปล่าๆ 8 อันที่ค้างพร้อมกันทำให้เกิด overlap แทบจำเป็น ซึ่งคือสิ่งที่ให้ assert นี้อำนาจจับ regression ได้จริง
+- **stock ตั้งสูงกว่าจำนวน contender ตั้งใจ:** `pay-wallet` fulfil แบบ strict ถ้าของขาดจะได้ `INSUFFICIENT_STOCK` มาบังโค้ด coupon ที่เรากำลังจะ assert
+- **ต้องมีอะไร:** dev server + Postgres จริง (`NK_TEST_BASE_URL`) — ไม่มีก็ skip เงียบๆ เหมือน `admin-concurrency.test.ts` ไม่ทำให้ `npm test` แดง
 ## CI pipeline (`.github/workflows/ci.yml`)
 
 | Job                         | ทำอะไร                                                                  | ผูกกับ gate                                                                                                    |
