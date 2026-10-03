@@ -303,7 +303,10 @@ jobs:
       - run: npm run build
         env:
           NEXT_PUBLIC_SITE_URL: http://localhost:3000
-          NK_JWT_SECRET: ci-test-secret
+          # Same value the other jobs use. The previous `ci-test-secret` was
+          # 14 characters and src/lib/jwt.ts refuses to sign with anything
+          # under 32 — a throw this job only avoided by never reaching it.
+          NK_JWT_SECRET: ci-test-secret-0123456789abcdef0123456789abcdef
           NK_ENCRYPTION_KEY: ci-test-encryption-key-32bytes!!
           NK_CSP_REPORT_ONLY: 'true'
           # Prerendering never queries these — CI has no database.
