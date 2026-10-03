@@ -10,6 +10,15 @@
 import { getOrderByNumber, getOrderById, type Order } from './orders';
 import { sendEmailWithRetry } from '@/lib/email/resend';
 import { orderConfirmationTemplate } from '@/lib/email/templates';
+import { checkRateLimit, type RateLimitRule } from '@/lib/rateLimit';
+
+/** 3 resends per order per hour — the documented cap for 07-api.md §10. */
+const RESEND_LIMIT: RateLimitRule = {
+  route: '_order_resend',
+  maxRequests: 3,
+  windowMs: 3_600_000,
+  keyBy: 'order',
+};
 
 export interface OrderLookupResult {
   success: boolean;
@@ -44,12 +53,13 @@ export async function lookupOrder(email: string, orderNumber: string): Promise<O
  * 07-api.md §10 — POST /orders/:id/resend-email
  *
  * AC-005: Validates email matches order's original email.
- * Rate limited: 3 resends per order per hour.
+ * Rate limited: 3 resends per order per hour (enforced below, keyed on the
+ * order — see the note at the check for why it runs after the email match).
  */
 export async function resendOrderEmail(
   orderId: string,
   email: string,
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; retryAfterSec?: number }> {
   const order = await getOrderById(orderId);
   if (!order) {
     return { success: false, error: 'NOT_FOUND' };
@@ -60,6 +70,20 @@ export async function resendOrderEmail(
     return { success: false, error: 'NOT_FOUND' };
   }
 
+  // 3 resends per ORDER per hour — the limit this function's doc comment has
+  // always claimed. Deliberately AFTER the email-match check: keyed on the
+  // order it is the owner's quota, and checking it first would let anyone who
+  // guessed an orderId exhaust it and lock the real customer out.
+  const rl = await checkRateLimit('_order_resend', orderId, RESEND_LIMIT);
+  if (!rl.allowed) {
+    // resetAt is an epoch-ms timestamp; the caller wants a seconds count for
+    // the Retry-After header, same conversion lib/rateLimit.ts uses.
+    return {
+      success: false,
+      error: 'RATE_LIMITED',
+      retryAfterSec: Math.max(0, Math.ceil((rl.resetAt - Date.now()) / 1000)),
+    };
+  }
   return sendOrderConfirmationEmail(order);
 }
 
@@ -71,10 +95,13 @@ export async function resendOrderEmail(
  * contains and how it is retried — a second copy would drift silently.
  *
  * The admin path is permission-gated and low-frequency, so it needs no
- * per-sender rate limit. The CUSTOMER path does: `resendOrderEmail` above is
- * documented as "3 resends per order per hour" but NO rate limit is
- * implemented in its body — do not mount a customer-facing resend route from
- * this helper until that is added.
+ * per-sender rate limit. The CUSTOMER path does, and now enforces it:
+ * `resendOrderEmail` applies the 3-per-order-per-hour cap itself.
+ *
+ * A route mounting the customer path must STILL add a per-IP limit keyed on
+ * getClientIp(req) — the per-order cap bounds one order, not the spray
+ * across many orders from one address. Follow the two-check pattern used by
+ * magic-link and forgot-password.
  */
 export async function sendOrderConfirmationEmail(
   order: Order,

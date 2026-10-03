@@ -14,7 +14,9 @@ export type RateLimitRule = {
   route: string;
   maxRequests: number;
   windowMs: number;
-  keyBy: 'ip' | 'email';
+  // Documents what `identifier` is, for the reader — the key is built from
+  // the identifier the call site passes, not from this field.
+  keyBy: 'ip' | 'email' | 'order';
 };
 
 export const RATE_LIMIT_RULES: RateLimitRule[] = [
