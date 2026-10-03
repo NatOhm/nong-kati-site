@@ -69,13 +69,25 @@ jobs:
       - name: Check production health
         id: check
         run: |
+          # GitHub's default shell runs with `bash -e`, so a failing pipeline
+          # aborts the step AT that line. Reading ${PIPESTATUS[0]} and writing
+          # the output afterwards therefore never ran — the step went red (which
+          # is what we want) but `steps.check.outputs.exit_code` was silently
+          # always empty. Verified by replaying this block locally.
+          #
+          # So suspend errexit around the pipeline, record the real exit code,
+          # then restore it and exit with that code. Do NOT "simplify" this back
+          # to a bare pipeline: the annotation step is the only thing that makes
+          # a red run legible.
           set -o pipefail
+          set +e
           node scripts/monitor-health.mjs \
             --url https://nongkatistore.com \
             --state .prod-health/state.json \
             --history .prod-health/history.ndjson \
             --webhook "$PRODUCTION_ALERT_WEBHOOK" 2>&1 | tee monitor.log
           status=${PIPESTATUS[0]}
+          set -e
           echo "exit_code=$status" >> "$GITHUB_OUTPUT"
           exit $status
 
@@ -85,6 +97,7 @@ jobs:
           # Without this the run is just "Process completed with exit code 1",
           # which is the same message for "site is down", "network hiccup" and
           # "the monitor is misconfigured". Name the actual verdict.
+          echo "monitor exited: ${{ steps.check.outputs.exit_code || 'unknown' }}"
           if [ ! -s monitor.log ]; then
             echo "::error title=production monitor produced no output::the monitor died before reporting — likely a runner-level kill. Nothing about production can be concluded from this run."
             exit 0
