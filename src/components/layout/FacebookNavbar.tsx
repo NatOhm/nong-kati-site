@@ -78,12 +78,12 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
             viewport — the widest cluster still fits from lg up. */}
         <div className="mx-auto flex h-14 items-center justify-between overflow-hidden px-4 md:h-16 md:px-6">
           {/* Left: Logo + Search */}
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             {/* Mobile menu button - opens sidebar drawer.
                 Audit #8: ≥44×44 hit area (icon stays 22px). */}
             <button
               onClick={onMenuToggle}
-              className="clay-btn transition-smart flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg text-fg-muted duration-interactive ease-ease-out hover:-translate-y-0.5 hover:text-fg-brand active:translate-y-0 active:scale-95 active:shadow-clay-press lg:hidden"
+              className="clay-btn transition-smart flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg text-fg-muted duration-interactive ease-ease-out hover:-translate-y-0.5 hover:text-fg-brand active:translate-y-0 active:scale-95 active:shadow-clay-press xl:hidden"
               aria-label="เปิดเมนู"
             >
               <Menu size={22} />
@@ -95,7 +95,7 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
             <Link
               href="/"
               aria-label="Nong-Kati หน้าหลัก"
-              className="group flex min-h-[44px] items-center gap-2"
+              className="group flex min-h-[44px] shrink-0 items-center gap-2"
             >
               <span className="block rounded-full shadow-clay-sm transition-transform duration-interactive ease-spring group-hover:scale-110 group-active:scale-95">
                 <HamsterFace size={40} />
@@ -111,13 +111,13 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
             <form
               onSubmit={handleSearch}
               className={cn(
-                'relative hidden md:block',
+                'relative hidden min-w-0 md:block',
                 pathname?.startsWith('/search') && 'md:hidden',
               )}
             >
               <div
                 className={cn(
-                  'shadow-inset-sm group/search transition-smart relative flex items-center gap-2 rounded-full border bg-surface-elevated px-3 py-2 duration-interactive ease-ease-out',
+                  'shadow-inset-sm group/search transition-smart relative flex min-w-0 items-center gap-2 rounded-full border bg-surface-elevated px-3 py-2 duration-interactive ease-ease-out',
                   searchFocused
                     ? 'border-peach-500 shadow-clay-sm'
                     : 'border-line hover:border-line-strong',
@@ -150,7 +150,7 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
                   onKeyDown={(e) => {
                     if (e.key === 'Escape') setSuggestions([]);
                   }}
-                  className="w-48 bg-transparent text-sm text-fg placeholder:text-fg-muted lg:w-64"
+                  className="w-48 min-w-0 flex-1 bg-transparent text-sm text-fg placeholder:text-fg-muted lg:w-64 xl:w-56"
                 />
               </div>
 
@@ -186,8 +186,16 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
             </form>
           </div>
 
-          {/* Center: Navigation text links — client ask (ข้อความแทนไอคอน) */}
-          <nav className="hidden items-center gap-1 md:flex" aria-label="เมนูหลัก">
+          {/* Center: Navigation text links — client ask (ข้อความแทนไอคอน).
+              xl, not md: measured, the three clusters need ~1180px to coexist
+              without squeezing. Below that a shrinking flex child crushed these
+              Thai labels to one glyph per line (audit 2026-10-03). Between md
+              and xl the drawer (hamburger above) carries the same links.
+              shrink-0 + whitespace-nowrap keep every label on one line. */}
+          <nav
+            className="hidden shrink-0 items-center gap-1 xl:flex"
+            aria-label="เมนูหลัก"
+          >
             {NAV_ITEMS.map((item) => {
               const isActive =
                 item.href === '/search'
@@ -198,7 +206,7 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    'transition-smart relative rounded-xl px-4 py-2.5 text-sm font-semibold duration-interactive ease-ease-out',
+                    'transition-smart relative shrink-0 whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-semibold duration-interactive ease-ease-out',
                     isActive
                       ? // Same active treatment as the sidebar: the fixed peach-100
                         // needs dark overrides — text-fg-brand-strong flips light in
@@ -216,8 +224,9 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
 
           {/* Right: Actions — on phones only the cart stays here; account,
               notifications and support live in the sidebar + bottom taskbar,
-              so the bar doesn't crowd. From md up everything fits. */}
-          <div className="flex items-center gap-1">
+              so the bar doesn't crowd. From md up everything fits. shrink-0 so
+              the action cluster never gives up width to the nav (see above). */}
+          <div className="flex shrink-0 items-center gap-1">
             {/* Cart — opens cart drawer */}
             <CartIcon count={itemCount} onClick={() => setCartOpen(true)} />
 

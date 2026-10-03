@@ -35,6 +35,7 @@
 | RL    | Customer resend-email cap (3/order/hour, no quota burn on a failed email match) | `tests/customer-resend-rate-limit.test.ts` | `npm test` (vitest) | Unit Tests |
 | AR    | Admin resend-email — error contract (EMAIL_SEND_FAILED, not a transport string) | `tests/admin-resend-email.test.ts` | `npm test` (vitest) | Unit Tests |
 | CE    | CI env secrets meet the minimums the code enforces | `tests/ci-env-secrets.test.ts`   | `npm test` (vitest)  | Unit Tests             |
+| NB    | Navbar layout — nav keeps natural width, search yields (no one-glyph-per-line Thai) | `tests/navbar-layout-gates.test.ts` | `npm test` (vitest) | Unit Tests             |
 | CC    | Coupon cap under REAL concurrency (8 simultaneous claims) | `tests/coupon-cap-concurrency.test.ts` | vitest + live server | **(ยังไม่ต่อ CI — ดูหัวข้อข้างล่าง)** |
 | E1    | Disabled-state affordance (WCAG 1.4.1)                | `e2e/disabled-state.spec.ts`       | `npm run test:e2e`   | (local/preview)        |
 | E2    | No hardcoded white in dark mode                       | `e2e/no-hardcoded-white.spec.ts`   | `npm run test:e2e`   | (local/preview)        |

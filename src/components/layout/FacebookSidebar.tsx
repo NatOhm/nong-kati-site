@@ -13,6 +13,8 @@ import {
   Gamepad2,
   Music,
   Scissors,
+  Heart,
+  Sparkles,
   X,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
@@ -22,6 +24,11 @@ import { useState, useEffect, useRef, useCallback, type MouseEventHandler } from
 const NAV_ITEMS = [
   { icon: Home, href: '/', label: 'หน้าหลัก', color: 'text-fg-brand' },
   { icon: Grid3X3, href: '/search', label: 'สินค้าทั้งหมด', color: 'text-sapphire-400' },
+  // Below xl the header text links are hidden (navbar width budget), so the
+  // drawer has to carry them — otherwise these two pages are unreachable
+  // on tablets and small laptops. Mirrors NAV_ITEMS in FacebookNavbar.tsx.
+  { icon: Sparkles, href: '/search?sort=featured', label: 'แนะนำ', color: 'text-peach-500' },
+  { icon: Heart, href: '/account/wishlist', label: 'รายการโปรด', color: 'text-peach-600' },
   { icon: Tv, href: '/category/movie-series', label: 'ดูหนัง/ซีรีส์', color: 'text-coral-500' },
   { icon: Music, href: '/category/music', label: 'ดนตรี', color: 'text-pink-400' },
   { icon: Gamepad2, href: '/category/chinese-apps', label: 'แอปจีน', color: 'text-jade-500' },
@@ -43,7 +50,10 @@ interface FacebookSidebarProps {
 function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
   const pathname = usePathname();
   const [showMore, setShowMore] = useState(false);
-  const visibleItems = showMore ? NAV_ITEMS : NAV_ITEMS.slice(0, 6);
+  // 8, not 6: the two links the header text row hides below xl (แนะนำ,
+  // รายการโปรด) now live here, and คำสั่งซื้อ must not get pushed behind
+  // "show more" on tablets.
+  const visibleItems = showMore ? NAV_ITEMS : NAV_ITEMS.slice(0, 8);
 
   // Close drawer on navigation (mobile). Track the previous path so the
   // effect's mount-run is a no-op — otherwise the drawer closes itself the
