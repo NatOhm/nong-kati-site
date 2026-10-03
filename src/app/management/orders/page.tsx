@@ -89,6 +89,13 @@ export default function AdminOrdersPage(): React.JSX.Element {
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
+  const [resendingId, setResendingId] = useState<string | null>(null);
+  const [refundingId, setRefundingId] = useState<string | null>(null);
+  const [refundRef, setRefundRef] = useState('');
+  const [refundAmount, setRefundAmount] = useState('');
+  const [refundCategory, setRefundCategory] = useState('other');
+  const [refundDetail, setRefundDetail] = useState('');
+  const [refundVoidCodes, setRefundVoidCodes] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -150,6 +157,90 @@ export default function AdminOrdersPage(): React.JSX.Element {
       );
     } finally {
       setVerifyingId(null);
+    }
+  };
+  /**
+   * ส่งอีเมลยืนยันออเดอร์ซ้ำ — สำหรับกรณีเมลไม่ถึงลูกค้า.
+   * ปลายทางคืออีเมลที่บันทึกไว้กับออเดอร์เสมอ (ฝั่งเซิร์ฟเวอร์บังคับ)
+   */
+  const resendEmail = async (id: string) => {
+    setResendingId(id);
+    setActionMessage(null);
+    setActionError(null);
+    try {
+      const res = await adminJson<{ data: { sentTo: string } }>(
+        `/api/v1/admin/orders/${id}/resend-email`,
+        { method: 'POST' },
+      );
+      setActionMessage(`ส่งอีเมลยืนยันซ้ำไปที่ ${res.data.sentTo} แล้ว`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '';
+      setActionError(
+        msg.includes('FORBIDDEN') || msg.includes('INSUFFICIENT_PERMISSIONS')
+          ? 'ไม่มีสิทธิ์ส่งอีเมลซ้ำ'
+          : msg.includes('EMAIL_SEND_FAILED')
+            ? 'ส่งอีเมลไม่สำเร็จ — ผู้ให้บริการอีเมลอาจมีปัญหา'
+            : msg.includes('ORDER_NOT_FOUND')
+              ? 'ไม่พบออเดอร์นี้'
+              : 'ส่งอีเมลไม่สำเร็จ กรุณาลองใหม่',
+      );
+    } finally {
+      setResendingId(null);
+    }
+  };
+
+  /**
+   * คืนเงิน — RECORD ONLY. แอดมินกดคืนที่เกตเวย์ก่อน แล้วค่อยบันทึกที่นี่
+   * พร้อมหมายเลขอ้างอิงจากเกตเวย์ ระบบจะไม่ยิงไปเรียกเกตเวย์เอง
+   * เพื่อไม่ให้กดซ้ำแล้วคืนเงินซ้ำ
+   */
+  const submitRefund = async (id: string, totalAmountThb: number) => {
+    setRefundingId(id);
+    setActionMessage(null);
+    setActionError(null);
+    try {
+      const res = await adminJson<{ data: { codesVoided: number } }>(
+        `/api/v1/admin/orders/${id}/refund`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            gatewayRefundReference: refundRef.trim(),
+            refundAmountThb: refundAmount.trim() === '' ? totalAmountThb : Number(refundAmount),
+            reasonCategory: refundCategory,
+            reasonDetail: refundDetail.trim() || undefined,
+            voidCodes: refundVoidCodes,
+          }),
+        },
+      );
+      setActionMessage(
+        `บันทึกการคืนเงินแล้ว — void โค้ด ${res.data.codesVoided} รายการ` +
+          (refundVoidCodes ? '' : ' (ไม่ได้ void โค้ด)'),
+      );
+      setRefundRef('');
+      setRefundAmount('');
+      setRefundDetail('');
+      setSelectedOrder(null);
+      await load();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '';
+      setActionError(
+        msg.includes('GATEWAY_REF_REQUIRED')
+          ? 'ต้องกรอกหมายเลขอ้างอิงการคืนเงินจากเกตเวย์'
+          : msg.includes('REFUND_AMOUNT_EXCEEDS_ORDER')
+            ? `ยอดคืนเงินต้องไม่เกินยอดรวม (${formatThb(totalAmountThb)})`
+            : msg.includes('INVALID_REFUND_AMOUNT')
+              ? 'ยอดคืนเงินต้องเป็นตัวเลขมากกว่า 0'
+              : msg.includes('ALREADY_REFUNDED')
+                ? 'ออเดอร์นี้คืนเงินไปแล้ว'
+                : msg.includes('NOT_REFUNDABLE')
+                  ? 'คืนเงินได้เฉพาะออเดอร์ที่ส่งมอบสำเร็จแล้วเท่านั้น'
+                  : msg.includes('FORBIDDEN') || msg.includes('INSUFFICIENT_PERMISSIONS')
+                    ? 'ไม่มีสิทธิ์คืนเงิน'
+                    : 'บันทึกการคืนเงินไม่สำเร็จ กรุณาลองใหม่',
+      );
+    } finally {
+      setRefundingId(null);
     }
   };
 
@@ -431,6 +522,134 @@ export default function AdminOrdersPage(): React.JSX.Element {
                   <p className="mt-2 text-center text-xs text-fg-muted">
                     ระบบจะตัดสต๊อกและส่งโค้ดให้ลูกค้าอัตโนมัติทันทีที่ยืนยัน
                   </p>
+                </div>
+              )}
+              {(selectedOrder.status === 'completed' || selectedOrder.status === 'refunded') && (
+                <div className="mt-5 border-t border-line-subtle pt-4">
+                  <button
+                    onClick={() => void resendEmail(selectedOrder.id)}
+                    disabled={resendingId === selectedOrder.id}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-line-subtle px-4 py-2.5 text-sm font-semibold text-fg-secondary hover:bg-surface disabled:opacity-60"
+                  >
+                    <RefreshCw size={16} />
+                    {resendingId === selectedOrder.id
+                      ? 'กำลังส่ง...'
+                      : 'ส่งอีเมลยืนยันซ้ำให้ลูกค้า'}
+                  </button>
+                </div>
+              )}
+
+              {selectedOrder.status === 'completed' && (
+                <div className="mt-5 border-t border-line-subtle pt-4">
+                  <p className="text-sm font-semibold text-fg">คืนเงิน</p>
+                  <div className="mt-2 rounded-md border border-amber-300 bg-amber-500/10 p-3 text-xs text-amber-800 dark:border-amber-700/50 dark:text-amber-200">
+                    <strong>ระบบนี้บันทึกเท่านั้น</strong> — กรุณากดคืนเงินที่ หน้าเกตเวย์ก่อน
+                    แล้วใส่หมายเลขอ้างอิงจากเกตเวย์ที่นี่ ระบบจะไม่ ยิงไปเรียกเกตเวย์เอง
+                    เพื่อไม่ให้กดซ้ำแล้วคืนเงินซ้ำ
+                  </div>
+
+                  <div className="mt-3 space-y-3">
+                    <div>
+                      <label
+                        htmlFor="refund-gateway-ref"
+                        className="mb-1 block text-xs font-medium text-fg-secondary"
+                      >
+                        หมายเลขอ้างอิงจากเกตเวย์ (จำเป็น)
+                      </label>
+                      <input
+                        id="refund-gateway-ref"
+                        type="text"
+                        value={refundRef}
+                        onChange={(e) => setRefundRef(e.target.value)}
+                        placeholder="เช่น re_test_xxxxxxxxxx"
+                        className="w-full rounded-md border border-line bg-surface px-3 py-2.5 font-mono text-sm text-fg focus:ring-2 focus:ring-peach-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="refund-amount"
+                        className="mb-1 block text-xs font-medium text-fg-secondary"
+                      >
+                        ยอดคืนเงิน (บาท)
+                      </label>
+                      <input
+                        id="refund-amount"
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        step="0.01"
+                        value={refundAmount}
+                        onChange={(e) => setRefundAmount(e.target.value)}
+                        placeholder={String(selectedOrder.totalAmountThb)}
+                        className="w-full rounded-md border border-line bg-surface px-3 py-2.5 text-sm text-fg focus:ring-2 focus:ring-peach-500"
+                      />
+                      <p className="mt-1 text-xs text-fg-muted">
+                        เว้นว่างไว้ = ยอดรวม {formatThb(selectedOrder.totalAmountThb)}
+                      </p>
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="refund-category"
+                        className="mb-1 block text-xs font-medium text-fg-secondary"
+                      >
+                        หมวดเหตุผล
+                      </label>
+                      <select
+                        id="refund-category"
+                        value={refundCategory}
+                        onChange={(e) => setRefundCategory(e.target.value)}
+                        className="w-full rounded-md border border-line bg-surface px-3 py-2.5 text-sm text-fg focus:ring-2 focus:ring-peach-500"
+                      >
+                        <option value="other">อื่น ๆ</option>
+                        <option value="customer_request">ลูกค้าขอคืนเอง</option>
+                        <option value="duplicate">ชำระเงินซ้ำ</option>
+                        <option value="unable_to_fulfil">ส่งมอบไม่ได้</option>
+                        <option value="product_issue">สินค้ามีปัญหา</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="refund-detail"
+                        className="mb-1 block text-xs font-medium text-fg-secondary"
+                      >
+                        รายละเอียดเพิ่มเติม (ไม่บังคับ)
+                      </label>
+                      <textarea
+                        id="refund-detail"
+                        value={refundDetail}
+                        onChange={(e) => setRefundDetail(e.target.value)}
+                        rows={2}
+                        className="w-full rounded-md border border-line bg-surface px-3 py-2.5 text-sm text-fg focus:ring-2 focus:ring-peach-500"
+                      />
+                    </div>
+
+                    <label className="flex items-center gap-2 text-xs text-fg-secondary">
+                      <input
+                        type="checkbox"
+                        checked={refundVoidCodes}
+                        onChange={(e) => setRefundVoidCodes(e.target.checked)}
+                        className="h-4 w-4 accent-peach-600"
+                      />
+                      void โค้ดของออเดอร์นี้ (แนะนำ — โค้ดที่ส่งให้ลูกค้าไปแล้ว ดึงคืนไม่ได้)
+                    </label>
+
+                    <button
+                      onClick={() =>
+                        void submitRefund(selectedOrder.id, selectedOrder.totalAmountThb)
+                      }
+                      disabled={refundingId === selectedOrder.id}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-coral-300 bg-coral-500/15 px-4 py-2.5 text-sm font-semibold text-fg-error disabled:opacity-60"
+                    >
+                      <RefreshCw size={16} />
+                      {refundingId === selectedOrder.id ? 'กำลังบันทึก...' : 'บันทึกการคืนเงิน'}
+                    </button>
+                    <p className="text-center text-xs text-fg-muted">
+                      คืนเงินแล้วออเดอร์จะเป็น &quot;คืนเงิน&quot; และย้อนกลับไม่ได้
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
