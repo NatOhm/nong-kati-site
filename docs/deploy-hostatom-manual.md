@@ -4,11 +4,28 @@ This replaces the earlier no-SSH plan (File-Manager upload + `install-hostatom.s
 kept as a fallback in [scripts/install-hostatom.sh](../scripts/install-hostatom.sh), but the flow
 below is what actually shipped the live build.
 
+> **Use `scripts/deploy-artifact.sh` for every deploy** — it automates Step 0 and Step 1, prints the
+> BUILD_ID and the Run-Now one-liner, and never touches your working tree. The steps below are the
+> same flow spelled out manually; keep them as the fallback and as the explanation of what the
+> script does. This file predates the script.
+
+> **Current live build (Oct 3, 2026): `13bdf58`, BUILD_ID `s3L0ijro_1BuotgUhnbfv`.** Repo HEAD is
+> **43 commits ahead of live**, and the gap includes real admin work (refund + resend controls) and
+> a security fix (coupon cap). Deploying closes it; see the deploy log in
+> [hostatom-live.md](hostatom-live.md) §5. Note that the `13bdf58..HEAD` range has **no `prisma/`
+> changes**, so no migration is needed, and the only `package.json` change is a build-time
+> `brace-expansion` override — the slow `npm ci` deps task can be skipped.
+
+> **⛔ Never read the `INFISICAL_CLIENT_SECRET` value in the Plesk panel.** It renders in clear text
+> and reading it has now burned that credential twice (Sep 30 and Oct 3). Presence checks only.
+
 > **Preconditions (all done, don't redo):** DNS points at thsv93 (`docs/dns-migration.md`),
 > Let's Encrypt cert installed, Node.js panel configured (Node 20.20.2, startup file
 > `server.js`, app mode production, app root `/httpdocs`), `node_modules` installed on the server
-> (Linux-native Prisma/SWC), Plesk env = 5 × `INFISICAL_*` + `VERCEL_GIT_COMMIT_REF=master`,
+> (Linux-native Prisma/SWC), Plesk env = 5 × `INFISICAL_*` + `VERCEL_GIT_COMMIT_REF=master`
+> (**required — two routes read it; do not "clean it up"**),
 > Infisical Production holds the real secrets. `server.js` is fail-closed: no Infisical, no boot.
+> **There is no `.env` on the server** — a deploy that omits the `INFISICAL_*` vars breaks prod.
 
 **Servers:** app = `thsv93.hostatom.com` (**147.50.254.11**), Plesk at
 `https://thsv93.hostatom.com:8443` (SSO: clientarea → product 74879 → **Manage Domains**).

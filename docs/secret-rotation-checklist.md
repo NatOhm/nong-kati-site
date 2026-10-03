@@ -13,15 +13,24 @@ before writing (Oct 1, 2026):
   key: all stored ciphertexts decrypt with the current key. The safe path is the paired re-encrypt
   script in `scripts/` (below).
 - Slips: `NK_SLIP_TOKEN_SECRET` falls back to `NK_JWT_SECRET`; it is not set separately in Infisical,
-  so rotating JWT covers it.
+  so rotating JWT covers it.**Progress — Oct 3, 2026:** Step 1 ⚠️ **RE-EXPOSED — rotate again.**
+The Oct 2 rotation succeeded, but on Oct 3 the Plesk Node.js panel was read again and the
+**new** client secret was displayed in clear text into session logs. So the Oct 2 secret is now
+burned too. This is the second burn of the same credential, both times caused by reading the panel.
+Execute [infisical-secret-rotation-oct3.md](infisical-secret-rotation-oct3.md) — same method, and
+**never read the panel's value field again**; check presence, never contents.
 
-**Progress — Oct 2, 2026:** Step 1 ✅ **RESOLVED — reframed as a client-SECRET rotation**
-(Infisical holds ONE identity, `hostatom-prod`, whose Universal-Auth client ID is the Plesk
-panel's `6be89e56-…`; the "old identity awaiting swap" story was wrong in both directions). New
-secret added to the identity, wired into Plesk, fail-closed boot verified green. Remaining in
-step 6 of Step 1: **remove the burned `2018***` secret** from `hostatom-prod` after the 24–48 h
-soak. Step 4 ✅ gift key rotated end-to-end. **Still open: Steps 2, 3, 5** and the remaining
-Step-6 hygiene items (old-secret removal, audit-log glance, backups off-machine).
+Also still outstanding from Oct 2: the burned `2018***` secret is **past its 24–48 h soak** and can
+now be deleted from `hostatom-prod`.
+
+Step 4 ✅ gift key rotated end-to-end. **Still open: Steps 2, 3, 5** and the remaining
+Step-6 hygiene items (audit-log glance, backups off-machine).
+
+> **⚠️ `VERCEL_GIT_COMMIT_REF` is load-bearing — do not delete it.** A later handoff called it "a
+> fossil from the Vercel era" and recommended removing it. It is read by
+> `src/app/api/v1/version/route.ts` and `src/app/api/v1/internal/build-info/route.ts`. Removing it
+> makes `/api/v1/version` report `gitRef: unknown` and silently breaks deploy verification. The
+> *name* is a fossil; the variable is required.
 
 > **Resolution — Oct 2, 2026:** the Oct 1 "correction" below was itself mistaken. Opening
 > `hostatom-prod` in Infisical showed its Universal-Auth **Client ID = `6be89e56-…`** — the very
