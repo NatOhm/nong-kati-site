@@ -207,18 +207,21 @@ production database surfaces `P2034` the way Prisma reports it.
 Found during the same backend audit on 2026-10-03. Listed for continuity; each needs its own
 verification before acting.
 
-| Finding                                           | Location                              | Note                                                                                            |
-| ------------------------------------------------- | ------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| Admin resend-email / refund have no server route  | `src/types/auth.ts:189`               | Permission is orphaned — the UI action resolves to `mockOrders.find(...)`, not a real endpoint. |
-| Zero Sentry instrumentation                       | `src/`                                | No error reporting wired up despite `.env.example` referencing it.                              |
-| CSP is report-only by default                     | `middleware.ts:79`, `.env.example:58` | Headers observe rather than block.                                                              |
-| `api.qrserver.com` still allowed in CSP `img-src` | `middleware.ts:35`                    | Leftover from before QR generation moved local.                                                 |
-| Manual transfer is disabled in production         | `src/app/api/v1/orders/route.ts:78`   | `manualUsable` needs all three of `enabled`, `accountName`, `accountNumber`.                    |
-| Payment channel requires live keys                | `src/api/omise.ts:55`                 | `isOpnConfigured`; without keys `POST /api/v1/orders` returns 503 `NO_PAYMENT_CHANNEL`.         |
+| Finding                                          | Location                              | Note                                                                                            |
+| ------------------------------------------------ | ------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Admin resend-email / refund have no server route | `src/types/auth.ts:189`               | Permission is orphaned — the UI action resolves to `mockOrders.find(...)`, not a real endpoint. |
+| Zero Sentry instrumentation                      | `src/`                                | No error reporting wired up despite `.env.example` referencing it.                              |
+| CSP is report-only by default                    | `middleware.ts:79`, `.env.example:58` | Headers observe rather than block.                                                              |
+| Manual transfer is disabled in production        | `src/app/api/v1/orders/route.ts:78`   | `manualUsable` needs all three of `enabled`, `accountName`, `accountNumber`.                    |
+| Payment channel requires live keys               | `src/api/omise.ts:55`                 | `isOpnConfigured`; without keys `POST /api/v1/orders` returns 503 `NO_PAYMENT_CHANNEL`.         |
 
 **Retired during that audit** (previously reported, proved wrong on inspection): backup codes
 _are_ consumable — `consumeBackupCode` in `adminAuth.ts` guards on `usedAt: null` and is
 covered by `tests/admin-backup-codes.test.ts`.
+
+**Resolved after that audit pass:** the `api.qrserver.com` CSP leftover is gone —
+`middleware.ts:35` no longer allows it in `img-src`. Nothing ever requested it once QR
+generation moved server-side, so the entry only widened the image policy.
 
 ---
 

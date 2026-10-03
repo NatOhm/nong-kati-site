@@ -197,9 +197,9 @@ Error codes at step 2: `TOTP_INVALID` (wrong code),
   `tests/admin-backup-codes.test.ts`.
 - ~~**QR generation uses an external service**~~ **FIXED 2026-10-03** — the
   `api.qrserver.com` dependency was replaced by local QR generation (it
-  rendered blank whenever that host was unreachable). One leftover:
-  `src/middleware.ts:35` still allows `https://api.qrserver.com` in CSP
-  `img-src` even though nothing requests it — safe to trim.
+  rendered blank whenever that host was unreachable). The leftover CSP
+  entry is gone too: `src/middleware.ts:35` no longer allows
+  `https://api.qrserver.com` in `img-src`, which nothing requested.
 - **~~Seeded shared secret~~ FIXED 2026-09-22** — the shared test seed is
   gone: every account now carries its **own unique TOTP secret**, generated
   fresh by `scripts/create-admin.ts` (rotation also revokes all sessions).
