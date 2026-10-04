@@ -6,6 +6,16 @@ node_modules/
 .vercel
 .env*
 
+# Dumped production credentials (deploy exports, env refreshes). These are
+# plaintext copies of NK_JWT_SECRET / NK_GIFT_CODE_ENCRYPTION_KEY / DATABASE_URL
+# and the repo is PUBLIC — a stray `git add -A` would publish them. `.env*`
+# above only covers dotfiles, so name these patterns explicitly.
+prod.env
+prod.env.*
+nk-*.txt
+*.env.dump
+deploy-env-*.txt
+
 # TypeScript incremental build artifact
 tsconfig.tsbuildinfo
 
