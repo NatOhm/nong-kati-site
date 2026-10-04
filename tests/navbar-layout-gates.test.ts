@@ -31,8 +31,21 @@ const NAVBAR = path.join(process.cwd(), 'src/components/layout/FacebookNavbar.ts
 const PROFILE = path.join(process.cwd(), 'src/components/layout/ProfileMenu.tsx');
 const NOTIFICATIONS = path.join(process.cwd(), 'src/components/layout/NotificationsDropdown.tsx');
 const POPOVER = path.join(process.cwd(), 'src/components/ui/AnchoredPopover.tsx');
+const CATALOG_SEARCH = path.join(process.cwd(), 'src/components/search/CatalogSearchBox.tsx');
 
 let source = '';
+
+/**
+ * Strip block + line comments.
+ *
+ * Several of these components document the markup they *used* to have in
+ * prose ("as an `absolute top-full` child this panel lost 291/295px"). A gate
+ * that greps for that class list would otherwise match its own explanation
+ * and fail, or worse, pass for the wrong reason.
+ */
+function stripComments(s: string): string {
+  return s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+}
 
 beforeAll(() => {
   source = readFileSync(NAVBAR, 'utf-8');
@@ -126,9 +139,6 @@ describe('navbar layout gates', () => {
     // `absolute top-full` panel. Comments are stripped first — these files
     // document the old `absolute top-full` markup in prose, and matching that
     // prose would make the gate fail on its own explanation.
-    const stripComments = (s: string): string =>
-      s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
-
     for (const [name, file] of [
       ['FacebookNavbar', NAVBAR],
       ['ProfileMenu', PROFILE],
@@ -151,5 +161,75 @@ describe('navbar layout gates', () => {
       source,
       'the justify-between row lost overflow-hidden → the horizontal scrollbar the a11y audit removed is back',
     ).toMatch(/justify-between[^"']*overflow-hidden|overflow-hidden[^"']*justify-between/);
+  });
+
+  /**
+   * G5b — the primitive MEASURES. A portal only escapes `overflow`; without
+   * measurement a portaled panel still hangs off a short viewport. G6 below is
+   * the bug this makes catchable.
+   */
+  it('G5b — the primitive measures and flips rather than assuming room below', () => {
+    const popover = stripComments(readFileSync(POPOVER, 'utf-8'));
+    expect(popover).toMatch(/getBoundingClientRect\(\)/);
+    expect(popover).toMatch(/spaceBelow/);
+    expect(popover).toMatch(/spaceAbove/);
+    // Both axes are clamped into the viewport.
+    expect(popover).toMatch(/vh\s*-\s*panelH\s*-\s*MARGIN/);
+    expect(popover).toMatch(/vw\s*-\s*panelW\s*-\s*MARGIN/);
+  });
+
+  /**
+   * G6 — the /search page suggestion list must be measured, not just portaled.
+   *
+   * A different bug from G5, found by measuring the live site rather than
+   * reading the CSS. /search has NO clipping ancestor, so this panel was
+   * never cropped — but it was an unpositioned `absolute top-full` child with
+   * no idea how much room was left below. The list is up to 6 suggestions
+   * (366px); at a 740x420 viewport it rendered from y=231 to y=597, putting
+   * its bottom 177px past the fold so the last two suggestions were simply
+   * unreachable. A portal alone does not fix that — the primitive has to
+   * measure, which is why this asserts on the measurement itself.
+   */
+  it('G6 — the catalog search dropdown is portaled, width-matched and bounded', () => {
+    const raw = readFileSync(CATALOG_SEARCH, 'utf-8');
+    const src = stripComments(raw);
+
+    expect(raw, 'CatalogSearchBox must render its list through AnchoredPopover').toContain(
+      'AnchoredPopover',
+    );
+    expect(
+      src,
+      'CatalogSearchBox reintroduced an `absolute top-full` list → it will hang off the bottom of a short viewport',
+    ).not.toMatch(/absolute[^"']*top-full/);
+
+    // Once portaled, a `w-full` panel would resolve against <body> and span
+    // the viewport instead of matching the input.
+    expect(src).toMatch(/matchAnchorWidth/);
+    // NOTE: the opening tag cannot be matched with a non-greedy `[\s\S]*?>`
+    // — `open={open && suggestions.length > 0}` contains a `>` of its own, so
+    // that pattern would stop mid-attribute and silently skip the checks
+    // below. Slice up to the tag that closes it (`>` followed by a newline and
+    // an indent), which is how this codebase formats these openings.
+    const panelTag = src.match(/<AnchoredPopover[\s\S]*?\n\s*>/)?.[0] ?? '';
+    expect(panelTag, 'AnchoredPopover usage not found').not.toBe('');
+    expect(
+      panelTag,
+      'panel kept `w-full` after portaling → it now spans the whole viewport instead of the input width',
+    ).not.toMatch(/\bw-full\b/);
+
+    // A capped height is the second half of the fix: even if the viewport is
+    // shorter than the natural list, the panel must scroll rather than vanish
+    // below the fold.
+    expect(panelTag).toMatch(/max-h-/);
+    expect(panelTag).toMatch(/overflow-y-auto/);
+
+    // The ad-hoc outside-click handler must be gone: the panel is no longer
+    // inside boxRef, so `boxRef.contains(target)` would read every
+    // suggestion click as an outside click.
+    expect(
+      src,
+      'CatalogSearchBox kept its own boxRef.contains() outside-click test → clicks inside the portaled panel dismiss it',
+    ).not.toMatch(/boxRef\.current\.contains/);
+    expect(src, 'the popover must be handed an onClose handler').toMatch(/onClose=\{close\}/);
   });
 });

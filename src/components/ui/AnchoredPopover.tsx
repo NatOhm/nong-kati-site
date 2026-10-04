@@ -37,6 +37,8 @@ const Z_INDEX = 100;
 interface Position {
   top: number;
   left: number;
+  /** Only set when `matchAnchorWidth` is on. */
+  width?: number;
 }
 
 export interface AnchoredPopoverProps {
@@ -48,6 +50,15 @@ export interface AnchoredPopoverProps {
   className?: string;
   /** `end` aligns the panel's right edge with the anchor's (nav actions). */
   align?: 'start' | 'end';
+  /**
+   * Stretch the panel to the anchor's width.
+   *
+   * Needed by any caller whose panel used to be `absolute` with `w-full`:
+   * once portaled, `w-full` resolves against <body>, not the anchor, so a
+   * dropdown that was previously exactly as wide as its input would suddenly
+   * span the whole viewport. Set this and drop `w-full` from className.
+   */
+  matchAnchorWidth?: boolean;
   role?: string;
   ariaLabel?: string;
   id?: string;
@@ -60,6 +71,7 @@ export function AnchoredPopover({
   children,
   className,
   align = 'end',
+  matchAnchorWidth = false,
   role,
   ariaLabel,
   id,
@@ -92,8 +104,15 @@ export function AnchoredPopover({
     let left = align === 'end' ? rect.right - panelW : rect.left;
     left = Math.max(MARGIN, Math.min(left, vw - panelW - MARGIN));
 
-    setPosition({ top, left });
-  }, [align, anchorRef]);
+    // The anchor width, clamped to what the viewport can actually show, so a
+    // wide anchor on a narrow phone cannot push the panel off-screen.
+    // `exactOptionalPropertyTypes` is on, so `width: undefined` is not the
+    // same as omitting the key — build the object conditionally.
+    const position: Position = { top, left };
+    if (matchAnchorWidth) position.width = Math.min(rect.width, vw - 2 * MARGIN);
+
+    setPosition(position);
+  }, [align, anchorRef, matchAnchorWidth]);
 
   // Measure before paint so the panel never flashes at the wrong spot.
   //
@@ -158,6 +177,7 @@ export function AnchoredPopover({
         position: 'fixed',
         top: position?.top ?? -9999,
         left: position?.left ?? -9999,
+        ...(position?.width !== undefined ? { width: position.width } : {}),
         // Hidden until measured, so the first frame can't appear at 0,0.
         visibility: position ? 'visible' : 'hidden',
         zIndex: Z_INDEX,

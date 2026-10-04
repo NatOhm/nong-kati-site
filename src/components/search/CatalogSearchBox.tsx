@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Search } from 'lucide-react';
+import { AnchoredPopover } from '@/components/ui/AnchoredPopover';
 import { cn } from '@/utils/cn';
 
 /**
@@ -27,6 +28,7 @@ export function CatalogSearchBox({ className }: { className?: string }): React.J
   const [open, setOpen] = useState(false);
   /* a11y gate (duplicate-ID): listbox id is per-instance (useId). */
   const suggestListId = useId();
+  /* Anchor for the portaled suggestion list (see AnchoredPopover). */
   const boxRef = useRef<HTMLDivElement>(null);
 
   // Debounced suggestion fetch (250ms, mirrors the navbar box)
@@ -48,15 +50,11 @@ export function CatalogSearchBox({ className }: { className?: string }): React.J
     return () => clearTimeout(t);
   }, [query]);
 
-  // Close on outside click
-  useEffect(() => {
-    if (!open) return;
-    const onDocClick = (e: MouseEvent) => {
-      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', onDocClick);
-    return () => document.removeEventListener('mousedown', onDocClick);
-  }, [open]);
+  // Close on outside click. AnchoredPopover owns this now: the panel is
+  // portaled to document.body, so it is no longer inside boxRef and the old
+  // `boxRef.contains(target)` test would have treated every suggestion click
+  // as an outside click. The primitive tests the panel ref as well.
+  const close = useCallback(() => setOpen(false), []);
 
   const go = (q: string) => {
     setOpen(false);
@@ -93,14 +91,25 @@ export function CatalogSearchBox({ className }: { className?: string }): React.J
         </div>
       </form>
 
-      {/* Google-style dropdown: slides down over the grid */}
-      {open && suggestions.length > 0 && (
-        <div
-          id={suggestListId}
-          role="listbox"
-          aria-label="คำค้นแนะนำ"
-          className="clay-card suggest-drop absolute left-0 top-full z-40 mt-2 w-full overflow-hidden rounded-2xl p-1.5"
-        >
+      {/* Google-style dropdown: slides down over the grid.
+          Portaled + measured instead of `absolute left-0 top-full`. As a
+          plain absolute child it could not know how much room was left, so on
+          a short viewport (measured at 740x420: the list is 366px tall and
+          hung 177px past the fold, putting the last two suggestions out of
+          reach) it simply ran off the bottom of the screen. AnchoredPopover
+          flips it above the input when that is the better side and clamps it
+          inside the viewport otherwise. */}
+      <AnchoredPopover
+        open={open && suggestions.length > 0}
+        onClose={close}
+        anchorRef={boxRef}
+        align="start"
+        matchAnchorWidth
+        role="listbox"
+        ariaLabel="คำค้นแนะนำ"
+        id={suggestListId}
+        className="clay-card suggest-drop max-h-[min(24rem,calc(100vh-1rem))] overflow-y-auto overscroll-contain rounded-2xl p-1.5"
+      >
           {suggestions.map((s) => (
             <button
               key={s.slug}
@@ -117,8 +126,7 @@ export function CatalogSearchBox({ className }: { className?: string }): React.J
               </span>
             </button>
           ))}
-        </div>
-      )}
+      </AnchoredPopover>
     </div>
   );
 }
