@@ -8,11 +8,14 @@
  *      exhausted outbox rows raise an email_outbox_dead_letter audit row.
  *  §4  Payment-channel union gate: Opn-only / manual-only / wallet-only
  *      succeed; a channel-less environment fails closed.
- *  §5  /api/v1/version answers the deployed SHA publicly (no auth, no secrets).
+ *  §5  /api/v1/version answers the running build id publicly (no auth, no
+ *      secrets), read from .next/BUILD_ID so it cannot report a stale sha.
  *  §6  ops-health requires auth and reports the monitored signals;
  *      the admin reconciliation queue resolves entries from live order state.
  */
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { join } from 'path';
+
+import { describe, expect, it, vi, afterEach, beforeEach } from 'vitest';
 
 // ─── prisma mock (shared) ────────────────────────────────
 const prismaMock = vi.hoisted(() => ({
@@ -100,23 +103,83 @@ describe('§4 payment-channel union gate', () => {
 
 // ─── §5 /api/v1/version ──────────────────────────────────
 describe('§5 public version endpoint', () => {
-  it('answers the deployed SHA without auth and leaks nothing else', async () => {
+  /**
+   * Import the route with fs/promises stubbed. The route reads exactly one
+   * path (.next/BUILD_ID); any other read is a bug worth failing on, so the
+   * stub asserts the caller is asking for that file.
+   */
+  async function loadRoute(contents: string | Error): Promise<() => Promise<Response>> {
     vi.resetModules();
+    vi.doMock('fs/promises', () => ({
+      readFile: vi.fn(async (p: string) => {
+        expect(String(p)).toContain(join('next', 'BUILD_ID'));
+        if (contents instanceof Error) throw contents;
+        return contents;
+      }),
+    }));
+    const { GET } = await import('@/app/api/v1/version/route');
+    return GET as () => Promise<Response>;
+  }
+
+  afterEach(() => {
+    vi.doUnmock('fs/promises');
+    delete process.env['GIT_SHA'];
+    delete process.env['VERCEL_GIT_COMMIT_SHA'];
+    delete process.env['VERCEL_GIT_COMMIT_REF'];
+  });
+
+  it('reports the build id from .next/BUILD_ID and leaks nothing else', async () => {
     process.env['GIT_SHA'] = 'abc1234';
     process.env['VERCEL_GIT_COMMIT_REF'] = 'master';
-    try {
-      const { GET } = await import('@/app/api/v1/version/route');
-      const res = await GET();
-      expect(res.status).toBe(200);
-      const body = (await res.json()) as Record<string, string>;
-      expect(body['gitSha']).toBe('abc1234');
-      expect(body['gitRef']).toBe('master');
-      expect(Object.keys(body).sort()).toEqual(['gitRef', 'gitSha']);
-      expect(res.headers.get('Cache-Control')).toContain('no-store');
-    } finally {
-      delete process.env['GIT_SHA'];
-      delete process.env['VERCEL_GIT_COMMIT_REF'];
-    }
+    const GET = await loadRoute('gUxcV6SEGUgIp6nFJf8hR\n');
+    const res = await GET();
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, string>;
+    // The build id is the authoritative release identity and comes off disk.
+    expect(body['buildId']).toBe('gUxcV6SEGUgIp6nFJf8hR');
+    expect(body['gitSha']).toBe('abc1234');
+    expect(body['gitRef']).toBe('master');
+    expect(Object.keys(body).sort()).toEqual(['buildId', 'gitRef', 'gitSha']);
+    expect(res.headers.get('Cache-Control')).toContain('no-store');
+  });
+
+  it('never lets a stale injected sha shadow the build actually running', async () => {
+    // This is the bug that made the endpoint lie: GIT_SHA lives in Infisical
+    // and no deploy step updates it, so it kept naming an old commit.
+    process.env['GIT_SHA'] = '2ee2ae7';
+    const GET = await loadRoute('gUxcV6SEGUgIp6nFJf8hR');
+    const body = (await (await GET()).json()) as Record<string, string>;
+
+    expect(body['buildId']).toBe('gUxcV6SEGUgIp6nFJf8hR');
+    // The stale value is still reported on its legacy field...
+    expect(body['gitSha']).toBe('2ee2ae7');
+    // ...but a caller can always tell what is really serving requests.
+    expect(body['buildId']).not.toBe(body['gitSha']);
+  });
+
+  it('degrades to "unknown" instead of failing when no env identity is set', async () => {
+    const GET = await loadRoute('gUxcV6SEGUgIp6nFJf8hR');
+    const body = (await (await GET()).json()) as Record<string, string>;
+    expect(body['gitSha']).toBe('unknown');
+    expect(body['gitRef']).toBe('unknown');
+    expect(body['buildId']).toBe('gUxcV6SEGUgIp6nFJf8hR');
+  });
+
+  it('returns null buildId rather than a junk one when the file is unreadable', async () => {
+    const GET = await loadRoute(new Error('ENOENT'));
+    const res = await GET();
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, string>;
+    expect(body['buildId']).toBeNull();
+  });
+
+  it('rejects a BUILD_ID file that does not look like a build id', async () => {
+    // A truncated extraction can leave an HTML error page where BUILD_ID
+    // should be; reporting that as the release id would be worse than null.
+    const GET = await loadRoute('<html>502 Bad Gateway</html>');
+    const body = (await (await GET()).json()) as Record<string, string | null>;
+    expect(body['buildId']).toBeNull();
   });
 });
 
