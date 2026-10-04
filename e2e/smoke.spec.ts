@@ -211,12 +211,17 @@ test.describe('checkout flow creates an order', () => {
 
 /** Security headers that must ship with every production response. */
 test.describe('API security headers', () => {
-  test('version endpoint exposes only sha/ref and carries the CSP policy', async ({ request }) => {
+  test('version endpoint exposes only release identity and carries the CSP policy', async ({ request }) => {
     const res = await request.get('/api/v1/version');
     expect(res.status()).toBe(200);
 
     const body = (await res.json()) as Record<string, unknown>;
-    expect(Object.keys(body).sort()).toEqual(['gitRef', 'gitSha']);
+    // `buildId` is read from .next/BUILD_ID on disk, so it is the only field
+    // that cannot go stale the way the Infisical-fed gitSha can.
+    expect(Object.keys(body).sort()).toEqual(['buildId', 'gitRef', 'gitSha']);
+    expect(body['buildId'], 'buildId must look like a real Next build id').toMatch(
+      /^[A-Za-z0-9_-]{8,64}$/,
+    );
 
     const csp = res.headers()['content-security-policy'] ?? '';
     expect(scriptSrcDirective(csp), "script-src must be nonce'd").toContain("'nonce-");
