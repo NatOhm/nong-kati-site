@@ -4,8 +4,10 @@
 [`.github/workflows/prod-health-monitor.yml`](../.github/workflows/prod-health-monitor.yml),
 gates in `tests/prod-health-monitor.test.ts` (inventory id `HM`).
 
-Production is Hostatom/Plesk (`docs/hostatom-live.md`). We cannot install a daemon
-there, so monitoring runs externally against the public hostname.
+Production is Hostatom/Plesk (`docs/hostatom-live.md`). The *check* runs externally
+against the public hostname; the *ping* runs on the server itself as a Plesk
+scheduled task — see [§3a](#3a-the-plesk-pinger-primary-watchdog). GitHub's `*/10`
+cron is retained as a secondary ping source.
 
 ---
 
@@ -103,6 +105,11 @@ whether the *schedule* is alive. GitHub disables scheduled workflows after 60 da
 of repo inactivity and silently delays them under load, and only an external
 watchdog notices "nothing has pinged in 20 minutes".
 
+> **The GitHub cron is not a reliable 10-minute pinger.** Measured Oct 4: scheduled
+> runs arrived 148 and 343 minutes apart, against a healthchecks window of 30 minutes
+> (period 10 + grace 20). That is why the primary pinger is now a Plesk task — see
+> [§3a](#3a-the-plesk-pinger-primary-watchdog).
+
 State travels between runs through the Actions cache (`restore-keys` picks the most
 recent entry), because every runner is ephemeral. History is uploaded as an artifact
 (30-day retention).
@@ -137,6 +144,57 @@ Requires your accounts — an agent cannot create either one. About two minutes.
 
 Verify by absence, not presence: once wired, the failure this protects against is a
 check going **quiet**, which looks identical to a healthy system from inside GitHub.
+
+### 3a. The Plesk pinger (primary watchdog)
+
+The dead-man's switch needs *reliable* pings, and GitHub's shared-runner cron is
+not reliable. A Plesk scheduled task pings healthchecks.io from the production
+server every 10 minutes.
+
+**Why this shape.** The task is chrooted into the vhost: no `date`, no absolute
+paths, and `curl` needs `-k` because the chroot has no CA bundle. The command field
+**must contain zero double-quote characters** — the runner wraps the command in
+double quotes, and an inner `"` truncates it silently.
+
+```
+cd httpdocs && curl -fsSLk https://hc-ping.com/<uuid>
+```
+
+Plesk → **Scheduled Tasks** → *Add Task*: type *Run a command*, run *Cron style*,
+`*/10 * * * *`, **Active** ticked, description `healthchecks.io watchdog ping (10 min)`.
+
+> **The "Active" checkbox gates Run Now.** Unticked, Plesk accepts the click and
+> does nothing — and shows a *stale* "successfully completed" toast from an earlier
+> session, which looks exactly like success. Verify a ping actually arrived rather
+> than trusting the toast.
+
+**Measured (Oct 4, server local ICT):**
+
+| Time | Event | Source |
+|---|---|---|
+| 13:18 | `OK` | `20.64.204.241` curl/8.5.0 — GitHub runner |
+| 13:48 | **`up ➔ down`** | 30 min with no ping — **false alert**, site was serving 200s |
+| 14:18 | `OK` | `147.50.254.11` curl/7.88.1 — Plesk (manual *Run Now*) |
+| 14:18 | `down ➔ up` | cleared by that ping |
+| 14:20 | `OK` | `147.50.254.11` — Plesk, **unattended cron fire** |
+| 14:30 | `OK` | `147.50.254.11` — Plesk, second unattended cron fire |
+
+Two consecutive unattended fires, each landing exactly on a `:10` boundary, with no
+status flip in between. The 13:48 row is the whole argument for this task: a
+fabricated outage, caused by a scheduler skipping, on a site that never stopped
+answering.
+
+**Verify the ping without reading the URL.** Check the check's *Events* log in
+healthchecks.io: a cron fire appears as a new `OK` line from the server's IP on the
+`:00/:10/:20…` boundary. Read the log, never the task field — the ping URL is a
+credential (§3) and the Plesk task list renders it as plain text.
+
+**Limitation, stated plainly.** This task runs on the server it monitors. If the
+server dies, the ping dies with it and healthchecks correctly alerts *"ping
+missing"* — but no path reports *"site is down"*. That is why the GitHub cron is
+kept: it is the only pinger with an independent vantage point.
+
+---
 
 ### Optional third-party uptime service
 
