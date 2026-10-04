@@ -135,7 +135,8 @@ cd httpdocs && curl -fsSLk -o deploy-bundle.tar.gz $RAW_URL && rm -rf .next && t
  5. Verification curls:
 
 curl -s https://nongkatistore.com/api/v1/version
-#   expect: {"gitSha":"$START_SHA","gitRef":"master"}
+#   expect buildId == $BUILD_ID above (read from .next/BUILD_ID on the server).
+#   gitSha is an Infisical echo and may legitimately differ — do NOT verify on it.
 curl -s https://nongkatistore.com/api/v1/health
 curl -s -o /dev/null -w "%{http_code}\n" https://nongkatistore.com/api/v1/products
 #   expect: 200

@@ -77,9 +77,12 @@ Raw URL (used in Step 2):
 Commit the bundle file itself on that branch (this flow is build-artifact-as-branch; the branch
 holds only the tarball, force-pushed each deploy).
 
-> **Also update Infisical now** (before the restart in Step 4): Infisical → nong-kati →
-> Production → set `GIT_SHA` = the commit you built, `GIT_REF` = branch name. The
-> `/api/v1/version` endpoint reads these; a stale value makes verification lie to you.
+> **Infisical `GIT_SHA` is now optional.** `/api/v1/version` reads `buildId` from
+> `.next/BUILD_ID` on disk — the build actually serving requests — so verification can no
+> longer be fooled by a stale hand-set value. Setting `GIT_SHA`/`GIT_REF` still populates
+> the legacy `gitSha`/`gitRef` fields for the audit trail, but they are informational
+> only; do not treat them as the verification signal. (They lied: on Oct 4 they reported
+> `2ee2ae7` while production served `cbbe097`.)
 
 ## Step 2 — Scheduled Task (Run Now, don't save)
 
@@ -149,7 +152,9 @@ build.
 
 ```bash
 curl -s https://nongkatistore.com/api/v1/version
-#    → {"gitSha":"<new sha>","gitRef":"master"}     (sha = what you set in Infisical in Step 1)
+#    → {"buildId":"<BUILD_ID>","gitSha":"…","gitRef":"…"}
+#    buildId MUST equal the BUILD_ID printed by deploy-artifact.sh in Step 1.
+#    gitSha/gitRef are Infisical echoes and may be stale — they are not the check.
 curl -s https://nongkatistore.com/api/v1/health
 #    → {"status":"healthy", ... "database":"ok"}
 curl -s -o /dev/null -w "%{http_code}\n" https://nongkatistore.com/api/v1/products   # 200
@@ -225,7 +230,9 @@ The extract step wipes `.next` before unpacking, so keep the previous bundle rea
    `git branch -f deploy-rollback && git push origin deploy-rollback --force` (from the *old*
    bundle's commit) — or keep a tag per release.
 2. To roll back: Step 2's task with the raw URL pointing at `deploy-rollback`, then Restart App.
-3. Infisical `GIT_SHA` must be set back to the rolled-back sha so `/api/v1/version` tells the truth.
+3. `/api/v1/version` needs no correction: `buildId` comes off disk, so re-running the
+   extract makes it report the restored bundle's own BUILD_ID automatically. If you want
+   `gitSha` to agree as well, set Infisical `GIT_SHA` back to the rolled-back sha.
 
 ## Migrations
 
