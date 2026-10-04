@@ -154,8 +154,9 @@ const ROUTE_COVERAGE: MatrixRow[] = [
   { method: 'GET', path: '/customers/cust-1', perm: 'customers:read' },
   { method: 'PATCH', path: '/customers/cust-1', perm: 'customers:write', body: {} },
   { method: 'PATCH', path: '/customers/cust-1/block', perm: 'customers:block', body: {} },
-  // dashboard
-  { method: 'GET', path: '/dashboard', perm: 'reports:read' },
+  // dashboard — narrow dashboard:read, deliberately NOT reports:read, so the
+  // dashboard does not double as a back door into Analytics & Reports.
+  { method: 'GET', path: '/dashboard', perm: 'dashboard:read' },
   // inventory
   { method: 'GET', path: '/inventory', perm: 'inventory:read' },
   { method: 'POST', path: '/inventory', perm: 'inventory:upload', body: {} },

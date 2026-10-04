@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import {
   RefreshCw,
   Search,
@@ -10,6 +11,7 @@ import {
   History,
   Loader2,
   AlertTriangle,
+  BarChart3,
   Users,
 } from 'lucide-react';
 
@@ -235,6 +237,16 @@ export default function AdminInventoryPage(): React.JSX.Element {
                 <AlertTriangle size={13} /> สต๊อกใกล้หมด {lowCount} รายการ
               </span>
             )}
+            {/* Slow-moving stock belongs here as well as under Reports: this is
+                where staff act on it. Safe for every role that can reach this
+                page — tests/admin-nav-sections.test.ts asserts anyone holding
+                inventory:read also holds reports:read. */}
+            <Link
+              href="/management/reports/slow-stock"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-line-subtle bg-surface px-3 py-1.5 text-sm text-fg-secondary transition-colors hover:bg-surface-elevated"
+            >
+              <BarChart3 size={14} /> สินค้าค้างสต๊อก
+            </Link>
             <button
               onClick={() => setShowHistory((v) => !v)}
               className={cn(

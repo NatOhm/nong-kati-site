@@ -27,12 +27,16 @@ function monthStart(): Date {
 /**
  * GET /api/v1/admin/dashboard — real analytics replacing src/api/analytics.ts
  * mocks (client list: สรุปยอดขาย, รายงานบัญชีและกำไร, รายงานสต๊อก, สถิติลูกค้า).
- * Requires reports:read.
+ * Requires dashboard:read — NOT reports:read. The dashboard is the landing
+ * page for every operational role, so gating it behind reports:read meant
+ * catalogue/order/support managers were shown no menu entry and then 403'd.
+ * Keeping the two permissions separate stops the dashboard from becoming a
+ * back door into Analytics & Reports.
  */
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const token = bearer(req);
   if (!token) return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 });
-  const check = await checkPermission(token, 'reports:read');
+  const check = await checkPermission(token, 'dashboard:read');
   if (!check.allowed) {
     return NextResponse.json({ error: check.error ?? 'FORBIDDEN' }, { status: 403 });
   }

@@ -1,10 +1,25 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { AdminSidebar } from './AdminSidebar';
 import { AdminTopBar } from './AdminTopBar';
 import { adminFetch } from '@/lib/adminSession';
+import { cn } from '@/utils/cn';
 import type { AdminRole } from '@/types/auth';
+
+/**
+ * Where the collapsed-rail preference is stored.
+ *
+ * This shell is rendered by each admin page rather than by the route layout, so
+ * React state dies at every navigation: collapsing the rail and then clicking
+ * anything snapped it straight back open. The rail is a stored preference
+ * rather than view state, so localStorage owns it — the one store that
+ * outlives both the remount and a reload. Moving the shell into
+ * src/app/management/layout.tsx would also fix it, but only by editing ~17
+ * pages to drop their own wrapper, which is a far larger change than the bug
+ * warrants.
+ */
+const SIDEBAR_COLLAPSED_KEY = 'nk_admin_sidebar_collapsed';
 
 export interface AdminShellProps {
   children: React.ReactNode;
@@ -28,6 +43,16 @@ export function AdminShell({
   className,
 }: AdminShellProps): React.JSX.Element {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // Restored after mount rather than during the initial state so the
+  // server-rendered markup stays deterministic (reading storage during render
+  // would desynchronise hydration).
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1') setSidebarCollapsed(true);
+    } catch {
+      /* storage unavailable (private mode, disabled) — stay expanded */
+    }
+  }, []);
   // Mobile drawer (< md): the fixed rail used to pin itself over the whole
   // phone viewport, squeezing the page content to a sliver (visual audit
   // 2026-09-28) — the hamburger now opens the sidebar as an off-canvas
@@ -56,13 +81,23 @@ export function AdminShell({
   const staffName = profile?.fullName ?? staffNameProp;
   const staffRole = profile?.role ?? staffRoleProp;
 
+  const toggleSidebar = useCallback(() => {
+    const next = !sidebarCollapsed;
+    setSidebarCollapsed(next);
+    try {
+      window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? '1' : '0');
+    } catch {
+      /* storage unavailable — the collapse still applies for this mount */
+    }
+  }, [sidebarCollapsed]);
+
   return (
     <div className="admin-shell flex h-screen overflow-hidden bg-surface-base">
       {/* Sidebar — rail on md+, off-canvas drawer below md */}
       <AdminSidebar
         role={staffRole}
         collapsed={sidebarCollapsed}
-        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        onToggle={toggleSidebar}
         mobileOpen={mobileNavOpen}
         onCloseMobile={() => setMobileNavOpen(false)}
       />
@@ -83,8 +118,4 @@ export function AdminShell({
       </div>
     </div>
   );
-}
-
-function cn(...classes: (string | undefined | false)[]): string {
-  return classes.filter(Boolean).join(' ');
 }

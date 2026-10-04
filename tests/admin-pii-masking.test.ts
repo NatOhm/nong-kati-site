@@ -311,40 +311,43 @@ describe('masking sanity (shared fixture)', () => {
 });
 
 // ─── Dashboard: topCustomers + recentOrders ──────────────────────────────
-// Dashboard requires reports:read — support_agent/order_manager lack it and
-// are 403 there (that contract belongs to the authz matrix). The roles that
-// REACH the dashboard are the ones these PII assertions shape.
+// The dashboard is gated on its own narrow dashboard:read. PII on the response
+// is scoped SEPARATELY, by customers:read:full. Reaching the dashboard and
+// being allowed to read customer identities are two different questions, so
+// both groups are derived from the role matrix rather than listed by hand — a
+// role that later gains dashboard access is covered the day it does.
+const REACHING = (Object.keys(ROLE_PERMISSIONS) as AdminRole[]).map(
+  (role) => [role, ROLE_PERMISSIONS[role]] as const,
+);
+const DASHBOARD_MASKED = REACHING.filter(([, p]) => !p.includes('customers:read:full')).map(
+  ([r]) => r,
+);
+const DASHBOARD_RAW = REACHING.filter(([, p]) => p.includes('customers:read:full')).map(
+  ([r]) => r,
+);
 
 describe('PII masking — dashboard', () => {
-  it.each(['finance_viewer', 'marketing_manager'] as const)(
-    '%s (reports:read, no customers:read:full) gets MASKED emails in topCustomers AND recentOrders',
-    async (role) => {
-      const mod = await importRoute('/dashboard/route.ts');
-      const { status, body } = await callGet(mod, '/dashboard', await tokenFor(role));
-      expect(status).toBe(200);
-      const customers = body['customers'] as { topCustomers: Array<{ email: string }> };
-      expect(customers.topCustomers[0]?.email).toBe(MASKED_EMAIL);
-      const recent = body['recentOrders'] as Array<{ customer: string }>;
-      expect(recent[0]?.customer).toBe(MASKED_EMAIL);
-    },
-  );
-
-  it('super_admin (reports:read + customers:read:full) gets raw emails in BOTH lists', async () => {
+  it.each(DASHBOARD_MASKED)('%s reaches it but gets MASKED emails throughout', async (role) => {
     const mod = await importRoute('/dashboard/route.ts');
-    const { status, body } = await callGet(mod, '/dashboard', await tokenFor('super_admin'));
-    expect(status).toBe(200);
+    const { status, body } = await callGet(mod, '/dashboard', await tokenFor(role));
+    expect(status, role).toBe(200);
     const customers = body['customers'] as { topCustomers: Array<{ email: string }> };
-    expect(customers.topCustomers[0]?.email).toBe(FULL_EMAIL);
+    expect(customers.topCustomers[0]?.email, role).toBe(MASKED_EMAIL);
     const recent = body['recentOrders'] as Array<{ customer: string }>;
-    expect(recent[0]?.customer).toBe(FULL_EMAIL);
+    expect(recent[0]?.customer, role).toBe(MASKED_EMAIL);
+    // Whole payload, not just the two known fields — a raw address anywhere in
+    // here is a masking regression.
+    expect(JSON.stringify(body), role).not.toContain(FULL_EMAIL);
   });
 
-  it('support_agent and order_manager (no reports:read) are 403 — authz before PII', async () => {
+  it.each(DASHBOARD_RAW)('%s holds customers:read:full and gets raw emails', async (role) => {
     const mod = await importRoute('/dashboard/route.ts');
-    for (const role of ['support_agent', 'order_manager'] as const) {
-      const { status } = await callGet(mod, '/dashboard', await tokenFor(role));
-      expect(status, role).toBe(403);
-    }
+    const { status, body } = await callGet(mod, '/dashboard', await tokenFor(role));
+    expect(status, role).toBe(200);
+    const customers = body['customers'] as { topCustomers: Array<{ email: string }> };
+    expect(customers.topCustomers[0]?.email, role).toBe(FULL_EMAIL);
+    const recent = body['recentOrders'] as Array<{ customer: string }>;
+    expect(recent[0]?.customer, role).toBe(FULL_EMAIL);
   });
 });
 

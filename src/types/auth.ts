@@ -68,6 +68,14 @@ export const ALL_PERMISSIONS = [
   'coupons:write',
   'coupons:delete',
 
+  // Dashboard
+  //
+  // Narrow, on purpose: the dashboard is the operational landing page, but it
+  // must not become a back door into Analytics & Reports. It used to require
+  // reports:read, which hid the menu entry (and then 403'd the page) for every
+  // role that does day-to-day work — catalogue/order/support managers.
+  'dashboard:read',
+
   // Reports
   'reports:read',
   'reports:export',
@@ -111,6 +119,10 @@ export const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
     'inventory:export',
     'coupons:read',
     'coupons:write',
+    'dashboard:read',
+    // Grants the Analytics & Reports section and nothing else — catalogue
+    // managers own stock decisions, and slow-moving stock is where they act.
+    'reports:read',
   ],
 
   order_manager: [
@@ -124,6 +136,9 @@ export const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
     'customers:write',
     'reviews:read',
     'reviews:moderate',
+    'dashboard:read',
+    // Grants the Support section (tickets) and nothing else.
+    'tickets:read',
   ],
 
   finance_viewer: [
@@ -132,6 +147,7 @@ export const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
     'orders:export',
     'reports:read',
     'reports:export',
+    'dashboard:read',
   ],
 
   support_agent: [
@@ -141,6 +157,7 @@ export const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
     'tickets:write',
     'topups:read',
     'reviews:read',
+    'dashboard:read',
   ],
 
   marketing_manager: [
@@ -149,6 +166,7 @@ export const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
     'coupons:read',
     'coupons:write',
     'reports:read',
+    'dashboard:read',
   ],
 };
 
