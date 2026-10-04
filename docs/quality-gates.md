@@ -36,6 +36,7 @@
 | AR    | Admin resend-email — error contract (EMAIL_SEND_FAILED, not a transport string) | `tests/admin-resend-email.test.ts` | `npm test` (vitest) | Unit Tests |
 | CE    | CI env secrets meet the minimums the code enforces | `tests/ci-env-secrets.test.ts`   | `npm test` (vitest)  | Unit Tests             |
 | NB    | Navbar layout — nav keeps natural width, search yields (no one-glyph-per-line Thai) | `tests/navbar-layout-gates.test.ts` | `npm test` (vitest) | Unit Tests             |
+| CK    | Combobox keyboard — arrow nav, aria-activedescendant, Enter fallthrough (WCAG 2.1.1) | `tests/combobox-keyboard.test.ts` | `npm test` (vitest) + `e2e/smoke.spec.ts` | Unit Tests + Browser Smoke |
 | HM    | Production health monitor — idle reap vs unexpected restart, alert threshold, CLI flag mapping, workflow wiring | `tests/prod-health-monitor.test.ts` | `npm test` (vitest) | Unit Tests + Production Health Monitor |
 | CC    | Coupon cap under REAL concurrency (8 simultaneous claims) | `tests/coupon-cap-concurrency.test.ts` | vitest + live server | **(ยังไม่ต่อ CI — ดูหัวข้อข้างล่าง)** |
 | E1    | Disabled-state affordance (WCAG 1.4.1)                | `e2e/disabled-state.spec.ts`       | `npm run test:e2e`   | (local/preview)        |
@@ -354,6 +355,17 @@ job `Build` ตั้ง `NK_JWT_SECRET: ci-test-secret` (14 ตัวอัก�
 - **สแกนข้อความ ไม่ parse YAML — และนี่คือจุดที่สำคัญ:** `js-yaml` มีใน `node_modules` แต่เป็น transitive dep ของ eslint เท่านั้น (ยังมี `.pnpm-store` อยู่ข้าง ๆ) การพึ่งมันคือผูก gate ไว้กับ npm hoisting แต่ที่สำคัญกว่า regex ตรวจได้**คุณสมบัติที่แข็งกว่า** คือ “ไม่มีค่าผิดที่ไหนเลย” ไม่ใช่ “ไม่มีค่าผิดใน env block ที่ผมนึกไปเช็ก” — บั๊กนี้เกิดเพราะ **secret ของ job `Build` อยู่ระดับ step ไม่ใช่ระดับ job** การไล่ดูแค่ระดับ job จึงมองข้าม ส่วนการนับบรรทัดไม่สนระดับการเยื้อง
 - **gate 5 เคส:** ทุกค่า literal ผ่านเกณฑ์ (พร้อมอ้างอิง `ไฟล์:บรรทัด` ในข้อความแดง) · ไม่มีค่าที่เป็น block scalar หรือว่าง (พวกนั้น parse ผ่านแต่เป็นกับดักตอนรัน) · ค่าที่เป็น `${{ secrets.X }}` ระบุชื่อไว้ว่าเช็คไม่ได้ แทนที่จะผ่านเงียบ · job `Build` ยังต้องมี JWT secret อยู่จริง (กันการแก้ปัญหาด้วยการ “ลบทิ้งไปเลย” ซึ่งจะทำให้ build เซ็น token ไม่ได้โดยไม่มีใครเห็น) · พบเกณฑ์ entropy ในซอร์สจริง
 - **mutation ยืนยันแล้ว:** คืนค่าเดิม 14 ตัวอักษร → แดง 2 เคสพร้อมชี้ `ci.yml:120 / 188 / 309` · ตั้ง gift-code key เป็น `deadbeef` → แดง · เปลี่ยนชื่อ `MIN_SECRET_LENGTH` → แดงพร้อมข้อความบอกวิธีแก้
+
+## Combobox keyboard (2026-10-04, WCAG 2.1.1) — `tests/combobox-keyboard.test.ts` + `e2e/smoke.spec.ts`
+
+กล่องค้นหาทั้งสอง (navbar และ `/search`) ประกาศสัญญา ARIA ครบทั้งชุด — `role=combobox`, `aria-expanded`, `aria-controls`, listbox ที่มี `role=option` — แต่**ไม่ได้ทำอะไรตามสัญญานั้นเลย** มีแต่ Escape กับเมาส์ ผู้ใช้คีย์บอร์ดหรือ screen reader **ไม่มีทางไปถึง suggestion ใดๆ ได้เลย** ทั้งที่ ARIA ประกาศว่ามี ผิด WCAG 2.1.1 (Keyboard) และแย่กว่าที่ฟังเป็นเพราะ ARIA บอกผิดว่ามีการนำทางอยู่
+
+- **ตัดสินใจแยกเป็น pure function (`resolveComboboxKey`) เพราะ repo นี้ไม่มี DOM test environment** — vitest รัน `environment: 'node'` ไม่มี jsdom/testing-library ถ้าเทสต์ hook ผ่านการ render ล้วนๆ มันจะเทสต์ไม่ได้เลย: pure function โดน unit เทสต์ครบทุกเคสใน `tests/combobox-keyboard.test.ts` ส่วนผลข้าง DOM (`aria-activedescendant` ถูกเรนเดอร์จริง, `scrollIntoView`, keypress จริงวิ่งเข้าถึง input) โดน e2e จับใน `e2e/smoke.spec.ts` ที่ยิง key จริงในเบราว์เซอร์จริง **เทสต์เขียวฝั่ง unit พิสูจน์แค่ว่าคณิตถูก มีแต่ e2e เท่านั้นที่พิสูจน์ว่าต่อสายถูก**
+- **Enter ต้อง fallthrough ไม่ใช่กลืนทิ้ง:** ตอนไม่มีอะไรถูกไฮไลต์ Enter ต้องปล่อยให้ form submit ตามปกติ ไม่งั้นพฤติกรรมเดิม “Enter เพื่อค้น” จะหายไป นี่คือเคสที่ naive implementation จะพังเงียบๆ และมีเทสต์กันไว้
+- **index เก่าต้องปลอดภัย:** ถ้ารายการย่อลงตอนที่ผู้ใช้กดลูกศรอยู่ Enter ต้อง commit ไม่ใช่ select index ที่ไม่มีอยู่จริง
+- **ไม่แย่ง Home/End และ Tab:** ในช่องพิมพ์สองปุ่มนี้เป็นของ caret ข้อความ การไปยึดจะทำให้แก้ข้อความกลายเป็นการเลื่อนลิสต์
+- **คำค้นใน e2e ดึงจากแค็ตตาลจริง ไม่ hardcode** — CI seed คนละชุดกับ production และ endpoint ไม่ match สระ/substring ทั่วไป ลิเตอรัลที่ดูสมเหตุสมผลอย่าง `"a"` จะคืน 0 suggestion แล้วเทสต์ผ่านมั่วหรือพังวูบวาบ การถาม API ก่อนแล้ว `test.skip` พร้อม annotation คือเวอร์ชันเดียวที่โกหกไม่ได้
+- **mutation ยืนยันแล้ว:** ถอด wrap-around → แดง · Enter ไม่เคย select → แดง 3 เคส · ลูกศรไม่ ignore เมื่อลิสต์ว่าง → แดง · ดัก Tab → แดง · ถอด `aria-activedescendant` ออกจาก DOM จริง → e2e แดง 3 จาก 4
 
 ## Security Audit — แยก production (blocking) กับ dev (report) (2026-10-03)
 

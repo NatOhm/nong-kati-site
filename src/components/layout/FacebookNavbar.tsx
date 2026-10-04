@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Search, MessageCircle, Menu } from 'lucide-react';
@@ -15,6 +15,7 @@ import { ProfileMenu } from './ProfileMenu';
 import { useCustomerSession } from './useCustomerSession';
 import { AcornIcon, HamsterFace } from '@/components/ui/ClayIcons';
 import { useCart } from '@/hooks/useCart';
+import { useComboboxKeyboard } from '@/hooks/useComboboxKeyboard';
 
 interface FacebookNavbarProps {
   onMenuToggle?: () => void;
@@ -55,6 +56,37 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
       window.location.href = `/search?q=${encodeURIComponent(searchQuery.trim())}`;
     }
   };
+
+  /* Close the suggestion list. Wired into the popover's outside-click/Escape
+     handling AND the combobox keyboard, so both dismissal paths reset it. */
+  const closeSuggestions = useCallback(() => setSuggestions([]), []);
+
+  const goToProduct = useCallback((slug: string) => {
+    window.location.href = `/product/${slug}`;
+  }, []);
+
+  /* Per-option ids for aria-activedescendant. Scoped to this instance's
+     useId, so the navbar box and the /search box never collide even though
+     /search renders both DOM trees. */
+  const searchOptionIds = suggestions.map((_, i) => `${suggestListId}-opt-${i}`);
+
+  // Arrow keys + Enter. This box previously accepted only Escape and the
+  // mouse, so there was no keyboard path to a suggestion at all.
+  const {
+    activeIndex: searchActiveIndex,
+    activeDescendantId: searchActiveDescendantId,
+    onKeyDown: onSearchKeyDown,
+  } = useComboboxKeyboard({
+    optionIds: searchOptionIds,
+    onSelect: (i) => goToProduct(suggestions[i]?.slug ?? ''),
+    onCommit: () => {
+      if (searchQuery.trim()) {
+        window.location.href = `/search?q=${encodeURIComponent(searchQuery.trim())}`;
+      }
+    },
+    onClose: closeSuggestions,
+    resetKey: searchQuery,
+  });
 
   // Google-style suggestions: debounced live lookups as you type.
   useEffect(() => {
@@ -144,6 +176,8 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
                   role="combobox"
                   aria-expanded={searchFocused && suggestions.length > 0}
                   aria-controls={suggestListId}
+                  aria-activedescendant={searchActiveDescendantId}
+                  aria-autocomplete="list"
                   aria-label="ค้นหาสินค้า"
                   placeholder="ค้นหาสินค้า…"
                   autoComplete="off"
@@ -151,9 +185,7 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onFocus={() => setSearchFocused(true)}
                   onBlur={() => setSearchFocused(false)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Escape') setSuggestions([]);
-                  }}
+                  onKeyDown={onSearchKeyDown}
                   className="w-48 min-w-0 flex-1 bg-transparent text-sm text-fg placeholder:text-fg-muted lg:w-64 xl:w-56"
                 />
               </div>
@@ -164,7 +196,7 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
                   overflow-hidden. */}
               <AnchoredPopover
                 open={searchFocused && suggestions.length > 0}
-                onClose={() => setSuggestions([])}
+                onClose={closeSuggestions}
                 anchorRef={searchAnchorRef}
                 align="start"
                 role="listbox"
@@ -172,16 +204,22 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
                 id={suggestListId}
                 className="clay-card suggest-drop w-80 overflow-hidden rounded-2xl p-1.5"
               >
-                  {suggestions.map((s) => (
+                  {suggestions.map((s, i) => (
                     <button
                       key={s.slug}
+                      id={searchOptionIds[i]}
                       type="button"
                       role="option"
-                      aria-selected={false}
+                      aria-selected={searchActiveIndex === i}
                       onMouseDown={() => {
                         window.location.href = `/product/${s.slug}`;
                       }}
-                      className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2.5 text-left transition-colors duration-fast hover:bg-surface-sunken"
+                      className={cn(
+                        'flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2.5 text-left transition-colors duration-fast',
+                        searchActiveIndex === i
+                          ? 'bg-surface-sunken'
+                          : 'hover:bg-surface-sunken',
+                      )}
                     >
                       <Search size={14} className="shrink-0 text-fg-placeholder" />
                       <span className="min-w-0 flex-1">

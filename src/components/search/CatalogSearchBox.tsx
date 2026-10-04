@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Search } from 'lucide-react';
 import { AnchoredPopover } from '@/components/ui/AnchoredPopover';
+import { useComboboxKeyboard } from '@/hooks/useComboboxKeyboard';
 import { cn } from '@/utils/cn';
 
 /**
@@ -61,6 +62,21 @@ export function CatalogSearchBox({ className }: { className?: string }): React.J
     router.push(q.trim() ? `/search?q=${encodeURIComponent(q.trim())}` : '/search');
   };
 
+  /* Per-option ids — aria-activedescendant needs a stable id per option, and
+     they must be unique across the two search boxes on the page. */
+  const optionIds = suggestions.map((_, i) => `${suggestListId}-opt-${i}`);
+
+  // Arrow keys + Enter. This box previously accepted only Escape and the
+  // mouse, so a keyboard or screen-reader user could not reach a suggestion at
+  // all despite the combobox/listbox roles advertising one.
+  const { activeIndex, activeDescendantId, onKeyDown } = useComboboxKeyboard({
+    optionIds,
+    onSelect: (i) => go(suggestions[i]?.name ?? query),
+    onCommit: () => go(query),
+    onClose: close,
+    resetKey: query,
+  });
+
   return (
     <div ref={boxRef} className={cn('relative', className)}>
       <form
@@ -77,15 +93,15 @@ export function CatalogSearchBox({ className }: { className?: string }): React.J
             role="combobox"
             aria-expanded={open && suggestions.length > 0}
             aria-controls={suggestListId}
+            aria-activedescendant={activeDescendantId}
+            aria-autocomplete="list"
             aria-label="ค้นหาสินค้า"
             placeholder="ค้นหาสินค้า…"
             autoComplete="off"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => suggestions.length > 0 && setOpen(true)}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') setOpen(false);
-            }}
+            onKeyDown={onKeyDown}
             className="h-11 w-full bg-transparent text-base text-fg"
           />
         </div>
@@ -110,14 +126,21 @@ export function CatalogSearchBox({ className }: { className?: string }): React.J
         id={suggestListId}
         className="clay-card suggest-drop max-h-[min(24rem,calc(100vh-1rem))] overflow-y-auto overscroll-contain rounded-2xl p-1.5"
       >
-          {suggestions.map((s) => (
+          {suggestions.map((s, i) => (
             <button
               key={s.slug}
+              id={optionIds[i]}
               type="button"
               role="option"
-              aria-selected={false}
+              aria-selected={activeIndex === i}
               onMouseDown={() => go(s.name)}
-              className="flex min-h-[44px] w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2.5 text-left transition-colors duration-fast hover:bg-surface-sunken"
+              className={cn(
+                'flex min-h-[44px] w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2.5 text-left transition-colors duration-fast',
+                // Highlight follows the keyboard highlight too, so the mouse
+                // and keyboard affordances look the same. Without this a
+                // keyboard user gets no visible indication of where they are.
+                activeIndex === i ? 'bg-surface-sunken' : 'hover:bg-surface-sunken',
+              )}
             >
               <Search size={14} className="shrink-0 text-fg-placeholder" />
               <span className="min-w-0 flex-1">

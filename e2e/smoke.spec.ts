@@ -241,3 +241,142 @@ test.describe('API security headers', () => {
     });
   });
 });
+
+/**
+ * Combobox keyboard operation (WCAG 2.1.1).
+ *
+ * Bug (Oct 4, 2026): both search boxes advertised role=combobox +
+ * aria-expanded + aria-controls + a listbox of role=option, and implemented
+ * none of the navigation that implies. Escape and the mouse worked; nothing
+ * else did. A keyboard or screen-reader user had no way to reach a suggestion.
+ *
+ * The pure decision function is unit-tested in
+ * tests/combobox-keyboard.test.ts. This block covers the DOM half that a node
+ * -environment test cannot reach: that real keypresses land on the input, that
+ * aria-activedescendant actually moves, and that the highlighted option is the
+ * one Enter commits. A green unit test proves the arithmetic; only this proves
+ * the wiring.
+ */
+test.describe('search suggestions are keyboard operable', () => {/**
+   * Type a query that reliably returns suggestions, then wait for the list.
+   *
+   * The term is DERIVED from whatever catalog this environment seeded rather
+   * than hardcoded. Two reasons: CI seeds prisma/seed.ts while a local run may
+   * point at any database, and the suggest endpoint does not match on vowels
+   * or arbitrary substrings — so a plausible-looking literal like "a" silently
+   * returns zero suggestions and the test passes vacuously or fails flakily.
+   * Asking the API first and skipping loudly when nothing matches is the only
+   * version of this that cannot lie.
+   */
+  async function queryWithSuggestions(
+    page: import('@playwright/test').Page,
+  ): Promise<string | null> {
+    const res = await page.request.get('/api/v1/products?limit=10');
+    const data = (await res.json()) as { products?: { name: string }[] };
+    for (const p of data.products ?? []) {
+      // A 3-char prefix is what the suggest endpoint indexes on.
+      const term = (p.name ?? '').slice(0, 3).trim();
+      if (term.length < 2) continue;
+      const s = await page.request.get(`/api/v1/search/suggest?q=${encodeURIComponent(term)}`);
+      const d = (await s.json()) as { suggestions?: unknown[] };
+      if ((d.suggestions ?? []).length >= 2) return term;
+    }
+    return null;
+  }
+
+  async function openSuggestions(page: import('@playwright/test').Page): Promise<string | null> {
+    const term = await queryWithSuggestions(page);
+    if (!term) {
+      test.info().annotations.push({
+        type: 'skip-reason',
+        description: 'no catalog term returned 2+ suggestions; keyboard nav not exercised',
+      });
+      return null;
+    }
+    const box = page.locator('input[role="combobox"].h-11').first();
+    await box.click();
+    await box.fill(term);
+    await expect(page.locator('[role="listbox"][aria-label="คำค้นแนะนำ"]')).toBeVisible();
+    return term;
+  }
+
+  test('/search: arrows move aria-activedescendant and Enter navigates', async ({ page }) => {
+    await page.goto('/search');
+    const term = await openSuggestions(page);
+    test.skip(term === null, 'catalog yielded no suggestion-bearing query');
+
+    const input = page.locator('input[role="combobox"].h-11').first();
+    const listbox = page.locator('[role="listbox"][aria-label="คำค้นแนะนำ"]');
+
+    // Nothing highlighted before any arrow key.
+    await expect(input).not.toHaveAttribute('aria-activedescendant', /./);
+
+    await input.press('ArrowDown');
+    const firstId = await input.getAttribute('aria-activedescendant');
+    expect(firstId, 'ArrowDown must expose the active option to AT').toBeTruthy();
+
+    await input.press('ArrowDown');
+    const secondId = await input.getAttribute('aria-activedescendant');
+    expect(secondId).not.toBe(firstId);
+
+    // The referenced id must actually exist in the DOM and be selected —
+    // an activedescendant pointing at nothing is worse than none at all.
+    // Attribute selector, not `#id`: these ids come from React's useId and an
+    // id selector would need escaping that does not exist in Node.
+    await expect(listbox.locator(`[id="${secondId}"]`)).toHaveAttribute('aria-selected', 'true');
+
+    // Enter commits the highlighted option.
+    const selectedText = await listbox.locator(`[id="${secondId}"]`).innerText();
+    await input.press('Enter');
+    await page.waitForURL(/\/search\?q=/);
+    expect(decodeURIComponent(page.url())).toContain(
+      // the committed suggestion is now the query
+      selectedText.split('\n')[0]!.trim(),
+    );
+  });
+
+  test('/search: Enter with no highlight still searches (fallthrough preserved)', async ({ page }) => {
+    await page.goto('/search');
+    const term = await openSuggestions(page);
+    test.skip(term === null, 'catalog yielded no suggestion-bearing query');
+    const input = page.locator('input[role="combobox"].h-11').first();
+
+    // No arrow key pressed: Enter must run the plain form submit rather than
+    // being swallowed by the combobox.
+    await expect(input).not.toHaveAttribute('aria-activedescendant', /./);
+    await input.press('Enter');
+    await page.waitForURL(/\/search\?q=/);
+  });
+
+  test('/search: Escape closes the list and clears the highlight', async ({ page }) => {
+    await page.goto('/search');
+    const term = await openSuggestions(page);
+    test.skip(term === null, 'catalog yielded no suggestion-bearing query');
+    const input = page.locator('input[role="combobox"].h-11').first();
+    const listbox = page.locator('[role="listbox"][aria-label="คำค้นแนะนำ"]');
+
+    await input.press('ArrowDown');
+    await expect(input).toHaveAttribute('aria-activedescendant', /./);
+
+    await input.press('Escape');
+    await expect(listbox).toBeHidden();
+    await expect(input).not.toHaveAttribute('aria-activedescendant', /./);
+  });
+
+  test('navbar search is keyboard operable too', async ({ page }) => {
+    await page.goto('/');
+    const term = await queryWithSuggestions(page);
+    test.skip(term === null, 'catalog yielded no suggestion-bearing query');
+    const input = page.locator('nav input[role="combobox"]').first();
+    await input.click();
+    await input.fill(term!);
+
+    const listbox = page.locator('[role="listbox"][aria-label="คำค้นแนะนำ"]');
+    await expect(listbox).toBeVisible();
+
+    await input.press('ArrowDown');
+    const id = await input.getAttribute('aria-activedescendant');
+    expect(id, 'navbar combobox must expose its active option').toBeTruthy();
+    await expect(listbox.locator(`[id="${id}"]`)).toHaveAttribute('aria-selected', 'true');
+  });
+});
