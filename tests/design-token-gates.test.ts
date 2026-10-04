@@ -284,9 +284,12 @@ const fmt = (list: Violation[]): string =>
 
 let gates: ReturnType<typeof scanSource>;
 
+// Reads every .ts/.tsx under src/ (~2.3 s standalone) but can exceed vitest's
+// 10 s default hook timeout when the full suite spawns 39 workers at once on a
+// loaded machine. Failures were always the hook timing out, never an assertion.
 beforeAll(() => {
   gates = scanSource();
-});
+}, 60_000);
 
 describe('design-token regression gates (source scan)', () => {
   it('R1: no light-scope coral text — semantic fg tokens only', () => {
