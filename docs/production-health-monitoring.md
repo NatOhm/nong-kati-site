@@ -107,6 +107,37 @@ State travels between runs through the Actions cache (`restore-keys` picks the m
 recent entry), because every runner is ephemeral. History is uploaded as an artifact
 (30-day retention).
 
+### Setting up the dead-man's switch
+
+Requires your accounts — an agent cannot create either one. About two minutes.
+
+1. **Create the check** at [healthchecks.io](https://healthchecks.io/) (Sign Up →
+   *Add Check*). Name it `nongkatistore health monitor`.
+2. **Set the period to 10 minutes** to match the cron (`*/10 * * * *`), and give it
+   a **grace period of about 20 minutes**. This is the setting people get wrong:
+   healthchecks defaults to a 24 h period with no grace, so a 10-minute cron would
+   either never alert or fire constantly. Period = 10 min, grace = 20 min, alert if
+   no ping for 30 minutes.
+3. Choose an alert channel (email is enough to start).
+4. **Copy the ping URL** — it looks like `https://hc-ping.com/<uuid>`. Use the bare
+   ping URL; the workflow already appends nothing to it.
+
+   > **Never commit the real ping URL to this repository.** `nong-kati-site` is a
+   > **public** repo, and anyone who has the URL can mark the check "up". A ping URL in
+   > git would silently disarm the dead-man's switch it is supposed to provide — the
+   > failure would look like a healthy system. It belongs in the repo *secret* only,
+   > and in whatever password manager holds it.
+5. **Add it as a repo secret**: GitHub → repo → Settings → Secrets and variables →
+   Actions → *New repository secret*, name **`HEALTHCHECKS_PING_URL`**, paste the
+   URL. The exact name matters; the workflow reads that key.
+6. **Confirm it works**: Actions → *Production Health Monitor* → *Run workflow*. The
+   ping step logs `ping failed (non-fatal)` if the URL is wrong, and the check's
+   status flips to green within a minute. If the job log says
+   `HEALTHCHECKS_PING_URL not set — skipping`, the secret name is wrong.
+
+Verify by absence, not presence: once wired, the failure this protects against is a
+check going **quiet**, which looks identical to a healthy system from inside GitHub.
+
 ### Optional third-party uptime service
 
 [UptimeRobot](https://uptimerobot.com) (free tier) was evaluated as an external

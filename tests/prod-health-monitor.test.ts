@@ -32,8 +32,21 @@
  *       A monitor that stops because its state file is ugly stops monitoring.
  *  G8 — the scheduled workflow exists and is wired to this script, so the
  *       monitoring cannot be deleted silently by a refactor.
+ *  G9 — every third-party action is pinned to a full 40-hex commit SHA. The
+ *       monitor's first-ever run failed in 2s because `actions/cache` was
+ *       pinned to a well-formed but NON-EXISTENT SHA, so the job could not
+ *       even start. A real SHA cannot be verified offline, so this gate does
+ *       the half that is checkable without the network (no floating tags) and
+ *       `scripts/verify-action-pins.sh` does the other half against the API.
  */
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -266,5 +279,29 @@ describe('G8 — the scheduled monitor cannot be deleted silently', () => {
     // The check can be green while the SCHEDULE is dead (cron disabled, repo
     // paused, Actions quota exhausted). Only an external watchdog notices that.
     expect(workflow).toMatch(/healthchecks\.io/);
+  });
+});
+
+describe('G9 — action pins cannot be floating tags', () => {
+  it('pins every `uses:` in every workflow to a full commit SHA', () => {
+    const dir = path.join(process.cwd(), '.github/workflows');
+    const files = readdirSync(dir).filter((f) => f.endsWith('.yml') || f.endsWith('.yaml'));
+    expect(files.length).toBeGreaterThan(0);
+
+    const unpinned: string[] = [];
+    for (const file of files) {
+      for (const line of readFileSync(path.join(dir, file), 'utf-8').split('\n')) {
+        const ref = line.match(/uses:\s*(\S+)/)?.[1];
+        if (ref === undefined) continue;
+        if (ref.startsWith('./') || ref.startsWith('docker://')) continue;
+        // Anchored at BOTH ends on purpose. The pin that actually broke this
+        // monitor was 41 hex chars, so an unanchored /@[0-9a-f]{40}/ would have
+        // matched its first 40 and passed a ref that cannot resolve.
+        if (!/@[0-9a-f]{40}$/.test(ref)) unpinned.push(`${file}: ${ref}`);
+      }
+    }
+    // A tag like `actions/cache@v4` is a supply-chain hole; a typo'd SHA is
+    // what actually broke this monitor. Both are caught by the same shape.
+    expect(unpinned).toEqual([]);
   });
 });

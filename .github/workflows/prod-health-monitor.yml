@@ -57,7 +57,7 @@ jobs:
       # so the job starts in seconds and cannot break because a dependency did.
       - name: Restore previous uptime state
         id: state
-        uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93a26806 # v4 (pinned)
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0 (pinned)
         with:
           path: .prod-health
           # The trailing - keys to "the most recent cache whose prefix matches",
@@ -114,7 +114,7 @@ jobs:
 
       - name: Persist state for the next run
         if: always()
-        uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93a26806 # v4 (pinned)
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0 (pinned)
         with:
           path: .prod-health
           key: prod-health-state-${{ github.run_id }}
