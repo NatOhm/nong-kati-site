@@ -28,6 +28,9 @@ import path from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 const NAVBAR = path.join(process.cwd(), 'src/components/layout/FacebookNavbar.tsx');
+const PROFILE = path.join(process.cwd(), 'src/components/layout/ProfileMenu.tsx');
+const NOTIFICATIONS = path.join(process.cwd(), 'src/components/layout/NotificationsDropdown.tsx');
+const POPOVER = path.join(process.cwd(), 'src/components/ui/AnchoredPopover.tsx');
 
 let source = '';
 
@@ -92,5 +95,61 @@ describe('navbar layout gates', () => {
     expect(start, 'right-hand cluster not found').toBeGreaterThan(-1);
     const close = source.indexOf('>', source.indexOf('className="flex', start));
     expect(source.slice(start, close)).toMatch(/\bshrink-0\b/);
+  });
+
+  /**
+   * G5 — every navbar popover escapes the row's overflow clip.
+   *
+   * Bug (Oct 4, 2026): all three popovers were `absolute top-full` children of
+   * the justify-between row that carries `overflow-hidden`, so they were
+   * cropped to the 56–64px bar: search 55/70px hidden, account 291/295px,
+   * notifications 318/322px. `z-50` cannot defeat `overflow: hidden` — a clip
+   * is applied after stacking.
+   *
+   * The fix is a portal (AnchoredPopover), NOT removing `overflow-hidden`:
+   * that guard is what keeps the document from scrolling horizontally
+   * (WCAG 1.4.10), which G1–G4 exist to protect. So this gate asserts the
+   * popovers render through the portal and that the overflow guard survives.
+   */
+  it('G5 — popovers are portaled out of the overflow-clipped row', () => {
+    const popover = readFileSync(POPOVER, 'utf-8');
+    // The primitive must actually portal to document.body.
+    expect(
+      popover,
+      'AnchoredPopover must render through createPortal into document.body, or it is clipped again',
+    ).toMatch(/createPortal\(/);
+    expect(popover).toMatch(/document\.body/);
+    // Fixed positioning against the anchor rect, not absolute-in-the-row.
+    expect(popover).toMatch(/position:\s*'fixed'/);
+
+    // Each popover consumer must use the primitive, not a hand-rolled
+    // `absolute top-full` panel. Comments are stripped first — these files
+    // document the old `absolute top-full` markup in prose, and matching that
+    // prose would make the gate fail on its own explanation.
+    const stripComments = (s: string): string =>
+      s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+
+    for (const [name, file] of [
+      ['FacebookNavbar', NAVBAR],
+      ['ProfileMenu', PROFILE],
+      ['NotificationsDropdown', NOTIFICATIONS],
+    ] as const) {
+      const raw = readFileSync(file, 'utf-8');
+      const src = stripComments(raw);
+      expect(raw, `${name} must render its popover through AnchoredPopover`).toContain(
+        'AnchoredPopover',
+      );
+      expect(
+        src,
+        `${name} reintroduced an \`absolute top-full\` popover → clipped by the row's overflow-hidden`,
+      ).not.toMatch(/absolute[^"']*top-full/);
+    }
+
+    // The reflow guard itself must still be there — a portal is not a licence
+    // to delete the WCAG 1.4.10 protection.
+    expect(
+      source,
+      'the justify-between row lost overflow-hidden → the horizontal scrollbar the a11y audit removed is back',
+    ).toMatch(/justify-between[^"']*overflow-hidden|overflow-hidden[^"']*justify-between/);
   });
 });

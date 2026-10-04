@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Search, MessageCircle, Menu } from 'lucide-react';
 import { cn } from '@/utils/cn';
+import { AnchoredPopover } from '@/components/ui/AnchoredPopover';
 import { CartIcon } from '@/components/cart/CartIcon';
 import { CartDrawer } from '@/components/cart/CartDrawer';
 import { NotificationsDropdown } from './NotificationsDropdown';
@@ -45,6 +46,8 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
+  /* Anchor for the portaled suggestion list (see AnchoredPopover). */
+  const searchAnchorRef = useRef<HTMLFormElement>(null);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,6 +113,7 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
                 it (audit #9: one search control per viewport). */}
             <form
               onSubmit={handleSearch}
+              ref={searchAnchorRef}
               className={cn(
                 'relative hidden min-w-0 md:block',
                 pathname?.startsWith('/search') && 'md:hidden',
@@ -155,14 +159,19 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
               </div>
 
               {/* Suggestion dropdown — mousedown navigates before the input's
-                  blur can hide the list */}
-              {searchFocused && suggestions.length > 0 && (
-                <div
-                  id={suggestListId}
-                  role="listbox"
-                  aria-label="คำค้นแนะนำ"
-                  className="clay-card suggest-drop absolute left-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-2xl p-1.5"
-                >
+                  blur can hide the list. Portaled: as an `absolute top-full`
+                  child of this row it lost 55/70px to the row's
+                  overflow-hidden. */}
+              <AnchoredPopover
+                open={searchFocused && suggestions.length > 0}
+                onClose={() => setSuggestions([])}
+                anchorRef={searchAnchorRef}
+                align="start"
+                role="listbox"
+                ariaLabel="คำค้นแนะนำ"
+                id={suggestListId}
+                className="clay-card suggest-drop w-80 overflow-hidden rounded-2xl p-1.5"
+              >
                   {suggestions.map((s) => (
                     <button
                       key={s.slug}
@@ -181,8 +190,7 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
                       </span>
                     </button>
                   ))}
-                </div>
-              )}
+              </AnchoredPopover>
             </form>
           </div>
 

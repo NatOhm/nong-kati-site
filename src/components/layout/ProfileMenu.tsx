@@ -15,6 +15,7 @@ import {
 
 import { cn } from '@/utils/cn';
 import { formatThb } from '@/utils/format';
+import { AnchoredPopover } from '@/components/ui/AnchoredPopover';
 import {
   useAdminIdentity,
   ADMIN_ROLE_LABELS,
@@ -52,15 +53,6 @@ export function ProfileMenu(): React.JSX.Element {
       .catch(() => setWallet({ balanceThb: 0 }));
   }, [sessionState]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onDoc = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
-  }, [open]);
-
   // Guests without an admin session keep the plain login link. Guests WITH an
   // admin session fall through to the popover so they can reach /management.
   if (sessionState !== 'authed' && !admin) {
@@ -93,12 +85,17 @@ export function ProfileMenu(): React.JSX.Element {
         <ChevronDown size={14} className={cn('transition-transform', open && 'rotate-180')} />
       </button>
 
-      {open && (
-        <div
-          role="menu"
-          aria-label="เมนูบัญชี"
-          className="clay-card suggest-drop absolute right-0 top-full z-50 mt-2 w-64 rounded-2xl p-2"
-        >
+      {/* Portaled to document.body — as an `absolute top-full` child of the
+          navbar row this panel lost 291/295px to the row's overflow-hidden. */}
+      <AnchoredPopover
+        open={open}
+        onClose={() => setOpen(false)}
+        anchorRef={rootRef}
+        align="end"
+        role="menu"
+        ariaLabel="เมนูบัญชี"
+        className="clay-card suggest-drop w-64 rounded-2xl p-2"
+      >
           {/* Identity — customer when signed in; admin identity when admin */}
           <div className="border-b border-line-subtle px-3 pb-3 pt-2">
             <p className="truncate text-sm font-bold text-fg">
@@ -215,8 +212,7 @@ export function ProfileMenu(): React.JSX.Element {
               </button>
             )}
           </div>
-        </div>
-      )}
+      </AnchoredPopover>
     </div>
   );
 }

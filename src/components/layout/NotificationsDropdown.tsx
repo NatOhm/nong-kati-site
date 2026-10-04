@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Bell, CheckCheck, Tag } from 'lucide-react';
 import { cn } from '@/utils/cn';
+import { AnchoredPopover } from '@/components/ui/AnchoredPopover';
 
 /**
  * Navbar bell — real data from /api/v1/notifications.
@@ -53,20 +54,6 @@ export function NotificationsDropdown(): React.JSX.Element {
   useEffect(() => {
     if (!open) return;
     void load().then(setItems);
-    const handleClick = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('mousedown', handleClick);
-    document.addEventListener('keydown', handleEsc);
-    return () => {
-      document.removeEventListener('mousedown', handleClick);
-      document.removeEventListener('keydown', handleEsc);
-    };
   }, [open, load]);
 
   const unreadCount = items?.filter((n) => !n.read).length ?? 0;
@@ -95,12 +82,18 @@ export function NotificationsDropdown(): React.JSX.Element {
         )}
       </button>
 
-      {open && (
-        <div
-          role="dialog"
-          aria-label="รายการแจ้งเตือน"
-          className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-xl border border-line-subtle bg-surface-elevated shadow-clay-lg"
-        >
+      {/* Portaled to document.body: the navbar row's overflow-hidden clipped
+          318/322px of this panel as an `absolute top-full` child. AnchoredPopover
+          keeps the reflow guard on the row intact. */}
+      <AnchoredPopover
+        open={open}
+        onClose={() => setOpen(false)}
+        anchorRef={containerRef}
+        align="end"
+        role="dialog"
+        ariaLabel="รายการแจ้งเตือน"
+        className="w-80 overflow-hidden rounded-xl border border-line-subtle bg-surface-elevated shadow-clay-lg"
+      >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-line-subtle px-4 py-2.5">
             <h2 className="text-sm font-semibold text-fg">การแจ้งเตือน</h2>
@@ -165,8 +158,7 @@ export function NotificationsDropdown(): React.JSX.Element {
           >
             ดูคำสั่งซื้อทั้งหมด
           </Link>
-        </div>
-      )}
+      </AnchoredPopover>
     </div>
   );
 }
