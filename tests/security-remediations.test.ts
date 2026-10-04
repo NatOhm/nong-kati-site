@@ -68,6 +68,73 @@ describe('jwt secret handling', () => {
   });
 });
 
+// ─── TOTP secret generation (regression) ─────────────────
+
+describe('generateTotpSecret', () => {
+  it('emits a fixed 32-char base32 secret (RFC 4648, unpadded)', async () => {
+    const { generateTotpSecret } = await import('@/lib/jwt');
+    for (let i = 0; i < 500; i++) {
+      const secret = generateTotpSecret();
+      // 20 random bytes -> exactly 32 base32 chars. A variable length is the
+      // fingerprint of the old bug: hex was drawn, then `.replace(/[^A-Z2-7]/g,
+      // '')` deleted 0/1/8/9, yielding 17-32 chars and ~25% less entropy.
+      expect(secret).toHaveLength(32);
+      // Full base32 alphabet must be reachable, not just the 12 hex-ish chars
+      // (234567ABCDEF) the old filter allowed through.
+      expect(secret).toMatch(/^[A-Z2-7]{32}$/);
+    }
+  });
+
+  it('uses the whole base32 alphabet across many samples', async () => {
+    const { generateTotpSecret } = await import('@/lib/jwt');
+    const seen = new Set<string>();
+    for (let i = 0; i < 400; i++) {
+      for (const ch of generateTotpSecret()) seen.add(ch);
+    }
+    expect(seen.size).toBe(32);
+  });
+
+  it('does not repeat secrets', async () => {
+    const { generateTotpSecret } = await import('@/lib/jwt');
+    const seen = new Set<string>();
+    for (let i = 0; i < 2000; i++) seen.add(generateTotpSecret());
+    expect(seen.size).toBe(2000);
+  });
+
+  it('round-trips: a generated secret verifies its own computed code', async () => {
+    const { generateTotpSecret, computeTotp, verifyTotpCode } = await import('@/lib/jwt');
+    const secret = generateTotpSecret();
+    const now = Math.floor(Date.now() / 1000);
+    const code = await computeTotp(secret, now);
+    expect(code).toMatch(/^\d{6}$/);
+    await expect(verifyTotpCode(secret, code!)).resolves.toBe(true);
+  });
+
+  it('still verifies secrets minted by the previous (variable-length) format', async () => {
+    // Backward compatibility: accounts provisioned before this fix keep their
+    // stored secret, and base32Decode must still accept it.
+    const { computeTotp, verifyTotpCode } = await import('@/lib/jwt');
+    const legacy = 'MFRGGZDFMZTWQ2LKNNWG23TPOBYXE43U'; // 32-char, hand-written fixture
+    expect(legacy).toHaveLength(32);
+    const now = Math.floor(Date.now() / 1000);
+    const code = await computeTotp(legacy, now);
+    expect(code).toMatch(/^\d{6}$/);
+    await expect(verifyTotpCode(legacy, code!)).resolves.toBe(true);
+  });
+
+  it('accepts a short pre-fix secret (the real 17-char shape it produced)', async () => {
+    // The old generator could emit as few as 17 chars. Those accounts exist,
+    // so verification must keep working for them.
+    const { computeTotp, verifyTotpCode } = await import('@/lib/jwt');
+    const legacyShort = 'ABCDEFGHIJKLMNOPQ'; // 17 chars, pre-fix floor
+    expect(legacyShort.length).toBeLessThan(32);
+    const now = Math.floor(Date.now() / 1000);
+    const code = await computeTotp(legacyShort, now);
+    expect(code).toMatch(/^\d{6}$/);
+    await expect(verifyTotpCode(legacyShort, code!)).resolves.toBe(true);
+  });
+});
+
 // ─── Slip capability secret fail-closed (review High #1) ──
 
 describe('slip token secret handling', () => {

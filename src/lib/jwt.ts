@@ -252,11 +252,19 @@ export async function hashRefreshToken(token: string): Promise<string> {
  * 08-auth.md §5.2 — 20-byte base32 secret.
  */
 export function generateTotpSecret(): string {
-  const bytes = getRandomHex(20);
-  return bytes
-    .toUpperCase()
-    .replace(/[^A-Z2-7]/g, '')
-    .slice(0, 32);
+  // 20 cryptographically random bytes, RFC 4648 base32-encoded (32 chars).
+  //
+  // The previous implementation drew a 40-char HEX string and then deleted
+  // every character outside the base32 alphabet with
+  // `.replace(/[^A-Z2-7]/g, '')`. Hex uses 0-9a-f, and 0, 1, 8 and 9 are not
+  // base32 characters, so ~25% of the entropy was silently thrown away and the
+  // result was a VARIABLE length (measured: 17-32 chars, never a reliable 32).
+  // Some authenticator apps validate the setup key's length/shape and refuse
+  // a short one, which presents to the operator as "my auth key does not work".
+  // Encode real random bytes instead: fixed 32 chars, full 160 bits.
+  const bytes = new Uint8Array(20);
+  globalThis.crypto.getRandomValues(bytes);
+  return base32Encode(bytes);
 }
 
 /**
@@ -275,6 +283,23 @@ export function generateBackupCodes(count: number = 10): string[] {
 // ─── TOTP (RFC 6238) ─────────────────────────────────────
 
 const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+
+/** RFC 4648 base32 encode, no padding (20 bytes -> 32 chars). */
+function base32Encode(bytes: Uint8Array): string {
+  let bits = 0;
+  let value = 0;
+  let out = '';
+  for (const byte of bytes) {
+    value = (value << 8) | byte;
+    bits += 8;
+    while (bits >= 5) {
+      out += BASE32_ALPHABET[(value >>> (bits - 5)) & 31];
+      bits -= 5;
+    }
+  }
+  if (bits > 0) out += BASE32_ALPHABET[(value << (5 - bits)) & 31];
+  return out;
+}
 
 function base32Decode(input: string): Uint8Array {
   const clean = input.toUpperCase().replace(/[^A-Z2-7]/g, '');

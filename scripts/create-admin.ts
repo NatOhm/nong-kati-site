@@ -52,8 +52,17 @@ function strongPassword(): string {
 }
 
 async function main(): Promise<void> {
-  const [email, fullName, role, password, rotateFlag] = process.argv.slice(2);
-  const rotate = rotateFlag === '--rotate';
+  // Pull the flag out BEFORE reading positionals. The documented usage is
+  //   <email> "<Full Name>" <role> [password] [--rotate]
+  // so when the optional password is omitted, `--rotate` slides into the
+  // PASSWORD slot and the run dies with "Password must be at least 12
+  // characters" — which reads like a password-policy error, not a parsing
+  // one, and makes "omit the password to get a strong generated one"
+  // impossible to use on an existing account.
+  const argv = process.argv.slice(2);
+  const rotate = argv.includes('--rotate');
+  const positional = argv.filter((a) => a !== '--rotate');
+  const [email, fullName, role, password] = positional;
   if (!email || !fullName || !role) {
     console.error(
       'Usage: npx tsx scripts/create-admin.ts <email> "<Full Name>" <role> [password] [--rotate]',
