@@ -210,6 +210,19 @@ export function HamsterFace({ size = 40, className }: ClayIconProps): React.JSX.
       {/* nose + mouth */}
       <ellipse cx="40" cy="49" rx="3" ry="2.2" fill="#FB7185" />
       <path d="M36 53.5 q4 3 8 0" stroke="#4E3820" strokeWidth="1.8" strokeLinecap="round" />
+      {/* Buck teeth + whiskers. Round ears and a button nose read as any small
+          animal; the two incisors and the whisker fan are what make it a
+          hamster specifically. Without them this was a plain round blob. */}
+      <g stroke="#C2A57F" strokeWidth="0.9" strokeLinecap="round" opacity="0.7">
+        <path d="M24 50 Q14 47 3 45" />
+        <path d="M24 54 Q14 55 4 56" />
+        <path d="M24 58 Q15 61 6 64" />
+        <path d="M56 50 Q66 47 77 45" />
+        <path d="M56 54 Q66 55 76 56" />
+        <path d="M56 58 Q65 61 74 64" />
+      </g>
+      <rect x="35.4" y="56" width="4.6" height="7.4" rx="1.7" fill="#FFFFFF" stroke="#EADCC3" strokeWidth="0.7" />
+      <rect x="40" y="56" width="4.6" height="7.4" rx="1.7" fill="#FFFFFF" stroke="#EADCC3" strokeWidth="0.7" />
       {/* blush */}
       <ellipse cx="16" cy="54" rx="4.4" ry="2.6" fill="#FECDD3" opacity="0.85" />
       <ellipse cx="64" cy="54" rx="4.4" ry="2.6" fill="#FECDD3" opacity="0.85" />
@@ -253,6 +266,19 @@ export function HamsterMascot({ size = 120, className }: ClayIconProps): React.J
       {/* nose + mouth */}
       <ellipse cx="60" cy="58" rx="3.4" ry="2.5" fill="#FB7185" />
       <path d="M56 63 q4 3.4 8 0" stroke="#4E3820" strokeWidth="2" strokeLinecap="round" />
+      {/* Buck teeth + whiskers — see HamsterFace. This is the largest mascot
+          render (hero, notice board, navbar logo), so it is the one that has to
+          read as a hamster at a glance. */}
+      <g stroke="#C2A57F" strokeWidth="1" strokeLinecap="round" opacity="0.7">
+        <path d="M32 60 Q18 56 4 53" />
+        <path d="M32 65 Q18 66 5 68" />
+        <path d="M32 70 Q19 74 8 78" />
+        <path d="M88 60 Q102 56 116 53" />
+        <path d="M88 65 Q102 66 115 68" />
+        <path d="M88 70 Q101 74 112 78" />
+      </g>
+      <rect x="53.8" y="67" width="5.6" height="9.2" rx="2" fill="#FFFFFF" stroke="#EADCC3" strokeWidth="0.8" />
+      <rect x="60.6" y="67" width="5.6" height="9.2" rx="2" fill="#FFFFFF" stroke="#EADCC3" strokeWidth="0.8" />
       {/* paws on the ledge */}
       <ellipse cx="46" cy="94" rx="8" ry="5.5" fill="#FDBA74" />
       <ellipse cx="74" cy="94" rx="8" ry="5.5" fill="#FDBA74" />
