@@ -386,3 +386,76 @@ describe('Slip2Go dispatch in the slip-verify route', () => {
     expect(url).toContain('slip2go');
   });
 });
+
+// 4. Main categories never reached the storefront.
+describe('storefront main-category groups', () => {
+  const child = (id: string, name: string) => ({ id, name, slug: id, children: [] });
+  const group = (id: string, name: string, kids: ReturnType<typeof child>[]) => ({
+    id,
+    name,
+    slug: id,
+    icon: null,
+    children: kids,
+  });
+
+  it('keeps a configured main group instead of flattening it away', async () => {
+    const { splitAppGroups } = await import('@/lib/appGroups');
+    const movie = group('movie-series', 'แอปดูหนัง/ซีรีส์', [
+      child('wetv', 'WeTV'),
+      child('bilibili', 'Bilibili'),
+    ]);
+    const { groups } = splitAppGroups([movie, child('loose', 'ไม่มีกลุ่ม')]);
+
+    // The regression: the old flatMap returned [wetv, bilibili, loose] and the
+    // group itself was discarded, so no heading could ever render.
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.name).toBe('แอปดูหนัง/ซีรีส์');
+    expect(groups[0]?.children.map((c) => c.name)).toEqual(['WeTV', 'Bilibili']);
+  });
+
+  it('routes a childless category to the loose bucket so a flat catalogue still renders', async () => {
+    const { splitAppGroups } = await import('@/lib/appGroups');
+    const { groups, looseApps } = splitAppGroups([child('netflix', 'Netflix')]);
+    expect(groups).toHaveLength(0);
+    expect(looseApps.map((c) => c.name)).toEqual(['Netflix']);
+  });
+
+  it('loses and duplicates nothing: every root appears exactly once', async () => {
+    const { splitAppGroups } = await import('@/lib/appGroups');
+    const roots = [
+      group('movie-series', 'แอปดูหนัง/ซีรีส์', [child('wetv', 'WeTV')]),
+      child('spotify', 'Spotify'),
+      group('music', 'แอปดนตรี', [child('spotify-premium', 'Spotify Premium')]),
+    ];
+    const { groups, looseApps } = splitAppGroups(roots);
+    expect([...groups, ...looseApps].map((c) => c.id).sort()).toEqual([
+      'movie-series',
+      'music',
+      'spotify',
+    ]);
+  });
+
+  it('preserves the caller ordering in both buckets', async () => {
+    const { splitAppGroups } = await import('@/lib/appGroups');
+    const roots = [
+      group('g1', 'กลุ่ม 1', [child('c1', 'c1')]),
+      child('a1', 'a1'),
+      group('g2', 'กลุ่ม 2', [child('c2', 'c2')]),
+      child('a2', 'a2'),
+    ];
+    const { groups, looseApps } = splitAppGroups(roots);
+    expect(groups.map((c) => c.id)).toEqual(['g1', 'g2']);
+    expect(looseApps.map((c) => c.id)).toEqual(['a1', 'a2']);
+  });
+
+  it('the homepage consumes the helper rather than re-flattening the tree', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync(
+      new URL('../src/app/page.tsx', import.meta.url),
+      'utf8',
+    ) as string;
+    expect(src).toContain('splitAppGroups(categories)');
+    // The flattening that discarded every main group must not come back.
+    expect(src).not.toMatch(/flatMap\(\s*\(root\)/);
+  });
+});

@@ -26,6 +26,7 @@ import {
   getHeroSlides,
   getStorefrontStats,
 } from '@/lib/data';
+import { splitAppGroups } from '@/lib/appGroups';
 import { publicOrigin } from '@/lib/siteConfig';
 
 export const metadata: Metadata = {
@@ -62,10 +63,11 @@ export default async function HomePage(): Promise<React.JSX.Element> {
     );
   }
 
-  // App tiles = the leaf app categories (13 apps); type-groups wrap them.
-  const appCategories = categories.flatMap((root) =>
-    root.children.length > 0 ? root.children : [root],
-  );
+  // Main groups keep their sub-apps instead of being flattened away. The old
+  // flatMap dissolved every group into the grid, so staff could configure a
+  // main group (แอปดูหนัง/ซีรีส์) with children (weTV, Bilibili…) and customers
+  // would never see one — the grouping existed only in the database.
+  const { groups: appGroups, looseApps } = splitAppGroups(categories);
 
   return (
     <>
@@ -178,7 +180,7 @@ export default async function HomePage(): Promise<React.JSX.Element> {
         <ScrollReveal>
           <section className="px-4 py-6 md:px-8">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-fg">หมวดเมนูแยกตามแอป</h2>
+              <h2 className="text-lg font-bold text-fg">หมวดหมู่แอปทั้งหมด</h2>
               <Link
                 href="/search"
                 className="text-sm font-medium text-fg-brand-strong hover:text-fg-brand-strong"
@@ -187,19 +189,58 @@ export default async function HomePage(): Promise<React.JSX.Element> {
               </Link>
             </div>
             <div className="shadow-clay-md rounded-2xl bg-clay-950 p-4">
-              <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
-                {appCategories.map((cat) => (
-                  <AppTile
-                    key={cat.id}
-                    name={cat.name}
-                    slug={cat.slug}
-                    icon={cat.icon}
-                    imageUrl={cat.imageUrl}
-                    productSlug={cat.productSlug}
-                    productCount={cat.productCount}
-                  />
-                ))}
-              </div>
+              {appGroups.map((group) => (
+                <section key={group.id} className="mb-6 last:mb-0">
+                  {/* Main group heading — the link goes to the group page, which
+                      already lists every descendant product. */}
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <h3 className="flex min-w-0 items-center gap-2 text-sm font-bold text-fg">
+                      <span aria-hidden className="shrink-0 text-base">
+                        {group.icon || '📁'}
+                      </span>
+                      <span className="truncate">{group.name}</span>
+                      <span className="shrink-0 text-xs font-normal text-fg-muted">
+                        {group.productCount ?? 0} รายการ
+                      </span>
+                    </h3>
+                    <Link
+                      href={`/category/${group.slug}`}
+                      className="shrink-0 text-xs font-medium text-peach-200 hover:text-peach-100"
+                    >
+                      ดูทั้งหมด →
+                    </Link>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
+                    {group.children.map((cat) => (
+                      <AppTile
+                        key={cat.id}
+                        name={cat.name}
+                        slug={cat.slug}
+                        icon={cat.icon}
+                        imageUrl={cat.imageUrl}
+                        productSlug={cat.productSlug}
+                        productCount={cat.productCount}
+                      />
+                    ))}
+                  </div>
+                </section>
+              ))}
+
+              {looseApps.length > 0 && (
+                <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
+                  {looseApps.map((cat) => (
+                    <AppTile
+                      key={cat.id}
+                      name={cat.name}
+                      slug={cat.slug}
+                      icon={cat.icon}
+                      imageUrl={cat.imageUrl}
+                      productSlug={cat.productSlug}
+                      productCount={cat.productCount}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           </section>
         </ScrollReveal>
