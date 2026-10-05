@@ -102,13 +102,19 @@ export function HamsterGrassScene({ className }: { className?: string }): React.
 
   return (
     <div className={cn('absolute inset-x-0 bottom-0 z-0', className)}>
-      {/* Rolling clay hills — overflow-hidden keeps the oversized hill
-          ellipses from widening the page on 320px phones (audit: horizontal
-          overflow at xs). */}
-      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-28 overflow-hidden">
-        {/* back hill */}
-        <div className="absolute bottom-6 left-[8%] h-24 w-72 rounded-[100%] bg-jade-200/50 dark:bg-jade-900/40" />
-        <div className="absolute bottom-4 right-[6%] h-28 w-96 rounded-[100%] bg-jade-200/40 dark:bg-jade-900/30" />
+      {/* Clay mountain range. These were `rounded-[100%]` ellipses at
+          288x96 and 384x112 — at that aspect the curve reads as a pillow or a
+          bush, never as a hill, so the scene had nothing mountainous about it.
+          clip-path gives a real ridgeline: several points per side so each
+          silhouette has sloping shoulders instead of one hard geometric
+          triangle. clip-path does not change the element box, and
+          overflow-hidden still keeps a wide range from widening the page on
+          320px phones (audit: horizontal overflow at xs). */}
+      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-32 overflow-hidden">
+        {/* back range — broad, low, peak just left of centre */}
+        <div className="absolute bottom-6 left-[2%] h-20 w-80 bg-jade-200/45 dark:bg-jade-900/35 [clip-path:polygon(0%_100%,18%_62%,30%_34%,42%_12%,50%_2%,60%_20%,72%_46%,86%_66%,100%_100%)]" />
+        {/* front peak — taller and sharper, right of centre */}
+        <div className="absolute bottom-3 right-[2%] h-24 w-[26rem] bg-jade-200/55 dark:bg-jade-900/45 [clip-path:polygon(0%_100%,26%_70%,40%_34%,48%_6%,56%_26%,68%_58%,84%_78%,100%_100%)]" />
         {/* front grass */}
         <div className="absolute bottom-0 left-0 right-0 h-14 rounded-t-[100%] bg-jade-500/25 dark:bg-jade-900/50" />
         <div className="absolute bottom-0 left-0 right-0 h-8 bg-jade-500/35 dark:bg-jade-900/60" />
