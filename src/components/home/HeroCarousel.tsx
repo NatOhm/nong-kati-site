@@ -89,6 +89,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlideContent[] }): React.
                       className="aspect-[16/6] w-full object-cover sm:aspect-[21/8]"
                       loading={i === 0 ? 'eager' : 'lazy'}
                       draggable={false}
+                      style={{ objectPosition: s.imageFocus ?? '50% 50%' }}
                     />
                     <span className="bg-surface/95 absolute bottom-3 left-3 rounded-full px-4 py-1.5 text-sm font-bold text-fg shadow-clay-sm">
                       {s.label}
@@ -102,6 +103,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlideContent[] }): React.
                     className="aspect-[16/6] w-full object-cover sm:aspect-[21/8]"
                     loading={i === 0 ? 'eager' : 'lazy'}
                     draggable={false}
+                    style={{ objectPosition: s.imageFocus ?? '50% 50%' }}
                   />
                 ) : (
                   <div

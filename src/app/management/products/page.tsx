@@ -78,7 +78,7 @@ interface DraftVariant {
   isActive: boolean;
 }
 
-const MAX_UPLOAD_BYTES = 512 * 1024;
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
 let draftKey = 1;
 function newDraftVariant(): DraftVariant {
@@ -739,7 +739,7 @@ function ProductEditor({
   async function handleUpload(file: File) {
     setError(null);
     if (file.size > MAX_UPLOAD_BYTES) {
-      setError('รูปใหญ่เกิน 512KB — กรุณาย่อรูปก่อนอัปโหลด');
+      setError('รูปใหญ่เกิน 5MB — กรุณาย่อรูปก่อนอัปโหลด');
       return;
     }
     setUploading(true);
@@ -891,7 +891,7 @@ function ProductEditor({
                   </button>
                 )}
                 <p className="text-[10px] text-fg-placeholder">
-                  PNG / JPG / WEBP / GIF · ไม่เกิน 512KB
+                  PNG / JPG / WEBP / GIF · ไม่เกิน 5MB
                 </p>
               </div>
             </div>

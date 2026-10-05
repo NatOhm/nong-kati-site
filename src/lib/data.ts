@@ -873,6 +873,8 @@ export interface HeroSlideContent {
   id: string;
   /** Image banner; null = text deal card (label only). */
   imageUrl: string | null;
+  /** object-position for the cover crop; null = centred. */
+  imageFocus: string | null;
   /** Promo deal text — the old ticker's role, now admin-editable per slide. */
   label: string | null;
   href: string | null;
@@ -892,6 +894,7 @@ export async function getHeroSlides(): Promise<HeroSlideContent[]> {
     return rows.map((r) => ({
       id: r.id,
       imageUrl: r.imageUrl,
+      imageFocus: r.imageFocus,
       label: r.label,
       href: r.href,
       alt: r.alt,

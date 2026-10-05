@@ -31,6 +31,28 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
  * Body: { imageUrl?, label?, href?, alt?, sortOrder?, isActive? }
  * Either an image (banner slide) or a label (text deal card) is required.
  */
+
+/**
+ * Focal point for object-cover cropping, stored as "X% Y%".
+ *
+ * Strictly validated because it lands in a `style` attribute: anything that
+ * is not a pair of percentages in 0–100 is rejected outright rather than
+ * passed through. Returns null for "not supplied", and null in the DB means
+ * centred, so every existing slide keeps rendering exactly as before.
+ */
+const FOCUS_RE = /^(\d{1,3})% (\d{1,3})%$/;
+function parseFocus(v: unknown): string | null | undefined {
+  if (v === null) return null;
+  if (typeof v !== 'string') return undefined;
+  const t = v.trim();
+  if (!t) return null;
+  const m = FOCUS_RE.exec(t);
+  if (!m) return undefined;
+  const x = Number(m[1]);
+  const y = Number(m[2]);
+  if (x > 100 || y > 100) return undefined;
+  return `${x}% ${y}%`;
+}
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const token = bearer(req);
   if (!token) return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 });
@@ -57,9 +79,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       ? b['alt'].trim()
       : (label ?? 'แบนเนอร์โปรโมชั่น');
 
+  const imageFocus = parseFocus(b['imageFocus']);
+  if (imageFocus === undefined) {
+    return NextResponse.json({ error: 'INVALID_IMAGE_FOCUS' }, { status: 400 });
+  }
+
   const slide = await prisma.heroSlide.create({
     data: {
       imageUrl,
+      imageFocus,
       label,
       href: typeof b['href'] === 'string' && b['href'].trim() ? b['href'].trim() : null,
       alt,

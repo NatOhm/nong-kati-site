@@ -574,7 +574,7 @@ function AppearanceSettings({
                 <p className="text-xs text-fg-placeholder">
                   {mascotUrl
                     ? 'ใช้รูปที่อัปโหลดแล้ว — แสดงแทนแฮมสเตอร์ทุกจุด (หน้าแรก, ตะกร้า, ชำระเงิน, toast)'
-                    : 'ยังใช้แฮมสเตอร์ตัวเดิม — อัปโหลดรูป PNG/JPG/WebP/GIF (สูงสุด 512KB) เพื่อเปลี่ยน'}
+                    : 'ยังใช้แฮมสเตอร์ตัวเดิม — อัปโหลดรูป PNG/JPG/WebP/GIF (สูงสุด 5MB) เพื่อเปลี่ยน'}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <button
@@ -1075,7 +1075,7 @@ function ManualTransferSettings(): React.JSX.Element {
                   <p className="text-xs text-fg-placeholder">
                     {form.qrImageUrl
                       ? 'แสดงภาพนี้ข้างข้อมูลบัญชีในหน้าชำระเงิน — ใช้ QR ที่ธนาคารออกให้กับบัญชีดิบ (ไม่ฝังยอด)'
-                      : 'อัปโหลดภาพ QR ที่ธนาคารออกให้กับบัญชี (PNG/JPG/WebP สูงสุด 512KB) — ลูกค้าสแกนแล้วกรอกยอดเอง'}
+                      : 'อัปโหลดภาพ QR ที่ธนาคารออกให้กับบัญชี (PNG/JPG/WebP สูงสุด 5MB) — ลูกค้าสแกนแล้วกรอกยอดเอง'}
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <button
@@ -2304,11 +2304,19 @@ function CopyButton({ text }: { text: string }) {
 interface AdminHeroSlide {
   id: string;
   imageUrl: string | null;
+  /** object-position focal point, e.g. "30% 70%". Null = centred. */
+  imageFocus: string | null;
   label: string | null;
   href: string | null;
   alt: string;
   sortOrder: number;
   isActive: boolean;
+}
+
+/** Parse a stored focal point into CSS percentages, defaulting to centre. */
+function focusPoint(focus: string | null): { x: string; y: string } {
+  const m = /^(\d{1,3})% (\d{1,3})%$/.exec(focus ?? '');
+  return { x: `${m?.[1] ?? 50}%`, y: `${m?.[2] ?? 50}%` };
 }
 
 function BannerSettings(): React.JSX.Element {
@@ -2489,7 +2497,7 @@ function BannerSettings(): React.JSX.Element {
         <h2 className="text-base font-bold text-fg">แบนเนอร์หน้าแรก (Carousel)</h2>
         <p className="mt-1 text-sm text-fg-muted">
           อัปโหลดภาพโปรโมชั่น ใส่ลิงก์เมื่อกดภาพ และจัดลำดับการแสดงผล — ภาพแนะนำขนาดกว้าง
-          อัตราส่วนประมาณ 21:8 (สูงสุด 512KB ต่อภาพ) หรือเพิ่มเป็นข้อความโปรโมชั่นล้วนก็ได้
+          อัตราส่วนประมาณ 21:8 (สูงสุด 5MB ต่อภาพ) หรือเพิ่มเป็นข้อความโปรโมชั่นล้วนก็ได้
         </p>
         {error && (
           <p className="bg-error mt-3 rounded-lg px-3 py-2 text-sm text-fg-error dark:bg-coral-900/20 dark:text-coral-300">
@@ -2511,11 +2519,35 @@ function BannerSettings(): React.JSX.Element {
             <div className="relative shrink-0">
               {slide.imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={slide.imageUrl}
-                  alt={slide.alt}
-                  className="h-24 w-44 rounded-xl object-cover shadow-clay-sm"
-                />
+                <button
+                  type="button"
+                  title="คลิกบนภาพเพื่อเลือกส่วนที่ต้องการให้เหลือในแบนเนอร์"
+                  aria-label={`เลื่อนตำแหน่งภาพแบนเนอร์ (ปัจจุบัน ${slide.imageFocus ?? 'กลางภาพ'})`}
+                  onClick={(e) => {
+                    const box = e.currentTarget.getBoundingClientRect();
+                    const x = Math.round(
+                      Math.min(100, Math.max(0, ((e.clientX - box.left) / box.width) * 100)),
+                    );
+                    const y = Math.round(
+                      Math.min(100, Math.max(0, ((e.clientY - box.top) / box.height) * 100)),
+                    );
+                    void patch(slide.id, { imageFocus: `${x}% ${y}%` });
+                  }}
+                  className="relative block h-24 w-44 cursor-crosshair overflow-hidden rounded-xl shadow-clay-sm"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={slide.imageUrl}
+                    alt={slide.alt}
+                    className="h-full w-full object-cover"
+                    style={{ objectPosition: slide.imageFocus ?? '50% 50%' }}
+                  />
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-black/40 shadow"
+                    style={{ left: focusPoint(slide.imageFocus).x, top: focusPoint(slide.imageFocus).y }}
+                  />
+                </button>
               ) : (
                 <div className="flex h-24 w-44 items-center justify-center rounded-xl bg-surface text-xs text-fg-placeholder shadow-clay-sm">
                   ยังไม่มีภาพ

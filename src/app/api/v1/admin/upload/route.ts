@@ -6,7 +6,7 @@ import { getAdminToken } from '@/lib/adminRequest';
 
 export const dynamic = 'force-dynamic';
 
-const MAX_BYTES = 512 * 1024; // 512 KB — plenty for a product card image
+const MAX_BYTES = 5 * 1024 * 1024; // 5 MB — photos from modern phones blow past 512 KB
 const ALLOWED_TYPES: Record<string, string> = {
   'image/png': 'png',
   'image/jpeg': 'jpg',

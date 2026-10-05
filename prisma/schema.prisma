@@ -623,6 +623,9 @@ model HeroSlide {
   id        String   @id @default(cuid())
   /// Image banner; null when the slide is a text deal card (label only).
   imageUrl  String?
+  /// Focal point used when object-cover crops the banner, e.g. "50% 30%".
+  /// Null means centred — the historical behaviour, so existing slides are unchanged.
+  imageFocus String?
   /// Promo deal text, e.g. "🔥 HBO Max 7 วัน ฿25" — the ticker's old role.
   label     String?
   href      String?
