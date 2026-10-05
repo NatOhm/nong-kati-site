@@ -125,7 +125,12 @@ cat <<SUMMARY
 cd httpdocs && curl -fsSLk -o deploy-bundle.tar.gz $RAW_URL && rm -rf .next && tar -xzf deploy-bundle.tar.gz && rm -f deploy-bundle.tar.gz && touch tmp/restart.txt && echo BUILD_ID_ON_DISK: > extract-check.txt && cat .next/BUILD_ID >> extract-check.txt
 
  3. Verify: httpdocs/extract-check.txt == BUILD_ID above
-    (only if deps changed: cd httpdocs && /opt/plesk/node/20/bin/npm ci --omit=dev && /opt/plesk/node/20/bin/npx prisma generate && echo DEPS_OK > extract-check.txt)
+    Node.js → Run Node.js commands (NOT a Scheduled Task — the task chroot has no node binary
+    at all; `find / -name node -type f` returns nothing there):
+      · deps changed (package.json)      →  npm ci --omit=dev
+      · prisma/schema.prisma changed     →  npm run postinstall      (= prisma generate)
+    The second one is REQUIRED whenever a schema change ships: the extracted bundle carries no
+    node_modules, so a stale Prisma Client makes every query on that model throw.
 
  4. Restart: Node.js → Restart App  (fallback: console kill one-liner in the manual §Step 4)
     IDENTITY CHECK while on the Node.js dashboard: Custom environment variables →

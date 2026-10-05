@@ -118,13 +118,25 @@ File Manager → `httpdocs/extract-check.txt` → content must equal the Step-0 
 log in [hostatom-live.md](hostatom-live.md) §5; always trust the BUILD_ID the script just printed
 over this line).
 
-**Only if dependencies changed** also run a deps task (this is the slow one, 5–15 min):
+**Only if dependencies changed** also install them (this is the slow one, 5–15 min).
 
-```
-cd httpdocs && /opt/plesk/node/20/bin/npm ci --omit=dev && /opt/plesk/node/20/bin/npx prisma generate && echo DEPS_OK > extract-check.txt
-```
+**Do not try this from a Scheduled Task.** The task chroot for this domain contains no `node`
+binary at all — `/opt/plesk/node/<major>/bin` does not exist inside it, and
+`find / -name node -type f` returns nothing. Use Plesk → Node.js → **Run Node.js commands**,
+which runs with the panel's own Node (20.20.2):
 
-(`node_modules` persists between deploys — skip this on most deploys.)
+| What changed | Command to run there |
+|---|---|
+| `package.json` dependencies | `npm ci --omit=dev` |
+| `prisma/schema.prisma` | `npm run postinstall` (the repo already defines this as `prisma generate`) |
+
+The second row is **required** whenever a schema change ships, and skipping it is not cosmetic:
+the extracted bundle deliberately carries no `node_modules`, so the server keeps its existing
+Prisma Client — which was generated from the *old* schema. Every query touching a model whose
+columns changed then throws. (Adding a nullable column that is only ever read, never selected
+explicitly, degrades more quietly: the column simply comes back `undefined`.)
+
+(`node_modules` persists between deploys — skip all of this on most deploys.)
 
 ## Step 4 — Restart the app
 
