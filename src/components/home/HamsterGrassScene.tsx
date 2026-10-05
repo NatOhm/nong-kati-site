@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { SiteMascot } from '@/components/ui/SiteMascot';
+import { HamsterSleeping } from '@/components/ui/ClayIcons';
 import { cn } from '@/utils/cn';
 
 /**
@@ -186,6 +187,17 @@ export function HamsterGrassScene({ className }: { className?: string }): React.
           }}
         />
       ))}
+
+      {/* Second hamster asleep in the grass — the scene read as one lonely
+          animal on an empty band, so it is a pair now. Static on purpose:
+          the peeking mascot beside it is the one that moves, and two moving
+          hamsters compete for attention. */}
+      <span
+        aria-hidden
+        className="absolute bottom-1 left-[22%] block opacity-80 transition-transform duration-slow hover:-translate-y-0.5"
+      >
+        <HamsterSleeping size={48} className="-rotate-6" />
+      </span>
 
       {/* The Nong-Kati mascot hiding in the grass — click me! */}
       <button

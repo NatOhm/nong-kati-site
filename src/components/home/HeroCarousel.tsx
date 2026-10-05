@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
+import { SiteMascot } from '@/components/ui/SiteMascot';
 import { cn } from '@/utils/cn';
 import { useMotionReduced } from '@/components/layout/MotionToggle';
 import type { HeroSlideContent } from '@/lib/data';
@@ -117,9 +118,20 @@ export function HeroCarousel({ slides }: { slides: HeroSlideContent[] }): React.
                     aria-label={s.alt}
                     className="flex aspect-[16/6] w-full items-center justify-center bg-gradient-to-br from-peach-100 via-surface-base to-peach-50 sm:aspect-[16/7]"
                   >
-                    <p className="px-6 text-center font-display text-xl font-bold text-fg sm:text-3xl">
-                      {s.label}
-                    </p>
+                    {/* A text-only slide used to be a lone line of copy floating
+                        in an empty gradient, which is the blandest thing on the
+                        page. The mascot gives it a subject without touching the
+                        banner path. SiteMascot (not the raw clay icon) so an
+                        admin-uploaded mascot replaces it here too. */}
+                    <div className="flex flex-col items-center gap-1.5 px-6 sm:gap-2">
+                      <SiteMascot
+                        size={96}
+                        className="mascot-peek drop-shadow-[0_4px_6px_rgba(147,107,73,0.28)]"
+                      />
+                      <p className="text-center font-display text-xl font-bold text-fg sm:text-3xl">
+                        {s.label}
+                      </p>
+                    </div>
                   </div>
                 );
               return (

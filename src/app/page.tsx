@@ -19,6 +19,8 @@ import { LINEChatButton } from '@/components/home/LINEChatButton';
 import { ScrollToTop } from '@/components/home/ScrollToTop';
 import { ScrollReveal } from '@/components/home/ScrollReveal';
 import { PawDivider } from '@/components/ui/PawDivider';
+import { SiteMascot } from '@/components/ui/SiteMascot';
+import { HamsterCelebrating, HamsterFace, HamsterWorried } from '@/components/ui/ClayIcons';
 
 import {
   getCategoriesWithProductCounts,
@@ -89,6 +91,12 @@ export default async function HomePage(): Promise<React.JSX.Element> {
             grid enters the first viewport (pt-8→pt-4, py-5→py-3 on mobile). */}
         <section className="px-4 pt-4 md:px-8 md:pt-8">
           <div className="mx-auto max-w-3xl rounded-2xl border-2 border-dashed border-peach-300 bg-peach-50 px-4 py-3 text-center shadow-clay-sm sm:px-6 sm:py-5 dark:border-peach-700/60 dark:bg-peach-900/20">
+            {/* Hamster mascot waving at the headline — the site mascot, so an
+                admin-uploaded mascot replaces it here as well as in the logo. */}
+            <SiteMascot
+              size={84}
+              className="mascot-wave mx-auto mb-1 block w-fit drop-shadow-[0_3px_5px_rgba(147,107,73,0.28)]"
+            />
             {/* Site-wide h1 (landmark spec): the notice-board headline is the
                 page's main heading — p→h1 keeps the identical clay styling. */}
             <h1 className="font-display text-xl font-bold leading-snug text-fg-brand-strong sm:text-2xl">
@@ -118,9 +126,28 @@ export default async function HomePage(): Promise<React.JSX.Element> {
             </h2>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-4">
               {[
-                { step: '01', title: 'เลือกสินค้า', desc: 'เลือกประเภทบัตรและราคาที่ต้องการ' },
-                { step: '02', title: 'ชำระเงิน', desc: 'โอนเงินแล้วส่งสลิปยืนยัน' },
-                { step: '03', title: 'รับโค้ด', desc: 'รับโค้ดหลังยืนยันการชำระเงิน' },
+                {
+                  step: '01',
+                  title: 'เลือกสินค้า',
+                  desc: 'เลือกประเภทบัตรและราคาที่ต้องการ',
+                  // Sniffing around the shelves = browsing.
+                  art: <HamsterFace size={44} className="mascot-sniff" />,
+                },
+                {
+                  step: '02',
+                  title: 'ชำระเงิน',
+                  desc: 'โอนเงินแล้วส่งสลิปยืนยัน',
+                  // Anxious waiting while the slip is checked — on-brand, and it
+                  // sets up the payoff on step 03.
+                  art: <HamsterWorried size={44} className="mascot-beg" />,
+                },
+                {
+                  step: '03',
+                  title: 'รับโค้ด',
+                  desc: 'รับโค้ดหลังยืนยันการชำระเงิน',
+                  // Code delivered.
+                  art: <HamsterCelebrating size={44} className="mascot-celebrate" />,
+                },
               ].map((item) => (
                 <div
                   key={item.step}
@@ -129,10 +156,11 @@ export default async function HomePage(): Promise<React.JSX.Element> {
                   <span className="text-2xl font-bold text-peach-700 dark:text-peach-200">
                     {item.step}
                   </span>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <h3 className="text-sm font-semibold text-fg">{item.title}</h3>
                     <p className="text-xs text-fg-muted">{item.desc}</p>
                   </div>
+                  <span className="shrink-0">{item.art}</span>
                 </div>
               ))}
             </div>
