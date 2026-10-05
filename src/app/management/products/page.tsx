@@ -15,6 +15,7 @@ import {
   FileUp,
   BadgePercent,
   PackagePlus,
+  Eye,
 } from 'lucide-react';
 
 import { AdminShell } from '@/components/layout/AdminShell';
@@ -23,6 +24,7 @@ import { cn } from '@/utils/cn';
 import { ImportDialog } from './ImportDialog';
 import { BulkPricingDialog } from './BulkPricingDialog';
 import { BulkStockDialog } from './BulkStockDialog';
+import { VariantCodesDialog } from '../inventory/VariantCodesDialog';
 /**
  * Admin Products Management — real CRUD over the Prisma catalog.
  * List, search, create, edit (info + image + variants), archive,
@@ -106,6 +108,37 @@ export default function AdminProductsPage(): React.JSX.Element {
   const [importing, setImporting] = useState(false);
   const [bulkPricing, setBulkPricing] = useState(false);
   const [stockTarget, setStockTarget] = useState<AdminProduct | null>(null);
+  /**
+   * Which stored-account list the eye opened. The products page is where staff
+   * actually work — they press buttons here, not on the inventory page — so
+   * the reveal has to be reachable from HERE or it does not exist for them
+   * (client report 2026-10-05: "where do i press to see it").
+   */
+  const [codesTarget, setCodesTarget] = useState<{
+    variantId: string;
+    variantLabel: string;
+    productName: string;
+  } | null>(null);
+  /**
+   * A product can have several packs, and the accounts live per pack. Rather
+   * than guessing which one the admin meant, ask — a chooser is one click and
+   * far cheaper than opening the wrong customer's account.
+   */
+  const [codesPicker, setCodesPicker] = useState<AdminProduct | null>(null);
+
+  const openCodesFor = (product: AdminProduct, variantId?: string): void => {
+    const v =
+      variantId !== undefined
+        ? product.variants.find((x) => x.id === variantId)
+        : product.variants[0];
+    if (!v) return;
+    setCodesPicker(null);
+    setCodesTarget({
+      variantId: v.id,
+      variantLabel: v.label || 'ตัวเลือกหลัก',
+      productName: product.name,
+    });
+  };
   const [bulkBusy, setBulkBusy] = useState(false);
   const [inlineBusy, setInlineBusy] = useState<string | null>(null);
 
@@ -384,6 +417,37 @@ export default function AdminProductsPage(): React.JSX.Element {
                         <div>
                           <p className="font-medium text-fg">{product.name}</p>
                           <p className="font-mono text-xs text-fg-placeholder">{product.slug}</p>
+                          {/* One eye PER VARIANT, sitting under the name where
+                              staff are already looking. A single row-level eye
+                              would be ambiguous the moment a product has more
+                              than one pack — and which variant you are reading
+                              is exactly what you must not guess. */}
+                          {product.variants.length > 0 && (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {product.variants.map((v) => (
+                                <button
+                                  key={v.id}
+                                  type="button"
+                                  onClick={() =>
+                                    setCodesTarget({
+                                      variantId: v.id,
+                                      variantLabel: v.label || 'ตัวเลือกหลัก',
+                                      productName: product.name,
+                                    })
+                                  }
+                                  aria-label={`ดูบัญชีที่เก็บไว้ ${product.name} ${v.label}`}
+                                  title={`ดูบัญชีที่เก็บไว้ — ${v.label} (เหลือ ${v.stock})`}
+                                  className="inline-flex min-h-[24px] items-center gap-1 rounded-md border border-line-subtle bg-surface px-1.5 py-0.5 text-[11px] text-fg-secondary transition-colors hover:border-line-brand hover:text-fg-brand"
+                                >
+                                  <Eye size={12} />
+                                  <span className="max-w-[9rem] truncate">
+                                    {v.label || 'บัญชี'}
+                                  </span>
+                                  <span className="font-mono text-fg-placeholder">{v.stock}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -475,6 +539,22 @@ export default function AdminProductsPage(): React.JSX.Element {
                         >
                           <PackagePlus size={14} />
                         </button>
+                        {/* Labelled, not a bare icon: staff could not find the
+                            eye when it was only an icon under the name, and an
+                            unlabelled control is invisible to anyone who does
+                            not already know it exists. */}
+                        <button
+                          onClick={() => {
+                            if (product.variants.length <= 1) openCodesFor(product);
+                            else setCodesPicker(product);
+                          }}
+                          className="inline-flex items-center gap-1 rounded px-2 py-1.5 text-xs text-fg-secondary hover:bg-surface hover:text-fg-brand"
+                          aria-label={`ดูบัญชีที่เก็บไว้ ${product.name}`}
+                          title="ดูบัญชีที่เก็บไว้ — ดู / แก้ / ส่ง / ลบ"
+                        >
+                          <Eye size={14} />
+                          บัญชี
+                        </button>
                         <button
                           onClick={() => setEditing(product)}
                           className="rounded p-1.5 text-fg-placeholder hover:bg-surface hover:text-fg"
@@ -541,6 +621,51 @@ export default function AdminProductsPage(): React.JSX.Element {
           productName={stockTarget.name}
           onClose={() => setStockTarget(null)}
           onSaved={() => void load()}
+        />
+      )}
+
+      {codesPicker && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-line bg-surface-elevated">
+            <div className="border-b border-line px-5 py-4">
+              <h2 className="text-base font-bold text-fg">เลือกแพ็กเกจ</h2>
+              <p className="text-sm text-fg-muted">{codesPicker.name}</p>
+            </div>
+            <ul className="max-h-[60vh] overflow-y-auto p-2">
+              {codesPicker.variants.map((v) => (
+                <li key={v.id}>
+                  <button
+                    onClick={() => openCodesFor(codesPicker, v.id)}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-fg hover:bg-surface-sunken"
+                  >
+                    <Eye size={14} />
+                    <span className="min-w-0 flex-1 truncate">
+                      {v.label || 'ตัวเลือกหลัก'}
+                    </span>
+                    <span className="font-mono text-xs text-fg-muted">เหลือ {v.stock}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <div className="border-t border-line px-5 py-3 text-right">
+              <button
+                onClick={() => setCodesPicker(null)}
+                className="rounded-md border border-line px-3 py-1.5 text-sm text-fg-secondary"
+              >
+                ยกเลิก
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {codesTarget && (
+        <VariantCodesDialog
+          variantId={codesTarget.variantId}
+          variantLabel={codesTarget.variantLabel}
+          productName={codesTarget.productName}
+          onClose={() => setCodesTarget(null)}
+          onChanged={() => void load()}
         />
       )}
 

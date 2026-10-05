@@ -40,6 +40,12 @@
 | NV    | Admin sidebar IA — 17 items → 7 sections, narrow `dashboard:read`, route preservation | `tests/admin-nav-sections.test.ts` | `npm test` (vitest) | Unit Tests |
 | HM    | Production health monitor — idle reap vs unexpected restart, alert threshold, CLI flag mapping, workflow wiring | `tests/prod-health-monitor.test.ts` | `npm test` (vitest) | Unit Tests + Production Health Monitor |
 | CC    | Coupon cap under REAL concurrency (8 simultaneous claims) | `tests/coupon-cap-concurrency.test.ts` | vitest + live server | **(ยังไม่ต่อ CI — ดูหัวข้อข้างล่าง)** |
+| TA    | Training deliverable — page restates no manual fact, beats match SRT, no cue overlap | `tests/admin-training-artifacts.test.ts` | `npm test` (vitest) | Unit Tests |
+| RH    | Restock-account how-to — every staff-facing claim pinned to the route/dialog/role matrix | `tests/admin-restock-howto.test.ts` | `npm test` (vitest) | Unit Tests |
+| EX    | Unpaid-order expiry sweep — CAS safety, batching, no stock side effects, cron-route gating | `tests/order-expiry-sweep.test.ts` | `npm test` (vitest) | Unit Tests |
+| CSO   | Stock-aware catalog — availability leads every sort, available-only filter, slice of one global order | `tests/catalog-stock-ordering.test.ts` | `npm test` (vitest) | Unit Tests |
+| GC    | Stored accounts + manual assignment to an order — audited reveal, atomic void, masked list; declared-vs-built route ratchet | `tests/admin-stored-accounts.test.ts` | `npm test` (vitest) | Unit Tests |
+| FP    | Forced password change — never looks like a permissions problem; layout redirect cannot loop | `tests/admin-forced-password-change.test.ts` | `npm test` (vitest) | Unit Tests |
 | E1    | Disabled-state affordance (WCAG 1.4.1)                | `e2e/disabled-state.spec.ts`       | `npm run test:e2e`   | (local/preview)        |
 | E2    | No hardcoded white in dark mode                       | `e2e/no-hardcoded-white.spec.ts`   | `npm run test:e2e`   | (local/preview)        |
 | E3    | Duplicate DOM ids (ทั้งไซต์ผ่าน sitemap)              | `e2e/duplicate-ids.spec.ts`        | `npm run test:e2e`   | (local/preview)        |
@@ -397,6 +403,171 @@ sidebar เดิมเป็นรายการแบน 17 รายกา�
 - **ตัดโค้ดซ้ำ 2 จุด** — `subtreeHasMatch` มีอยู่สองฝั่ง (ใน `adminNav.ts` กับซ้ำอีกชุดใน sidebar) รวมเป็นตัวเดียวที่ export · rail แบบย่อและแบบเต็มใช้ `NavLinkRow` ตัวเดียวกันผ่าน prop `iconOnly` แทนที่จะเขียน `<Link>` + `aria-current` + class ซ้ำอีกชุด
 - **พิสูจน์ด้วยเบราว์เซอร์จริงทุก role ไม่ใช่แค่ unit test** — ตัว admin shell ใช้ cookie `nk_admin_flag` + `nk_admin_exp` ในการ admit session แล้วดึง role จาก `GET /api/v1/auth/admin/me` การ stub แค่ endpoint นั้นจึง render เมนูของแต่ละ role ได้จริง **โดยไม่เขียนฐานข้อมูลเลย** ได้ผลตรงตามที่กฎระบุ: order_manager เห็น 4 หัวข้อ · catalogue_manager เห็น 3 หัวข้อ · super_admin เห็น 7 หัวข้อ
 - **หมายเหตุเรื่อง PDPA:** หน้า PDPA **อยู่ใต้หัวข้อ "การดูแลระบบ" ตามที่ตัดสิน ไม่ย้ายไปฝ่ายสนับสนุน** เหตุผลคือ `pdpa:action` คือการอนุมัติ/ปฏิเสธคำขอเข้าถึง–ลบข้อมูลส่วนบุคคล ซึ่งเป็นการกำกับดูแล ไม่ใช่งาน triage ของฝ่ายสนับสนุน ตอนนี้ `pdpa:read` มีแต่ super_admin ที่ถือ ถ้าธุรกิจต้องการให้ support agent เห็นคำขอ PDPA ต้องตัดสินใจแยกเรื่องสิทธิ์นี้ชัดเจนก่อน ไม่ใช่แถมมากับการจัดกลุ่มเมนู
+
+## ชุดอบรมหลังบ้าน (เผยแพร่ 5 ต.ค. 2569) — `tests/admin-training-artifacts.test.ts`
+
+คู่มือ + วิดีโออธิบายเมนูหลังบ้านรูปแบบใหม่อยู่ที่ `webapp/nong-kati/admin-training/` — **อยู่นอก repo นี้โดยตั้งใจ** เพื่อไม่ให้ไฟล์ binary หลายสิเมกะไบต์ไหลเข้า remote สาธารณะ ผลข้างเคียงคือ **ไม่มีอะไรมาคุม** และของจริง 2 อย่างหลุดเข้าไปโดยไม่มีใครเห็น:
+
+- **คำบรรยายทับกัน 8 ช่วง** — ทุก cue ใน `th.srt` เริ่มก่อน cue ก่อนหน้าจะจบราว 0.6 วินาที libass จึงวางซ้อนกัน **สองประโยคพร้อมกัน** วัดแล้วแถบคำบรรยายสูง 47px แทนที่จะเป็น 21px คนดูเห็นเป็นคำบรรยายซ้อนทุกช่วงเปลี่ยนบท แก้โดยตัด**ปลาย**ของ cue ให้เท่ากับต้นของ cue ถัดไป (ไม่ใช่เลื่อนต้น) เพื่อให้จังหวะที่หน้าเว็บกระโดดไปยังตรงกับคำบรรยายของตัวเองเสมอ
+- **หน้าเว็บคัดลอกข้อเท็จจริงจากคู่มือมาอีกชุด** — `index.html` เคยเขียนหัวข้อ 7 หัวข้อ เมนูของแต่ละบทบาท และความกว้าง rail เอง แม้วันที่เขียนจะตรงกับคู่มือ แต่ไม่มีอะไรหยุดคนต่อไปแก้ไฟล์หนึ่งแล้วหน้าเว็บขัดกับอีกไฟล์แบบเงียบ ๆ ตอนนี้**คู่มือหมวด 0 เป็นเจ้าของข้อเท็จจริงชุดเดียว** และเกตนี้ยืนยันว่าหน้าเว็บจะไม่มีสำเนากลับมาโดยไม่ตั้งใจ
+
+**ประตูที่รันทุก `npm test` (ไม่ต้องใช้เบราว์เซอร์ ไม่ต้องใช้เน็ต)**
+
+| ตัว | บังคับว่า |
+|---|---|
+| D1 | หมวด 0 มีหัวข้อครบ 7 แถว และแถว role ครบ 3 บรรทัด (7 / 4 / 4) |
+| D2 | รายการในสารบัญของหมวด 0 ชี้ไปที่หัวข้อจริง |
+| D3 | หมวด 0 ยังเขียนไว้ครบสิ่งที่วิดีโออ้างว่าได้สาธิต (rail 64px · ลิ้นชักมือถือ · หมายเหตุ 403) |
+| A1 | `index.html` ไม่คัดลอกข้อเท็จจริงใด ๆ จากหมวด 0 กลับมา |
+| A2 | ทุก `href`/`src` ที่เป็นไฟล์บนดิสก์ใน `index.html` ต้องมีอยู่จริง |
+| A3 | จำนวนบท = จำนวน cue และเวลาที่แต่ละบทกระโดดไปต้องอยู่ในช่วงของ cue ตัวเอง |
+| S1 | `th.srt` ต้องไม่มีช่วง cue ที่ทับกัน และ cue สั้นที่สุดต้องยาวเกิน 1.5 วินาที |
+
+**เกตนี้พังได้จริง — ทดสอบด้วยการใส่บั๊กกลับ ไม่ใช่แค่เขียนแล้วเขียว**
+
+- ยืดปลาย cue 1 ให้ทับ cue 2 → S1 แดง: `cue 1 overruns cue 2 by 0.60s`
+- ใส่คำว่า "การดูแลระบบ" กลับเข้า `index.html` → A1 แดง: `page restates "การดูแลระบบ"`
+- ลบ beat หนึ่งแถว → A3 แดง: `expected 12 to be 13`
+- เปลี่ยนลิงก์ `th.srt` เป็นชื่อที่ไม่มี → A2 แดง: `broken local references: th-subtitles.srt`
+
+**ที่ยังตรวจอัตโนมัติไม่ได้ (ต้องรันเองก่อน burn ใหม่)** — การพิสูจน์ระดับพิกเซลว่าไม่มีคำบรรยายทับแถบเมนู และที่ตัวอักษรไทยเป็นตัวอักษรจริง (ไม่ใช่กล่อง `.notdef`) ต้องใช้ ffmpeg และใช้เวลาราว 90 วินาที จึงไม่รวมไว้ใน `npm test` แต่ทำซ้ำได้เองด้วยสองคำสั่งนี้ (ไม่ต้องพึ่งสคริปต์ภายนอก repo) — รันจากโฟลเดอร์ `webapp/nong-kati/admin-training/`:
+
+```bash
+# 1) เมนูด้านซ้ายกว้าง 272px — คำบรรยายต้องไม่มีพิกเซลของคำบรรยายตกในช่วง x < 272
+ffmpeg -hide_banner -loglevel error -y -ss 5.0 -i admin-walkthrough-th.mp4 -frames:v 1 /tmp/frame.png
+
+# 2) ดูด้วยตาจริงว่าเป็นตัวอักษรไทย ไม่ใช่กล่องสี่เหลี่ยม และไม่มีสองบรรทัดซ้อนกัน
+ffmpeg -hide_banner -loglevel error -y -ss 5.0 -i admin-walkthrough-th.mp4 -frames:v 1 /tmp/frame.png
+```
+
+ถ้าจะ burn ใหม่ ต้องสร้าง `base.mp4` (คลิปตัดดิบไม่ทับซ้อน) ก่อน แล้วค่อย burn `th.ass` ทับ โดย `th.ass` ต้องตั้ง `PlayResX/Y` เท่าขนาดวิดีโอจริง (1280×800) — ถ้าไม่ตั้ง libass จะ scale จาก 384×288 ทำให้ `FontSize` และ `MarginV` ไม่เป็นค่าที่เขียนไว้จริง ๆ
+
+## คู่มือฟีเจอร์ "เติมสต๊อกบัญชี" (5 ต.ค. 2569) — `tests/admin-restock-howto.test.ts`
+
+`docs/admin-restock-howto-th.md` เป็นคู่มือไทยที่เขียน **เจาะหนึ่งฟีเจอร์** ไม่ใช่ทั้งหลังบ้าน (หมวด 3 ของคู่มือหลักย่อยหมดนี้แล้วและลิงก์ไปหาไฟล์นี้) ปัญหาที่เป็นแบบของมันคือ **อ่านเหมือนเอกสาร แต่ไม่มีใครเช็คว่าตรงกับโค้ดจริงหรือเปล่า** — ตอนเขียนพบว่าคู่มือหลักหมวด 3 ผิดไปแล้ว 3 จุด:
+
+- **ปุ่มถูกเรียกผิด** — คู่มือเดิมบอกว่า "จัดการสต๊อก (ไอคอนรูปกุญแจ)" แต่ tooltip ที่พนักงานเห็นคือ **เติมสต๊อกบัญชี** และไอคอนเป็นกล่องพัสดุที่มีเครื่องหมาย `+`
+- **ตัวคั่นถูกอธิบายผิดที่สุด** — คู่มือเดิมบอกว่าเลือก Comma / Semicolon / Tab ได้เมื่อข้อมูลเป็น `user,pass` จริง ๆ แล้ว **ปุ่มตัวคั่นถูก disable ในแบบสั้น และ route ไม่เคยอ่านค่า `separator` เลย** บล็อกแบบยาวถูกส่งให้ลูกค้าตามต้นฉบับเต็มก้อน (doc-comment ของ route เองยังเขียนคอมมิตแบบเก่าไว้ — เกตนี้ยืนยันเจตนานั้นไว้เป็น assertion)
+- **ไม่บอกสิทธิ์เลย** — พนักงานจึงไม่รู้ว่าทำไม Order Manager กดแล้วได้ 403
+
+| ตัว | บังคับว่า |
+|---|---|
+| RH1 | tooltip `เติมสต๊อกบัญชี` และชื่อหน้าต่าง `จัดการข้อมูลบัญชี` ตรงกับที่โค้ดเขียนไว้ |
+| RH2 | หน้า **สินค้า** และ **คลังสินค้า** เปิด dialog ตัวเดียวกันจริง (คู่มือบอก 2 ทาง) |
+| RH3 | สิทธิ์ที่ route ตรวจคือ `products:write` และ **ตาราง role ในคู่มือตรงกับ `ROLE_PERMISSIONS` ทุก role ไม่ตกหล่น** (วนจากโค้ดจริง ไม่ต้องเขียนชื่อเอง) |
+| RH4 | กฎแบบยาว = บรรทัดว่าง 2 บรรทัด (`blankRun >= 2`) และรายการตัวคั่นในคู่มือตรงกับ `SEPARATORS` |
+| RH5 | **route ยังไม่อ่าน `separator` หลังแยก body เสร็จ** — ถ้ามีคนไปทำให้ตัวคั่นมีผลจริง เกตนี้จะแดงเพื่อให้แก้คู่มือพร้อมกัน |
+| RH6 | การข้ามโค้ดซ้ำ · StockMove `restock` · เฉพาะแพ็กเกจที่เปิดใช้งาน (`NO_VARIANTS`) · เข้ารหัสก่อนเก็บ |
+| RH7 | การแจกโค้ดวนรอบ (`order[cursor % order.length]`) และการล็อกแพ็กเกจด้วยชื่อที่ตรงเป๊ะ |
+| RH8 | กับดักบรรทัดขึ้นต้นด้วย `ID:` / `Ref:` / `Order:` / `Inv:` ที่ถูกตัดทิ้งทั้งบรรทัด |
+| RH9 | คู่มือหลักหมวด 3 ยังลิงก์มาที่นี่ และไม่มีข้อความเก่าที่อ้างว่าตัวคั่นใช้ได้ในแบบสั้น |
+
+**พังได้จริง — ทดสอบด้วยการใส่มั๊กกลับ**
+
+- แทรก `void separator;` ลงใน parser ของ route → RH5 แดง: `expected 'const apply = …' not to match /\bseparator\b/`
+- เปลี่ยนแถว `| Catalogue Manager | ได้ |` เป็น `ไม่ได้` → RH3 แดง: `Catalogue Manager should read "ได้"`
+- เปลี่ยนคำว่า `เติมสต๊อกบัญชี` ในคู่มือทั้งไฟล์เป็น `เติมสต๊อกโค้ด` → 2 เคสแดง
+- คืนไฟล์แล้วรันซ้ำ → 25 เคสผ่าน
+
+## กวาดออเดอร์ที่ยังไม่จ่าย (5 ต.ค. 2569) — `tests/order-expiry-sweep.test.ts`
+
+รีวิวหน้าร้านข้อ 2: checkout สร้างออเดอร์ `pending_payment` **จริง** ตั้งแต่กด "Continue" ก่อนลูกค้าจะยืนยันการจ่ายเงิน (`src/app/checkout/page.tsx` `handleContactSubmit` → `createOrder`) แต่ **ไม่มีโค้ดสักบรรทัดใน repo ที่หมดอายุมันได้** — `updateOrderStatus` อนุญาต `pending_payment → expired` แต่ไม่มีผู้เรียกเลย และคิว inventory ที่ `mockQueue.ts` เขียนไว้ว่า *"Reservation sweep (5min), expiry sweep (15min)"* มี `registerJobHandler` ที่ **ไม่เคยถูกเรียกที่ไหนเลย**
+
+หมายเหตุสำคัญที่ตรวจเจอระหว่างลงมือ: รีวิวเดิมเสนอให้ "คืน stock reservation" ด้วย — **ทำไม่ได้และไม่จำเป็น**: `createOrder` แค่ *ตรวจ* สต๊อก (โยน `OUT_OF_STOCK`) ส่วนการหักสต๊อกจริงเกิดใน transaction ตอนยืนยันการจ่ายเงิน (`src/lib/fulfilment.ts`) ออเดอร์ที่หมดอายุจึง**ไม่ถือของไว้** ส่วน `releaseExpiredReservations` เดินบน `mockCodeStore` ในหน่วยความจำซึ่งว่างเปล่าตอน cold start บน serverless — เอามาเรียกจาก cron คือทำลายเพื่อไม่ได้อะไร เกตนี้จึงยืนยันว่า**ไม่** import มัน
+
+| ตัว | บังคับว่า |
+|---|---|
+| EX1 | กวาดเฉพาะ `pending_payment` ที่เก่ากว่าหน้าต่างชำระเงิน (ค่าเริ่มต้น 30 นาที = `order_payment_timeout_minutes` ใน 06-database) และตั้ง `expiredAt` ที่ไม่เคยมีใครเขียนมาก่อน |
+| EX2 | **`updateMany` ต้องย้ำ `status: 'pending_payment'` ใน `where` อีกครั้ง** — นี่คือ CAS ที่ทำให้ cron tick ปลอดภัยเมื่อชน webhook การจ่ายเงินพอดี ถ้ามีคนไปลบ predicate นี้ทิ้ง "ล้างโค้ด" ออเดอร์ที่จ่ายเงินแล้วจะถูกพลิกเป็น `expired` ได้ |
+| EX3 | แข่งกันแล้วไม่ซ้ำซ้อน — `scanned > expired` คือสัญญาณว่า webhook ชนก่อน |
+| EX4 | ทำงานเป็น batch ไม่ใช่ประโยคเดียวจบ (หนี้สต๊อกค้างครั้งแรกต้องไม่ล้ม) · รันซ้ำแล้วเป็น no-op |
+| EX5 | **ไม่แตะสต๊อกและไม่แตะ gift code เลย** — ยืนยันด้วยการเรียกจริง ไม่ใช่อ่านซอร์สอย่างเดียว พร้อมดริฟต์การ์์ว่า `reservation.ts` ยังเป็น mock อยู่จริง |
+| EX6 | route `/api/v1/internal/orders/expire` เหมือน drain ของอีเมลทุกประการ: 503 เมื่อไม่ตั้ง `NK_CRON_SECRET` (fail-closed) · 401 เมื่อ token ผิด · รับ admin JWT เพื่อกดจากแผง · clamp `?batch` |
+| EX7 | drift guard — `expired` ยังเป็น transition ที่ถูกต้องใน `VALID_TRANSITIONS` ของ `src/api/orders.ts` |
+
+**พังได้จริง — ทดสอบด้วยการใส่มั๊กกลับ**
+
+- ลบ `, status: 'pending_payment'` ออกจาก `where` ของ `updateMany` → EX2 แดง: `re-asserts status=pending_payment in the updateMany where-clause`
+
+## แคตตาล็อกอันดับตามสต๊อก (5 ต.ค. 2569) — `tests/catalog-stock-ordering.test.ts`
+
+รีวิวหน้าร้านข้อ 3: หน้าหมวดหมู่เรียงด้วย `createdAt desc` ล้วน ๆ ไม่มีตัวเลือกเรียง ไม่มีฟิลเตอร์ และ**ไม่มี pagination เลย** (หน้า 1 เสมอ 24 รายการ) ส่วน `getCatalogProducts` มี 5 วิธีเรียงแต่ **ไม่วิธีไหนดูสต๊อกเลย** เพราะ ordering select เดิมดึงแค่ `variants: { select: { price: true } }` — ไม่มี `stock` ให้เรียงด้วยซ้ำ
+
+สิ่งที่แก้: ย้ายการเรียงไปทับ **ทุก** sort (ไม่ใช่แค่เพิ่มตัวเลือกใหม่ เพราะการฝังสินค้าที่ซื้อได้ไว้ใต้ของที่หมด ต้องเข้าถึงไม่ได้แม้ "ลืมเลือก sort"), เพิ่ม sort `available` (มีของเยอะก่อน), เพิ่ม `?available=1` ที่หน้าหมวดหมู่และหน้าค้นหา, และเปลี่ยนหน้าหมวดหมู่ให้เรียงทั้งชุดแล้วค่อยตัดหน้า (เดิมใช้ `skip/take` ต่อหน้า ทำให้ลำดับข้ามหน้าไม่ตรงกัน)
+
+| ตัว | บังคับว่า |
+|---|---|
+| CSO1 | **มีของมาก่อนของหมด ทุก sort ทั้ง 6** (แคสต์โหด: ของหมดชนะทุก key อื่น — ราคาถูก ราคาถูกสุด ฟีเจอร์ ใหม่สุด — แต่ยังต้องไปอยู่หลังของที่ซื้อได้) |
+| CSO2 | variant ที่ `isActive: false` ถึงมีสต๊อกก็**นับเป็นไม่มีของ** เพราะ `createOrder` กรอง `isActive: true` — แคตตาล็อกห้ามโฆษณาของที่ checkout จะตอบ `OUT_OF_STOCK` |
+| CSO3 | sort `available` เรียงตามสต๊อกมาก→น้อย |
+| CSO4 | `?available=1` ใส่ predicate `{ some: { stock: { gt: 0 }, isActive: true } }` และไม่ใส่เมื่อปิด |
+| CSO5 | **หน้า 2 ต่อจากหน้า 1 พอดี** — เรียงทั้งชุดครั้งเดียวแล้ว slice ไม่มีของซ้ำและไม่มีของหาย |
+| CSO6 | deterministic — key ที่เท่ากันตกไปที่ชื่อแล้ว id กันสลับหน้า |
+| CSO7 | **ordering select ต้องดึง `stock` กับ `isActive` จริง ๆ** — เคสนี้จับได้เฉพาะการดู shape ของ select เพราะ prisma mock คืนค่าที่เทสต์ให้เสมอ ไม่ว่า select จะเขียนอะไร |
+| CSO8 | `getProductsByCategory` (ที่หน้าหมวดหมู่ใช้) stock-aware เหมือนกัน และไม่มี `skip/take` + `orderBy` ในดับของการเรียงแล้ว |
+
+**พังได้จริง — ทดสอบด้วยการใส่มั๊กกลับ**
+
+- เปลี่ยน `byAvailability(a, b) || cmp(a, b)` เป็น `cmp(a, b)` → 4 เคสแดง
+- ตัด `stock: true, isActive: true` ออกจาก ordering select → CSO7 แดง 2 เคส (เคสนี้แรกที่พังหลังเขียนเทสต์เสร็จแล้ว คือเคสที่เทสต์พฤติกรรมจับไม่ได้ — ต้องเพิ่ม CSO7 ถึงจะเห็น)
+
+## บัญชีที่ต้องเปลี่ยนรหัสผ่าน (5 ต.ค. 2569) — `tests/admin-forced-password-change.test.ts`
+
+ลูกค้าแจ้ง: **Super Admin** เปิดหน้าสินค้าแล้วเจอแถบแดง `INSUFFICIENT_PERMISSIONS` ทับ "0 รายการ" — แต่**เมนูด้านซ้ายยังครบทั้ง 7 หมวด** รีวิวแล้วไม่ใช่บั๊กตารางสิทธิ์ (super_admin ได้ `products:read` อยู่แล้ว) สาเหตุคือบัญชีนั้นมี `mustChangePassword = true` ค้างไว้
+
+ห่วงโซ่ที่ทำให้เกิดอาการนี้ — และทำไมถึงไม่มีใครจับได้ทั้งที่ผ่าน 466 เทสต์:
+
+1. `mustChangePassword` ตั้งไว้ (ครั้งแรกที่ล็อกอิน หรือถูกบังคับเปลี่ยนจากหน้าพนักงาน)
+2. [`verifyAdminJwt`](../../webapp/nong-kati/nong-kati/src/lib/jwt.ts) **ตัดสิทธิ์ใน token ทิ้งทั้งหมด** — ตั้งใจให้รหัสชั่วคราวไม่ได้อะไรเลย
+3. **เมนูข้างซ้ายเช็คด้วย role ไม่ใช่ token** (`visibleNav` → `roleHasPermission` → `ROLE_PERMISSIONS[role]`) เลยยังโชว์ครบทุกหมวด
+4. **API เช็คด้วยสิทธิ์ใน token** ทุกตัวก็ 403 หมด → เมนูกับ API ขัดกันเอง และข้อความบอกว่า "สิทธิ์ไม่พอ" ทั้งที่ที่จริงคือ "ยังไม่ได้เปลี่ยนรหัสผ่าน"
+5. **ไม่มีอะไรฝั่ง server บังคับเปลี่ยน** — มีแค่ `router.push` ฝั่ง client ในหน้า login ถ้าพลาด (หรือเข้าผ่าน bookmark) ก็ติดอยู่อย่างเดียว
+
+ทำไมเทสต์เดิมไม่จับ: [`admin-authz-matrix.test.ts`](../../webapp/nong-kati/nong-kati/tests/admin-authz-matrix.test.ts) ฮาร์ดโค้ด `mustChangePassword: false` ไว้ทั้ง 53 endpoint × 6 role — **สถานะนี้ไม่เคยถูกทดสอบเลย** เลยไปถึง production แบบเขียว
+
+| ตัว | บังคับว่า |
+|---|---|
+| FP1 | บัญชีที่ต้องเปลี่ยนรหัส **ยังถูกตัดสิทธิ์เหมือนเดิม** — งานนี้ไม่ได้ทำให้ประตูหลวมลง |
+| FP2 | `verifyAdminJwt` ตั้งธง `passwordChangeRequired` เพื่อบอกเหตุผลจริง (ธงนี้อยู่ฝั่ง server ไม่ได้อยู่ใน token ที่เซ็น) |
+| FP3 | `checkPermission` ตอบ `PASSWORD_CHANGE_REQUIRED` — **ไม่ใช่** `INSUFFICIENT_PERMISSIONS` |
+| FP4 | การปฏิเสธสิทธิ์จริง (เช่น finance_viewer ขอ `products:read`) ยังตอบ `INSUFFICIENT_PERMISSIONS` เหมือนเดิม — สาขาใหม่ต้องไม่กวาดความผิดพลาดนี้ |
+| FP5 | หน้าสินค้าตอบ 403 ด้วยโค้ดที่สุจริต **และไม่ leak รายการสินค้า** |
+| FP6 | layout ยิง `/api/v1/auth/admin/me` (route นี้ auth-only ไม่ต้องมีสิทธิ์ — เพราะฉะนั้นถึงบัญชีที่ไม่มีสิทธิ์เลยก็ถามได้) แล้ว `router.replace` ไปที่ `/management/settings?tab=security` |
+| FP7 | ยกเว้นเฉพาะหน้า settings ตรง ๆ ไม่งั้นจะวนลูป — และไม่รันตอนหน้า login |
+| FP8 | การเช็คล้มเหลว **ห้าม** กลายเป็นการล็อกคนออก — 403 ของแต่ละ route ยังเป็นด่านสุดท้าย |
+| FP9 | ทางออกยังเปิดอยู่: change-password ไม่ต้องมีสิทธิ์ · `changeAdminPassword` **ต้อง** เคลียร์ธงและ revoke session (ถ้าลืมเคลียร์ = เปลี่ยนรหัสแล้วยังล็อกอยู่ตลอด) · หน้า settings ไม่มี permission gate |
+
+**พังได้จริง — ทดสอบด้วยการใส่มั๊กกลับ**
+
+- ถอด `passwordChangeRequired: true` ออกจาก `verifyAdminJwt` → FP1/FP3/FP5 แดง 3 เคส
+- ลบบรรทัด `if (pathname === FORCED_CHANGE_EXEMPT_PATH) return;` ออกจาก layout → FP7 แดง (นี่คือบรรทัดที่กัน redirect วนไม่ให้)
+
+## ดู / ปิดใช้งานบัญชีที่เก็บไว้ (5 ต.ค. 2569) — `tests/admin-stored-accounts.test.ts`
+
+ลูกค้าถามว่า “เพิ่มบัญชีเข้าสินค้าแล้วดูยังไง ลบยังไง” — ปรากฏว่า **ฟีเจอร์นี้ถูกออกแบบและประกาศสิทธิ์ไว้แล้ว แต่ไม่เคยเขียนโค้ดจริง** มีทั้ง permission (`inventory:reveal`, `inventory:void`) และชื่อ route ในตารางมาตั้งแต่สมัยทำ inventory แต่โฟลเดอร์ route ไม่เคยถูกสร้าง
+
+| ตัว | บังคับว่า |
+|---|---|
+| GC1 | `reveal` ถอดรหัสได้จริง (ทดสอบด้วย ciphertext จริง ไม่ใช่ตัวแทน) และ**เขียน audit ทุกครั้ง** — เพราะสิทธิ์ที่ไม่มีบันทึกถือว่าตรวจสอบย้อนหลังไม่ได้ |
+| GC2 | **audit ห้ามมี plaintext** — ถ้าเขียนลง `diff` ก็เท่ากับถอดการเข้ารหัสทิ้งสำหรับข้อมูลที่อ่อนไหวที่สุดในระบบ |
+| GC3 | บัญชีสถานะ voided/expired ตอบ **409 ไม่ใช่ 403** — คนที่เรียกมีสิทธิ์อยู่แล้ว แค่แถวนี้เปิดดูไม่ได้ 403 จะโกหก |
+| GC4 | decrypt ไม่สำเร็จต้องตอบ 500 แบบไม่มีรายละเอียด ไม่รั่ว ciphertext หรือ key version |
+| GC5 | `void` ทำ 4 อย่างใน**transaction เดียว**: พลิกสถานะ · ลดสต๊อก · เขียน StockMove · audit (audit ต้องอยู่ใน tx เดียวกัน) |
+| GC6 | **CAS** — void ซ้ำต้องไม่ลดสต๊อกซ้ำ และขายไปแล้วห้ามถูกปิดเงียบ ๆ (409) |
+| GC7 | รายการ masked ต้อง**ไม่หลุด plaintext** ออกไปทาง response แม้แต่ตัวอักษรเดียว |
+| GC9 | การส่งบัญชีให้ลูกค้ารายตัว: ผูกกับ variant ที่ออเดอร์ซื้อจริงเท่านั้น · **ห้ามออเดอร์ที่ยังไม่จ่าย** · CAS · ไม่คืน plaintext · audit ใน tx เดียวกัน |
+| GC8 | **ratchet: route ที่ประกาศใน `ROUTE_PERMISSIONS` ต้องมีไฟล์จริง** — ทิศทางที่เกตน์เดิมไม่เคยตรวจ |
+| GC10 | แก้ไขบัญชีที่พิมพ์ผิด: เข้ารหัสใหม่ + **nonce ใหม่เสมอ** · hash ใหม่ · ชนบัญชีอื่นต้องตอบ 409 · **สต๊อกไม่ขยับ** · ขาย/จองแล้วแก้ไม่ได้ · ขวัญเหตุคือ `inventory:reveal` ไม่ใช่ `inventory:write` |
+
+**GC10 — เรื่องนี้ค้างมาตั้งแต่รอบ GC:** มี "ดู" กับ "ลบ" แล้ว แต่**ไม่มี "แก้"** พิมพ์ผิดตัวเดียว = ต้องกินสต๊อกทิ้ง 1 ชุ้นผ่าน void ทั้งที่เป็นแค่ typo · `codeHash` เป็น UNIQUE ระดับทั้งระบบ ถ้าแก้ไปชนบัญชีที่มีอยู่แล้วต้องตอบ **409 DUPLICATE_CODE** ไม่ใช่ปล่อยให้ query พังเป็น 500 · nonce ห้ามใช้ซ้ำเด็ดขาด (GCM) และ audit ต้องเป็น `diff: null` เพราะค่า "ก่อนแก้" คือ plaintext เดิม
+
+**พังได้จริง — ทดสอบด้วยการใส่มั๊กกลับ**
+
+- ถอน `status: 'available'` ออกจาก CAS ของ void → GC5 แดง
+- เปลี่ยน audit ของ reveal เป็น `diff: { before: { plaintext } }` → GC2 แดง
+- แก้ `codeHash: nextHash` ใน edit เป็น `codeHash: code.codeHash` (เก็บ hash เก่า) → GC10 แดง (พิสูจน์แล้ว 5 ต.ค. 2569)
+
+**GC8 เจอเจอะทันทีตอนรันครั้งแรก — เจอ route ประกาศไว้แต่ไม่มีอีก 8 ตัว** นอกจาก reveal/void ที่เพิ่งสร้าง: `PATCH products/:id/status` · `POST inventory/:id/upload` · `POST inventory/:id/codes` · `POST orders/:id/assign-code` · `PATCH customers/:id/tier` · `PATCH staff/:id/role` · `PATCH staff/:id/deactivate` · `GET dashboard/stats` — เก็บไว้ใน `KNOWN_UNBUILT` ในเทสต์ (ต้องลบทีละตัวเมื่อสร้างเสร็จ **รายการใหม่ที่โผล่เพิ่มจะทำให้เกตน์แดง**)
 
 ## Security Audit — แยก production (blocking) กับ dev (report) (2026-10-03)
 

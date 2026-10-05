@@ -17,6 +17,9 @@ export interface SearchToolbarProps {
   /** Outage mode (audit #6): hide sort + pager — they operate on nothing
    *  and imply a loaded result set next to the failure message. */
   hideControls?: boolean;
+  /** Route the dropdown and pager push to. Category pages reuse the same
+   *  gated control (review #3) instead of hand-rolling a second one. */
+  basePath?: string;
   className?: string;
 }
 
@@ -33,6 +36,7 @@ export function SearchToolbar({
   sortOptions,
   currentSort,
   hideControls = false,
+  basePath = '/search',
   className,
 }: SearchToolbarProps): React.JSX.Element {
   const router = useRouter();
@@ -48,7 +52,7 @@ export function SearchToolbar({
       else sp.set(k, v);
     }
     const s = sp.toString();
-    router.push(`/search${s ? `?${s}` : ''}`);
+    router.push(`${basePath}${s ? `?${s}` : ''}`);
   };
 
   const currentLabel =

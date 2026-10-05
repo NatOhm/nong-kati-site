@@ -19,6 +19,7 @@ import { AdminShell } from '@/components/layout/AdminShell';
 import { adminFetch, adminJson } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
 import { BulkStockDialog } from '../products/BulkStockDialog';
+import { VariantCodesDialog } from './VariantCodesDialog';
 
 /**
  * Admin Inventory — รายการสินค้าจริงทั้งหมด (ชุดเดียวกับหน้าเว็บหลัก)
@@ -29,6 +30,7 @@ import { BulkStockDialog } from '../products/BulkStockDialog';
 interface InventoryItem {
   id: string;
   variantId: string | null;
+  variantLabel: string | null;
   variantCount: number;
   sku: string | null;
   name: string;
@@ -104,6 +106,12 @@ export default function AdminInventoryPage(): React.JSX.Element {
   const [toggling, setToggling] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [stockTarget, setStockTarget] = useState<{ id: string; name: string } | null>(null);
+  /** Variant whose stored accounts are being browsed (review 2026-10-05). */
+  const [codesTarget, setCodesTarget] = useState<{
+    variantId: string;
+    variantLabel: string;
+    productName: string;
+  } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -410,6 +418,28 @@ export default function AdminInventoryPage(): React.JSX.Element {
                           >
                             <Users size={14} />
                           </button>
+                          {/* Browse the stored accounts themselves — the "did my
+                              paste land?" view. Without this, an admin could
+                              only ever see a COUNT (review 2026-10-05). The
+                              existing จัดการบัญชี button opens the restock
+                              dialog, which shows accounts only in its PREVIEW;
+                              this one shows what is actually stored now. */}
+                          {item.variantId && (
+                            <button
+                              onClick={() =>
+                                setCodesTarget({
+                                  variantId: item.variantId!,
+                                  variantLabel: item.variantLabel ?? 'ตัวเลือกหลัก',
+                                  productName: item.name,
+                                })
+                              }
+                              aria-label={`ดูบัญชีที่เก็บไว้ ${item.name}`}
+                              title="ดูบัญชีที่เก็บไว้"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-line-subtle text-fg-secondary transition-colors hover:border-line-brand hover:text-fg-brand"
+                            >
+                              <Eye size={14} />
+                            </button>
+                          )}
                           <button
                             onClick={() => setDraft(newDraft(item))}
                             aria-label={`แก้ไข ${item.name}`}
@@ -521,6 +551,16 @@ export default function AdminInventoryPage(): React.JSX.Element {
           productName={stockTarget.name}
           onClose={() => setStockTarget(null)}
           onSaved={() => void load()}
+        />
+      )}
+
+      {codesTarget && (
+        <VariantCodesDialog
+          variantId={codesTarget.variantId}
+          variantLabel={codesTarget.variantLabel}
+          productName={codesTarget.productName}
+          onClose={() => setCodesTarget(null)}
+          onChanged={() => void load()}
         />
       )}
 

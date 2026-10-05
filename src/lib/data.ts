@@ -327,6 +327,109 @@ function mapProduct(
   };
 }
 
+// ─── Catalog ordering (review finding #3, 2026-10-05) ───
+
+/**
+ * Lightweight ordering keys.
+ *
+ * Ordering is computed over the WHOLE matching set in memory and only then
+ * sliced, so page N+1 continues page N's sequence exactly. That select
+ * must therefore carry every field the comparators need — including
+ * `stock`, which the original `getCatalogProducts` key select never
+ * fetched (`variants: { select: { price: true } }`). That omission is why
+ * NO sort in the app could ever have been stock-aware, and it is also why
+ * a sold-out product dominated the default first page.
+ */
+interface CatalogOrderKey {
+  id: string;
+  name: string;
+  createdAt: Date;
+  isFeatured: boolean;
+  variants: { price: unknown; stock: number; isActive: boolean }[];
+}
+
+const catalogOrderSelect = {
+  id: true,
+  name: true,
+  createdAt: true,
+  isFeatured: true,
+  variants: { select: { price: true, stock: true, isActive: true } },
+} as const;
+
+/**
+ * "At least one ACTIVE variant has stock" — the same set `createOrder`
+ * will actually accept (`productVariant.findMany({ where: { id: { in },
+ * isActive: true } })`), so the catalog never advertises availability the
+ * order route would then reject with OUT_OF_STOCK.
+ */
+const AVAILABILITY_FILTER = { some: { stock: { gt: 0 }, isActive: true } } as const;
+
+/** Sellable units across ACTIVE variants only. */
+function totalStock(key: CatalogOrderKey): number {
+  return key.variants.reduce(
+    (sum, v) => (v.isActive ? sum + Number(v.stock ?? 0) : sum),
+    0,
+  );
+}
+
+/**
+ * Leading comparator for every sort: anything purchasable outranks
+ * anything sold out. Applied before the requested sort rather than as one
+ * more option, because burying a purchasable product under sold-out ones
+ * was the complaint — it should not be reachable by forgetting a sort.
+ */
+function byAvailability(a: CatalogOrderKey, b: CatalogOrderKey): number {
+  const aIn = totalStock(a) > 0;
+  const bIn = totalStock(b) > 0;
+  if (aIn !== bIn) return aIn ? -1 : 1;
+  return 0;
+}
+
+function byName(a: { name: string }, b: { name: string }): number {
+  return a.name.localeCompare(b.name, 'th');
+}
+
+function byId(a: { id: string }, b: { id: string }): number {
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
+/**
+ * Total, deterministic ordering. Every path ends in `byName || byId` so
+ * equal-key products never swap places between two requests — without
+ * that, page 1 of the catalog could repeat or drop an item.
+ */
+function orderCatalogKeys<T extends CatalogOrderKey>(keys: T[], sort: CatalogSort): T[] {
+  const minPriceOf = (p: T): number | null =>
+    p.variants.length ? Math.min(...p.variants.map((v) => Number(v.price))) : null;
+
+  const cmp: (a: T, b: T) => number =
+    sort === 'price-asc' || sort === 'price-desc'
+      ? (a, b) => {
+          // Products without variants sink to the bottom in either direction.
+          const pa = minPriceOf(a);
+          const pb = minPriceOf(b);
+          if (pa === null && pb === null) return byName(a, b) || byId(a, b);
+          if (pa === null) return 1;
+          if (pb === null) return -1;
+          const d = sort === 'price-asc' ? pa - pb : pb - pa;
+          return d !== 0 ? d : byName(a, b) || byId(a, b);
+        }
+      : sort === 'name-asc'
+        ? (a, b) => byName(a, b) || byId(a, b)
+        : sort === 'newest'
+          ? (a, b) => b.createdAt.getTime() - a.createdAt.getTime() || byName(a, b) || byId(a, b)
+          : sort === 'available'
+            ? // Best-stocked first; the most likely to actually be bought.
+              (a, b) =>
+                totalStock(b) - totalStock(a) || byName(a, b) || byId(a, b)
+            : // featured: featured first, then name, then id — deterministic
+              (a, b) => Number(b.isFeatured) - Number(a.isFeatured) || byName(a, b) || byId(a, b);
+
+  // byAvailability wraps EVERY sort, including 'available' itself (where
+  // it is a no-op because the stock comparison already separates them).
+  return [...keys].sort((a, b) => byAvailability(a, b) || cmp(a, b));
+}
+
 // ─── Product Queries ───────────────────────────────────
 
 export async function getFeaturedProducts(): Promise<ProductItem[]> {
@@ -348,6 +451,8 @@ export async function getProductsByCategory(
   slug: string,
   page: number = 1,
   limit: number = 24,
+  sort: CatalogSort = 'featured',
+  availableOnly: boolean = false,
 ): Promise<{ products: ProductItem[]; total: number }> {
   const cat = await prisma.category.findUnique({ where: { slug } });
   if (!cat) return { products: [], total: 0 };
@@ -355,26 +460,39 @@ export async function getProductsByCategory(
   // Type-level parent categories show every product in their subtree.
   const descendantIds = await getDescendantIds(cat.id);
   const categoryIds = [cat.id, ...descendantIds];
-  const where = { categoryId: { in: categoryIds }, isActive: true };
+  const where: CatalogWhere = { categoryId: { in: categoryIds }, isActive: true };
+  if (availableOnly) where.variants = AVAILABILITY_FILTER;
 
   const tier = await resolveTier();
-  const [products, total] = await Promise.all([
-    prisma.product.findMany({
-      where,
-      include: {
-        category: { select: { id: true, name: true, slug: true } },
-        variants: { orderBy: { sortOrder: 'asc' } },
-        aliases: true,
-      },
-      skip: (page - 1) * limit,
-      take: limit,
-      orderBy: { createdAt: 'desc' },
-    }),
-    prisma.product.count({ where }),
-  ]);
+
+  // Same global-ordering-then-slice shape as getCatalogProducts: before this
+  // the category page ordered with a plain `createdAt desc` skip/take, so a
+  // product's position could differ between page 1 and page 2 of the same
+  // listing and nothing was ordered by stock at all (review finding #3).
+  const keys = await prisma.product.findMany({
+    where,
+    select: catalogOrderSelect,
+  });
+  const ordered = orderCatalogKeys(keys, sort);
+  const total = ordered.length;
+  const pageIds = ordered.slice((page - 1) * limit, page * limit).map((k) => k.id);
+  if (pageIds.length === 0) return { products: [], total };
+
+  const rows = await prisma.product.findMany({
+    where: { id: { in: pageIds } },
+    include: {
+      category: { select: { id: true, name: true, slug: true } },
+      variants: { orderBy: { sortOrder: 'asc' } },
+      aliases: true,
+    },
+  });
+  const rowById = new Map(rows.map((r) => [r.id, r]));
 
   return {
-    products: products.map((p) => mapProduct(p, p.category, tier)),
+    products: pageIds
+      .map((id) => rowById.get(id))
+      .filter((r): r is NonNullable<typeof r> => Boolean(r))
+      .map((p) => mapProduct(p, p.category, tier)),
     total,
   };
 }
@@ -402,7 +520,26 @@ export async function getAllProductSlugs(): Promise<string[]> {
   return products.map((p) => p.slug);
 }
 
-export type CatalogSort = 'featured' | 'price-asc' | 'price-desc' | 'name-asc' | 'newest';
+export type CatalogSort =
+  | 'featured'
+  | 'price-asc'
+  | 'price-desc'
+  | 'name-asc'
+  | 'newest'
+  /** Best-stocked first. Availability already leads every other sort. */
+  | 'available';
+
+/** Shared `where` shape for the catalog queries. */
+type CatalogWhere = {
+  isActive: boolean;
+  OR?: Array<
+    | { name: { contains: string; mode: 'insensitive' } }
+    | { description: { contains: string; mode: 'insensitive' } }
+    | { aliases: { some: { alias: { contains: string; mode: 'insensitive' } } } }
+  >;
+  categoryId?: string | { in: string[] };
+  variants?: { some: { stock: { gt: number }; isActive: boolean } };
+};
 
 /**
  * Full catalog query with sorting — used by the "สินค้าทั้งหมด" page.
@@ -419,17 +556,9 @@ export async function getCatalogProducts(
   sort: CatalogSort,
   page: number = 1,
   limit: number = 24,
+  availableOnly: boolean = false,
 ): Promise<{ products: ProductItem[]; total: number }> {
   const trimmed = query.trim().toLowerCase();
-  type CatalogWhere = {
-    isActive: boolean;
-    OR?: Array<
-      | { name: { contains: string; mode: 'insensitive' } }
-      | { description: { contains: string; mode: 'insensitive' } }
-      | { aliases: { some: { alias: { contains: string; mode: 'insensitive' } } } }
-    >;
-    categoryId?: string;
-  };
   const where: CatalogWhere = { isActive: true };
 
   if (trimmed) {
@@ -444,50 +573,18 @@ export async function getCatalogProducts(
     if (!cat) return { products: [], total: 0 };
     where.categoryId = cat.id;
   }
+  if (availableOnly) where.variants = AVAILABILITY_FILTER;
 
   // Lightweight pass: only the fields needed to order the full matching set.
-  const keys = await prisma.product.findMany({
-    where,
-    select: {
-      id: true,
-      name: true,
-      createdAt: true,
-      isFeatured: true,
-      variants: { select: { price: true } },
-    },
-  });
+  const keys = await prisma.product.findMany({ where, select: catalogOrderSelect });
 
-  const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name, 'th');
-  const byId = (a: { id: string }, b: { id: string }) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
-  const minPriceOf = (p: (typeof keys)[number]) =>
-    p.variants.length ? Math.min(...p.variants.map((v) => Number(v.price))) : null;
+  const ordered = orderCatalogKeys(keys, sort);
+
+  const total = ordered.length;
+  const pageIds = ordered.slice((page - 1) * limit, page * limit).map((k) => k.id);
+  if (pageIds.length === 0) return { products: [], total };
 
   const tier = await resolveTier();
-
-  const cmp: (a: (typeof keys)[number], b: (typeof keys)[number]) => number =
-    sort === 'price-asc' || sort === 'price-desc'
-      ? (a, b) => {
-          // Products without variants sink to the bottom in either direction.
-          const pa = minPriceOf(a);
-          const pb = minPriceOf(b);
-          if (pa === null && pb === null) return byName(a, b) || byId(a, b);
-          if (pa === null) return 1;
-          if (pb === null) return -1;
-          const d = sort === 'price-asc' ? pa - pb : pb - pa;
-          return d !== 0 ? d : byName(a, b) || byId(a, b);
-        }
-      : sort === 'name-asc'
-        ? (a, b) => byName(a, b) || byId(a, b)
-        : sort === 'newest'
-          ? (a, b) => b.createdAt.getTime() - a.createdAt.getTime() || byId(a, b)
-          : // featured: featured first, then name, then id — deterministic
-            (a, b) => Number(b.isFeatured) - Number(a.isFeatured) || byName(a, b) || byId(a, b);
-
-  keys.sort(cmp);
-
-  const total = keys.length;
-  const pageIds = keys.slice((page - 1) * limit, page * limit).map((k) => k.id);
-  if (pageIds.length === 0) return { products: [], total };
 
   const rows = await prisma.product.findMany({
     where: { id: { in: pageIds } },

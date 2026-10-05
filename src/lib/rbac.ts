@@ -39,7 +39,17 @@ export async function checkPermission(
 
   // Check permission
   if (!payload.perms.includes(requiredPermission)) {
-    return { allowed: false, error: 'INSUFFICIENT_PERMISSIONS' };
+    // A forced-password-change admin is zeroed perms on EVERY route, which
+    // used to surface as INSUFFICIENT_PERMISSIONS — telling the operator to
+    // ask their manager for access when the actual fix is one form away.
+    // The distinction is the whole point: the gate still denies, it just
+    // stops lying about why.
+    return {
+      allowed: false,
+      error: payload.passwordChangeRequired
+        ? 'PASSWORD_CHANGE_REQUIRED'
+        : 'INSUFFICIENT_PERMISSIONS',
+    };
   }
 
   return { allowed: true, payload };

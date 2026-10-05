@@ -17,11 +17,18 @@ import { getCatalogProducts, getCategoriesWithProductCounts, type CatalogSort } 
 export const dynamic = 'force-dynamic';
 
 interface SearchPageProps {
-  searchParams: Promise<{ q?: string; page?: string; sort?: string; category?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    page?: string;
+    sort?: string;
+    category?: string;
+    available?: string;
+  }>;
 }
 
 const SORT_OPTIONS: { value: CatalogSort; label: string }[] = [
   { value: 'featured', label: 'แนะนำ' },
+  { value: 'available', label: 'มีของเยอะก่อน' },
   { value: 'price-asc', label: 'ราคาต่ำ → สูง' },
   { value: 'price-desc', label: 'ราคาสูง → ต่ำ' },
   { value: 'name-asc', label: 'ชื่อ A → Z' },
@@ -33,12 +40,14 @@ function buildUrl(params: {
   page?: number | undefined;
   sort?: string | undefined;
   category?: string | undefined;
+  available?: boolean | undefined;
 }): string {
   const sp = new URLSearchParams();
   if (params.q) sp.set('q', params.q);
   if (params.category) sp.set('category', params.category);
   if (params.sort && params.sort !== 'featured') sp.set('sort', params.sort);
   if (params.page && params.page > 1) sp.set('page', String(params.page));
+  if (params.available) sp.set('available', '1');
   const s = sp.toString();
   return `/search${s ? `?${s}` : ''}`;
 }
@@ -61,18 +70,27 @@ export async function generateMetadata({ searchParams }: SearchPageProps): Promi
 export default async function SearchPage({
   searchParams,
 }: SearchPageProps): Promise<React.JSX.Element> {
-  const { q, page: pageParam, sort: sortParam, category } = await searchParams;
+  const { q, page: pageParam, sort: sortParam, category, available } = await searchParams;
   const query = q || '';
   const page = parseInt(pageParam || '1', 10);
   const limit = 24;
   const sort: CatalogSort = SORT_OPTIONS.find((o) => o.value === sortParam)?.value ?? 'featured';
+  // ?available=1 → hide sold-out products (review #3).
+  const availableOnly = available === '1';
 
   let products: Awaited<ReturnType<typeof getCatalogProducts>>['products'] = [];
   let total = 0;
   let categories: Awaited<ReturnType<typeof getCategoriesWithProductCounts>> = [];
   let dbDown = false;
   try {
-    const result = await getCatalogProducts(query, category, sort, page, limit);
+    const result = await getCatalogProducts(
+      query,
+      category,
+      sort,
+      page,
+      limit,
+      availableOnly,
+    );
     products = result.products;
     total = result.total;
     categories = await getCategoriesWithProductCounts();
@@ -123,10 +141,42 @@ export default async function SearchPage({
                   currentSort={sort}
                   sortOptions={SORT_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
                   hideControls={dbDown}
+                  basePath="/search"
                 >
                   <CatalogSearchBox className="w-full" />
                 </SearchToolbar>
               </Suspense>
+              {/* "Available only" toggle (review #3) — hidden during an outage
+                  for the same reason the sort/pager are. */}
+              {!dbDown && (
+                <div className="mt-3">
+                  {availableOnly ? (
+                    <Link
+                      href={buildUrl({
+                        q: query || undefined,
+                        category: category || undefined,
+                        sort: sortParam,
+                      })}
+                      className="inline-flex min-h-[40px] items-center rounded-full border border-line-brand bg-peach-50 px-3 py-1.5 text-sm font-medium text-fg-brand"
+                      aria-pressed="true"
+                    >
+                      ✓ เฉพาะที่มีของ
+                    </Link>
+                  ) : (
+                    <Link
+                      href={buildUrl({
+                        q: query || undefined,
+                        category: category || undefined,
+                        sort: sortParam,
+                        available: true,
+                      })}
+                      className="inline-flex min-h-[40px] items-center rounded-full border border-line px-3 py-1.5 text-sm text-fg-secondary transition-colors hover:border-line-brand hover:text-fg-brand"
+                    >
+                      เฉพาะที่มีของ
+                    </Link>
+                  )}
+                </div>
+              )}
             </section>
 
             {/* Category chips */}

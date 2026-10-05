@@ -1,6 +1,7 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import { Suspense } from 'react';
 
 import { FacebookLayout } from '@/components/layout/FacebookLayout';
 
@@ -13,12 +14,42 @@ import { AppTile } from '@/components/product/AppTile';
 import { CategoryIcon } from '@/components/product/CategoryIcon';
 import { Breadcrumb } from '@/components/data-display/Breadcrumb';
 import { StructuredData } from '@/components/data-display/StructuredData';
+import { SearchToolbar } from '@/components/search/SearchToolbar';
 
-import { getCategoryBySlug, getProductsByCategory } from '@/lib/data';
+import { getCategoryBySlug, getProductsByCategory, type CatalogSort } from '@/lib/data';
 import { publicOrigin } from '@/lib/siteConfig';
 
 interface CategoryPageProps {
   params: Promise<{ slug: string[] }>;
+  searchParams: Promise<{ sort?: string; page?: string; available?: string }>;
+}
+
+/**
+ * Category sort menu (review #3). Availability is NOT an option here: it
+ * already leads every sort in the query, so an in-stock product can never
+ * be buried by sold-out ones regardless of which sort is chosen.
+ */
+const SORT_OPTIONS: { value: CatalogSort; label: string }[] = [
+  { value: 'featured', label: 'แนะนำ' },
+  { value: 'available', label: 'มีของเยอะก่อน' },
+  { value: 'price-asc', label: 'ราคาต่ำ → สูง' },
+  { value: 'price-desc', label: 'ราคาสูง → ต่ำ' },
+  { value: 'name-asc', label: 'ชื่อ A → Z' },
+  { value: 'newest', label: 'ใหม่มาก่อน' },
+];
+
+const PAGE_SIZE = 24;
+
+function buildCategoryUrl(
+  base: string,
+  params: { sort?: string | undefined; page?: number | undefined; available?: boolean | undefined },
+): string {
+  const sp = new URLSearchParams();
+  if (params.sort && params.sort !== 'featured') sp.set('sort', params.sort);
+  if (params.page && params.page > 1) sp.set('page', String(params.page));
+  if (params.available) sp.set('available', '1');
+  const s = sp.toString();
+  return `${base}${s ? `?${s}` : ''}`;
 }
 
 export async function generateMetadata({ params }: CategoryPageProps): Promise<Metadata> {
@@ -55,13 +86,24 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
 
 export default async function CategoryPage({
   params,
+  searchParams,
 }: CategoryPageProps): Promise<React.JSX.Element> {
   const { slug } = await params;
+  const { sort: sortParam, page: pageParam, available } = await searchParams;
   const slugPath = slug.join('/');
+  const categoryPath = `/category/${slugPath}`;
+
+  const sort: CatalogSort = SORT_OPTIONS.find((o) => o.value === sortParam)?.value ?? 'featured';
+  const parsedPage = Number.parseInt(pageParam ?? '1', 10);
+  const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+  // ?available=1 → hide sold-out products entirely (review #3). Anything
+  // else, including a junk value, keeps them visible.
+  const availableOnly = available === '1';
 
   let result: Awaited<ReturnType<typeof getCategoryBySlug>> = null;
   let products: Awaited<ReturnType<typeof getProductsByCategory>>['products'] = [];
   let total = 0;
+  let dbDown = false;
   try {
     result = await getCategoryBySlug(slugPath);
   } catch {
@@ -88,13 +130,23 @@ export default async function CategoryPage({
   }
   if (!result) notFound();
   try {
-    const catResult = await getProductsByCategory(slugPath);
+    const catResult = await getProductsByCategory(
+      slugPath,
+      page,
+      PAGE_SIZE,
+      sort,
+      availableOnly,
+    );
     products = catResult.products;
     total = catResult.total;
   } catch {
     // Catalogue query failed — the category shell still renders; grid falls
-    // back to its own empty state.
+    // back to its own empty state. The sort/pager controls are hidden in
+    // this state for the same reason the search page hides them (audit #6):
+    // they would operate on nothing.
+    dbDown = true;
   }
+  const totalPages = Math.ceil(total / PAGE_SIZE);
 
   const { category, breadcrumb } = result!;
 
@@ -133,7 +185,10 @@ export default async function CategoryPage({
               </span>
               {category.name}
             </h1>
-            <p className="mt-2 text-fg-placeholder">{total} สินค้า</p>
+            <p className="mt-2 text-fg-placeholder">
+              {total} สินค้า
+              {availableOnly && ' (เฉพาะที่มีของ)'}
+            </p>
           </section>
 
           {/* Sub-apps as dark app tiles (client mockup: artwork + จำนวน pill) */}
@@ -161,7 +216,51 @@ export default async function CategoryPage({
               the repeated-card rows the client crossed out in the mockup */}
           {category.children.length === 0 && products.length > 0 ? (
             <section className="pb-16">
-              <h2 className="mb-4 text-lg font-semibold text-fg-secondary">สินค้าทั้งหมด</h2>
+              {/* Sort + pager + "available only" (review #3). Before this the
+                  category page had NO controls at all: it always rendered the
+                  newest 24 products by `createdAt desc` and silently truncated
+                  everything past that. Reuses the search page's gated toolbar
+                  (useId'd label, listbox semantics, 40px targets) instead of a
+                  second implementation. */}
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-lg font-semibold text-fg-secondary">สินค้าทั้งหมด</h2>
+                {availableOnly ? (
+                  <Link
+                    href={buildCategoryUrl(categoryPath, { sort: sortParam, page })}
+                    className="inline-flex min-h-[40px] items-center rounded-full border border-line-brand bg-peach-50 px-3 py-1.5 text-sm font-medium text-fg-brand"
+                    aria-pressed="true"
+                  >
+                    ✓ เฉพาะที่มีของ
+                  </Link>
+                ) : (
+                  <Link
+                    href={buildCategoryUrl(categoryPath, {
+                      sort: sortParam,
+                      page,
+                      available: true,
+                    })}
+                    className="inline-flex min-h-[40px] items-center rounded-full border border-line px-3 py-1.5 text-sm text-fg-secondary transition-colors hover:border-line-brand hover:text-fg-brand"
+                  >
+                    เฉพาะที่มีของ
+                  </Link>
+                )}
+              </div>
+
+              {totalPages > 1 && (
+                <div className="mb-4">
+                  <Suspense fallback={null}>
+                    <SearchToolbar
+                      page={page}
+                      totalPages={dbDown ? 1 : totalPages}
+                      currentSort={sort}
+                      sortOptions={SORT_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+                      hideControls={dbDown}
+                      basePath={categoryPath}
+                    />
+                  </Suspense>
+                </div>
+              )}
+
               <ProductGrid>
                 {products.map((product) => (
                   <ProductCard

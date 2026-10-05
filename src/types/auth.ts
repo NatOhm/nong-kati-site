@@ -180,6 +180,12 @@ export interface AdminJwtPayload {
   iat: number;
   exp: number;
   jti: string; // unique token ID
+  /**
+   * NOT part of the signed token. Set by `verifyAdminJwt` when `perms` was
+   * emptied because `mustChangePassword` is still pending, so callers can
+   * report the real reason instead of a misleading permission error.
+   */
+  passwordChangeRequired?: boolean;
 }
 
 // ─── Route → Permission Map ───────────────────────────────
@@ -200,7 +206,16 @@ export const ROUTE_PERMISSIONS: Record<string, Permission[]> = {
   'POST /api/v1/admin/inventory/:id/upload': ['inventory:upload'],
   'POST /api/v1/admin/inventory/:id/codes': ['inventory:upload'],
   'PATCH /api/v1/admin/inventory/codes/:id/void': ['inventory:void'],
+  // Correcting an unsold account. `inventory:reveal`, not `inventory:write`:
+  // rewriting a stored credential is at least as sensitive as reading one, so
+  // the staff who paste but cannot read must not be able to alter what they
+  // cannot see.
+  'PATCH /api/v1/admin/inventory/codes/:id': ['inventory:reveal'],
   'GET /api/v1/admin/inventory/codes/:id/reveal': ['inventory:reveal'],
+  // Masked listing that backs the "did my paste land?" view. Deliberately
+  // NOT reveal — reading the list must not hand out live credentials to
+  // everyone with inventory:read.
+  'GET /api/v1/admin/inventory/variants/:variantId/codes': ['inventory:read'],
 
   'GET /api/v1/admin/orders': ['orders:read'],
   'GET /api/v1/admin/orders/:id': ['orders:read'],

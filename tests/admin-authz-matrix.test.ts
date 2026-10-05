@@ -123,6 +123,22 @@ const ROUTE_COVERAGE: MatrixRow[] = [
   { method: 'PUT', path: '/announcement', perm: 'settings:write', body: { text: 'x' } },
   // audit-log
   { method: 'GET', path: '/audit-log', perm: 'audit:read' },
+  // stored-account reveal + void. Declared in src/types/auth.ts since the
+  // original inventory work and never implemented; the table here was never
+  // updated to match, so nothing flagged the gap (review 2026-10-05).
+  { method: 'GET', path: '/inventory/codes/:id/reveal', perm: 'inventory:reveal' },
+  { method: 'PATCH', path: '/inventory/codes/:id', perm: 'inventory:reveal' },
+  { method: 'PATCH', path: '/inventory/codes/:id/void', perm: 'inventory:void', body: {} },
+  { method: 'GET', path: '/inventory/variants/:variantId/codes', perm: 'inventory:read' },
+  // Manual "send this exact account to this exact customer" (review
+  // 2026-10-05). Declared in ROUTE_PERMISSIONS since the inventory work,
+  // never implemented until now.
+  {
+    method: 'POST',
+    path: '/orders/:id/assign-code',
+    perm: 'orders:write',
+    body: { codeId: 'gc_x' },
+  },
   // reconciliation queue (roadmap §6 operator view)
   { method: 'GET', path: '/reconciliation', perm: 'orders:read' },
   // re-run fulfilment — the queue's operator action (audit #4 follow-up)

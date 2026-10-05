@@ -198,7 +198,15 @@ export async function verifyAdminJwt(token: string): Promise<AdminJwtPayload | n
   // RBAC-gated route rejects it; the self-service password-change route
   // authenticates via verifyAdminJwt directly (no permission required), so
   // first login → change password still works.
-  if (user.mustChangePassword) return { ...payload, perms: [] };
+  if (user.mustChangePassword) {
+    // Client report 2026-10-05: the empty-perms token was reported to the
+    // admin as INSUFFICIENT_PERMISSIONS on every page, while the sidebar —
+    // which gates on ROLE, not on this token — kept showing all 7 sections.
+    // The result was a super_admin staring at "insufficient permissions"
+    // with no hint that a password change was the actual blocker. Flag the
+    // reason so `checkPermission` can answer honestly.
+    return { ...payload, perms: [], passwordChangeRequired: true };
+  }
   return payload;
 }
 

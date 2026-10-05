@@ -43,6 +43,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return {
       id: p.id,
       variantId: v?.id ?? null,
+      variantLabel: v?.label ?? null,
       variantCount: p.variants.length,
       sku: p.sku,
       name: p.name,
