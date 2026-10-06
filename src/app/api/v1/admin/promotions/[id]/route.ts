@@ -135,27 +135,26 @@ export async function PATCH(
   const description =
     typeof b['description'] === 'string' ? b['description'].trim() || null : existing.description;
 
-  const updateData: Record<string, unknown> = {
-    name,
-    description,
-    scope,
-    discountType,
-    discountValue,
-    minSpendThb: minSpend,
-  };
+  const updateData: Record<string, unknown> = {};
+  updateData['name'] = name;
+  updateData['description'] = description;
+  updateData['scope'] = scope;
+  updateData['discountType'] = discountType;
+  updateData['discountValue'] = discountValue;
+  updateData['minSpendThb'] = minSpend;
 
   if (scope === 'selected') {
-    updateData.productIds = JSON.stringify(productIds);
+    updateData['productIds'] = JSON.stringify(productIds);
   } else {
-    updateData.productIds = null;
+    updateData['productIds'] = null;
   }
 
-  if (startsAt) updateData.startsAt = startsAt;
-  if (expiresAt) updateData.expiresAt = expiresAt;
+  if (startsAt) updateData['startsAt'] = startsAt;
+  if (expiresAt) updateData['expiresAt'] = expiresAt;
 
   // Handle isActive toggle separately
   if (b['isActive'] !== undefined) {
-    updateData.isActive = b['isActive'] === true;
+    updateData['isActive'] = b['isActive'] === true;
   }
 
   const updated = await prisma.promotion.update({
@@ -176,7 +175,7 @@ export async function PATCH(
       discountType,
       discountValue,
       minSpendThb: minSpend,
-      isActive: updateData.isActive ?? existing.isActive,
+      isActive: updateData['isActive'] ?? existing.isActive,
     },
   });
 

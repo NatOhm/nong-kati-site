@@ -19,6 +19,8 @@ const { prismaMock } = vi.hoisted(() => {
   const prismaMock = {
     adminUser: { findUnique: vi.fn() },
     siteSetting: { findUnique: vi.fn(), upsert: vi.fn() },
+    $transaction: vi.fn(async (fn) => fn(prismaMock)),
+    auditLog: { create: vi.fn(async () => ({ id: 'audit_1' })), findMany: vi.fn(async () => []), count: vi.fn(async () => 0) },
   };
   return { prismaMock };
 });

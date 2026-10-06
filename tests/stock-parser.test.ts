@@ -10,6 +10,7 @@
  * - Preview count matching saved count
  */
 
+import { describe, expect, it } from 'vitest';
 import { parseStockContent, parseCsv } from '../src/lib/inventory/csvUpload';
 
 describe('parseCsv', () => {
@@ -20,10 +21,10 @@ TEST002,,Test code 2`;
 
     const rows = parseCsv(csv);
     expect(rows).toHaveLength(2);
-    expect(rows[0].code).toBe('TEST001');
-    expect(rows[0].expiresAt).toBe('2026-12-31');
-    expect(rows[1].code).toBe('TEST002');
-    expect(rows[1].expiresAt).toBeUndefined();
+    expect(rows[0]!.code).toBe('TEST001');
+    expect(rows[0]!.expiresAt).toBe('2026-12-31');
+    expect(rows[1]!.code).toBe('TEST002');
+    expect(rows[1]!.expiresAt).toBeUndefined();
   });
 
   it('should parse CSV with CRLF line endings', () => {
@@ -31,8 +32,8 @@ TEST002,,Test code 2`;
 
     const rows = parseCsv(csv);
     expect(rows).toHaveLength(2);
-    expect(rows[0].code).toBe('TEST001');
-    expect(rows[1].code).toBe('TEST002');
+    expect(rows[0]!.code).toBe('TEST001');
+    expect(rows[1]!.code).toBe('TEST002');
   });
 
   it('should skip blank lines', () => {
@@ -56,9 +57,9 @@ user3:pass3`;
 
     const records = parseStockContent(content, 'short', 'newline');
     expect(records).toHaveLength(3);
-    expect(records[0].code).toBe('user1:pass1');
-    expect(records[1].code).toBe('user2:pass2');
-    expect(records[2].code).toBe('user3:pass3');
+    expect(records[0]!.code).toBe('user1:pass1');
+    expect(records[1]!.code).toBe('user2:pass2');
+    expect(records[2]!.code).toBe('user3:pass3');
   });
 
   it('should parse short format with CRLF line endings', () => {
@@ -66,7 +67,7 @@ user3:pass3`;
 
     const records = parseStockContent(content, 'short', 'newline');
     expect(records).toHaveLength(3);
-    expect(records[0].code).toBe('user1:pass1');
+    expect(records[0]!.code).toBe('user1:pass1');
   });
 
   it('should parse comma-separated values', () => {
@@ -74,9 +75,9 @@ user3:pass3`;
 
     const records = parseStockContent(content, 'short', ',');
     expect(records).toHaveLength(2);
-    expect(records[0].code).toBe('code1');
-    expect(records[0].reference).toBe('ref1');
-    expect(records[1].code).toBe('code2');
+    expect(records[0]!.code).toBe('code1');
+    expect(records[0]!.reference).toBe('ref1');
+    expect(records[1]!.code).toBe('code2');
   });
 
   it('should parse semicolon-separated values', () => {
@@ -84,8 +85,8 @@ user3:pass3`;
 
     const records = parseStockContent(content, 'short', ';');
     expect(records).toHaveLength(2);
-    expect(records[0].code).toBe('code1');
-    expect(records[1].code).toBe('code2');
+    expect(records[0]!.code).toBe('code1');
+    expect(records[1]!.code).toBe('code2');
   });
 
   it('should parse tab-separated values', () => {
@@ -93,8 +94,8 @@ user3:pass3`;
 
     const records = parseStockContent(content, 'short', 'tab');
     expect(records).toHaveLength(2);
-    expect(records[0].code).toBe('code1');
-    expect(records[1].code).toBe('code2');
+    expect(records[0]!.code).toBe('code1');
+    expect(records[1]!.code).toBe('code2');
   });
 
   it('should handle Thai text', () => {
@@ -103,8 +104,8 @@ user3:pass3`;
 
     const records = parseStockContent(content, 'short', 'newline');
     expect(records).toHaveLength(2);
-    expect(records[0].code).toContain('ผู้ใช้');
-    expect(records[1].code).toContain('รหัส');
+    expect(records[0]!.code).toContain('ผู้ใช้');
+    expect(records[1]!.code).toContain('รหัส');
   });
 
   it('should handle emoji', () => {
@@ -113,8 +114,8 @@ user2:🎲code2`;
 
     const records = parseStockContent(content, 'short', 'newline');
     expect(records).toHaveLength(2);
-    expect(records[0].code).toContain('🎮');
-    expect(records[1].code).toContain('🎲');
+    expect(records[0]!.code).toContain('🎮');
+    expect(records[1]!.code).toContain('🎲');
   });
 
   it('should skip blank lines in short format', () => {
@@ -126,9 +127,9 @@ code3`;
 
     const records = parseStockContent(content, 'short', 'newline');
     expect(records).toHaveLength(3);
-    expect(records[0].code).toBe('code1');
-    expect(records[1].code).toBe('code2');
-    expect(records[2].code).toBe('code3');
+    expect(records[0]!.code).toBe('code1');
+    expect(records[1]!.code).toBe('code2');
+    expect(records[2]!.code).toBe('code3');
   });
 
   it('should handle consecutive blank lines', () => {
@@ -148,9 +149,9 @@ order:ORD001:code1`;
 
     const records = parseStockContent(content, 'short', 'newline');
     expect(records).toHaveLength(3);
-    expect(records[0].code).toBe('user1:pass1');
-    expect(records[1].code).toBe('user2:pass2');
-    expect(records[2].code).toBe('ORD001:code1');
+    expect(records[0]!.code).toBe('user1:pass1');
+    expect(records[1]!.code).toBe('user2:pass2');
+    expect(records[2]!.code).toBe('ORD001:code1');
   });
 
   it('should handle empty content', () => {
@@ -173,10 +174,10 @@ describe('parseStockContent - long format', () => {
 
     const records = parseStockContent(content, 'long', 'newline');
     expect(records).toHaveLength(2);
-    expect(records[0].lines).toEqual(['line1a', 'line1b', 'line1c']);
-    expect(records[0].code).toBe('line1a\nline1b\nline1c');
-    expect(records[1].lines).toEqual(['line2a', 'line2b']);
-    expect(records[1].code).toBe('line2a\nline2b');
+    expect(records[0]!.lines).toEqual(['line1a', 'line1b', 'line1c']);
+    expect(records[0]!.code).toBe('line1a\nline1b\nline1c');
+    expect(records[1]!.lines).toEqual(['line2a', 'line2b']);
+    expect(records[1]!.code).toBe('line2a\nline2b');
   });
 
   it('should preserve single blank lines inside multiline records', () => {
@@ -185,8 +186,8 @@ describe('parseStockContent - long format', () => {
 
     const records = parseStockContent(content, 'long', 'newline');
     expect(records).toHaveLength(1);
-    expect(records[0].lines).toEqual(['line1a', 'line1b', '', 'line1c']);
-    expect(records[0].code).toBe('line1a\nline1b\n\nline1c');
+    expect(records[0]!.lines).toEqual(['line1a', 'line1b', '', 'line1c']);
+    expect(records[0]!.code).toBe('line1a\nline1b\n\nline1c');
   });
 
   it('should preserve single blank lines inside records', () => {
@@ -195,7 +196,7 @@ describe('parseStockContent - long format', () => {
 
     const records = parseStockContent(content, 'long', 'newline');
     expect(records).toHaveLength(1); // Only 1 blank line, so all in one block
-    expect(records[0].lines).toEqual(['line1a', 'line1b', '', 'line1c', 'line2a']);
+    expect(records[0]!.lines).toEqual(['line1a', 'line1b', '', 'line1c', 'line2a']);
   });
 
   it('should split on 3+ lines with 2 blank lines between', () => {
@@ -206,8 +207,8 @@ describe('parseStockContent - long format', () => {
     const records = parseStockContent(content, 'long', 'newline');
     console.log('Records:', JSON.stringify(records, null, 2));
     expect(records).toHaveLength(2);
-    expect(records[0].lines).toEqual(['line1a', 'line1b']);
-    expect(records[1].lines).toEqual(['line2a', 'line2b']);
+    expect(records[0]!.lines).toEqual(['line1a', 'line1b']);
+    expect(records[1]!.lines).toEqual(['line2a', 'line2b']);
   });
 
   it('should handle CRLF in long format', () => {
@@ -218,8 +219,8 @@ describe('parseStockContent - long format', () => {
     const records = parseStockContent(content, 'long', 'newline');
     // 2 blank lines = split into 2 records
     expect(records).toHaveLength(2);
-    expect(records[0].lines).toEqual(['line1a', 'line1b']);
-    expect(records[1].lines).toEqual(['line2a']);
+    expect(records[0]!.lines).toEqual(['line1a', 'line1b']);
+    expect(records[1]!.lines).toEqual(['line2a']);
   });
 
   it('should handle mixed CRLF and LF in long format', () => {
@@ -228,8 +229,8 @@ describe('parseStockContent - long format', () => {
     
     const records = parseStockContent(content, 'long', 'newline');
     expect(records).toHaveLength(2);
-    expect(records[0].lines).toEqual(['line1a', 'line1b']);
-    expect(records[1].lines).toEqual(['line2a']);
+    expect(records[0]!.lines).toEqual(['line1a', 'line1b']);
+    expect(records[1]!.lines).toEqual(['line2a']);
   });
 
   it('should treat single blank line as part of content', () => {
@@ -237,7 +238,7 @@ describe('parseStockContent - long format', () => {
 
     const records = parseStockContent(content, 'long', 'newline');
     expect(records).toHaveLength(1); // Single blank line = same block
-    expect(records[0].lines).toEqual(['line1a', 'line1b', '', 'line2a']);
+    expect(records[0]!.lines).toEqual(['line1a', 'line1b', '', 'line2a']);
   });
 
   it('should split on double blank line in long format', () => {
@@ -245,8 +246,8 @@ describe('parseStockContent - long format', () => {
 
     const records = parseStockContent(content, 'long', 'newline');
     expect(records).toHaveLength(2);
-    expect(records[0].lines).toHaveLength(2); // line1a, line1b
-    expect(records[1].lines).toHaveLength(1); // line2a
+    expect(records[0]!.lines).toHaveLength(2); // line1a, line1b
+    expect(records[1]!.lines).toHaveLength(1); // line2a
   });
 
   it('should handle Thai text in multiline mode', () => {
@@ -255,7 +256,7 @@ describe('parseStockContent - long format', () => {
 
     const records = parseStockContent(content, 'long', 'newline');
     expect(records).toHaveLength(2);
-    expect(records[0].code).toContain('บรรทัด');
+    expect(records[0]!.code).toContain('บรรทัด');
   });
 
   it('should handle emoji in multiline mode', () => {
@@ -264,8 +265,8 @@ describe('parseStockContent - long format', () => {
 
     const records = parseStockContent(content, 'long', 'newline');
     expect(records).toHaveLength(2);
-    expect(records[0].code).toContain('🎮');
-    expect(records[1].code).toContain('📺');
+    expect(records[0]!.code).toContain('🎮');
+    expect(records[1]!.code).toContain('📺');
   });
 
   it('should treat single blank line as part of content', () => {
@@ -273,7 +274,7 @@ describe('parseStockContent - long format', () => {
 
     const records = parseStockContent(content, 'long', 'newline');
     expect(records).toHaveLength(1);
-    expect(records[0].lines).toHaveLength(3);
+    expect(records[0]!.lines).toHaveLength(3);
   });
 
   it('should handle empty content in long format', () => {
@@ -310,8 +311,8 @@ test-ภาษาไทย`;
 
     const records = parseStockContent(content, 'short', 'newline');
     expect(records).toHaveLength(2);
-    expect(records[0].code).toContain('α');
-    expect(records[1].code).toContain('ไทย');
+    expect(records[0]!.code).toContain('α');
+    expect(records[1]!.code).toContain('ไทย');
   });
 
   it('should handle special characters in codes', () => {
@@ -339,8 +340,8 @@ describe('Parse count verification', () => {
     const records = parseStockContent(content, 'long', 'newline');
     expect(records.length).toBe(2);
     // First record has 2 lines, second has 1
-    expect(records[0].lines).toHaveLength(2);
-    expect(records[1].lines).toHaveLength(1);
+    expect(records[0]!.lines).toHaveLength(2);
+    expect(records[1]!.lines).toHaveLength(1);
     // Total lines across all records
     const totalLines = records.reduce((sum, r) => sum + r.lines.length, 0);
     expect(totalLines).toBe(3);

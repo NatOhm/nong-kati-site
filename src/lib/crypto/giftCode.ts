@@ -151,10 +151,39 @@ export function hashCode(plainCode: string): Buffer {
 }
 
 /**
- * Mask a code for display (show last 4 chars only).
- * e.g. "ABCD-EFGH-IJKL-MNOP" → "****-****-****-MNOP"
+ * Longest single-line value still treated as an ordinary code. Anything longer,
+ * or anything spanning lines, is a delivery record rather than a code.
+ */
+const MASK_INLINE_MAX = 64;
+
+/**
+ * Mask a stored account for display.
+ *
+ * Short, single-line codes keep the original behaviour byte-for-byte
+ * ("ABCD-EFGH-IJKL-MNOP" → "****-****-****-MNOP"), because that output is part
+ * of the contract the admin screens and the seeded fixtures already expect.
+ *
+ * Everything else gets a structural summary and NO content at all. The old rule
+ * masked every dash-separated segment except the last, which is safe for a
+ * fixed-format code and catastrophic for a real account record: stocked
+ * accounts are pasted as a multi-line block (credential, expiry, terms,
+ * contact line, signature) and the "last segment after the final dash" in that
+ * block is the entire terms text. The masked list is gated on `inventory:read`
+ * — deliberately weaker than the super-admin-only `inventory:reveal` — precisely
+ * so catalogue managers can paste accounts without being able to read them
+ * back, and that separation was being voided by this one function.
  */
 export function maskCode(plainCode: string): string {
+  const lines = plainCode.split('\n');
+  if (lines.length > 1) {
+    // Line count + total length fingerprint the record so staff can still tell
+    // two rows apart, without exposing a single character of either.
+    return `[บัญชี ${lines.length} บรรทัด · ${plainCode.length} ตัวอักษร]`;
+  }
+  if (plainCode.length > MASK_INLINE_MAX) {
+    return `[บัญชียาว ${plainCode.length} ตัวอักษร]`;
+  }
+
   const parts = plainCode.split('-');
   if (parts.length <= 1) {
     // No dashes — show last 4 chars

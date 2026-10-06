@@ -970,6 +970,7 @@ export async function getStoreInfo(): Promise<StoreInfoContent> {
     email: null,
     phone: null,
     line: null,
+    lineUrl: null,
     facebook: null,
   };
   try {

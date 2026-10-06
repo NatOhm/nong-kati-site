@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { checkPermission } from '@/lib/rbac';
 import { getAdminToken } from '@/lib/adminRequest';
+import { writeAuditLog } from '@/lib/auditLog';
 import { claimOrderForConfirmation, getOrderById } from '@/api/orders';
 import { fulfilOrder, scheduleOutboxDrain } from '@/lib/fulfilment';
 import { recordPaymentReconciliation } from '@/lib/paymentReconciliation';
@@ -14,6 +15,56 @@ function bearer(req: NextRequest): string | null {
   const token = getAdminToken(req);
   if (!token) return null;
   return token;
+}
+
+type VerifyTx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
+/**
+ * Audit evidence for an admin payment verification.
+ *
+ * This endpoint moves money-state (order status, coupon usage, payment
+ * attempt settlement) and stock, by hand, on a live shop — it was the last
+ * mutating admin route with no audit row, so "who released this order?" had
+ * no answer. The row is written INSIDE the caller's transaction (`tx`), for
+ * the same reason refund does: a committed confirmation without its evidence
+ * is exactly the drift the audit trail exists to prevent, and a rolled-back
+ * confirmation must not leave a phantom row behind.
+ *
+ * No gift code, email or slip reference is recorded — only status moves,
+ * counts and the order number.
+ */
+async function auditPaymentVerified(
+  tx: VerifyTx,
+  p: {
+    orderId: string;
+    orderNumber: string;
+    actorId: string;
+    actorEmail: string;
+    ipAddress: string | null;
+    fromStatus: string;
+    toStatus: string;
+    codesDelivered: number;
+    resumed: boolean;
+    deferredForStock?: boolean;
+  },
+): Promise<void> {
+  await writeAuditLog({
+    actorType: 'admin',
+    actorId: p.actorId,
+    actorEmail: p.actorEmail,
+    action: 'order.payment_verified',
+    tableName: 'Order',
+    recordId: p.orderId,
+    diff: { before: { status: p.fromStatus }, after: { status: p.toStatus } },
+    ipAddress: p.ipAddress,
+    metadata: {
+      orderNumber: p.orderNumber,
+      codesDelivered: p.codesDelivered,
+      resumed: p.resumed,
+      ...(p.deferredForStock ? { deferredForStock: true } : {}),
+    },
+    tx,
+  });
 }
 
 /**
@@ -37,6 +88,10 @@ export async function POST(
   }
   const { id } = await ctx.params;
 
+  const adminId = check.payload?.sub ?? 'unknown';
+  const adminEmail = check.payload?.email ?? '';
+  const ipAddress = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
+
   // Review #5: a pending_manual_fulfilment order (restocked after a code
   // shortage) must RESUME — the old path claimed only pending_payment and
   // returned 409 NOT_PAYABLE forever. Claim that state atomically, fulfil in
@@ -56,6 +111,17 @@ export async function POST(
           if (claimed.count !== 1) throw new Error('ALREADY_CLAIMED');
           const result = await fulfilOrder(id, tx);
           if (!result.success) throw new Error(result.error ?? 'FULFILMENT_FAILED');
+          await auditPaymentVerified(tx, {
+            orderId: id,
+            orderNumber: existing.orderNumber,
+            actorId: adminId,
+            actorEmail: adminEmail,
+            ipAddress,
+            fromStatus: 'pending_manual_fulfilment',
+            toStatus: 'completed',
+            codesDelivered: result.codes?.length ?? 0,
+            resumed: true,
+          });
           return result;
         },
         { isolationLevel: 'Serializable' },
@@ -144,6 +210,17 @@ export async function POST(
           where: { orderId: id, status: 'pending' },
           data: { status: 'succeeded', webhookReceivedAt: new Date() },
         });
+        await auditPaymentVerified(tx, {
+          orderId: id,
+          orderNumber: claimedInTx.orderNumber,
+          actorId: adminId,
+          actorEmail: adminEmail,
+          ipAddress,
+          fromStatus: 'pending_payment',
+          toStatus: 'completed',
+          codesDelivered: fulfilment.codes?.length ?? 0,
+          resumed: false,
+        });
         return { claimed: claimedInTx, codes: fulfilment.codes?.length ?? 0 };
       },
       { isolationLevel: 'Serializable' },
@@ -195,6 +272,21 @@ export async function POST(
                 status: 'pending_manual_fulfilment',
                 manualFulfilmentReason: 'INSUFFICIENT_STOCK',
               },
+            });
+            // The money state DID move here (coupon counted, attempt
+            // settled) even though nothing was delivered — that deferred
+            // outcome needs its own attributable row.
+            await auditPaymentVerified(tx, {
+              orderId: id,
+              orderNumber: existing.orderNumber,
+              actorId: adminId,
+              actorEmail: adminEmail,
+              ipAddress,
+              fromStatus: 'pending_payment',
+              toStatus: 'pending_manual_fulfilment',
+              codesDelivered: 0,
+              resumed: false,
+              deferredForStock: true,
             });
           },
           { isolationLevel: 'Serializable' },

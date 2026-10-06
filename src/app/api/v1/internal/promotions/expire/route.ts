@@ -21,7 +21,7 @@ function getCronToken(req: NextRequest): string {
 }
 
 // In production, this would be a real cron secret from env.
-const CRON_TOKEN = process.env.CRON_SECRET ?? '';
+const CRON_TOKEN = process.env['CRON_SECRET'] ?? '';
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const token = getCronToken(req);
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   // Mark them as inactive
-  const ids = expiredPromotions.map((p) => p.id);
+  const ids = expiredPromotions.map((p: { id: string }) => p.id);
   await prisma.promotion.updateMany({
     where: { id: { in: ids } },
     data: { isActive: false },

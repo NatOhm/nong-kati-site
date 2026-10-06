@@ -58,6 +58,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       discountValue: true,
       scope: true,
       productIds: true,
+      minSpendThb: true,
       expiresAt: true,
     },
     orderBy: { createdAt: 'desc' },

@@ -176,7 +176,7 @@ export async function applyPromotionsToCart(
       unitPriceThb: item.unitPriceThb,
       productNameTh: item.productNameTh,
       productNameEn: item.productNameEn,
-      promotion: bestPromotion,
+      ...(bestPromotion ? { promotion: bestPromotion } : {}),
       effectivePriceThb: bestPrice,
       lineTotalThb: Math.round(bestPrice * item.quantity * 100) / 100,
     });
@@ -236,10 +236,8 @@ export async function calculateOrderTotals(
   };
 }
 
-/**
- * Get all active promotions for customer display (bell notification, etc.)
- */
-export async function getActivePromotions(): Promise<{
+// Get all active promotions for customer display (bell notification, etc.)
+export async function getActivePromotions(): Promise<Array<{
   id: string;
   name: string;
   description: string | null;
@@ -248,7 +246,7 @@ export async function getActivePromotions(): Promise<{
   scope: 'all' | 'selected';
   productIds: string[];
   expiresAt: string | null;
-}[> {
+}>> {
   const now = new Date();
 
   const promotions = await prisma.promotion.findMany({

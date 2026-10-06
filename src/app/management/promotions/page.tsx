@@ -132,7 +132,7 @@ export default function AdminPromotionsPage(): React.JSX.Element {
           .split(/[,，\s]+/)
           .map((s) => s.trim())
           .filter((s) => s);
-        if (ids.length > 0) body.productIds = ids;
+        if (ids.length > 0) body['productIds'] = ids;
       }
 
       if (editingId) {
@@ -417,7 +417,7 @@ export default function AdminPromotionsPage(): React.JSX.Element {
                     colSpan={6}
                     className="px-4 py-8 text-center text-fg-muted"
                   >
-                    ยังไม่มีโปรโมชัน — กด "สร้างโปรโมชัน" ด้านบนเพื่อเริ่ม
+                    ยังไม่มีโปรโมชัน — กด “สร้างโปรโมชัน” ด้านบนเพื่อเริ่ม
                   </td>
                 </tr>
               ) : (

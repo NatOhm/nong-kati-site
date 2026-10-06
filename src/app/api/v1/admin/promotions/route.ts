@@ -129,7 +129,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       minSpendThb: minSpend,
       startsAt,
       expiresAt,
-      createdBy: check.payload?.sub ?? null,
     },
   });
 

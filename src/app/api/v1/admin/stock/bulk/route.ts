@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { checkPermission } from '@/lib/rbac';
 import { getAdminToken } from '@/lib/adminRequest';
 import { encryptCode, hashCode } from '@/lib/crypto/giftCode';
+import { writeAuditLog } from '@/lib/auditLog';
 
 export const dynamic = 'force-dynamic';
 
@@ -233,6 +234,32 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           stockAfter,
           actorId: adminId,
         },
+      });
+      // Restocking is how accounts enter the shop, so "who added these, and how
+      // many" has to be as durable as the stock movement — same transaction, or
+      // a crash between the two leaves unattributable credentials in stock.
+      // Only counts and ids: never a code, even masked.
+      await writeAuditLog({
+        actorType: 'admin',
+        actorId: adminId ?? 'unknown',
+        actorEmail: check.payload?.email ?? 'unknown',
+        action: 'inventory.restock',
+        tableName: 'GiftCode',
+        recordId: plan.variantId,
+        diff: {
+          before: { stock: variant.stock },
+          after: { stock: stockAfter },
+        },
+        ipAddress: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
+        metadata: {
+          productId: product.id,
+          productName: product.name,
+          variantId: plan.variantId,
+          variantLabel: plan.label,
+          accountsAdded: rows.length,
+          duplicatesSkipped: duplicates,
+        },
+        tx,
       });
       return rows.length;
     });

@@ -4,8 +4,12 @@ import { invalidateSecurityPolicyCache } from '@/api/adminAuth';
 import { prisma } from '@/lib/db';
 import { checkPermission } from '@/lib/rbac';
 import { getAdminToken } from '@/lib/adminRequest';
+import { writeAuditLog } from '@/lib/auditLog';
 
 export const dynamic = 'force-dynamic';
+
+/** Placeholder written into the audit diff in place of a real setting value. */
+const REDACTED = '(redacted)';
 
 const VALID_KEYS = new Set([
   'appearance',
@@ -314,10 +318,38 @@ export async function PUT(
   }
 
   const value = JSON.stringify({ ...currentObj, ...next });
-  await prisma.siteSetting.upsert({
-    where: { key },
-    update: { value, updatedBy: check.payload?.sub ?? null },
-    create: { key, value, updatedBy: check.payload?.sub ?? null },
+  // Setting + audit in ONE transaction. The security group here changes the
+  // runtime password policy, so "who turned off pwRequireUpper" has to be as
+  // durable as the change itself — an audit written after a successful write
+  // can be lost exactly when it matters most.
+  await prisma.$transaction(async (tx) => {
+    await tx.siteSetting.upsert({
+      where: { key },
+      update: { value, updatedBy: check.payload?.sub ?? null },
+      create: { key, value, updatedBy: check.payload?.sub ?? null },
+    });
+    const actor = check.payload;
+    await writeAuditLog({
+      actorType: 'admin',
+      actorId: actor?.sub ?? 'unknown',
+      actorEmail: actor?.email ?? 'unknown',
+      action: 'settings.update',
+      tableName: 'SiteSetting',
+      recordId: key,
+      // Redacted on purpose: the security group carries policy only, but other
+      // groups can hold the bank QR image and SMTP details. Diff the changed
+      // keys with their values withheld so the trail records what moved
+      // without copying secrets into an append-only log.
+      diff: {
+        before: Object.fromEntries(Object.keys(currentObj).map((k) => [k, REDACTED])),
+        after: Object.fromEntries(
+          Object.keys({ ...currentObj, ...next }).map((k) => [k, REDACTED]),
+        ),
+      },
+      ipAddress: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
+      metadata: { key, changedKeys: Object.keys(next) },
+      tx,
+    });
   });
 
   // The security group is enforced at runtime — drop the 30s policy cache so

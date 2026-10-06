@@ -340,6 +340,88 @@ describe('masked list — inventory:read must not mean "hand over credentials"',
   });
 });
 
+describe('maskCode cannot hand over a delivery record', () => {
+  it('keeps short codes byte-identical (the screens depend on this shape)', async () => {
+    const { maskCode } = await import('@/lib/crypto/giftCode');
+    expect(maskCode('ABCD-EFGH-IJKL-MNOP')).toBe('****-****-****-MNOP');
+    expect(maskCode('TMUBM5084U2:P2')).toBe('**********2:P2');
+    expect(maskCode('abc')).toBe('abc');
+    expect(maskCode('abcd')).toBe('abcd');
+  });
+
+  it('summarises a multi-line account instead of leaking its body', async () => {
+    const { maskCode } = await import('@/lib/crypto/giftCode');
+    // A real stocked account, verbatim in shape: credential, expiry, terms,
+    // contact line, signature. The old rule printed everything after the final
+    // dash, which here is the whole terms block.
+    const record = [
+      'silip23527@bejum.com',
+      'oned30days',
+      '4-9-26',
+      '',
+      'เข้าได้ 1 อุปกรณ์เท่านั้น',
+      'จอหารไม่ชน จอชนแจ้งยึด',
+      'หลังหมดอายุแล้วออกจากระบบให้เค้าด้วยนร้า',
+      'มีปัญหาแจ้งแอดมินได้เลย',
+      'ทดสอบ ทดสอบ',
+    ].join('\n');
+
+    const masked = maskCode(record);
+
+    // Not one character of the secret may survive.
+    expect(masked).not.toContain('silip23527');
+    expect(masked).not.toContain('bejum.com');
+    expect(masked).not.toContain('oned30days');
+    expect(masked).not.toContain('เข้าได้');
+    expect(masked).not.toContain('ยึด');
+    expect(masked).not.toContain('ทดสอบ');
+    // It is still a structural summary, so staff can tell rows apart.
+    expect(masked).toContain('9 บรรทัด');
+    expect(masked).toContain(`${record.length}`);
+  });
+
+  it('summarises a long single-line record too, since the tail is the leak', async () => {
+    const { maskCode } = await import('@/lib/crypto/giftCode');
+    // No newline, but the "last segment after the last dash" is still the
+    // whole secret — the dash path must not run on anything oversized.
+    const long = `user:secretpassword-${'x'.repeat(80)}`;
+    const masked = maskCode(long);
+    expect(masked).not.toContain('secretpassword');
+    expect(masked).not.toContain('x'.repeat(80));
+    expect(masked).toContain(`${long.length}`);
+  });
+
+  it('the masked-list response carries none of it end to end', async () => {
+    const { encryptCode, maskCode } = await import('@/lib/crypto/giftCode');
+    const record = 'silip23527@bejum.com\noned30days\nเข้าได้ 1 อุปกรณ์เท่านั้น';
+    const { ciphertext, nonce, keyVersion } = encryptCode(record);
+
+    prismaMock.giftCode.findMany.mockResolvedValue([
+      await codeRow({
+        id: 'gc_multi',
+        codeEncrypted: ciphertext,
+        nonce,
+        keyVersion,
+      }),
+    ]);
+    const mod = (await import(/* @vite-ignore */ LIST)) as Record<string, unknown>;
+    const fn = mod['GET'] as (r: NextRequest, c: unknown) => Promise<Response>;
+    const res = await fn(
+      new NextRequest('http://localhost/x', {
+        headers: { cookie: `nk_admin_at=${superToken}` },
+      }),
+      { params: Promise.resolve({ variantId: 'var_1' }) },
+    );
+
+    expect(res.status).toBe(200);
+    const raw = JSON.stringify(await res.json());
+    expect(raw).not.toContain('silip23527');
+    expect(raw).not.toContain('oned30days');
+    expect(raw).not.toContain('เข้าได้');
+    expect(maskCode(record)).toContain('3 บรรทัด');
+  });
+});
+
 describe('the blind spot is closed', () => {
   it('every route declared in ROUTE_PERMISSIONS exists on disk', () => {
     // The direction that was missing: the spec table is checked against the

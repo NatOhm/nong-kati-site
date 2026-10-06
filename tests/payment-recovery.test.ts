@@ -88,6 +88,11 @@ beforeEach(() => {
 });
 
 import { recordPaymentReconciliation } from '@/lib/paymentReconciliation';
+import { writeAuditLog } from '@/lib/auditLog';
+
+const auditSpy = writeAuditLog as unknown as ReturnType<typeof vi.fn>;
+const auditArgs = (): Record<string, unknown>[] =>
+  (auditSpy.mock.calls as unknown as Record<string, unknown>[][]).map((c) => c[0]!);
 
 const reconCalls = (): Recorded[] =>
   (auditCreate.mock.calls as unknown as Recorded[][])
@@ -310,5 +315,122 @@ describe('POST /api/v1/admin/orders/[id]/verify-payment — recovery honesty (au
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe('RECONCILIATION_REQUIRED');
     expect(reconCalls()).toHaveLength(1);
+  });
+});
+
+/**
+ * The verification route was the last mutating admin route with no audit
+ * row: a hand action that moves order status, coupon usage, payment-attempt
+ * settlement and stock, with no answer to "who released this order?".
+ */
+describe('POST /api/v1/admin/orders/[id]/verify-payment — audit evidence', () => {
+  const routePath = '../src/app/api/v1/admin/orders/[id]/verify-payment/route.ts';
+  const call = async (req: NextRequest): Promise<Response> => {
+    const route = (await import(routePath)) as Record<string, unknown>;
+    return (route['POST'] as (r: NextRequest, c: unknown) => Promise<Response>)(req, {
+      params: Promise.resolve({ id: 'ord-adm' }),
+    });
+  };
+
+  const post = (): NextRequest =>
+    new NextRequest('http://localhost/api/v1/admin/orders/ord-adm/verify-payment', {
+      method: 'POST',
+      headers: { authorization: 'Bearer admin-token', 'x-forwarded-for': '203.0.113.9, 10.0.0.1' },
+    });
+
+  function seedOrder(status: string): void {
+    ordersMock.getOrderById.mockResolvedValue({
+      id: 'ord-adm',
+      orderNumber: 'NK-4001',
+      status,
+      totalAmountThb: 107,
+      items: [],
+    });
+    ordersMock.claimOrderForConfirmation.mockResolvedValue({
+      id: 'ord-adm',
+      orderNumber: 'NK-4001',
+      status: 'payment_confirmed',
+      totalAmountThb: 107,
+      items: [],
+    });
+  }
+
+  it('fresh confirmation writes one row, bound to the transaction', async () => {
+    seedOrder('pending_payment');
+    fulfilmentMock.fulfilOrder.mockResolvedValue({ success: true, codes: ['c1', 'c2'] });
+
+    const res = await call(post());
+    expect(res.status).toBe(200);
+
+    const rows = auditArgs().filter((a) => a['action'] === 'order.payment_verified');
+    expect(rows).toHaveLength(1);
+    const row = rows[0]!;
+    expect(row['actorType']).toBe('admin');
+    expect(row['tableName']).toBe('Order');
+    expect(row['recordId']).toBe('ord-adm');
+    expect(row['ipAddress']).toBe('203.0.113.9');
+    // Atomic with the mutation: a committed confirmation without its
+    // evidence is the drift this closes.
+    expect(row['tx']).toBe(prismaMock);
+    const diff = row['diff'] as { before: Record<string, unknown>; after: Record<string, unknown> };
+    expect(diff.before['status']).toBe('pending_payment');
+    expect(diff.after['status']).toBe('completed');
+    expect(row['metadata']).toMatchObject({
+      orderNumber: 'NK-4001',
+      codesDelivered: 2,
+      resumed: false,
+    });
+  });
+
+  it('resume after restock is recorded as a resume, not a fresh confirm', async () => {
+    seedOrder('pending_manual_fulfilment');
+    fulfilmentMock.fulfilOrder.mockResolvedValue({ success: true, codes: ['c1'] });
+
+    const res = await call(post());
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { resumed?: boolean };
+    expect(body.resumed).toBe(true);
+
+    const rows = auditArgs().filter((a) => a['action'] === 'order.payment_verified');
+    expect(rows).toHaveLength(1);
+    const diff = rows[0]!['diff'] as { before: Record<string, unknown>; after: Record<string, unknown> };
+    expect(diff.before['status']).toBe('pending_manual_fulfilment');
+    expect(rows[0]!['metadata']).toMatchObject({ resumed: true, codesDelivered: 1 });
+  });
+
+  it('a shortage park records the deferred outcome — the money state still moved', async () => {
+    seedOrder('pending_payment');
+    fulfilmentMock.fulfilOrder.mockResolvedValue({ success: false, error: 'INSUFFICIENT_STOCK' });
+
+    const res = await call(post());
+    expect(res.status).toBe(200);
+
+    const rows = auditArgs().filter((a) => a['action'] === 'order.payment_verified');
+    expect(rows).toHaveLength(1);
+    const diff = rows[0]!['diff'] as { before: Record<string, unknown>; after: Record<string, unknown> };
+    expect(diff.after['status']).toBe('pending_manual_fulfilment');
+    expect(rows[0]!['metadata']).toMatchObject({ codesDelivered: 0, deferredForStock: true });
+  });
+
+  it('a rolled-back confirmation leaves NO row (no phantom evidence)', async () => {
+    seedOrder('pending_payment');
+    fulfilmentMock.fulfilOrder.mockRejectedValue(new Error('write conflict'));
+
+    const res = await call(post());
+    expect(res.status).toBe(500);
+    expect(auditArgs().filter((a) => a['action'] === 'order.payment_verified')).toHaveLength(0);
+    // The durable reconciliation row still lands — money proven, order not moved.
+    expect(reconCalls()).toHaveLength(1);
+  });
+
+  it('never records a gift code, customer email or slip reference', async () => {
+    seedOrder('pending_payment');
+    fulfilmentMock.fulfilOrder.mockResolvedValue({ success: true, codes: ['PLAINTEXT-CODE'] });
+
+    await call(post());
+    for (const row of auditArgs()) {
+      const dumped = JSON.stringify(row);
+      expect(dumped).not.toContain('PLAINTEXT-CODE');
+    }
   });
 });

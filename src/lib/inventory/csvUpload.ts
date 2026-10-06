@@ -65,8 +65,8 @@ export function parseCsv(content: string): CsvRow[] {
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i];
     // Skip blank lines
-    if (!line.trim()) continue;
-    
+    if (!line?.trim()) continue;
+
     const parts = line.split(',').map((p) => p.trim());
     const code = parts[0] ?? '';
     const expiresAt = parts[1] ?? undefined;
@@ -155,7 +155,7 @@ export function parseStockContent(
     // Short format: one record per non-blank line
     for (let i = 0; i < allLines.length; i++) {
       const line = allLines[i];
-      if (!line.trim()) continue;
+      if (!line?.trim()) continue;
       
       // Strip reference prefix if present (e.g., "ref: code" or "id: code")
       const refMatch = line.match(/^[[(]?(?:id|ref|order|inv|refid)\s*[:：\-]\s*.*$/i);
@@ -166,7 +166,7 @@ export function parseStockContent(
         // Extract the actual code after the prefix
         const parts = line.split(/[:：\-]/);
         if (parts.length >= 2) {
-          reference = parts[0].trim();
+          reference = parts[0]!.trim();
           code = parts.slice(1).join(':').trim();
         }
       }
@@ -178,16 +178,16 @@ export function parseStockContent(
         if (fields.length > 1) {
           // Last field is the code, everything before is reference
           reference = fields.slice(0, -1).join(separator).trim();
-          code = fields[fields.length - 1];
+          code = fields[fields.length - 1] ?? code;
         }
       }
       
-      if (code.trim()) {
+      if (code?.trim()) {
         records.push({
           raw: line,
           lines: [line],
           code: code.trim(),
-          reference,
+          ...(reference !== undefined ? { reference } : {}),
         });
       }
     }
