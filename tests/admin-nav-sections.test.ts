@@ -176,6 +176,7 @@ describe('admin nav — every role still gets a usable menu', () => {
         '/management/coupons',
         '/management/dashboard',
         '/management/products',
+        '/management/promotions',
         '/management/reports',
         '/management/reports/customer-sales',
         '/management/reports/slow-stock',

@@ -48,18 +48,28 @@ export interface UploadResult {
 /**
  * Parse CSV content into rows.
  * 10-digital-code.md §4.1 — CSV format: code,expires_at,notes
+ *
+ * Supports:
+ * - CRLF and LF line endings
+ * - Blank lines (skipped)
+ * - Comma separator
+ * - Multiline records when format permits
  */
 export function parseCsv(content: string): CsvRow[] {
-  const lines = content.split('\n').filter((line) => line.trim());
+  // Normalize line endings: CRLF -> LF
+  const normalized = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const lines = normalized.split('\n');
   const rows: CsvRow[] = [];
 
-  // Skip header row
+  // Skip header row, start from line 1
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i];
-    if (!line) continue;
+    // Skip blank lines
+    if (!line.trim()) continue;
+    
     const parts = line.split(',').map((p) => p.trim());
     const code = parts[0] ?? '';
-    const expiresAt = parts[1];
+    const expiresAt = parts[1] ?? undefined;
 
     if (code) {
       const row: CsvRow = {
@@ -74,6 +84,116 @@ export function parseCsv(content: string): CsvRow[] {
   }
 
   return rows;
+}
+
+/**
+ * Parse stock paste content for bulk stock upload.
+ * Supports multiple formats:
+ * - Short format: one account per line
+ * - Long format: multiline blocks separated by blank lines
+ * - Various separators: comma, semicolon, tab
+ * - Thai text and emoji in content
+ */
+export interface ParsedStockRecord {
+  raw: string;
+  lines: string[];
+  code: string;
+  reference?: string;
+}
+
+export function parseStockContent(
+  content: string,
+  format: 'short' | 'long',
+  separator: ',' | ';' | 'tab' | 'newline' = ',',
+): ParsedStockRecord[] {
+  // Normalize line endings
+  const normalized = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const allLines = normalized.split('\n');
+  
+  const records: ParsedStockRecord[] = [];
+  
+  if (format === 'long') {
+    // Long format: blocks separated by 2+ consecutive blank lines
+    // Single blank lines are preserved inside blocks
+    let block: string[] = [];
+    let pendingBlankCount = 0;
+    
+    for (const line of allLines) {
+      if (line.trim() === '') {
+        pendingBlankCount++;
+        continue;
+      }
+      
+      // Non-blank line encountered
+      if (pendingBlankCount >= 2 && block.length > 0) {
+        // 2+ blank lines = end of current block, save it
+        records.push({
+          raw: block.join('\n'),
+          lines: block,
+          code: block.join('\n').trim(),
+        });
+        block = [];
+      } else if (pendingBlankCount === 1 && block.length > 0) {
+        // Single blank line = preserved inside block
+        block.push('');
+      }
+      // If block is empty, ignore leading blank lines
+      
+      pendingBlankCount = 0;
+      block.push(line);
+    }
+    
+    // Don't forget the last block
+    if (block.length > 0) {
+      records.push({
+        raw: block.join('\n'),
+        lines: block,
+        code: block.join('\n').trim(),
+      });
+    }
+  } else {
+    // Short format: one record per non-blank line
+    for (let i = 0; i < allLines.length; i++) {
+      const line = allLines[i];
+      if (!line.trim()) continue;
+      
+      // Strip reference prefix if present (e.g., "ref: code" or "id: code")
+      const refMatch = line.match(/^[[(]?(?:id|ref|order|inv|refid)\s*[:：\-]\s*.*$/i);
+      let code = line;
+      let reference: string | undefined;
+      
+      if (refMatch) {
+        // Extract the actual code after the prefix
+        const parts = line.split(/[:：\-]/);
+        if (parts.length >= 2) {
+          reference = parts[0].trim();
+          code = parts.slice(1).join(':').trim();
+        }
+      }
+      
+      // For separator-based formats, split the line
+      if (separator !== 'newline') {
+        const sepChar = separator === 'tab' ? '\t' : separator;
+        const fields = code.split(sepChar).map(f => f.trim());
+        if (fields.length > 1) {
+          // Last field is the code, everything before is reference
+          reference = fields.slice(0, -1).join(separator).trim();
+          code = fields[fields.length - 1];
+        }
+      }
+      
+      if (code.trim()) {
+        records.push({
+          raw: line,
+          lines: [line],
+          code: code.trim(),
+          reference,
+        });
+      }
+    }
+  }
+  
+  return records;
 }
 
 /**

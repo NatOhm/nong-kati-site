@@ -158,6 +158,14 @@ const ROUTE_COVERAGE: MatrixRow[] = [
   { method: 'POST', path: '/coupons', perm: 'coupons:write', body: { code: 'X' } },
   { method: 'PATCH', path: '/coupons/c-1', perm: 'coupons:write', body: { active: false } },
   { method: 'DELETE', path: '/coupons/c-1', perm: 'coupons:delete' },
+  // promotions
+  { method: 'GET', path: '/promotions', perm: 'promotions:read' },
+  { method: 'POST', path: '/promotions', perm: 'promotions:write', body: { name: 'x' } },
+  { method: 'PATCH', path: '/promotions', perm: 'promotions:write', body: { toggleIds: [] } },
+  { method: 'DELETE', path: '/promotions', perm: 'promotions:delete' },
+  { method: 'GET', path: '/promotions/p-1', perm: 'promotions:read' },
+  { method: 'PATCH', path: '/promotions/p-1', perm: 'promotions:write', body: { isActive: false } },
+  { method: 'DELETE', path: '/promotions/p-1', perm: 'promotions:delete' },
   // dev-seed (guarded 404 in production builds, guard order itself is tested)
   { method: 'POST', path: '/dev-seed', perm: 'customers:write', body: {} },
   // hero-slides
@@ -217,6 +225,9 @@ const ROUTE_COVERAGE: MatrixRow[] = [
   // settings
   { method: 'GET', path: '/settings/some-key', perm: 'settings:read' },
   { method: 'PUT', path: '/settings/some-key', perm: 'settings:write', body: { value: 'x' } },
+  // VAT settings
+  { method: 'GET', path: '/settings/vat', perm: 'settings:read' },
+  { method: 'PUT', path: '/settings/vat', perm: 'settings:write', body: { enabled: true, rate: 7 } },
   // SMTP connectivity probe for the email settings panel (no save, no send)
   { method: 'POST', path: '/settings/email-test', perm: 'settings:write', body: {} },
   // staff

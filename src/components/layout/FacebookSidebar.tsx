@@ -27,7 +27,7 @@ const NAV_ITEMS = [
   // Below xl the header text links are hidden (navbar width budget), so the
   // drawer has to carry them — otherwise these two pages are unreachable
   // on tablets and small laptops. Mirrors NAV_ITEMS in FacebookNavbar.tsx.
-  { icon: Sparkles, href: '/search?sort=featured', label: 'แนะนำ', color: 'text-peach-500' },
+  { icon: Sparkles, href: '/recommended', label: 'สินค้าแนะนำ', color: 'text-peach-500' },
   { icon: Heart, href: '/account/wishlist', label: 'รายการโปรด', color: 'text-peach-600' },
   { icon: Tv, href: '/category/movie-series', label: 'ดูหนัง/ซีรีส์', color: 'text-coral-500' },
   { icon: Music, href: '/category/music', label: 'ดนตรี', color: 'text-pink-400' },

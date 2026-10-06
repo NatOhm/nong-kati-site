@@ -247,6 +247,28 @@ model TopUpLog {
   @@index([createdAt])
 }
 
+// ─── Promotions (โปรโมชัน — ส่วนลดอัตโนมัติโดยไม่ต้องใส่โค้ด) ──
+
+model Promotion {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  scope       String   @default("selected") // all | selected
+  discountType String  @default("percent")  // percent | amount
+  discountValue Decimal @db.Decimal(10, 2)
+  // For 'all' scope, applies to entire shop. For 'selected', these product IDs.
+  productIds  String?  // JSON array of product IDs (for selected scope)
+  minSpendThb Decimal? @db.Decimal(10, 2)
+  isActive    Boolean  @default(true)
+  startsAt    DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive, expiresAt])
+  @@index([startsAt, expiresAt])
+}
+
 // ─── Coupons (คูปองส่วนลด — บาท/%, ยอดขั้นต่ำ, วันหมดอายุ) ──
 
 model Coupon {

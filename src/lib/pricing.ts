@@ -4,9 +4,29 @@
  * 01-prd.md FR-052: VAT = round(subtotal × 0.07, 2); Total = subtotal + VAT
  *
  * All monetary values are NUMERIC(10,2) — 2 decimal places, Thai Baht.
+ *
+ * VAT is configurable: shop-wide setting (default 7%, disabled initially).
+ * Consumer prices remain VAT-inclusive when VAT is enabled.
  */
 
-const VAT_RATE = 0.07;
+let vatRate = 0.07;
+let vatEnabled = false;
+
+/** Configure VAT rate and enabled state (called from settings). */
+export function configureVat(rate: number, enabled: boolean): void {
+  vatRate = rate;
+  vatEnabled = enabled;
+}
+
+/** Get current VAT rate (returns 0 if disabled). */
+export function getVatRate(): number {
+  return vatEnabled ? vatRate : 0;
+}
+
+/** Check if VAT is enabled. */
+export function isVatEnabled(): boolean {
+  return vatEnabled;
+}
 
 // ─── Price tiers (ราคาปลีก vs สมาชิก vs ตัวแทนจำหน่าย) ──────────
 
@@ -47,7 +67,9 @@ export function tierPrice(
  * @returns VAT amount rounded to 2 decimal places
  */
 export function calculateVatFromInclusive(inclusivePrice: number): number {
-  const exVat = inclusivePrice / (1 + VAT_RATE);
+  const rate = getVatRate();
+  if (rate === 0) return 0;
+  const exVat = inclusivePrice / (1 + rate);
   return Math.round((inclusivePrice - exVat) * 100) / 100;
 }
 
@@ -57,18 +79,22 @@ export function calculateVatFromInclusive(inclusivePrice: number): number {
  * @returns Price excluding VAT
  */
 export function calculateExVat(inclusivePrice: number): number {
-  const exVat = inclusivePrice / (1 + VAT_RATE);
+  const rate = getVatRate();
+  if (rate === 0) return inclusivePrice;
+  const exVat = inclusivePrice / (1 + rate);
   return Math.round(exVat * 100) / 100;
 }
 
 /**
  * Calculate VAT from a subtotal (ex-VAT).
- * FR-052: VAT = round(subtotal × 0.07, 2)
+ * FR-052: VAT = round(subtotal × rate, 2)
  * @param subtotal - Ex-VAT subtotal
  * @returns VAT amount
  */
 export function calculateVat(subtotal: number): number {
-  return Math.round(subtotal * VAT_RATE * 100) / 100;
+  const rate = getVatRate();
+  if (rate === 0) return 0;
+  return Math.round(subtotal * rate * 100) / 100;
 }
 
 /**

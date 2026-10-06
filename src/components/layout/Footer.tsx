@@ -6,7 +6,9 @@ const FOOTER_COLUMNS: Array<{ title: string; links: Array<{ label: string; href:
   {
     title: 'สินค้า',
     links: [
-      { label: 'ดูสินค้าทั้งหมด', href: '/search' },
+      { label: 'สินค้าทั้งหมด', href: '/search' },
+      { label: 'สินค้าแนะนำ', href: '/recommended' },
+      { label: 'รายการโปรด', href: '/account/wishlist' },
       { label: 'Netflix', href: '/category/netflix' },
       { label: 'Spotify', href: '/category/spotify' },
     ],

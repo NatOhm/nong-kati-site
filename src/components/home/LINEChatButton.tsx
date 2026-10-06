@@ -1,11 +1,18 @@
 'use client';
 
 import { MessageCircle } from 'lucide-react';
+import { getStoreInfo } from '@/lib/data';
 
-export function LINEChatButton() {
+export async function LINEChatButton() {
+  const store = await getStoreInfo();
+  // Use LINE URL from store settings, or fallback to LINE ID lookup
+  // The LINE ID @057qytao maps to https://lin.ee/uH72DZ2
+  const lineId = store.line?.replace('@', '') || '057qytao';
+  const lineUrl = store.lineUrl || `https://lin.ee/uH72DZ2`;
+  
   return (
     <a
-      href="https://line.me/R/ti/p/@nongkati"
+      href={lineUrl}
       target="_blank"
       rel="noopener noreferrer"
       // audit #8: green-500 was ~2.28:1 on the white artwork; green-700 ≈ 4.8:1.

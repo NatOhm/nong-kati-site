@@ -28,6 +28,7 @@ import {
   ShoppingCart,
   Tags,
   Ticket,
+  Gift,
   Users,
   Wallet,
 } from 'lucide-react';
@@ -107,6 +108,7 @@ export const ADMIN_NAV: AdminNavNode[] = [
     children: [
       { label: 'ลูกค้า', href: '/management/customers', permission: 'customers:read' },
       { label: 'คูปองส่วนลด', href: '/management/coupons', permission: 'coupons:read', icon: Ticket },
+      { label: 'โปรโมชัน', href: '/management/promotions', permission: 'promotions:read', icon: Gift },
     ],
   },
   {

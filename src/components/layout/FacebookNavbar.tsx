@@ -30,7 +30,7 @@ interface SearchSuggestion {
 // Client ask: ข้อความแทนไอคอน — 4 ลิงก์หลัก (หน้าแรกอยู่ที่โลโก้)
 const NAV_ITEMS = [
   { href: '/search', label: 'สินค้าทั้งหมด' },
-  { href: '/search?sort=featured', label: 'แนะนำ' },
+  { href: '/recommended', label: 'สินค้าแนะนำ' },
   { href: '/account/wishlist', label: 'รายการโปรด' },
   { href: '/account/orders', label: 'คำสั่งซื้อ' },
 ];

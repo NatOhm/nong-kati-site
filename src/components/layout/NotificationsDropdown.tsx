@@ -14,7 +14,7 @@ import { AnchoredPopover } from '@/components/ui/AnchoredPopover';
  */
 interface NotificationItem {
   id: string;
-  code: string;
+  code?: string;
   title: string;
   body: string;
   expiresAt: string | null;
@@ -135,8 +135,21 @@ export function NotificationsDropdown(): React.JSX.Element {
                       <Tag size={16} />
                     </div>
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-fg">{n.title}</p>
+                      <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-fg">
+                        {n.code ? (
+                          <>
+                            <span className="inline-block rounded-md bg-peach-100 px-1.5 py-0.5 text-[11px] font-mono font-semibold text-peach-800 mr-1">
+                              {n.code}
+                            </span>
+                            {n.title}
+                          </>
+                        ) : (
+                          n.title
+                        )
+                      </p>
                       <p className="text-xs text-fg-placeholder">{n.body}</p>
+                    </div>
                       {hint && (
                         <p className="mt-0.5 text-[11px] font-medium text-fg-error">{hint}</p>
                       )}

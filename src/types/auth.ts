@@ -68,6 +68,11 @@ export const ALL_PERMISSIONS = [
   'coupons:write',
   'coupons:delete',
 
+  // Promotions
+  'promotions:read',
+  'promotions:write',
+  'promotions:delete',
+
   // Dashboard
   //
   // Narrow, on purpose: the dashboard is the operational landing page, but it
@@ -119,6 +124,8 @@ export const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
     'inventory:export',
     'coupons:read',
     'coupons:write',
+    'promotions:read',
+    'promotions:write',
     'dashboard:read',
     // Grants the Analytics & Reports section and nothing else — catalogue
     // managers own stock decisions, and slow-moving stock is where they act.
@@ -165,6 +172,8 @@ export const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
     'categories:read',
     'coupons:read',
     'coupons:write',
+    'promotions:read',
+    'promotions:write',
     'reports:read',
     'dashboard:read',
   ],

@@ -44,6 +44,7 @@
 | RH    | Restock-account how-to — every staff-facing claim pinned to the route/dialog/role matrix | `tests/admin-restock-howto.test.ts` | `npm test` (vitest) | Unit Tests |
 | EX    | Unpaid-order expiry sweep — CAS safety, batching, no stock side effects, cron-route gating | `tests/order-expiry-sweep.test.ts` | `npm test` (vitest) | Unit Tests |
 | CSO   | Stock-aware catalog — availability leads every sort, available-only filter, slice of one global order | `tests/catalog-stock-ordering.test.ts` | `npm test` (vitest) | Unit Tests |
+| SP    | Stock-text parsing — CRLF/LF, blank lines, Unicode/emoji, separators, multiline, invalid input | `tests/stock-parser.test.ts` | `npm test` (vitest) | Unit Tests |
 | GC    | Stored accounts + manual assignment to an order — audited reveal, atomic void, masked list; declared-vs-built route ratchet | `tests/admin-stored-accounts.test.ts` | `npm test` (vitest) | Unit Tests |
 | FP    | Forced password change — never looks like a permissions problem; layout redirect cannot loop | `tests/admin-forced-password-change.test.ts` | `npm test` (vitest) | Unit Tests |
 | E1    | Disabled-state affordance (WCAG 1.4.1)                | `e2e/disabled-state.spec.ts`       | `npm run test:e2e`   | (local/preview)        |
@@ -490,6 +491,28 @@ ffmpeg -hide_banner -loglevel error -y -ss 5.0 -i admin-walkthrough-th.mp4 -fram
 - ลบ `, status: 'pending_payment'` ออกจาก `where` ของ `updateMany` → EX2 แดง: `re-asserts status=pending_payment in the updateMany where-clause`
 
 ## แคตตาล็อกอันดับตามสต๊อก (5 ต.ค. 2569) — `tests/catalog-stock-ordering.test.ts`
+
+- **กฎ:**
+  - สินค้าที่มีสต๊อก > 0 ต้องมาก่อนสินค้าหมดสต๊อกเสมอ ไม่ว่าจะเรียงแบบไหน
+  - การเรียงลำดับคำนวณจากชุดทั้งหมดก่อนตัดหน้า ไม่ใช่ตัดหน้าก่อนเรียง
+  - สต๊อกรวมจาก variants ที่ active เท่านั้น
+- **ที่มา:** review พบว่าการเรียงไม่เคยคำนึงสต๊อกเลย เพราะ query ไม่ fetch ฟิลด์ stock
+- **วิธีแก้เมื่อแดง:** ตรวจสอบว่า catalogOrderSelect มี stock ใน variants หรือไม่
+
+## การ parsed ข้อความสต๊อก (SP) — `tests/stock-parser.test.ts`
+
+- **กฎ:**
+  - รองรับทั้ง LF และ CRLF line endings (normalize ก่อน parse)
+  - รองรับ blank lines ภายใน multiline records (single blank = ส่วนหนึ่งของ record, 2+ consecutive blanks = แยก record)
+  - รองรับ Thai text และ emoji ใน content
+  - รองรับ comma, semicolon, tab separators
+  - รองรับ reference prefix เช่น `id:`, `ref:`, `order:`
+  - แจ้ง error ชัดเจนเมื่อ record ไม่สามารถ parse ได้
+  - Preview count ต้องตรงกับ saved count
+- **ที่มา:** client feedback เรื่อง parser แชร์สต๊อกไม่รับ formatted input 일부
+- **วิธีแก้เมื่อแดง:** ตรวจสอบว่า parseStockContent จัดการ line endings และ blank line logic ถูกต้องหรือไม่
+
+## Stored accounts — `tests/admin-stored-accounts.test.ts`
 
 รีวิวหน้าร้านข้อ 3: หน้าหมวดหมู่เรียงด้วย `createdAt desc` ล้วน ๆ ไม่มีตัวเลือกเรียง ไม่มีฟิลเตอร์ และ**ไม่มี pagination เลย** (หน้า 1 เสมอ 24 รายการ) ส่วน `getCatalogProducts` มี 5 วิธีเรียงแต่ **ไม่วิธีไหนดูสต๊อกเลย** เพราะ ordering select เดิมดึงแค่ `variants: { select: { price: true } }` — ไม่มี `stock` ให้เรียงด้วยซ้ำ
 

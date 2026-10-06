@@ -280,7 +280,7 @@ export default async function HomePage(): Promise<React.JSX.Element> {
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="text-lg font-bold text-fg">สินค้าแนะนำ</h2>
                 <Link
-                  href="/search?q="
+                  href="/recommended"
                   className="text-sm font-medium text-fg-brand-strong hover:text-fg-brand-strong"
                 >
                   ดูทั้งหมด →

@@ -955,6 +955,7 @@ export interface StoreInfoContent {
   email: string | null;
   phone: string | null;
   line: string | null;
+  lineUrl: string | null;
   facebook: string | null;
 }
 
@@ -981,7 +982,8 @@ export async function getStoreInfo(): Promise<StoreInfoContent> {
       description: str(parsed.description),
       email: str(parsed.email),
       phone: str(parsed.phone),
-      line: str(parsed.line),
+        line: str(parsed.line),
+      lineUrl: str(parsed.lineUrl),
       facebook: str(parsed.facebook),
     };
   } catch {
