@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import Script from 'next/script';
-import { JetBrains_Mono, Mitr, Noto_Sans_Thai_Looped } from 'next/font/google';
 
 import { MascotProvider } from '@/providers/MascotProvider';
 import { ThemeProvider } from '@/providers/ThemeProvider';
@@ -14,6 +13,7 @@ import { getAppearance } from '@/lib/data';
 import { publicOrigin } from '@/lib/siteConfig';
 import { ToastMount } from './ToastMount';
 
+import './fonts.css';
 import './globals.css';
 
 /**
@@ -30,26 +30,15 @@ import './globals.css';
 export const dynamic = 'force-dynamic';
 
 // Rounded, friendly faces: Mitr for display, Noto Sans Thai Looped for UI body.
-const mitr = Mitr({
-  subsets: ['thai', 'latin'],
-  weight: ['400', '500', '600', '700'],
-  variable: '--font-mitr',
-  display: 'swap',
-});
-
-const notoSansThaiLooped = Noto_Sans_Thai_Looped({
-  subsets: ['thai', 'latin'],
-  weight: ['400', '500', '600', '700'],
-  variable: '--font-noto-sans-thai-looped',
-  display: 'swap',
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ['latin'],
-  weight: ['400', '500'],
-  variable: '--font-jetbrains-mono',
-  display: 'swap',
-});
+//
+// Vendored (2026-10-10): previously next/font/google, which downloaded these
+// fonts from fonts.gstatic.com DURING `next build` — the fetch started failing
+// intermittently on CI runners (next/font TypeError -> webpack errors),
+// killing the Browser Smoke gate for a network hiccup. The same woff2 subsets
+// + unicode-range splitting now ship from public/fonts/ via ./fonts.css, and
+// the --font-* variables come from its :root block instead of next/font's
+// <html> className injection. Do not re-add next/font/google — the
+// font-vendoring gate in tests/ forbids it.
 
 // 14-seo.md §2.1 — root metadata defaults. <NK_DOMAIN> resolved at M10 per that
 // document's placeholder convention; a safe local fallback is used until then.
@@ -77,16 +66,43 @@ export default async function RootLayout({
   children: React.ReactNode;
 }): Promise<React.JSX.Element> {
   return (
-    <html
-      lang="th"
-      className={`${mitr.variable} ${notoSansThaiLooped.variable} ${jetbrainsMono.variable}`}
-      suppressHydrationWarning
-    >
+    <html lang="th" suppressHydrationWarning>
       <head>
         {/* beforeInteractive = injected into <head> and executed before React
             hydrates — keeps the no-FOUC guarantee without an inline script
             (which the enforced nonce CSP forbids). */}
         <Script src="/theme-init.js" strategy="beforeInteractive" />
+        {/* Warm the two faces above the fold (display + UI body, thai+latin)
+            — next/font used to preload these for us; vendored fonts need the
+            explicit hint to keep LCP identical. */}
+        <link
+          rel="preload"
+          as="font"
+          type="font/woff2"
+          href="/fonts/mitr-thai-400.woff2"
+          crossOrigin="anonymous"
+        />
+        <link
+          rel="preload"
+          as="font"
+          type="font/woff2"
+          href="/fonts/mitr-latin-400.woff2"
+          crossOrigin="anonymous"
+        />
+        <link
+          rel="preload"
+          as="font"
+          type="font/woff2"
+          href="/fonts/noto-sans-thai-looped-thai-400.woff2"
+          crossOrigin="anonymous"
+        />
+        <link
+          rel="preload"
+          as="font"
+          type="font/woff2"
+          href="/fonts/noto-sans-thai-looped-latin-400.woff2"
+          crossOrigin="anonymous"
+        />
       </head>
       <body className="text-thai font-ui">
         {/* Shared SVG paint-server defs (one document-wide registry — the
