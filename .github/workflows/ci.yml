@@ -299,7 +299,7 @@ jobs:
       - name: Run browser smoke tests
         run: |
           set -o pipefail
-          E2E_BASE_URL=http://127.0.0.1:4200 npx playwright test e2e/smoke.spec.ts e2e/management.spec.ts e2e/order-refund-resend.spec.ts 2>&1 | tee /tmp/pw-output.log
+          E2E_BASE_URL=http://127.0.0.1:4200 npx playwright test e2e/smoke.spec.ts e2e/management.spec.ts e2e/order-refund-resend.spec.ts e2e/admin-search-history-reveal.spec.ts 2>&1 | tee /tmp/pw-output.log
       - name: Emit smoke failure annotations
         if: failure()
         run: |

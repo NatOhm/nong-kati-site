@@ -64,6 +64,32 @@ interface OrderDetail {
   }[];
 }
 
+/** Masked delivery overview + audited reveal payload from GET /orders/:id/delivery. */
+interface DeliveryLine {
+  itemId: string;
+  productNameTh: string;
+  skuCode: string;
+  deliveryStatus: string | null;
+  latestCode: { id: string; status: string | null; createdAt: string | null } | null;
+  codesCount: number;
+}
+
+interface RevealedCode {
+  itemId: string;
+  productNameTh: string;
+  skuCode: string;
+  code: string;
+  status: string | null;
+  createdAt: string | null;
+}
+
+interface DeliveryReveal {
+  id: string;
+  orderNumber: string;
+  lines: DeliveryLine[];
+  revealedCodes: RevealedCode[];
+}
+
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   pending_payment: { label: 'รอชำระเงิน', color: 'text-amber-600' },
   payment_confirmed: { label: 'ชำระแล้ว', color: 'text-sapphire-700' },
@@ -96,14 +122,25 @@ export default function AdminOrdersPage(): React.JSX.Element {
   const [refundCategory, setRefundCategory] = useState('other');
   const [refundDetail, setRefundDetail] = useState('');
   const [refundVoidCodes, setRefundVoidCodes] = useState(true);
+  /** Draft inputs vs applied filters — search runs on Enter/ค้นหา only. */
+  const [emailInput, setEmailInput] = useState('');
+  const [orderNumberInput, setOrderNumberInput] = useState('');
+  const [emailFilter, setEmailFilter] = useState('');
+  const [orderNumberFilter, setOrderNumberFilter] = useState('');
+  /** Explicit, permission-gated delivery-code reveal (never automatic). */
+  const [revealBusy, setRevealBusy] = useState(false);
+  const [revealData, setRevealData] = useState<DeliveryReveal | null>(null);
+  const [revealError, setRevealError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
       if (statusFilter) params.set('status', statusFilter);
+      if (emailFilter) params.set('email', emailFilter);
+      if (orderNumberFilter) params.set('orderNumber', orderNumberFilter);
       const data = await adminJson<{ orders: OrderRow[]; statusCounts: Record<string, number> }>(
-        `/api/v1/admin/orders${params.size ? `?${params}` : ''}`,
+        `/api/v1/admin/orders/search${params.size ? `?${params}` : ''}`,
       );
       setOrders(data.orders);
       setStatusCounts(data.statusCounts);
@@ -112,11 +149,16 @@ export default function AdminOrdersPage(): React.JSX.Element {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter]);
+  }, [statusFilter, emailFilter, orderNumberFilter]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  const applySearch = () => {
+    setEmailFilter(emailInput.trim());
+    setOrderNumberFilter(orderNumberInput.trim());
+  };
 
   const openDetail = async (id: string) => {
     try {
@@ -244,6 +286,37 @@ export default function AdminOrdersPage(): React.JSX.Element {
     }
   };
 
+  /**
+   * เปิดเผยโค้ดส่งมอบ — deliberate, explicit action. The server requires
+   * `orders:delivery:reveal` and writes an audit event per revealed code;
+   * nothing is fetched until the staff member confirms here.
+   */
+  const openDeliveryReveal = async (order: Pick<OrderRow, 'id' | 'orderNumber' | 'customerEmail'>) => {
+    const ok = window.confirm(
+      `เปิดเผยโค้ดส่งมอบสำหรับออเดอร์ ${order.orderNumber}\nลูกค้า: ${order.customerEmail}\n\nการเปิดเผยแต่ละครั้งจะถูกบันทึกใน audit log และต้องมีสิทธิ์ orders:delivery:reveal`,
+    );
+    if (!ok) return;
+    setRevealBusy(true);
+    setRevealError(null);
+    try {
+      const data = await adminJson<DeliveryReveal>(
+        `/api/v1/admin/orders/${order.id}/delivery`,
+      );
+      setRevealData(data);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '';
+      setRevealError(
+        msg.includes('FORBIDDEN') || msg.includes('INSUFFICIENT_PERMISSIONS')
+          ? 'ไม่มีสิทธิ์เปิดเผยโค้ดส่งมอบ (ต้องการสิทธิ์ orders:delivery:reveal)'
+          : msg.includes('ORDER_NOT_FOUND')
+            ? 'ไม่พบออเดอร์นี้'
+            : 'เปิดเผยโค้ดไม่สำเร็จ กรุณาลองใหม่',
+      );
+    } finally {
+      setRevealBusy(false);
+    }
+  };
+
   return (
     <AdminShell staffName="Founder" staffRole="super_admin" breadcrumbs={[{ label: 'คำสั่งซื้อ' }]}>
       <div className="space-y-6">
@@ -267,6 +340,58 @@ export default function AdminOrdersPage(): React.JSX.Element {
             {actionError}
           </div>
         )}
+
+        {/* Email / order-number search — GET /api/v1/admin/orders/search */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 md:max-w-xs">
+            <Search
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-placeholder"
+            />
+            <input
+              type="text"
+              value={emailInput}
+              onChange={(e) => setEmailInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && applySearch()}
+              placeholder="ค้นหาอีเมลลูกค้า..."
+              className="w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-3 text-sm text-fg placeholder:text-clay-400 focus:border-line-brand"
+            />
+          </div>
+          <div className="relative flex-1 md:max-w-xs">
+            <Search
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-placeholder"
+            />
+            <input
+              type="text"
+              value={orderNumberInput}
+              onChange={(e) => setOrderNumberInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && applySearch()}
+              placeholder="ค้นหาหมายเลขคำสั่งซื้อ..."
+              className="w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-3 text-sm text-fg placeholder:text-clay-400 focus:border-line-brand"
+            />
+          </div>
+          <button
+            onClick={applySearch}
+            disabled={loading}
+            className="rounded-md bg-peach-500 px-4 py-2 text-sm font-medium text-fg hover:bg-peach-400 disabled:opacity-50"
+          >
+            {loading ? 'กำลังค้นหา...' : 'ค้นหา'}
+          </button>
+          {(emailFilter || orderNumberFilter) && (
+            <button
+              onClick={() => {
+                setEmailInput('');
+                setOrderNumberInput('');
+                setEmailFilter('');
+                setOrderNumberFilter('');
+              }}
+              className="rounded-md border border-line-subtle px-3 py-2 text-sm text-fg-secondary hover:bg-surface"
+            >
+              ล้างตัวกรอง
+            </button>
+          )}
+        </div>
 
         {/* Status filter tabs */}
         <div className="flex flex-wrap gap-2">
@@ -403,6 +528,75 @@ export default function AdminOrdersPage(): React.JSX.Element {
           </table>
         </div>
 
+        {/* Delivery reveal modal — shown only after an explicit, audited reveal */}
+        {revealData && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
+            <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-line-subtle bg-surface-base p-6">
+              <div className="mb-4 flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-fg">
+                    โค้ดส่งมอบ — {revealData.orderNumber}
+                  </h2>
+                  <p className="text-xs text-fg-muted">
+                    เปิดเผยด้วยสิทธิ์ orders:delivery:reveal · บันทึกใน audit log แล้ว
+                  </p>
+                </div>
+                <button
+                  onClick={() => setRevealData(null)}
+                  className="text-fg-muted hover:text-fg"
+                >
+                  <XCircle size={20} />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {revealData.lines.map((line) => {
+                  const codes = revealData.revealedCodes.filter((c) => c.itemId === line.itemId);
+                  return (
+                    <div
+                      key={line.itemId}
+                      className="rounded border border-line-subtle p-3 text-sm"
+                    >
+                      <div className="flex items-center justify-between">
+                        <p className="text-fg">{line.productNameTh}</p>
+                        <span className="text-xs text-fg-muted">
+                          {line.codesCount} โค้ด · {line.deliveryStatus ?? '—'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-fg-muted">{line.skuCode}</p>
+                      {codes.length > 0 ? (
+                        <div className="mt-2 space-y-1">
+                          {codes.map((c, idx) => (
+                            <div
+                              key={`${line.itemId}-${idx}`}
+                              className="flex items-center justify-between rounded bg-surface px-2 py-1.5"
+                            >
+                              <code className="font-mono text-xs text-fg break-all">
+                                {c.code}
+                              </code>
+                              <span className="ml-2 shrink-0 text-[10px] text-fg-muted">
+                                {c.status ?? '—'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="mt-2 text-xs text-fg-muted">
+                          ไม่มีโค้ดที่เปิดเผยได้ในรายการนี้
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <p className="mt-4 text-center text-xs text-fg-muted">
+                โค้ดเหล่านี้เป็นความลับ — อย่าคัดลอกไปไว้ในแชตหรือหน้าจอที่ไม่จำเป็น
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Order detail modal */}
         {selectedOrder && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -503,6 +697,33 @@ export default function AdminOrdersPage(): React.JSX.Element {
                   </p>
                 </div>
               )}
+
+              {/* Delivery-code reveal — explicit, audited, permission-gated.
+                  No codes are fetched until the staff member clicks this. */}
+              <div className="mt-5 border-t border-line-subtle pt-4">
+                <p className="text-sm font-semibold text-fg">โค้ดส่งมอบ (Delivery codes)</p>
+                <p className="mt-1 text-xs text-fg-muted">
+                  ดูรหัสที่ส่งให้ลูกค้า — ต้องใช้สิทธิ์ orders:delivery:reveal และทุกครั้งถูกบันทึกใน
+                  audit log
+                </p>
+                <button
+                  onClick={() =>
+                    void openDeliveryReveal({
+                      id: selectedOrder.id,
+                      orderNumber: selectedOrder.orderNumber,
+                      customerEmail: selectedOrder.customerEmail,
+                    })
+                  }
+                  disabled={revealBusy}
+                  className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-md border border-line-subtle px-4 py-2.5 text-sm font-semibold text-fg-secondary hover:bg-surface disabled:opacity-60"
+                >
+                  <Eye size={16} />
+                  {revealBusy ? 'กำลังเปิดเผย...' : 'เปิดเผยโค้ดส่งมอบสำหรับออเดอร์นี้'}
+                </button>
+                {revealError && (
+                  <p className="mt-2 text-xs text-fg-error">{revealError}</p>
+                )}
+              </div>
 
               {(selectedOrder.status === 'pending_payment' ||
                 selectedOrder.status === 'pending_manual_fulfilment') && (

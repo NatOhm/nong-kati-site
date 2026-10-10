@@ -7,6 +7,8 @@ export interface CartSummaryProps {
   subtotal: number;
   vat: number;
   total: number;
+  vatEnabled?: boolean;
+  vatRate?: number;
   discount?: number;
   className?: string;
 }
@@ -19,13 +21,15 @@ export function CartSummary({
   subtotal,
   vat,
   total,
+  vatEnabled = false,
+  vatRate = 0,
   discount = 0,
   className,
 }: CartSummaryProps): React.JSX.Element {
   return (
     <div className={cn('space-y-2 text-sm', className)}>
       <div className="flex items-center justify-between text-fg-muted">
-        <span>ยอดรวม (ไม่รวม VAT)</span>
+        <span>ยอดรวม{vatEnabled ? ' (รวม VAT)' : ''}</span>
         <span>{formatThb(subtotal)}</span>
       </div>
 
@@ -36,10 +40,12 @@ export function CartSummary({
         </div>
       )}
 
-      <div className="flex items-center justify-between text-fg-muted">
-        <span>VAT 7%</span>
-        <span>{formatThb(vat)}</span>
-      </div>
+      {vatEnabled && (
+        <div className="flex items-center justify-between text-fg-muted">
+          <span>VAT {(vatRate * 100).toLocaleString('th-TH')}% (รวมในราคา)</span>
+          <span>{formatThb(vat)}</span>
+        </div>
+      )}
 
       <div className="border-t border-line-subtle pt-2">
         <div className="flex items-center justify-between text-lg font-bold text-fg-brand">

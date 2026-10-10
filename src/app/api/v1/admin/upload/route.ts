@@ -3,16 +3,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { checkPermission } from '@/lib/rbac';
 import { getAdminToken } from '@/lib/adminRequest';
+import { imageDimensions, isWithinImageLimits, isWithinImageSize, MAX_IMAGE_BYTES } from '@/lib/imageValidation';
 
 export const dynamic = 'force-dynamic';
 
-const MAX_BYTES = 5 * 1024 * 1024; // 5 MB — photos from modern phones blow past 512 KB
 const ALLOWED_TYPES: Record<string, string> = {
   'image/png': 'png',
   'image/jpeg': 'jpg',
   'image/webp': 'webp',
   'image/gif': 'gif',
 };
+const MAX_DIMENSION = 8192;
 
 function bearer(req: NextRequest): string | null {
   const token = getAdminToken(req);
@@ -44,15 +45,23 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     typeof (body as Record<string, unknown>)?.['dataUrl'] === 'string'
       ? ((body as Record<string, unknown>)['dataUrl'] as string)
       : '';
+  const filename = typeof (body as Record<string, unknown>)?.['filename'] === 'string'
+    ? String((body as Record<string, unknown>)['filename'])
+    : '';
   const match = /^data:(image\/(?:png|jpeg|webp|gif));base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
-  if (!match) return NextResponse.json({ error: 'UNSUPPORTED_TYPE' }, { status: 400 });
+  if (!match) return NextResponse.json({ error: 'UNSUPPORTED_TYPE', message: 'รองรับไฟล์ PNG, JPG, WebP และ GIF เท่านั้น' }, { status: 400 });
 
   const mime = match[1] ?? '';
+  const extension = filename.toLowerCase().split('.').pop() ?? '';
+  const allowedExtensions = mime === 'image/jpeg' ? ['jpg', 'jpeg'] : [ALLOWED_TYPES[mime]];
+  if (!filename || !allowedExtensions.includes(extension)) {
+    return NextResponse.json({ error: 'EXTENSION_MISMATCH', message: 'นามสกุลไฟล์ไม่ตรงกับชนิดรูปภาพ' }, { status: 400 });
+  }
   const base64 = match[2] ?? '';
   const bytes = Buffer.from(base64, 'base64');
-  if (bytes.length === 0) return NextResponse.json({ error: 'EMPTY_FILE' }, { status: 400 });
-  if (bytes.length > MAX_BYTES) {
-    return NextResponse.json({ error: 'FILE_TOO_LARGE', maxBytes: MAX_BYTES }, { status: 413 });
+  if (bytes.length === 0) return NextResponse.json({ error: 'EMPTY_FILE', message: 'ไฟล์รูปภาพว่างเปล่า' }, { status: 400 });
+  if (!isWithinImageSize(bytes.length)) {
+    return NextResponse.json({ error: 'FILE_TOO_LARGE', message: 'รูปภาพต้องมีขนาดไม่เกิน 5 MB', maxBytes: MAX_IMAGE_BYTES }, { status: 413 });
   }
 
   // Content sniffing: magic bytes must match the declared MIME.
@@ -69,7 +78,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     (mime === 'image/jpeg' && jpg) ||
     (mime === 'image/gif' && gif) ||
     (mime === 'image/webp' && webp);
-  if (!sniffed) return NextResponse.json({ error: 'CONTENT_MISMATCH' }, { status: 400 });
+  if (!sniffed) return NextResponse.json({ error: 'CONTENT_MISMATCH', message: 'เนื้อหาไฟล์ไม่ใช่รูปภาพชนิดที่แจ้งไว้' }, { status: 400 });
+  const dimensions = imageDimensions(bytes, mime);
+  if (!dimensions) {
+    return NextResponse.json({ error: 'INVALID_IMAGE_DIMENSIONS', message: 'อ่านขนาดรูปภาพไม่ได้ กรุณาเลือกไฟล์รูปภาพอื่น' }, { status: 400 });
+  }
+  if (!isWithinImageLimits(dimensions)) {
+    return NextResponse.json({ error: 'IMAGE_DIMENSIONS_TOO_LARGE', message: 'รูปภาพมีขนาดพิกเซลใหญ่เกินกำหนด กรุณาย่อรูปก่อนอัปโหลด', maxDimension: MAX_DIMENSION }, { status: 400 });
+  }
 
   const key = `image:${Date.now().toString(36)}-${bytes.length.toString(36)}-${ALLOWED_TYPES[mime]}`;
 

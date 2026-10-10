@@ -57,7 +57,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       discountType: true,
       discountValue: true,
       scope: true,
-      productIds: true,
+      products: {
+        select: { product: { select: { name: true, slug: true } } },
+      },
       minSpendThb: true,
       expiresAt: true,
     },
@@ -83,6 +85,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     body: string;
     expiresAt: string | null;
     read: boolean;
+    links?: Array<{ label: string; href: string }>;
   }> = [];
 
   // Coupons first (code-based, tracked as read)
@@ -113,24 +116,27 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       p.discountType === 'percent'
         ? `${Number(p.discountValue).toLocaleString('th-TH')}%`
         : `${Number(p.discountValue).toLocaleString('th-TH')}฿`;
+    const productRows = p.products ?? [];
     const scopeLabel =
       p.scope === 'all'
-        ? 'ทุกสินค้า'
-        : p.productIds && p.productIds.trim()
-            ? `${JSON.parse(p.productIds).length} สินค้า`
-            : 'สินค้าเจาะจง';
+        ? 'ทุกสินค้าในร้าน'
+        : productRows.length > 0
+          ? `สินค้า: ${productRows.map((row) => row.product.name).join(', ')}`
+          : 'สินค้าเจาะจง';
+    const conditions = p.minSpendThb && Number(p.minSpendThb) > 0
+      ? ` (ขั้นต่ำ ${Number(p.minSpendThb).toLocaleString('th-TH')}฿)`
+      : '';
+    const details = `ลด ${value} สำหรับ ${scopeLabel}${conditions}`;
+    const customDescription = p.description?.trim();
     items.push({
       id: p.id,
       title: `ส่วนลดอัตโนมัติ: ${p.name}`,
-      body:
-        p.description ??
-        `ลด ${value} สำหรับ ${scopeLabel}${
-          p.minSpendThb && Number(p.minSpendThb) > 0
-            ? ` (ขั้นต่ำ ${Number(p.minSpendThb).toLocaleString('th-TH')}฿)`
-            : ''
-        }`,
+      body: customDescription ? `${details} — ${customDescription}` : details,
       expiresAt: p.expiresAt?.toISOString() ?? null,
       read: false, // promotions are automatic — always show as new
+      links: p.scope === 'all'
+        ? [{ label: 'ดูสินค้าทั้งหมด', href: '/search' }]
+        : productRows.map((row) => ({ label: row.product.name, href: `/product/${encodeURIComponent(row.product.slug)}` })),
     });
   }
 

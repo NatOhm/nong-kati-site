@@ -48,12 +48,13 @@ model Product {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  category  Category            @relation(fields: [categoryId], references: [id])
-  variants  ProductVariant[]
-  aliases   ProductAlias[]
-  inventory InventorySnapshot[]
-  wishlist  WishlistItem[]
-  tags      ProductTag[]
+  category         Category            @relation(fields: [categoryId], references: [id])
+  variants         ProductVariant[]
+  aliases          ProductAlias[]
+  inventory        InventorySnapshot[]
+  wishlist         WishlistItem[]
+  tags             ProductTag[]
+  promotionProducts PromotionProduct[]
 
   @@index([categoryId])
   @@index([slug])
@@ -212,6 +213,10 @@ model Customer {
   sessionsInvalidBefore DateTime?
 
   @@index([email])
+  // Declared to match the migrated database: Customer_tier_idx exists in the
+  // migration history but had no counterpart here, so `migrate dev` would
+  // otherwise generate a DROP INDEX against a live index.
+  @@index([tier])
 }
 
 // ─── Wishlist (client ask: รายการโปรด — สินค้าที่ลูกค้ากดใจไว้) ──
@@ -256,8 +261,15 @@ model Promotion {
   scope       String   @default("selected") // all | selected
   discountType String  @default("percent")  // percent | amount
   discountValue Decimal @db.Decimal(10, 2)
-  // For 'all' scope, applies to entire shop. For 'selected', these product IDs.
-  productIds  String?  // JSON array of product IDs (for selected scope)
+  // Legacy compatibility column. The expand migration keeps Promotion.productIds
+  // so the previously deployed reader keeps working, and the migration's backfill
+  // copies each JSON array into PromotionProduct. Nothing in this codebase reads
+  // or writes it — it is declared here only so schema.prisma matches the database
+  // the migration produces. A later contract migration drops the column and this
+  // field together.
+  productIds  String?
+  // For 'all' scope, applies to entire shop. For 'selected', these products.
+  products   PromotionProduct[]
   minSpendThb Decimal? @db.Decimal(10, 2)
   isActive    Boolean  @default(true)
   startsAt    DateTime?
@@ -267,6 +279,19 @@ model Promotion {
 
   @@index([isActive, expiresAt])
   @@index([startsAt, expiresAt])
+}
+
+model PromotionProduct {
+  id           String @id @default(cuid())
+  promotionId  String @map("promotion_id")
+  productId    String @map("product_id")
+
+  promotion   Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([promotionId, productId])
+  @@index([productId])
+  @@map("PromotionProduct")
 }
 
 // ─── Coupons (คูปองส่วนลด — บาท/%, ยอดขั้นต่ำ, วันหมดอายุ) ──
@@ -339,6 +364,14 @@ model Order {
   confirmationUuid       String    @unique @default("")
   notes                  String?
   manualFulfilmentReason String?
+  // Aggregate automatic-promotion discount for the order. Per-line promotion
+  // evidence (id/name/type/value) lives on OrderItem — the algorithm picks the
+  // best promotion per line, so an order-level promotion id/name cannot
+  // represent the charged price.
+  promotionDiscountThb Decimal   @default(0) @db.Decimal(10, 2)
+  // VAT snapshot (rate in effect at order time, stored as fraction e.g. 0.07)
+  vatEnabled           Boolean  @default(false)
+  vatRate              Decimal? @db.Decimal(5, 4)
   // Manual slip check (ลูกค้าส่งสลิปให้แอดมินตรวจ): image path in the
   // SiteSetting image store; admin note recorded on confirmation.
   slipImageUrl           String?
@@ -363,6 +396,9 @@ model Order {
   @@index([status])
   @@index([confirmationUuid])
   @@index([orderNumber])
+  // Order_couponId_idx exists in the migrated database but was not declared
+  // here; without it `migrate dev` would drop a live index.
+  @@index([couponId])
 }
 
 // ─── Order Items (§10) ───────────────────────────────────
@@ -384,6 +420,23 @@ model OrderItem {
   deliveredAt     DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+  // Promotion evidence snapshot for this line (historical record — no FK so
+  // rows survive promotion edit/delete). unitPriceThb is the effective
+  // post-promotion unit price; originalUnitPriceThb is the tier price before
+  // any promotion; promotionDiscountThb is the TOTAL discount for the line.
+  originalUnitPriceThb Decimal  @default(0) @db.Decimal(10, 2)
+  appliedPromotionId    String?
+  promotionName         String?
+  promotionType         String? // percent | amount
+  promotionValue        Decimal? @db.Decimal(10, 2)
+  promotionDiscountThb  Decimal  @default(0) @db.Decimal(10, 2)
+  // Final line totals after coupon allocation; these persist the exact
+  // satang-level values the customer pays per line so item sums reconcile
+  // to Order.totalAmountThb and Order.vatAmountThb without rounding drift.
+  couponDiscountThb      Decimal  @default(0) @db.Decimal(10, 2)
+  finalLineTotalThb      Decimal  @default(0) @db.Decimal(10, 2)
+  finalLineExVat         Decimal  @default(0) @db.Decimal(10, 2)
+  finalLineVatAmount     Decimal  @default(0) @db.Decimal(10, 2)
 
   order     Order          @relation(fields: [orderId], references: [id], onDelete: Restrict)
   variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
@@ -810,7 +863,10 @@ model EmailOutbox {
   availableAt    DateTime  @default(now()) // next eligible delivery attempt
   sentAt         DateTime?
   createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  // The migrated database carries a DEFAULT on this column; declaring it here
+  // keeps schema.prisma and the database in agreement so `migrate dev` does not
+  // strip the default out from under non-Prisma inserts.
+  updatedAt      DateTime  @updatedAt @default(now())
 
   @@index([status, availableAt])
   @@index([templateKey, createdAt(sort: Desc)])

@@ -28,6 +28,9 @@ const { prismaMock } = vi.hoisted(() => ({
     category: { findUnique: vi.fn(), findMany: vi.fn() },
     product: { findMany: vi.fn() },
     siteSetting: { findUnique: vi.fn() },
+    // decoratePromotionPrices() queries active promotions while hydrating the
+    // category page; these ordering tests have no promotions to apply.
+    promotion: { findMany: vi.fn() },
   },
 }));
 
@@ -115,6 +118,7 @@ beforeEach(() => {
   prismaMock.category.findUnique.mockResolvedValue({ id: 'c1', slug: 'steam' });
   prismaMock.category.findMany.mockResolvedValue([]);
   prismaMock.product.findMany.mockImplementation(async () => []);
+  prismaMock.promotion.findMany.mockResolvedValue([]);
 });
 
 describe('availability leads every sort', () => {

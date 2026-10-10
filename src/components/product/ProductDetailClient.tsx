@@ -6,6 +6,8 @@ import { useCart } from '@/hooks/useCart';
 import { formatThb } from '@/utils/format';
 import { cn } from '@/utils/cn';
 import { StockBadge } from './StockBadge';
+import { useVatConfig } from '@/hooks/useVatConfig';
+import { calculateVatFromInclusive } from '@/lib/pricing';
 
 interface Variant {
   id: string;
@@ -16,6 +18,7 @@ interface Variant {
   stock: number;
   isActive: boolean;
   sortOrder: number;
+  promotion?: { name: string; originalPriceThb: number; discountedPriceThb: number; expiresAt: string | null };
 }
 
 interface ProductDetailClientProps {
@@ -58,6 +61,7 @@ export function ProductDetailClient({
   variants,
 }: ProductDetailClientProps): React.JSX.Element {
   const { addItem, isInCart, getQuantity } = useCart();
+  const vatConfig = useVatConfig();
   const [selectedVariant, setSelectedVariant] = useState<Variant | null>(
     variants.find((v) => v.stock > 0) ?? null,
   );
@@ -77,8 +81,13 @@ export function ProductDetailClient({
         productSlug,
         thumbnailUrl,
         denominationThb: selectedVariant.effectivePrice,
-        unitPriceThb: selectedVariant.effectivePrice,
-        vatAmountThb: Math.round((selectedVariant.effectivePrice / 1.07) * 0.07 * 100) / 100,
+        unitPriceThb: selectedVariant.promotion?.discountedPriceThb ?? selectedVariant.effectivePrice,
+        ...(selectedVariant.promotion ? {
+          originalUnitPriceThb: selectedVariant.promotion.originalPriceThb,
+          promotionName: selectedVariant.promotion.name,
+          promotionExpiresAt: selectedVariant.promotion.expiresAt,
+        } : {}),
+        vatAmountThb: calculateVatFromInclusive(selectedVariant.promotion?.discountedPriceThb ?? selectedVariant.effectivePrice, vatConfig),
         inStock: true,
         availableQuantity: selectedVariant.stock,
         maxQuantity: Math.min(10, selectedVariant.stock),
@@ -111,12 +120,18 @@ export function ProductDetailClient({
         <span className="text-xs text-fg-placeholder">ราคา</span>
         <div className="text-3xl font-bold text-fg-brand">
           {selectedVariant
-            ? formatThb(selectedVariant.effectivePrice)
-            : formatThb(variants[0]?.effectivePrice ?? 0)}
+            ? formatThb(selectedVariant.promotion?.discountedPriceThb ?? selectedVariant.effectivePrice)
+            : formatThb(variants[0]?.promotion?.discountedPriceThb ?? variants[0]?.effectivePrice ?? 0)}
         </div>
-        {selectedVariant && (
+        {selectedVariant?.promotion && (
+          <p className="mt-1 text-xs font-semibold text-fg-brand-strong">
+            โปรโมชั่น: {selectedVariant.promotion.name}
+            {selectedVariant.promotion.expiresAt ? ` · ถึง ${new Date(selectedVariant.promotion.expiresAt).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok' })}` : ''}
+          </p>
+        )}
+        {selectedVariant && vatConfig.enabled && (
           <p className="text-xs text-fg-placeholder">
-            รวม VAT 7% = {formatThb(selectedVariant.effectivePrice)}
+            รวม VAT {(vatConfig.rate * 100).toLocaleString('th-TH')}% {formatThb(calculateVatFromInclusive(selectedVariant.promotion?.discountedPriceThb ?? selectedVariant.effectivePrice, vatConfig))}
           </p>
         )}
       </div>
@@ -164,8 +179,19 @@ export function ProductDetailClient({
                     isSelected ? 'text-peach-800' : 'text-fg-brand',
                   )}
                 >
-                  {formatThb(variant.effectivePrice)}
+                  {variant.promotion ? (
+                    <span className="flex items-center gap-1.5">
+                      <del className="text-xs opacity-65">{formatThb(variant.promotion.originalPriceThb)}</del>
+                      <span>{formatThb(variant.promotion.discountedPriceThb)}</span>
+                    </span>
+                  ) : formatThb(variant.effectivePrice)}
                 </span>
+                {variant.promotion && (
+                  <span className="text-[10px] font-semibold text-fg-brand-strong">
+                    โปรโมชั่น: {variant.promotion.name}
+                    {variant.promotion.expiresAt ? ` · ถึง ${new Date(variant.promotion.expiresAt).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok' })}` : ''}
+                  </span>
+                )}
                 {variant.stock === 0 ? (
                   <span className="text-xs text-fg-error">หมด</span>
                 ) : variant.stock <= 10 ? (

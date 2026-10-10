@@ -13,6 +13,8 @@ export interface CartItemProps {
     denominationThb: number;
     thumbnailUrl: string | null;
     unitPriceThb: number;
+    originalUnitPriceThb?: number;
+    promotionName?: string;
     quantity: number;
     inStock: boolean;
     maxQuantity: number;
@@ -57,7 +59,13 @@ export function CartItem({ item, onUpdateQty, onRemove }: CartItemProps): React.
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="truncate text-sm font-medium text-fg">{item.productNameTh}</p>
-            <p className="text-xs text-fg-placeholder">{formatThb(item.unitPriceThb)}</p>
+            <p className="text-xs text-fg-placeholder">
+              {item.originalUnitPriceThb && item.originalUnitPriceThb > item.unitPriceThb && (
+                <del className="mr-1">{formatThb(item.originalUnitPriceThb)}</del>
+              )}
+              {formatThb(item.unitPriceThb)}
+            </p>
+            {item.promotionName && <p className="text-[10px] font-semibold text-fg-brand-strong">โปรโมชั่น: {item.promotionName}</p>}
           </div>
           <button
             onClick={onRemove}

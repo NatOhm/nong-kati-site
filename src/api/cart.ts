@@ -77,7 +77,7 @@ export function addToCart(sessionKey: string, variantId: string, quantity: numbe
   }
 
   const unitPrice = parseFloat(variant.salePriceThb);
-  const vatAmount = Math.round(unitPrice * 0.07 * 100) / 100;
+  const vatAmount = 0; // VAT is disabled by default; checkout resolves the saved shop setting.
 
   if (existingItem) {
     // Update quantity

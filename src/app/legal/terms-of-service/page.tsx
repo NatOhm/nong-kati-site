@@ -4,6 +4,7 @@
  */
 
 import type { Metadata } from 'next';
+import { getStoreInfo } from '@/lib/data';
 
 export const metadata: Metadata = {
   title: 'ข้อกำหนดการใช้งาน',
@@ -11,7 +12,8 @@ export const metadata: Metadata = {
   description: 'ข้อกำหนดการใช้งานเว็บไซต์ Nong-Kati',
 };
 
-export default function TermsOfServicePage(): React.JSX.Element {
+export default async function TermsOfServicePage(): Promise<React.JSX.Element> {
+  const store = await getStoreInfo();
   return (
     <div className="mx-auto max-w-3xl px-4 py-12">
       <h1 className="mb-6 text-2xl font-bold text-fg">ข้อกำหนดการใช้งาน</h1>
@@ -39,7 +41,7 @@ export default function TermsOfServicePage(): React.JSX.Element {
         <section>
           <h2 className="mb-2 text-lg font-semibold text-fg">3. การสั่งซื้อและการชำระเงิน</h2>
           <p>
-            ราคาสินค้าทั้งหมดแสดงเป็นบาทไทย (THB) รวม VAT 7% แล้ว
+            ราคาสินค้าแสดงเป็นบาทไทย (THB) โดยจะแสดงรายละเอียดภาษีตามการตั้งค่าของร้านก่อนยืนยันคำสั่งซื้อ
             การชำระเงินดำเนินการผ่านผู้ให้บริการชำระเงินที่ได้รับการรับรอง
           </p>
         </section>
@@ -57,10 +59,12 @@ export default function TermsOfServicePage(): React.JSX.Element {
         <section>
           <h2 className="mb-2 text-lg font-semibold text-fg">5. การติดต่อ</h2>
           <p>
-            หากมีคำถาม กรุณาติดต่อที่{' '}
-            <a href="mailto:support@nong-kati.co.th" className="text-fg-brand hover:text-fg-brand">
-              support@nong-kati.co.th
-            </a>
+            หากมีคำถาม กรุณาติดต่อผ่าน{' '}
+            {store.email ? (
+              <a href={`mailto:${store.email}`} className="text-fg-brand hover:text-fg-brand">{store.email}</a>
+            ) : (
+              <a href="/account/support" className="text-fg-brand hover:text-fg-brand">แบบฟอร์มติดต่อฝ่ายสนับสนุน</a>
+            )}
           </p>
         </section>
       </div>

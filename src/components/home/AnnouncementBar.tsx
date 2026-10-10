@@ -46,7 +46,7 @@ export function AnnouncementBar(): React.JSX.Element | null {
 
   return (
     <div className="relative bg-gradient-to-r from-peach-400 via-peach-300 to-peach-400 px-4 py-2">
-      <div className="mx-auto flex max-w-[1440px] items-center justify-center gap-2 text-center">
+      <div className="mx-auto flex max-w-[1440px] items-center justify-center gap-2 pr-12 text-center">
         <Sparkles size={16} className="shrink-0 text-peach-900" aria-hidden="true" />
         <p className="text-sm font-medium text-fg">
           <span className="font-bold">{content.message}</span>

@@ -3,8 +3,9 @@
  * ผ่าน Discord)" and low-stock alerts. Fire-and-forget: failures must never
  * break the checkout or admin flow, so every send is swallowed.
  *
- * Config lives in SiteSetting key 'notifications' (editable in admin):
- * { discordWebhookUrl: string, lowStockThreshold: number }
+ * The webhook lives only in the server environment as
+ * NK_DISCORD_WEBHOOK_URL. SiteSetting key 'notifications' stores the
+ * non-secret lowStockThreshold, editable in admin.
  */
 
 import { prisma } from '@/lib/db';
@@ -19,10 +20,21 @@ export interface NotificationSettings {
 export async function getNotificationSettings(): Promise<NotificationSettings> {
   try {
     const row = await prisma.siteSetting.findUnique({ where: { key: SETTING_KEY } });
-    if (!row) return {};
+    if (!row) {
+      const webhook = process.env['NK_DISCORD_WEBHOOK_URL'];
+      return webhook ? { discordWebhookUrl: webhook } : {};
+    }
     const parsed: unknown = JSON.parse(row.value);
-    if (typeof parsed === 'object' && parsed !== null) return parsed as NotificationSettings;
-    return {};
+    const lowStockThreshold =
+      typeof parsed === 'object' && parsed !== null &&
+      Number.isInteger((parsed as Record<string, unknown>)['lowStockThreshold'])
+        ? Number((parsed as Record<string, unknown>)['lowStockThreshold'])
+        : undefined;
+    const webhook = process.env['NK_DISCORD_WEBHOOK_URL'];
+    return {
+      ...(webhook ? { discordWebhookUrl: webhook } : {}),
+      ...(lowStockThreshold !== undefined ? { lowStockThreshold } : {}),
+    };
   } catch {
     return {};
   }

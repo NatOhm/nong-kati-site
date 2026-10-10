@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Search, Eye, ShieldOff, ShieldCheck, XCircle, Tag, Wallet } from 'lucide-react';
 
 import { AdminShell } from '@/components/layout/AdminShell';
@@ -48,6 +48,59 @@ const TIER_BADGE: Record<PriceTier, string> = {
   dealer: 'bg-jade-500/15 text-jade-700',
 };
 
+/**
+ * Order history from GET /api/v1/admin/customers/:id/history.
+ * The server masks PII unless the caller has customers:read:full and never
+ * returns raw delivery codes from this endpoint.
+ */
+type HistoryOrder = {
+  id: string;
+  orderNumber: string;
+  status: string;
+  paymentMethod: string | null;
+  subtotalThb: number;
+  vatAmountThb: number;
+  discountThb: number;
+  totalAmountThb: number;
+  manualFulfilmentReason: string | null;
+  requiresTaxInvoice: boolean;
+  createdAt: string;
+  completedAt: string | null;
+  slip: {
+    ref: string;
+    verifiedAt: string | null;
+    receiverAccount: string | null;
+  } | null;
+  items: {
+    id: string;
+    productNameTh: string;
+    skuCode: string;
+    quantity: number;
+    lineTotalThb: number;
+    deliveryStatus: string | null;
+  }[];
+};
+
+type CustomerHistory = {
+  id: string;
+  email: string;
+  phone: string | null;
+  createdAt: string;
+  orderCount: number;
+  orders: HistoryOrder[];
+};
+
+const HISTORY_STATUS: Record<string, { label: string; color: string }> = {
+  pending_payment: { label: 'รอชำระเงิน', color: 'text-amber-600' },
+  payment_confirmed: { label: 'ชำระแล้ว', color: 'text-sapphire-700' },
+  pending_manual_fulfilment: { label: 'รอส่งโค้ด', color: 'text-fg-brand' },
+  completed: { label: 'สำเร็จ', color: 'text-jade-600' },
+  refunded: { label: 'คืนเงิน', color: 'text-fg-error' },
+  failed: { label: 'ล้มเหลว', color: 'text-fg-error' },
+  expired: { label: 'หมดอายุ', color: 'text-fg-muted' },
+  abandoned: { label: 'ถูกทิ้ง', color: 'text-fg-muted' },
+};
+
 const TIER_OPTIONS: PriceTier[] = ['retail', 'member', 'dealer'];
 
 export default function AdminCustomersPage(): React.JSX.Element {
@@ -57,6 +110,10 @@ export default function AdminCustomersPage(): React.JSX.Element {
   const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const customerSelectionRequest = useRef(0);
+  const [history, setHistory] = useState<CustomerHistory | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
 
   const handleSearch = useCallback(async () => {
     setLoading(true);
@@ -92,8 +149,53 @@ export default function AdminCustomersPage(): React.JSX.Element {
   }, []);
 
   const handleViewCustomer = async (customerId: string) => {
+    const requestId = ++customerSelectionRequest.current;
+    setSelectedCustomer(null);
+    setHistory(null);
+    setHistoryError(null);
+    setHistoryLoading(false);
     const res = await adminFetch(`/api/v1/admin/customers/${customerId}`, { cache: 'no-store' });
-    if (res.ok) setSelectedCustomer((await res.json()) as CustomerDetail);
+    if (requestId !== customerSelectionRequest.current || !res.ok) return;
+    const customer = (await res.json()) as CustomerDetail;
+    if (requestId !== customerSelectionRequest.current) return;
+    setSelectedCustomer(customer);
+    // Order history lives on its own endpoint; load it alongside the detail.
+    void loadHistory(customerId, requestId);
+  };
+
+  const loadHistory = async (customerId: string, requestId: number) => {
+    setHistoryLoading(true);
+    setHistoryError(null);
+    setHistory(null);
+    try {
+      const res = await adminFetch(`/api/v1/admin/customers/${customerId}/history`, {
+        cache: 'no-store',
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error ?? `HTTP ${res.status}`);
+      }
+      const result = (await res.json()) as CustomerHistory;
+      if (requestId === customerSelectionRequest.current) setHistory(result);
+    } catch (e) {
+      if (requestId === customerSelectionRequest.current) {
+        setHistoryError(
+          e instanceof Error && (e.message === 'FORBIDDEN' || e.message === 'INSUFFICIENT_PERMISSIONS')
+            ? 'ไม่มีสิทธิ์ดูประวัติคำสั่งซื้อ'
+            : 'โหลดประวัติคำสั่งซื้อไม่สำเร็จ',
+        );
+      }
+    } finally {
+      if (requestId === customerSelectionRequest.current) setHistoryLoading(false);
+    }
+  };
+
+  const closeCustomerDetail = () => {
+    customerSelectionRequest.current += 1;
+    setSelectedCustomer(null);
+    setHistory(null);
+    setHistoryLoading(false);
+    setHistoryError(null);
   };
 
   const handleBlockToggle = async (customerId: string, currentStatus: string) => {
@@ -107,7 +209,7 @@ export default function AdminCustomersPage(): React.JSX.Element {
     });
     if (res.ok) {
       setActionMessage(block ? 'บล็อคลูกค้าสำเร็จ' : 'ปลดบล็อคสำเร็จ');
-      setSelectedCustomer(null);
+      closeCustomerDetail();
       void handleSearch();
     }
   };
@@ -227,7 +329,7 @@ export default function AdminCustomersPage(): React.JSX.Element {
                   {selectedCustomer.fullName || selectedCustomer.email}
                 </h2>
                 <button
-                  onClick={() => setSelectedCustomer(null)}
+                  onClick={closeCustomerDetail}
                   className="text-fg-placeholder hover:text-fg"
                 >
                   <XCircle size={20} />
@@ -333,25 +435,92 @@ export default function AdminCustomersPage(): React.JSX.Element {
                   </div>
                 </div>
 
-                {/* Recent Orders */}
-                {selectedCustomer.recentOrders.length > 0 && (
+                {/* Full order history — GET /customers/:id/history (masked server-side).
+                    Replaces the short recentOrders preview when loaded. */}
+                {history && history.orders.length > 0 ? (
                   <div>
-                    <p className="mb-2 text-sm font-medium text-fg-muted">คำสั่งซื้อล่าสุด</p>
-                    {selectedCustomer.recentOrders.map((order, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between rounded border border-line-subtle p-2 text-sm"
-                      >
-                        <div>
-                          <p className="text-fg-secondary">{order.orderNumber}</p>
-                          <p className="text-xs text-fg-placeholder">
-                            {new Date(order.createdAt).toLocaleDateString('th-TH')}
-                          </p>
-                        </div>
-                        <p className="text-fg-secondary">{formatThb(order.totalAmountThb)}</p>
-                      </div>
-                    ))}
+                    <p className="mb-2 text-sm font-medium text-fg-muted">
+                      ประวัติคำสั่งซื้อ ({history.orderCount} รายการ)
+                    </p>
+                    <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+                      {history.orders.map((order) => {
+                        const st = HISTORY_STATUS[order.status];
+                        return (
+                          <div
+                            key={order.id}
+                            className="rounded border border-line-subtle p-2.5 text-sm"
+                          >
+                            <div className="flex items-center justify-between">
+                              <p className="font-mono text-xs text-fg-secondary">
+                                {order.orderNumber}
+                              </p>
+                              <span
+                                className={cn('text-xs font-medium', st?.color ?? 'text-fg-muted')}
+                              >
+                                {st?.label ?? order.status}
+                              </span>
+                            </div>
+                            <div className="mt-1 flex items-center justify-between text-xs text-fg-placeholder">
+                              <span>
+                                {new Date(order.createdAt).toLocaleDateString('th-TH')}
+                                {order.completedAt
+                                  ? ` · สำเร็จ ${new Date(order.completedAt).toLocaleDateString('th-TH')}`
+                                  : ''}
+                              </span>
+                              <span className="font-medium text-fg-secondary">
+                                {formatThb(order.totalAmountThb)}
+                              </span>
+                            </div>
+                            {order.slip && (
+                              <p className="mt-0.5 text-[11px] text-jade-600">
+                                สลิป ref {order.slip.ref}
+                                {order.slip.verifiedAt
+                                  ? ` · ตรวจแล้ว ${new Date(order.slip.verifiedAt).toLocaleString('th-TH')}`
+                                  : ''}
+                              </p>
+                            )}
+                            {order.items.length > 0 && (
+                              <p className="mt-0.5 text-[11px] text-fg-placeholder">
+                                {order.items
+                                  .map(
+                                    (i) =>
+                                      `${i.productNameTh} ×${i.quantity} (${i.deliveryStatus ?? '—'})`,
+                                  )
+                                  .join(' · ')}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
+                ) : historyLoading ? (
+                  <p className="text-sm text-fg-placeholder">กำลังโหลดประวัติคำสั่งซื้อ...</p>
+                ) : historyError ? (
+                  <p className="text-sm text-fg-error">{historyError}</p>
+                ) : history ? (
+                  <p className="text-sm text-fg-placeholder">ลูกค้ายังไม่มีคำสั่งซื้อ</p>
+                ) : (
+                  /* Fallback preview from the detail payload while history loads. */
+                  selectedCustomer.recentOrders.length > 0 && (
+                    <div>
+                      <p className="mb-2 text-sm font-medium text-fg-muted">คำสั่งซื้อล่าสุด</p>
+                      {selectedCustomer.recentOrders.map((order, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between rounded border border-line-subtle p-2 text-sm"
+                        >
+                          <div>
+                            <p className="text-fg-secondary">{order.orderNumber}</p>
+                            <p className="text-xs text-fg-placeholder">
+                              {new Date(order.createdAt).toLocaleDateString('th-TH')}
+                            </p>
+                          </div>
+                          <p className="text-fg-secondary">{formatThb(order.totalAmountThb)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )
                 )}
 
                 {/* Actions */}

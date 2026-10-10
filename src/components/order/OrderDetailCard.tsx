@@ -26,6 +26,8 @@ export interface OrderDetailCardProps {
     }>;
     subtotalThb: number;
     vatAmountThb: number;
+    vatEnabled: boolean;
+    vatRate: number;
     totalAmountThb: number;
     customerEmail: string;
   };
@@ -107,10 +109,12 @@ export function OrderDetailCard({
           <span>ยอดรวม</span>
           <span>{formatThb(order.subtotalThb)}</span>
         </div>
-        <div className="flex items-center justify-between text-sm text-fg-muted">
-          <span>VAT 7%</span>
-          <span>{formatThb(order.vatAmountThb)}</span>
-        </div>
+        {order.vatEnabled && (
+          <div className="flex items-center justify-between text-sm text-fg-muted">
+            <span>VAT {(order.vatRate * 100).toLocaleString('th-TH')}% (รวมในราคา)</span>
+            <span>{formatThb(order.vatAmountThb)}</span>
+          </div>
+        )}
         <div className="mt-2 flex items-center justify-between border-t border-line-subtle pt-2">
           <span className="font-bold text-fg">รวมทั้งสิ้น</span>
           <span className="text-lg font-bold text-fg-brand">{formatThb(order.totalAmountThb)}</span>

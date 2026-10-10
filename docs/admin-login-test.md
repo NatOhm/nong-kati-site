@@ -200,7 +200,9 @@ Settings specifics worth exercising:
 - **ธีมและแอนิเมชัน** — 6 accent swatches + 4 speed presets (550ms is the
   designed default) with live preview; the accent regenerates the whole
   peach ramp.
-- **การแจ้งเตือน** — Discord webhook for new orders and low-stock alerts.
+- **การแจ้งเตือน** — verify the webhook configured in server environment and
+  adjust the non-secret low-stock threshold; the webhook itself is never shown
+  or saved through admin settings.
 - **ความปลอดภัย** — change password (see §7).
 
 Quick authorization check (logged out, e.g. incognito):

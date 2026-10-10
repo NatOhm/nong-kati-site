@@ -19,6 +19,15 @@
  *    the resend button only renders for `completed` / `refunded`. Without this
  *    the order-detail modal's refund and resend paths have no fixture at all,
  *    which is how they shipped with no browser coverage.
+ * 5. Two role-scoped admins for the A1–A3 permission legs
+ *    (`e2e/admin-search-history-reveal.spec.ts`): `support_agent` (orders:read
+ *    MASKED + customers:read + orders:delivery:reveal → the allowed browser
+ *    journey) and `finance_viewer` (orders:read:full but neither
+ *    customers:read nor orders:delivery:reveal → the denied journey).
+ * 6. A customer linked to a COMPLETED order with one DELIVERED code whose
+ *    plaintext is KNOWN (`HISTSMOKE-E2E-CODE-0001`): the reveal spec asserts
+ *    this exact string appears only after the audited reveal and that customer
+ *    history never contains it. A random plaintext could prove neither.
  *
  * Run: node scripts/seed-management-smoke.mjs
  */
@@ -233,6 +242,157 @@ async function main() {
     });
   }
   console.log(`[mgmt-smoke] refund fixture ${refundOrderNumber} (${refundOrder.id}) completed`);
+
+  // ── 5. Role-scoped admins — the allowed/denied legs of the A1–A3 spec ──
+  // Same password and TOTP pattern as the super admin so the spec varies only
+  // the account it signs in as. Roles come straight from ROLE_PERMISSIONS in
+  // src/types/auth.ts: support_agent is the staff member who MAY search,
+  // read history and reveal codes; finance_viewer is the auditor who may
+  // search (with full PII) but may NOT read history or reveal codes.
+  const roleAdmins = [
+    {
+      email: `${EMAIL_PREFIX}-support-${stamp}@test.local`,
+      role: 'support_agent',
+      fullName: 'Management Smoke Support',
+    },
+    {
+      email: `${EMAIL_PREFIX}-finance-${stamp}@test.local`,
+      role: 'finance_viewer',
+      fullName: 'Management Smoke Finance',
+    },
+  ];
+  for (const ra of roleAdmins) {
+    await prisma.adminUser.upsert({
+      where: { email: ra.email },
+      update: {
+        passwordHash: scryptHash(PASSWORD),
+        totpSecret: TOTP_SECRET,
+        status: 'active',
+        role: ra.role,
+      },
+      create: {
+        email: ra.email,
+        fullName: ra.fullName,
+        role: ra.role,
+        status: 'active',
+        passwordHash: scryptHash(PASSWORD),
+        totpSecret: TOTP_SECRET,
+        totpConfirmed: true,
+      },
+    });
+    console.log(`[mgmt-smoke] role admin ${ra.role}: ${ra.email}`);
+  }
+
+  // ── 6. History/reveal fixture — customer + COMPLETED order + DELIVERED
+  // code with a KNOWN plaintext. Written to final state (like RFND01) because
+  // the spec needs a deterministic starting point; the fulfilment path itself
+  // is already covered by management.spec.ts. Rerun-safe: restores the
+  // completed/delivered state a prior pass may have disturbed.
+  const HISTORY_EMAIL = 'mgmt-smoke-history@test.local';
+  const HIST_CODE = 'HISTSMOKE-E2E-CODE-0001';
+  const historyCustomer = await prisma.customer.upsert({
+    where: { email: HISTORY_EMAIL },
+    update: { status: 'active' },
+    create: {
+      email: HISTORY_EMAIL,
+      fullName: 'MGMT Smoke History',
+      emailVerified: true,
+    },
+  });
+
+  const histOrderNumber = `NK-${new Date().getFullYear()}-HIST1`;
+  const histItemData = {
+    variantId: variant.id,
+    productNameTh: variant.product.name,
+    productNameEn: variant.product.name,
+    skuCode: variant.product.sku ?? variant.id,
+    denominationThb: totalThb,
+    quantity: 1,
+    unitPriceThb: totalThb,
+    unitPriceExVat: totalThb,
+    unitVatAmount: 0,
+    lineTotalThb: totalThb,
+    deliveryStatus: 'delivered',
+    deliveredAt: new Date(),
+  };
+  let histOrder = await prisma.order.findUnique({
+    where: { orderNumber: histOrderNumber },
+    include: { items: true },
+  });
+  if (!histOrder) {
+    histOrder = await prisma.order.create({
+      data: {
+        orderNumber: histOrderNumber,
+        customerEmail: HISTORY_EMAIL,
+        customerId: historyCustomer.id,
+        status: 'completed',
+        paymentMethod: 'manual_transfer',
+        subtotalThb: totalThb,
+        vatAmountThb: 0,
+        totalAmountThb: totalThb,
+        tosAcceptedAt: new Date(),
+        completedAt: new Date(),
+        confirmationUuid: crypto.randomUUID(),
+        items: { create: [histItemData] },
+      },
+      include: { items: true },
+    });
+  } else {
+    histOrder = await prisma.order.update({
+      where: { id: histOrder.id },
+      data: {
+        status: 'completed',
+        customerEmail: HISTORY_EMAIL,
+        customerId: historyCustomer.id,
+        completedAt: histOrder.completedAt ?? new Date(),
+      },
+      include: { items: true },
+    });
+    if (histOrder.items.length === 0) {
+      await prisma.orderItem.create({ data: { ...histItemData, orderId: histOrder.id } });
+    } else {
+      await prisma.orderItem.updateMany({
+        where: { orderId: histOrder.id },
+        data: { deliveryStatus: 'delivered', deliveredAt: new Date() },
+      });
+    }
+  }
+
+  // The reveal endpoint reads codes THROUGH THE ITEM (giftCode.orderItemId);
+  // an order-only attachment renders `0 โค้ด` in the reveal modal. Resolve the
+  // item first (created above in either branch) and bind the code to it.
+  const histItem = await prisma.orderItem.findFirst({ where: { orderId: histOrder.id } });
+  if (!histItem) throw new Error('history fixture order has no item — seed script invariant broken');
+
+  const histCode = await prisma.giftCode.findFirst({ where: { orderId: histOrder.id } });
+  if (histCode) {
+    await prisma.giftCode.update({
+      where: { id: histCode.id },
+      data: {
+        status: 'delivered',
+        orderItemId: histItem.id,
+        voidedById: null,
+        voidReason: null,
+        voidedAt: null,
+      },
+    });
+  } else {
+    const enc = encryptCode(HIST_CODE);
+    await prisma.giftCode.create({
+      data: {
+        variantId: variant.id,
+        orderId: histOrder.id,
+        orderItemId: histItem.id,
+        codeEncrypted: enc.ciphertext,
+        codeHash: hashCode(HIST_CODE),
+        nonce: enc.nonce,
+        status: 'delivered',
+      },
+    });
+  }
+  console.log(
+    `[mgmt-smoke] history/reveal fixture ${histOrderNumber} (${histOrder.id}) for ${HISTORY_EMAIL}`,
+  );
 
   console.log(`[mgmt-smoke] admin login: ${admin.email} / ${PASSWORD} (TOTP from DB secret)`);
 }

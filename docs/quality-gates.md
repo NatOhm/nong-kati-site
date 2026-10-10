@@ -45,14 +45,24 @@
 | EX    | Unpaid-order expiry sweep — CAS safety, batching, no stock side effects, cron-route gating | `tests/order-expiry-sweep.test.ts` | `npm test` (vitest) | Unit Tests |
 | CSO   | Stock-aware catalog — availability leads every sort, available-only filter, slice of one global order | `tests/catalog-stock-ordering.test.ts` | `npm test` (vitest) | Unit Tests |
 | SP    | Stock-text parsing — CRLF/LF, blank lines, Unicode/emoji, separators, multiline, invalid input | `tests/stock-parser.test.ts` | `npm test` (vitest) | Unit Tests |
+| PP    | Pricing persistence — coupon/VAT allocation, preview parity, promotion snapshots | `tests/pricing-persistence.test.ts` | `npm test` (vitest) | Unit Tests |
+| PS    | Promotion percent/fixed discounts, timing/scope/minimum-spend, and no coupon stacking; coupon-only checkout remains available | `tests/promotion-stacking.test.ts` | `npm test` (vitest) | Unit Tests |
+| VD    | VAT inclusive display, disabled state, configurable rate | `tests/vat-display.test.ts` | `npm test` (vitest) | Unit Tests |
+| IU    | Admin image upload 5 MB byte limit, dimensions, and pixel-area limits | `tests/image-upload-validation.test.ts` | `npm test` (vitest) | Unit Tests |
+| DS    | Discord webhook is environment-only; legacy DB value is ignored | `tests/discord-secret-config.test.ts` | `npm test` (vitest) | Unit Tests |
+| SI    | Store contact settings persist a configurable HTTPS LINE URL | `tests/store-info-settings.test.ts` | `npm test` (vitest) | Unit Tests |
+| PN    | Customer promotion alerts include discount, conditions, expiry, description, and item links | `tests/promotion-notifications.test.ts` | `npm test` (vitest) | Unit Tests |
+| RP    | Recommended catalog includes only active, admin-featured products | `tests/recommended-products.test.ts` | `npm test` (vitest) | Unit Tests |
 | GC    | Stored accounts + manual assignment to an order — audited reveal, atomic void, masked list; declared-vs-built route ratchet | `tests/admin-stored-accounts.test.ts` | `npm test` (vitest) | Unit Tests |
 | FP    | Forced password change — never looks like a permissions problem; layout redirect cannot loop | `tests/admin-forced-password-change.test.ts` | `npm test` (vitest) | Unit Tests |
+| PP    | Pricing persistence — seven-blocker coverage (VAT satang allocation across lines, snapshot sums reconcile to order totals) | `tests/pricing-persistence.test.ts` | `npm test` (vitest) | Unit Tests |
 | E1    | Disabled-state affordance (WCAG 1.4.1)                | `e2e/disabled-state.spec.ts`       | `npm run test:e2e`   | (local/preview)        |
 | E2    | No hardcoded white in dark mode                       | `e2e/no-hardcoded-white.spec.ts`   | `npm run test:e2e`   | (local/preview)        |
 | E3    | Duplicate DOM ids (ทั้งไซต์ผ่าน sitemap)              | `e2e/duplicate-ids.spec.ts`        | `npm run test:e2e`   | (local/preview)        |
 | E4    | Text contrast ≥ 4.5:1 (WCAG 1.4.3)                    | `e2e/contrast.spec.ts`             | `npm run test:e2e`   | (local/preview)        |
 | E5    | Touch targets 44px + stats consistency                | `e2e/touch-targets.spec.ts`        | `npm run test:e2e`   | (local/preview)        |
 | E6    | Admin refund + resend controls on the order detail modal | `e2e/order-refund-resend.spec.ts` | `npm run test:e2e`   | **Browser Smoke** (run ใน CI ด้วย) |
+| E7    | Admin order search / customer history / delivery reveal — masked vs full PII, cancel-path, allowed + denied roles | `e2e/admin-search-history-reveal.spec.ts` | `npm run test:e2e` | **Browser Smoke** (run ใน CI ด้วย) |
 
 **วิธีรัน:**
 
@@ -198,6 +208,16 @@ Playwright เลือก target ตาม `E2E_BASE_URL` > localhost:4200 (dev
 - **leg ของ resend คือ “ความล้มเหลวอย่างซื่อสัตย์”:** job นี้ตั้งใจไม่มี `NK_RESEND_API_KEY` และ `lib/email/resend.ts` fail-closed (audit #2) — ถ้าตั้ง key จริงในอนาคต เคสนี้จะ skip อัตโนมัติแทนที่จะเดา การคืนเงินที่ไม่มีผู้ให้บริการเมลถือว่าผ่านได้เพราะ**ไม่มีการโกหกว่าส่งสำเร็จ** ซึ่งคือสิ่งที่ต้องกันไว้มากกว่า
 - **หมายเหตุ:** `sendEmailWithRetry` เดิน backoff 2s/4s/8s ตอนไม่มี credential (config error retry ไม่มีทางหาย) — ขานี้จึงใช้ timeout 60s และเวลารันเพิ่มราว 11s ต่อครั้ง
 - **สถานะการรัน:** **รันผ่านแล้วใน CI** — run #90 (`70fb2e9`, 2026-10-03) ผ่านทุก step ของ job Browser Smoke รวมถึง `Seed management smoke fixtures` (fixture `RFND01` ใหม่) และ `Run browser smoke tests` บน production build + Postgres จริง ก่อนหน้านั้นยืนยันได้แค่ `tsc` / eslint / `playwright --list` / `node --check` เพราะเครื่อง dev ไม่มี Docker (ดูหัวข้อ CC) — **ยังรันในเครื่องนี้ไม่ได้** ถ้าแก้ spec ต้องดูผลจาก CI รอบถัดไปด้วยเสมอ
+
+### E7 — Admin order search / customer history / delivery reveal — `e2e/admin-search-history-reveal.spec.ts` (5 เคส)
+
+ต่อเนื่องจาก E6: สามเส้นทาง A1–A3 (`GET /orders/search`, `GET /customers/:id/history`, `GET /orders/:id/delivery`) เคยมีแค่ authz-matrix (unit) กับ denied-path smoke — CI เขียวได้โดยที่หน้าแอดมินไม่เคยเรียกมันเลย สเปกนี้ปิดช่องนั้นใน browser จริงต่อ production build + Postgres จริง เหมือน E6
+
+- **สิทธิ์นำมาจาก fixture สองตัวใน `seed-management-smoke.mjs`** (ไม่ใช่ super_admin คนเดียว): `support_agent` (orders:read **masked** + customers:read + orders:delivery:reveal) เป็นขา **allowed** ทั้งสาม flow และ `finance_viewer` (orders:read:full แต่ไม่มี customers:read / reveal) เป็นขา **denied** — พิสูจน์ว่า behavior ขึ้นกับ permission ไม่ใช่ role ที่ล็อกอินอยู่
+- **Fixture รหัส plaintext คงที่:** `mgmt-smoke-history@test.local` + ออเดอร์ `NK-…-HIST1` (completed, มีโค้ด delivered หนึ่งใบ, plaintext `HISTSMOKE-E2E-CODE-0001`) — รู้ plaintext จึง assert ได้ทั้งสองฝั่ง: โค้ด **โผล่เฉพาะหลัง reveal ที่ confirm แล้ว** และ **ไม่มีวันอยู่ในหน้า history** (รหัสสุ่มพิสูจน์อะไรไม่ได้)
+- **5 เคส:** ค้นหาด้วยอีเมล/เลขออเดอร์โดยอีเมลถูก mask สำหรับ masked role + กรองที่ไม่เจอต้องล้างตารางจริง (ไม่ fallback รายการเต็ม) · history แสดงออเดอร์ + delivery status โดยไม่มี raw code · reveal ต้องผ่าน `window.confirm` — **ยกเลิก = ไม่ fetch ไม่เขียน audit row**, ยืนยัน = โค้ดขึ้นจริง + `order.delivery_revealed` row เพิ่มจริง (อ่านจาก DB เหมือน E6) · finance_viewer เห็น raw email ตอนค้น (orders:read:full) แต่ reveal โดน 403 ขึ้นข้อความ ไม่มีสิทธิ์ ไม่มีโค้ดหลุด ไม่มี audit row · history ที่ API: 200 โดยไม่มี code plaintext สำหรับ support_agent, 403 `INSUFFICIENT_PERMISSIONS` สำหรับ finance_viewer
+- **ทำไม denied leg ของ history อยู่ที่ API ไม่ใช่ UI:** list กับ history ใช้สิทธิ์ `customers:read` ตัวเดียวกัน — ไม่มีบทบาท nàoเปิด list ได้แต่ history โดน 403; ทำ UI leg จะได้แค่ "list พัง" ซึ่งไม่ได้วัด gate ที่สเปกนี้มีอยู่
+- **สถานะการรัน:** เพิ่มใน `Run browser smoke tests` ของ job Browser Smoke (ci.yml) — ผลจริงดูจาก CI รอบถัดไป ส่วน `tsc` / eslint / `playwright --list` รันในเครื่องตอนเพิ่มสเปก
 
 ---
 

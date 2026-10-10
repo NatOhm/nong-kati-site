@@ -214,8 +214,16 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const profit = grossRevenue - discounts - totalCost;
   const completedOrders = allAgg._count._all;
   const averageOrderValue = completedOrders > 0 ? grossRevenue / completedOrders : 0;
-  // ราคาขายรวม VAT แล้ว — VAT ที่เก็บจริง = ยอด − ยอด/1.07
-  const vatCollected = Math.round((grossRevenue - grossRevenue / 1.07) * 100) / 100;
+  // VAT is historical order data: use each order's saved VAT amount instead
+  // of applying today's rate to revenue from orders placed under old settings.
+  const vatGroups = await prisma.order.groupBy({
+    by: ['vatEnabled'],
+    where: { status: 'completed', vatEnabled: true },
+    _sum: { vatAmountThb: true },
+  });
+  const vatCollected = Math.round(
+    vatGroups.reduce((sum, group) => sum + Number(group._sum.vatAmountThb ?? 0), 0) * 100,
+  ) / 100;
 
   // Returning-customer rate (review): computed from the FULL 500-customer
   // analytical set BEFORE the top-5 slice, so the denominator is the active

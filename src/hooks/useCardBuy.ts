@@ -4,6 +4,8 @@ import { useCallback, useRef, useState } from 'react';
 
 import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/useToast';
+import { useVatConfig } from '@/hooks/useVatConfig';
+import { calculateVatFromInclusive } from '@/lib/pricing';
 
 type BuyState = 'idle' | 'pending' | 'added';
 
@@ -16,6 +18,7 @@ interface CardBuyInput {
   slug: string;
   imageUrl?: string | null | undefined;
   price: number;
+  promotion?: { name: string; originalPriceThb: number; discountedPriceThb: number; expiresAt: string | null } | undefined;
   stock: number;
 }
 
@@ -31,6 +34,7 @@ export function useCardBuy(input: CardBuyInput): {
   handleBuy: () => void;
 } {
   const { addItem } = useCart();
+  const vatConfig = useVatConfig();
   const { toast } = useToast();
   const [buyState, setBuyState] = useState<BuyState>('idle');
   const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -55,8 +59,13 @@ export function useCardBuy(input: CardBuyInput): {
           productSlug: input.slug,
           thumbnailUrl: input.imageUrl ?? null,
           denominationThb: input.price,
-          unitPriceThb: input.price,
-          vatAmountThb: Math.round((input.price / 1.07) * 0.07 * 100) / 100,
+          unitPriceThb: input.promotion?.discountedPriceThb ?? input.price,
+          ...(input.promotion ? {
+            originalUnitPriceThb: input.promotion.originalPriceThb,
+            promotionName: input.promotion.name,
+            promotionExpiresAt: input.promotion.expiresAt,
+          } : {}),
+          vatAmountThb: calculateVatFromInclusive(input.promotion?.discountedPriceThb ?? input.price, vatConfig),
           inStock: true,
           availableQuantity: input.stock,
           maxQuantity: Math.min(10, input.stock),
@@ -71,7 +80,7 @@ export function useCardBuy(input: CardBuyInput): {
       });
       resetTimer.current = setTimeout(() => setBuyState('idle'), 1600);
     }, 450);
-  }, [canDirectAdd, buyState, addItem, input, toast]);
+  }, [canDirectAdd, buyState, addItem, input, toast, vatConfig]);
 
   return { canDirectAdd, buyState, handleBuy };
 }

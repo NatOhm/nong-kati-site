@@ -23,25 +23,36 @@ export function CopyButton({
   className,
 }: CopyButtonProps): React.JSX.Element {
   const [copied, setCopied] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   const handleCopy = useCallback(async () => {
+    setCopied(false);
+    setFailed(false);
     try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      // Fallback for older browsers
-      const textarea = document.createElement('textarea');
-      textarea.value = text;
-      textarea.style.position = 'fixed';
-      textarea.style.opacity = '0';
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textarea);
-    }
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        // Fallback for older browsers; report failure if the browser refuses it.
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        try {
+          textarea.select();
+          if (!document.execCommand('copy')) throw new Error('Clipboard copy was rejected');
+        } finally {
+          document.body.removeChild(textarea);
+        }
+      }
 
-    setCopied(true);
-    onCopied?.();
-    setTimeout(() => setCopied(false), 2000);
+      setCopied(true);
+      onCopied?.();
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setFailed(true);
+      setTimeout(() => setFailed(false), 3000);
+    }
   }, [text, onCopied]);
 
   const sizeClasses = {
@@ -55,12 +66,16 @@ export function CopyButton({
       className={cn(
         'transition-smart inline-flex items-center whitespace-nowrap rounded-md border border-line bg-surface font-medium text-fg-secondary hover:border-line-brand hover:text-fg',
         copied && 'border-jade-700 bg-jade-500/15 text-jade-700',
+        failed && 'border-fg-error text-fg-error',
         sizeClasses[size],
         className,
       )}
-      aria-label={copied ? 'คัดลอกแล้ว' : 'คัดลอกรหัส'}
+      aria-label={copied ? 'คัดลอกแล้ว' : failed ? 'คัดลอกไม่สำเร็จ' : 'คัดลอกข้อมูลส่งมอบ'}
+      aria-live="polite"
     >
-      {copied ? (
+      {failed ? (
+        <span>คัดลอกไม่สำเร็จ</span>
+      ) : copied ? (
         <>
           <Check size={size === 'sm' ? 12 : 14} strokeWidth={2.5} />
           <span>คัดลอกแล้ว</span>

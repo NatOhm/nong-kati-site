@@ -4,6 +4,7 @@
  */
 
 import type { Metadata } from 'next';
+import { getStoreInfo } from '@/lib/data';
 
 export const metadata: Metadata = {
   title: 'นโยบายการคืนเงิน',
@@ -11,7 +12,8 @@ export const metadata: Metadata = {
   description: 'นโยบายการคืนเงินของ Nong-Kati',
 };
 
-export default function RefundPolicyPage(): React.JSX.Element {
+export default async function RefundPolicyPage(): Promise<React.JSX.Element> {
+  const store = await getStoreInfo();
   return (
     <div className="mx-auto max-w-3xl px-4 py-12">
       <h1 className="mb-6 text-2xl font-bold text-fg">นโยบายการคืนเงิน</h1>
@@ -38,10 +40,12 @@ export default function RefundPolicyPage(): React.JSX.Element {
         <section>
           <h2 className="mb-2 text-lg font-semibold text-fg">3. วิธีการขอคืนเงิน</h2>
           <p>
-            ติดต่อเราที่{' '}
-            <a href="mailto:support@nong-kati.co.th" className="text-fg-brand hover:text-fg-brand">
-              support@nong-kati.co.th
-            </a>{' '}
+            ติดต่อเราผ่าน{' '}
+            {store.email ? (
+              <a href={`mailto:${store.email}`} className="text-fg-brand hover:text-fg-brand">{store.email}</a>
+            ) : (
+              <a href="/account/support" className="text-fg-brand hover:text-fg-brand">แบบฟอร์มติดต่อฝ่ายสนับสนุน</a>
+            )}{' '}
             พร้อมหมายเลขคำสั่งซื้อและเหตุผลในการขอคืนเงิน
           </p>
         </section>

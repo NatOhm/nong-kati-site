@@ -194,19 +194,6 @@ export default function AccountSupportPage(): React.JSX.Element {
         </div>
       )}
 
-      {/* Contact Info */}
-      <div className="rounded-md border border-line-subtle bg-surface p-6">
-        <h2 className="mb-3 text-lg font-semibold text-fg">ช่องทางอื่น</h2>
-        <div className="space-y-2 text-sm text-fg-muted">
-          <p>
-            อีเมล:{' '}
-            <a href="mailto:support@nong-kati.co.th" className="text-fg-brand hover:text-fg-brand">
-              support@nong-kati.co.th
-            </a>
-          </p>
-          <p>เวลาทำการ: จันทร์-ศุกร์ 9:00-18:00</p>
-        </div>
-      </div>
     </div>
   );
 }

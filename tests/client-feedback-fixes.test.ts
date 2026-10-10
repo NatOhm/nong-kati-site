@@ -58,6 +58,19 @@ describe('OUT_OF_STOCK guard', () => {
           ]),
         },
         customer: { findUnique: vi.fn(async () => null) },
+        $transaction: vi.fn(async (fn) => {
+          const tx = {
+            productVariant: { findMany: vi.fn(async () => [
+              { id: 'v1', stock: 0, isActive: true, price: 100,
+                memberPrice: null, dealerPrice: null, label: 'D1',
+                product: { name: 'Test Product' } } ]) },
+            customer: { findUnique: vi.fn(async () => null) },
+            siteSetting: { findUnique: vi.fn(async () => null) },
+            promotion: { findMany: vi.fn(async () => []) },
+            order: { count: vi.fn(async () => 0), create: vi.fn() },
+          };
+          return typeof fn === 'function' ? await fn(tx) : null;
+        }),
         order: { count: vi.fn(async () => 0), create: vi.fn() },
       },
     }));
@@ -97,8 +110,44 @@ describe('OUT_OF_STOCK guard', () => {
               product: { name: 'Test Product' },
             },
           ]),
+          findUnique: vi.fn(async () => null),
         },
         customer: { findUnique: vi.fn(async () => null) },
+        promotion: { findMany: vi.fn(async () => []) },
+        siteSetting: { findUnique: vi.fn(async () => null) },
+        $transaction: vi.fn(async (fn) => {
+          const tx = {
+            productVariant: { findMany: vi.fn(async () => [
+              {
+                id: 'v1', stock: 3, isActive: true, price: 100,
+                memberPrice: null, dealerPrice: null, label: 'D1',
+                product: { name: 'Test Product' },
+              },
+            ]) },
+            customer: { findUnique: vi.fn(async () => null) },
+            promotion: { findMany: vi.fn(async () => []) },
+            siteSetting: { findUnique: vi.fn(async () => null) },
+            order: {
+              count: vi.fn(async () => 0),
+              create: vi.fn(async () => ({
+                id: 'o1', orderNumber: 'NK-2026-000001', confirmationUuid: 'u1',
+                customerEmail: 'a@b.co', customerPhone: null, status: 'pending_payment',
+                paymentMethod: 'promptpay', subtotalThb: 100, vatAmountThb: 6.54,
+                discountThb: 0, couponId: null, totalAmountThb: 100,
+                requiresTaxInvoice: false, taxInvoiceName: null, taxInvoiceTaxId: null,
+                manualFulfilmentReason: null,
+                createdAt: new Date('2026-10-01T00:00:00Z'),
+                items: [{
+                  id: 'i1', variantId: 'v1', productNameTh: 'Test Product',
+                  productNameEn: 'Test Product', skuCode: 'D1', denominationThb: 100,
+                  quantity: 1, unitPriceThb: 100, unitPriceExVat: 93.46,
+                  unitVatAmount: 6.54, lineTotalThb: 100, deliveryStatus: 'pending',
+                }],
+              })),
+            },
+          };
+          return typeof fn === 'function' ? await fn(tx) : null;
+        }),
         order: {
           count: vi.fn(async () => 0),
           create: vi.fn(async () => ({
@@ -323,7 +372,10 @@ describe('Slip2Go dispatch in the slip-verify route', () => {
           })),
           update: vi.fn(async () => ({})),
         },
-        productVariant: { findMany: vi.fn(async () => []) },
+        productVariant: {
+          findMany: vi.fn(async () => []),
+          findUnique: vi.fn(async () => null),
+        },
         $transaction: vi.fn(async (fn: unknown) => {
           const tx = {
             paymentAttempt: { update: vi.fn(async () => ({})) },

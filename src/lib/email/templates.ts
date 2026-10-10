@@ -21,6 +21,8 @@ export interface OrderConfirmationData {
   }>;
   subtotalThb: number;
   vatAmountThb: number;
+  vatEnabled: boolean;
+  vatRate: number;
   totalAmountThb: number;
   confirmationUrl: string;
 }
@@ -94,7 +96,7 @@ export function orderConfirmationTemplate(data: OrderConfirmationData): {
 
         <div style="text-align: right; margin: 20px 0;">
           <p>ยอดรวม: ${formatThb(data.subtotalThb)}</p>
-          <p>VAT 7%: ${formatThb(data.vatAmountThb)}</p>
+          ${data.vatEnabled ? `<p>VAT ${(data.vatRate * 100).toLocaleString('th-TH')}% (รวมในราคา): ${formatThb(data.vatAmountThb)}</p>` : ''}
           <p style="font-size: 18px; font-weight: bold; color: #f0a020;">รวมทั้งสิ้น: ${formatThb(data.totalAmountThb)}</p>
         </div>
 

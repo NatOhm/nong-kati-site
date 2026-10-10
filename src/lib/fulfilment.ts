@@ -63,6 +63,8 @@ export async function enqueueCodeDeliveryEmail(
     items: Array<{ productNameTh: string; denominationThb: unknown; quantity: number }>;
     subtotalThb: unknown;
     vatAmountThb: unknown;
+    vatEnabled?: boolean;
+    vatRate?: unknown;
     totalAmountThb: unknown;
   },
   /** Plaintext codes allocated by the fulfilment transaction — the whole
@@ -94,6 +96,8 @@ export async function enqueueCodeDeliveryEmail(
     items: lines,
     subtotalThb: Number(order.subtotalThb),
     vatAmountThb: Number(order.vatAmountThb),
+    vatEnabled: order.vatEnabled === true,
+    vatRate: Number(order.vatRate ?? 0),
     totalAmountThb: Number(order.totalAmountThb),
     confirmationUrl,
   });

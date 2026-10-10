@@ -19,6 +19,7 @@ interface NotificationItem {
   body: string;
   expiresAt: string | null;
   read: boolean;
+  links?: Array<{ label: string; href: string }>;
 }
 
 /** Human-friendly Thai relative time for the expiry hint. */
@@ -146,6 +147,20 @@ export function NotificationsDropdown(): React.JSX.Element {
                         <p className="truncate text-sm font-medium text-fg">{n.title}</p>
                       )}
                       <p className="text-xs text-fg-placeholder">{n.body}</p>
+                      {n.links && n.links.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1">
+                          {n.links.map((link) => (
+                            <Link
+                              key={`${n.id}:${link.href}`}
+                              href={link.href}
+                              onClick={() => setOpen(false)}
+                              className="text-xs font-medium text-fg-brand underline underline-offset-2 hover:text-peach-700"
+                            >
+                              {link.label}
+                            </Link>
+                          ))}
+                        </div>
+                      )}
                       {hint && (
                         <p className="mt-0.5 text-[11px] font-medium text-fg-error">{hint}</p>
                       )}

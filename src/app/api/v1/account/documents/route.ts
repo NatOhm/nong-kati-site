@@ -165,6 +165,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     })),
     subtotalThb: Number(order.subtotalThb),
     vatAmountThb: Number(order.vatAmountThb),
+    vatEnabled: order.vatEnabled,
+    vatRate: Number(order.vatRate ?? 0),
     totalAmountThb: Number(order.totalAmountThb),
     createdAt: order.createdAt.toISOString(),
   };

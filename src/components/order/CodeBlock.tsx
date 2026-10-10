@@ -8,6 +8,7 @@ export interface CodeBlockProps {
   code: string;
   productName: string;
   denomination: number;
+  instructions?: string | null;
   className?: string;
 }
 
@@ -19,8 +20,17 @@ export function CodeBlock({
   code,
   productName,
   denomination,
+  instructions,
   className,
 }: CodeBlockProps): React.JSX.Element {
+  const copyText = [
+    `${productName}${denomination > 0 ? ` ${formatThb(denomination)}` : ''}`,
+    instructions?.trim(),
+    code,
+  ]
+    .filter(Boolean)
+    .join('\n');
+
   return (
     <div
       className={cn(
@@ -32,6 +42,9 @@ export function CodeBlock({
       <p className="mb-3 text-sm font-medium text-fg-muted">
         {productName} {formatThb(denomination)}
       </p>
+      {instructions?.trim() && (
+        <p className="mb-3 whitespace-pre-wrap text-sm text-fg-secondary">{instructions}</p>
+      )}
 
       {/* Code + Copy — multi-line account blocks render pre-wrapped */}
       {code.includes('\n') ? (
@@ -40,7 +53,7 @@ export function CodeBlock({
             {code}
           </pre>
           <div className="flex justify-end">
-            <CopyButton text={code} size="sm" />
+            <CopyButton text={copyText} size="sm" />
           </div>
         </div>
       ) : (
@@ -55,7 +68,7 @@ export function CodeBlock({
             {code}
           </span>
 
-          <CopyButton text={code} size="sm" />
+          <CopyButton text={copyText} size="sm" />
         </div>
       )}
     </div>

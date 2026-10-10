@@ -5,29 +5,55 @@ import { notifyPromotionExpired } from '@/lib/notify';
 
 /**
  * POST /api/v1/internal/promotions/expire — promotion expiry tick.
- * Called by cron or manually. Marks expired promotions as inactive
- * and sends Discord notifications.
  *
- * Auth: x-cron-token or x-outbox-token (same as order expiry).
+ * Marks promotions whose expiresAt has passed as inactive and sends
+ * Discord notifications. Auth + shape mirror the sibling order-expiry
+ * route exactly: NK_CRON_SECRET is canonical, admin JWTs are accepted
+ * so the panel can trigger a run, and an unconfigured secret fails CLOSED
+ * (503) rather than letting an unauthenticated caller expire promotions.
+ *
+ * Manual re-runs are always safe — the sweep is a status CAS, so
+ * concurrent ticks never double-transition one promotion.
  */
 export const dynamic = 'force-dynamic';
 
-function getCronToken(req: NextRequest): string {
-  return (
-    req.headers.get('x-cron-token') ??
-    req.headers.get('x-outbox-token') ??
-    ''
-  );
+function timingSafeEqualShim(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
 }
 
-// In production, this would be a real cron secret from env.
-const CRON_TOKEN = process.env['CRON_SECRET'] ?? '';
-
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  const token = getCronToken(req);
+  const secret = process.env['NK_CRON_SECRET'];
+  if (!secret) {
+    // Not configured → disabled, fail-closed. Expiring promotions
+    // unauthenticated would let anyone deactivate live promotions.
+    return NextResponse.json({ error: 'SWEEP_DISABLED' }, { status: 503 });
+  }
 
-  // Allow unauthenticated in dev/test, but require token in production.
-  if (process.env.NODE_ENV === 'production' && token !== CRON_TOKEN) {
+  const bearer = req.headers.get('authorization');
+  // x-cron-token is canonical; x-outbox-token is accepted so an operator
+  // reuses one header across both internal ticks.
+  const headerToken =
+    req.headers.get('x-cron-token') ?? req.headers.get('x-outbox-token') ?? '';
+  const bearerToken = bearer?.startsWith('Bearer ') ? bearer.slice(7) : '';
+  const token = headerToken || bearerToken;
+
+  let authenticated = Boolean(token) && timingSafeEqualShim(token, secret);
+
+  if (!authenticated && bearerToken) {
+    // Fall back to an admin JWT (panel-triggered sweep).
+    try {
+      const { verifyAdminJwt } = await import('@/lib/jwt');
+      const payload = await verifyAdminJwt(bearerToken);
+      authenticated = Boolean(payload);
+    } catch {
+      authenticated = false;
+    }
+  }
+
+  if (!authenticated) {
     return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 });
   }
 

@@ -456,11 +456,11 @@ function AppearanceSettings({
       const up = await adminFetch('/api/v1/admin/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dataUrl }),
+        body: JSON.stringify({ dataUrl, filename: file.name }),
       });
       if (!up.ok) {
-        const data = (await up.json().catch(() => ({}))) as { error?: string };
-        throw new Error(data.error ?? `HTTP ${up.status}`);
+        const data = (await up.json().catch(() => ({}))) as { error?: string; message?: string };
+        throw new Error(data.message ?? data.error ?? `HTTP ${up.status}`);
       }
       const { path } = (await up.json()) as { path: string };
       await saveMascot(path);
@@ -799,7 +799,7 @@ function StoreSettings({
               <input
                 value={form.email}
                 onChange={(e) => set('email', e.target.value)}
-                placeholder="support@nong-kati.co.th"
+                placeholder=""
                 className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
               />
             </Field>
@@ -807,7 +807,7 @@ function StoreSettings({
               <input
                 value={form.phone}
                 onChange={(e) => set('phone', e.target.value)}
-                placeholder="02-123-4567"
+                placeholder=""
                 className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
               />
             </Field>
@@ -817,15 +817,15 @@ function StoreSettings({
               <input
                 value={form.line}
                 onChange={(e) => set('line', e.target.value)}
-                placeholder="@nongkati"
+                placeholder=""
                 className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
               />
             </Field>
-            <Field label="URL LINE (เช่น https://lin.ee/uH72DZ2)">
+            <Field label="ลิงก์ LINE Official Account (lin.ee หรือ line.me)">
               <input
                 value={form.lineUrl}
                 onChange={(e) => set('lineUrl', e.target.value)}
-                placeholder="https://lin.ee/uH72DZ2"
+                placeholder=""
                 className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
               />
             </Field>
@@ -1083,11 +1083,11 @@ function ManualTransferSettings(): React.JSX.Element {
       const up = await adminFetch('/api/v1/admin/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dataUrl }),
+        body: JSON.stringify({ dataUrl, filename: file.name }),
       });
       if (!up.ok) {
-        const data = (await up.json().catch(() => ({}))) as { error?: string };
-        throw new Error(data.error ?? `HTTP ${up.status}`);
+        const data = (await up.json().catch(() => ({}))) as { error?: string; message?: string };
+        throw new Error(data.message ?? data.error ?? `HTTP ${up.status}`);
       }
       const { path } = (await up.json()) as { path: string };
       set('qrImageUrl', path);
@@ -2173,7 +2173,7 @@ function NotificationSettings({
 }: {
   registerSaver: (fn: SettingsSaver | null) => void;
 }): React.JSX.Element {
-  const [webhookUrl, setWebhookUrl] = useState('');
+  const [discordConfigured, setDiscordConfigured] = useState(false);
   const [threshold, setThreshold] = useState('5');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -2184,9 +2184,9 @@ function NotificationSettings({
     let cancelled = false;
     adminFetch('/api/v1/admin/settings/notifications')
       .then(async (r) => (r.ok ? r.json() : {}))
-      .then((data: { discordWebhookUrl?: string | null; lowStockThreshold?: number }) => {
+      .then((data: { discordConfigured?: boolean; lowStockThreshold?: number }) => {
         if (cancelled) return;
-        setWebhookUrl(data.discordWebhookUrl ?? '');
+        setDiscordConfigured(data.discordConfigured === true);
         setThreshold(String(data.lowStockThreshold ?? 5));
       })
       .catch(() => {})
@@ -2207,16 +2207,13 @@ function NotificationSettings({
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          discordWebhookUrl: webhookUrl.trim() === '' ? null : webhookUrl.trim(),
           lowStockThreshold: Number(threshold) || 0,
         }),
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(
-          data.error === 'INVALID_WEBHOOK_URL'
-            ? 'ลิงก์ Discord Webhook ไม่ถูกต้อง'
-            : data.error === 'INVALID_THRESHOLD'
+          data.error === 'INVALID_THRESHOLD'
               ? 'ค่าเตือนสต๊อกต้องเป็นตัวเลข 0-1000'
               : 'บันทึกไม่สำเร็จ',
         );
@@ -2227,7 +2224,7 @@ function NotificationSettings({
     } finally {
       setSaving(false);
     }
-  }, [webhookUrl, threshold]);
+  }, [threshold]);
 
   useEffect(() => {
     registerSaver(save);
@@ -2243,22 +2240,9 @@ function NotificationSettings({
         <p className="py-6 text-center text-sm text-fg-muted">กำลังโหลด...</p>
       ) : (
         <div className="space-y-5">
-          <div>
-            <label className={cn('mb-1 block text-sm font-medium text-fg')}>
-              Discord Webhook URL
-            </label>
-            <input
-              type="url"
-              value={webhookUrl}
-              onChange={(e) => setWebhookUrl(e.target.value)}
-              placeholder="https://discord.com/api/webhooks/..."
-              className={INPUT_CLASS}
-            />
-            <p className="mt-1 text-xs text-clay-400">
-              สร้างได้จาก Discord → เซิร์ฟเวอร์ของคุณ → ช่องแชท → แก้ไขช่อง → Integration → Webhooks
-              → New Webhook → Copy Webhook URL เว้นว่างไว้ = ปิดการแจ้งเตือน
-            </p>
-          </div>
+          <p className="rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg-secondary">
+            Discord: {discordConfigured ? 'ตั้งค่า webhook ใน environment แล้ว' : 'ยังไม่เปิดใช้งาน — รอการตั้งค่า webhook ใน environment'}
+          </p>
           <div>
             <label className="mb-1 block text-sm font-medium text-fg">
               เตือนเมื่อสต๊อกเหลือไม่เกิน (ชิ้น)
@@ -2608,11 +2592,11 @@ function BannerSettings(): React.JSX.Element {
       const up = await adminFetch('/api/v1/admin/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dataUrl }),
+        body: JSON.stringify({ dataUrl, filename: file.name }),
       });
       if (!up.ok) {
-        const data = (await up.json().catch(() => ({}))) as { error?: string };
-        throw new Error(data.error ?? `HTTP ${up.status}`);
+        const data = (await up.json().catch(() => ({}))) as { error?: string; message?: string };
+        throw new Error(data.message ?? data.error ?? `HTTP ${up.status}`);
       }
       const { path } = (await up.json()) as { path: string };
       const res = await adminFetch('/api/v1/admin/hero-slides', {
@@ -2651,11 +2635,11 @@ function BannerSettings(): React.JSX.Element {
       const res = await adminFetch('/api/v1/admin/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dataUrl }),
+        body: JSON.stringify({ dataUrl, filename: file.name }),
       });
       if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(data.error ?? `HTTP ${res.status}`);
+        const data = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
+        throw new Error(data.message ?? data.error ?? `HTTP ${res.status}`);
       }
       const { path } = (await res.json()) as { path: string };
       await patch(id, { imageUrl: path });

@@ -8,6 +8,8 @@ import { formatThb } from '@/utils/format';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/useToast';
+import { useVatConfig } from '@/hooks/useVatConfig';
+import { calculateVatFromInclusive } from '@/lib/pricing';
 
 export interface QuickViewVariant {
   id: string;
@@ -16,6 +18,7 @@ export interface QuickViewVariant {
   /** Tier-resolved price (server) — what this customer actually pays. */
   effectivePrice: number;
   stock: number;
+  promotion?: { name: string; originalPriceThb: number; discountedPriceThb: number; expiresAt: string | null } | undefined;
 }
 
 export interface QuickViewProduct {
@@ -45,6 +48,7 @@ export function QuickViewModal({
   product,
 }: QuickViewModalProps): React.JSX.Element {
   const { addItem } = useCart();
+  const vatConfig = useVatConfig();
   const { toast } = useToast();
   const modalRef = useFocusTrap(isOpen);
   const available = product.variants.filter((v) => v.stock > 0);
@@ -115,8 +119,13 @@ export function QuickViewModal({
             productSlug: product.slug,
             thumbnailUrl: product.imageUrl ?? null,
             denominationThb: selected.effectivePrice,
-            unitPriceThb: selected.effectivePrice,
-            vatAmountThb: Math.round((selected.effectivePrice / 1.07) * 0.07 * 100) / 100,
+            unitPriceThb: selected.promotion?.discountedPriceThb ?? selected.effectivePrice,
+            ...(selected.promotion ? {
+              originalUnitPriceThb: selected.promotion.originalPriceThb,
+              promotionName: selected.promotion.name,
+              promotionExpiresAt: selected.promotion.expiresAt,
+            } : {}),
+            vatAmountThb: calculateVatFromInclusive(selected.promotion?.discountedPriceThb ?? selected.effectivePrice, vatConfig),
             inStock: true,
             availableQuantity: selected.stock,
             maxQuantity: Math.min(10, selected.stock),
@@ -132,7 +141,7 @@ export function QuickViewModal({
         timers.current.push(setTimeout(requestClose, 900));
       }, 450),
     );
-  }, [selected, addState, addItem, product, quantity, requestClose, toast]);
+  }, [selected, addState, addItem, product, quantity, requestClose, toast, vatConfig]);
 
   if (!isOpen) return <></>;
 
@@ -213,12 +222,23 @@ export function QuickViewModal({
                     )}
                   >
                     {variant.label || formatThb(variant.effectivePrice)}
-                    <span className="ml-1.5 opacity-80">{formatThb(variant.effectivePrice)}</span>
+                    {variant.promotion ? (
+                      <span className="ml-1.5 opacity-80">
+                        <del>{formatThb(variant.promotion.originalPriceThb)}</del> {formatThb(variant.promotion.discountedPriceThb)}
+                      </span>
+                    ) : <span className="ml-1.5 opacity-80">{formatThb(variant.effectivePrice)}</span>}
                   </button>
                 );
               })}
             </div>
           </div>
+
+          {selected?.promotion && (
+            <p className="mt-2 text-xs font-semibold text-fg-brand-strong">
+              โปรโมชั่น: {selected.promotion.name}
+              {selected.promotion.expiresAt ? ` · ถึง ${new Date(selected.promotion.expiresAt).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok' })}` : ''}
+            </p>
+          )}
 
           {/* Quantity stepper */}
           <div className="mt-4 flex items-center justify-between">
@@ -253,7 +273,7 @@ export function QuickViewModal({
             <div>
               <span className="text-[11px] text-fg-muted">รวม</span>
               <p className="text-lg font-bold text-fg-brand">
-                {selected ? formatThb(selected.effectivePrice * quantity) : '—'}
+                {selected ? formatThb((selected.promotion?.discountedPriceThb ?? selected.effectivePrice) * quantity) : '—'}
               </p>
             </div>
             <button

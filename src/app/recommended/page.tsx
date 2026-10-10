@@ -50,6 +50,7 @@ export default async function RecommendedPage(): Promise<React.JSX.Element> {
                 categoryName={product.category.name}
                 categorySlug={product.category.slug}
                 price={product.variants[0]?.effectivePrice ?? 0}
+                promotion={product.variants[0]?.promotion}
                 stock={product.variants.reduce((sum, v) => sum + v.stock, 0)}
                 variantId={product.variants[0]?.id}
                 variantCount={product.variants.length}
@@ -59,6 +60,7 @@ export default async function RecommendedPage(): Promise<React.JSX.Element> {
                   price: v.effectivePrice,
                   effectivePrice: v.effectivePrice,
                   stock: v.stock,
+                  promotion: v.promotion,
                 }))}
               />
             ))}
@@ -67,7 +69,7 @@ export default async function RecommendedPage(): Promise<React.JSX.Element> {
           <div className="rounded-xl border border-line-subtle bg-surface p-12 text-center">
             <p className="text-lg font-semibold text-fg">ยังไม่มีสินค้าแนะนำ</p>
             <p className="mt-2 text-sm text-fg-muted">
-              Staff จะต้อง 마크สินค้าเป็นแนะนำก่อนจึงจะปรากฏที่นี่
+              ทีมงานต้องตั้งสินค้าเป็นสินค้าแนะนำก่อน สินค้าจึงจะแสดงที่หน้านี้
             </p>
             <Link
               href="/search"

@@ -45,9 +45,24 @@ export async function GET(
   if (!VALID_KEYS.has(key)) return NextResponse.json({ error: 'UNKNOWN_KEY' }, { status: 404 });
 
   const row = await prisma.siteSetting.findUnique({ where: { key } });
-  if (!row) return NextResponse.json({}, { status: 200 });
+  if (!row) {
+    return NextResponse.json(
+      key === 'notifications'
+        ? { discordConfigured: Boolean(process.env['NK_DISCORD_WEBHOOK_URL']) }
+        : {},
+      { status: 200 },
+    );
+  }
   try {
-    return NextResponse.json(JSON.parse(row.value), { status: 200 });
+    const value = JSON.parse(row.value) as Record<string, unknown>;
+    if (key === 'notifications') {
+      const { discordWebhookUrl: _discarded, ...safeSettings } = value;
+      return NextResponse.json({
+        ...safeSettings,
+        discordConfigured: Boolean(process.env['NK_DISCORD_WEBHOOK_URL']),
+      }, { status: 200 });
+    }
+    return NextResponse.json(value, { status: 200 });
   } catch {
     return NextResponse.json({}, { status: 200 });
   }
@@ -127,21 +142,9 @@ export async function PUT(
     if (speed !== undefined) next['speed'] = speed;
     if (mascotUrl !== undefined) next['mascotUrl'] = mascotUrl ?? null;
   } else if (key === 'notifications') {
-    // Discord webhook + low-stock threshold (แจ้งเตือน Discord / สต๊อกใกล้หมด).
+    // The webhook is an environment secret, never a setting or API value.
+    // Saving this group also drops any legacy webhook value from SiteSetting.
     next = {};
-    if (b['discordWebhookUrl'] === null || typeof b['discordWebhookUrl'] === 'string') {
-      const url = b['discordWebhookUrl'];
-      if (url === null || url === '') {
-        next['discordWebhookUrl'] = null;
-      } else if (
-        typeof url === 'string' &&
-        /^https:\/\/(canary\.|ptb\.)?discord(app)?\.com\/api\/webhooks\//.test(url)
-      ) {
-        next['discordWebhookUrl'] = url.trim();
-      } else {
-        return NextResponse.json({ error: 'INVALID_WEBHOOK_URL' }, { status: 400 });
-      }
-    }
     if (b['lowStockThreshold'] !== undefined) {
       const t = Number(b['lowStockThreshold']);
       if (!Number.isInteger(t) || t < 0 || t > 1000) {
@@ -312,7 +315,19 @@ export async function PUT(
   } else {
     // store-info: whitelist string fields.
     next = {};
-    for (const field of ['name', 'description', 'email', 'phone', 'line', 'facebook'] as const) {
+    if (typeof b['lineUrl'] === 'string' && b['lineUrl'].trim() !== '') {
+      try {
+        const url = new URL(b['lineUrl'].trim());
+        const host = url.hostname.toLowerCase();
+        const lineOfficialHost = host === 'lin.ee' || host === 'line.me' || host.endsWith('.line.me');
+        if (url.protocol !== 'https:' || !lineOfficialHost) {
+          return NextResponse.json({ error: 'INVALID_LINE_URL' }, { status: 400 });
+        }
+      } catch {
+        return NextResponse.json({ error: 'INVALID_LINE_URL' }, { status: 400 });
+      }
+    }
+    for (const field of ['name', 'description', 'email', 'phone', 'line', 'lineUrl', 'facebook'] as const) {
       if (typeof b[field] === 'string') next[field] = (b[field] as string).trim();
     }
   }

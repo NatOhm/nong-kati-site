@@ -50,7 +50,7 @@ function v(
   inStock: boolean,
   isLowStock = false,
 ): SeedVariant {
-  const vatAmount = Math.round((salePrice / 1.07) * 0.07 * 100) / 100;
+  const vatAmount = 0; // Shop VAT defaults to disabled; checkout resolves its live setting.
   const exVat = Math.round((salePrice - vatAmount) * 100) / 100;
   return {
     id,

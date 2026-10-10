@@ -19,6 +19,7 @@ export interface ProductCardProps {
   categoryName: string;
   categorySlug: string;
   price: number;
+  promotion?: { name: string; originalPriceThb: number; discountedPriceThb: number; expiresAt: string | null } | undefined;
   stock: number;
   /** First (default) variant id — enables direct add-to-cart from the card. */
   variantId?: string | undefined;
@@ -45,6 +46,7 @@ export function ProductCard({
   categoryName,
   categorySlug,
   price,
+  promotion,
   stock,
   variantId,
   variantCount = 1,
@@ -58,6 +60,7 @@ export function ProductCard({
     slug,
     imageUrl,
     price,
+    promotion,
     stock,
   });
   const [quickViewOpen, setQuickViewOpen] = useState(false);
@@ -121,9 +124,24 @@ export function ProductCard({
         {/* Price pill + stock urgency + buy button — outside the link */}
         <div className="flex flex-1 flex-col gap-2 p-3">
           <div className="mt-auto flex items-center justify-between gap-2">
-            <span className="shadow-inset-sm rounded-full bg-surface-sunken px-3 py-1 text-sm font-bold text-fg-brand-strong">
-              {formatThb(price)}
-            </span>
+            {promotion ? (
+              <div className="min-w-0">
+                <span className="mb-1 inline-flex rounded-full bg-peach-100 px-2 py-0.5 text-[10px] font-bold text-fg-brand-strong">
+                  โปรโมชั่น: {promotion.name}
+                </span>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                  <del className="text-xs text-fg-muted">{formatThb(promotion.originalPriceThb)}</del>
+                  <span className="text-sm font-bold text-fg-brand-strong">{formatThb(promotion.discountedPriceThb)}</span>
+                </div>
+                {promotion.expiresAt && (
+                  <p className="text-[10px] text-fg-muted">ถึง {new Date(promotion.expiresAt).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok' })}</p>
+                )}
+              </div>
+            ) : (
+              <span className="shadow-inset-sm rounded-full bg-surface-sunken px-3 py-1 text-sm font-bold text-fg-brand-strong">
+                {formatThb(price)}
+              </span>
+            )}
             {/* Stock urgency line */}
             <span
               className={cn(

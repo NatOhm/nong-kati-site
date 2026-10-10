@@ -5,7 +5,6 @@ import { ArrowLeft, Search } from 'lucide-react';
 import { FacebookLayout } from '@/components/layout/FacebookLayout';
 
 export const dynamic = 'force-dynamic';
-import { Footer } from '@/components/layout/Footer';
 import { PageShell } from '@/components/layout/PageShell';
 import { Breadcrumb } from '@/components/data-display/Breadcrumb';
 import { OrderDetailCard } from '@/components/order/OrderDetailCard';
@@ -77,6 +76,8 @@ export default async function OrderDetailPage({
                 codes, // delivered codes decrypted above; empty until completed
                 subtotalThb: Number(order.subtotalThb),
                 vatAmountThb: Number(order.vatAmountThb),
+                vatEnabled: order.vatEnabled,
+                vatRate: order.vatRate,
                 totalAmountThb: Number(order.totalAmountThb),
                 customerEmail: order.customerEmail,
               }}
@@ -106,7 +107,6 @@ export default async function OrderDetailPage({
         </PageShell>
       </FacebookLayout>
 
-      <Footer />
     </>
   );
 }

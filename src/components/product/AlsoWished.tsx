@@ -33,6 +33,7 @@ export function AlsoWished({ items }: { items: WishRankedProduct[] }): React.JSX
               categoryName={product.category.name}
               categorySlug={product.category.slug}
               price={product.variants[0]?.price ?? 0}
+              promotion={product.variants[0]?.promotion}
               stock={product.variants.reduce((s, v) => s + v.stock, 0)}
               variantId={product.variants[0]?.id}
               variantCount={product.variants.length}
@@ -42,6 +43,7 @@ export function AlsoWished({ items }: { items: WishRankedProduct[] }): React.JSX
                 price: v.price,
                 effectivePrice: v.effectivePrice,
                 stock: v.stock,
+                promotion: v.promotion,
               }))}
             />
             <span

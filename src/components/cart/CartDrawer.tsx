@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { X, ShoppingCart } from 'lucide-react';
 import { cn } from '@/utils/cn';
@@ -9,6 +9,7 @@ import { CartItem } from './CartItem';
 import { CartSummary } from './CartSummary';
 import { EmptyCart } from './EmptyCart';
 import type { CartItemData } from '@/lib/cart';
+import { calculateVatFromInclusive } from '@/lib/pricing';
 
 export interface CartDrawerProps {
   isOpen: boolean;
@@ -34,6 +35,24 @@ export function CartDrawer({
 
   // Fade-out: keep mounted through the 250ms exit, then unmount for real.
   const [closing, setClosing] = useState(false);
+  const [vatConfig, setVatConfig] = useState({ enabled: false, rate: 0 });
+  const subtotal = useMemo(
+    () => items.reduce((sum, item) => sum + item.unitPriceThb * item.quantity, 0),
+    [items],
+  );
+  const vat = calculateVatFromInclusive(subtotal, vatConfig);
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/v1/orders/vat')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((config: { enabled?: boolean; rate?: number } | null) => {
+        if (!cancelled && config) {
+          setVatConfig({ enabled: config.enabled === true, rate: Number(config.rate) || 0 });
+        }
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, []);
   useEffect(() => {
     if (isOpen) setClosing(false);
   }, [isOpen]);
@@ -131,30 +150,11 @@ export function CartDrawer({
         {items.length > 0 && (
           <div className="border-t border-line-subtle p-4">
             <CartSummary
-              subtotal={items.reduce(
-                (sum, i) => Math.round((sum + i.unitPriceThb * i.quantity) * 100) / 100,
-                0,
-              )}
-              vat={items.reduce(
-                (sum, i) =>
-                  Math.round(
-                    (sum + Math.round(i.unitPriceThb * i.quantity * 0.07 * 100) / 100) * 100,
-                  ) / 100,
-                0,
-              )}
-              total={
-                items.reduce(
-                  (sum, i) => Math.round((sum + i.unitPriceThb * i.quantity) * 100) / 100,
-                  0,
-                ) +
-                items.reduce(
-                  (sum, i) =>
-                    Math.round(
-                      (sum + Math.round(i.unitPriceThb * i.quantity * 0.07 * 100) / 100) * 100,
-                    ) / 100,
-                  0,
-                )
-              }
+              subtotal={subtotal}
+              vat={vat}
+              total={subtotal}
+              vatEnabled={vatConfig.enabled}
+              vatRate={vatConfig.rate}
             />
 
             <div className="mt-4 space-y-2">

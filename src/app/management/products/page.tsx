@@ -415,7 +415,7 @@ export default function AdminProductsPage(): React.JSX.Element {
                           </div>
                         )}
                         <div>
-                          <p className="font-medium text-fg">{product.name}</p>
+                          <p className="whitespace-nowrap font-medium text-fg">{product.name}</p>
                           <p className="font-mono text-xs text-fg-placeholder">{product.slug}</p>
                           {/* One eye PER VARIANT, sitting under the name where
                               staff are already looking. A single row-level eye
@@ -753,11 +753,11 @@ function ProductEditor({
       const res = await adminFetch('/api/v1/admin/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dataUrl }),
+        body: JSON.stringify({ dataUrl, filename: file.name }),
       });
       if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(data.error ?? `HTTP ${res.status}`);
+        const data = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
+        throw new Error(data.message ?? data.error ?? `HTTP ${res.status}`);
       }
       const { path } = (await res.json()) as { path: string };
       setImageUrl(path);

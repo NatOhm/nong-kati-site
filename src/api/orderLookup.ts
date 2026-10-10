@@ -119,6 +119,8 @@ export async function sendOrderConfirmationEmail(
     })),
     subtotalThb: Number(order.subtotalThb),
     vatAmountThb: Number(order.vatAmountThb),
+    vatEnabled: order.vatEnabled,
+    vatRate: order.vatRate,
     totalAmountThb: Number(order.totalAmountThb),
     confirmationUrl,
   });

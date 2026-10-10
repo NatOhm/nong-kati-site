@@ -52,7 +52,10 @@ const COUPON_ERRORS: Record<string, string> = {
   EXPIRED: 'โค้ดนี้หมดอายุแล้ว',
   MIN_SPEND: 'ยอดซื้อไม่ถึงขั้นต่ำของโค้ดนี้',
   USAGE_LIMIT: 'โค้ดนี้ถูกใช้ครบจำนวนแล้ว',
+  PROMOTION_NOT_STACKABLE: 'ตะกร้านี้มีโปรโมชั่นอัตโนมัติแล้ว ไม่สามารถใช้โค้ดส่วนลดร่วมกันได้',
   INVALID: 'กรุณากรอกโค้ดส่วนลด',
+  NO_CODE: 'ไม่พบโค้ดส่วนลดที่ใช้ได้สำหรับคำสั่งซื้อนี้',
+  PREVIEW_FAILED: 'ไม่สามารถตรวจสอบโค้ดได้ กรุณาลองใหม่',
 };
 
 /**
@@ -93,9 +96,44 @@ export default function CheckoutPage(): React.JSX.Element {
     null,
   );
   const [couponMsg, setCouponMsg] = useState<string | null>(null);
+  const [pricingPreview, setPricingPreview] = useState<{
+    grossSubtotalThb: number;
+    promotionDiscountThb: number;
+    couponDiscountThb: number;
+    totalAmountThb: number;
+    vatAmountThb: number;
+    vatEnabled: boolean;
+    vatRate: number;
+  } | null>(null);
   const [walletBalanceThb, setWalletBalanceThb] = useState<number | null>(null);
   const [walletBusy, setWalletBusy] = useState(false);
   const [walletMsg, setWalletMsg] = useState<string | null>(null);
+
+  // Keep the displayed cart total on the same server pricing path as order
+  // creation, including tier pricing, automatic promotions, coupons, and VAT.
+  useEffect(() => {
+    if (!cart || cart.items.length === 0) {
+      setPricingPreview(null);
+      return;
+    }
+    const controller = new AbortController();
+    fetch('/api/v1/orders/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({
+        customerEmail: contactData?.email ?? '',
+        items: cart.items.map((item) => ({ variantId: item.variantId, quantity: item.quantity })),
+        ...(couponApplied?.code ? { couponCode: couponApplied.code } : {}),
+      }),
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((preview) => {
+        if (preview && !controller.signal.aborted) setPricingPreview(preview);
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [cart, couponApplied, contactData]);
 
   // Wallet balance — fetched once for logged-in customers (the wallet option
   // is hidden for guests; a 401 here just means no balance).
@@ -160,24 +198,35 @@ export default function CheckoutPage(): React.JSX.Element {
       });
   }, []);
 
-  // Validate + stage a coupon code (server check; applied on order create).
+  // Validate + stage a coupon code via the authoritative preview endpoint.
+  // This resolves tier/VAT/promotions/coupon/server totals in one call, so
+  // the displayed discount matches what order creation will persist.
   const handleApplyCoupon = useCallback(async () => {
     const code = couponInput.trim().toUpperCase();
     if (!code || !cart) return;
     setCouponMsg(null);
     try {
-      const res = await fetch('/api/v1/coupons/validate', {
+      const res = await fetch('/api/v1/orders/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, subtotalThb: cart.summary.subtotalThb }),
+        body: JSON.stringify({
+          customerEmail: '', // guest checkout — tier resolved from coupon customer if needed
+          items: cart.items.map((i) => ({ variantId: i.variantId, quantity: i.quantity })),
+          couponCode: code,
+        }),
       });
       const data = await res.json();
-      if (data?.ok) {
-        setCouponApplied({ code, discountThb: data.discountThb });
-        setCouponMsg(`ใช้โค้ด ${code} แล้ว — ลด ${formatThb(data.discountThb)}`);
+      if (data?.couponCheck?.ok) {
+        setCouponApplied({ code, discountThb: data.couponCheck.discountThb });
+        setCouponMsg(`ใช้โค้ด ${code} แล้ว — ลด ${formatThb(data.couponCheck.discountThb)}`);
+      } else if (data?.error?.code === 'PREVIEW_FAILED' || data?.couponCheck?.error === 'NO_CODE') {
+        const couponErrorKey: string = data?.couponCheck?.error ?? 'PREVIEW_FAILED';
+        setCouponApplied(null);
+        const fallbackMsg = COUPON_ERRORS['PREVIEW_FAILED'];
+        setCouponMsg(COUPON_ERRORS[couponErrorKey] ?? fallbackMsg ?? null);
       } else {
         setCouponApplied(null);
-        setCouponMsg(COUPON_ERRORS[data?.error as string] ?? 'โค้ดส่วนลดไม่ถูกต้อง');
+        setCouponMsg(COUPON_ERRORS[data?.couponCheck?.error as string] ?? 'โค้ดส่วนลดไม่ถูกต้อง');
       }
     } catch {
       setCouponMsg('ตรวจสอบโค้ดไม่สำเร็จ กรุณาลองใหม่');
@@ -648,7 +697,19 @@ export default function CheckoutPage(): React.JSX.Element {
 
         {/* Sidebar — Order Summary */}
         <div className="space-y-4">
-          {cart && cart.items.length > 0 && <OrderSummaryPanel items={cart.items} />}
+          {cart && cart.items.length > 0 && (
+            <OrderSummaryPanel
+              items={cart.items}
+              subtotalThb={order?.subtotalThb ?? pricingPreview?.grossSubtotalThb}
+              discountThb={order
+                ? order.discountThb + order.promotionDiscountThb
+                : (pricingPreview?.promotionDiscountThb ?? 0) + (pricingPreview?.couponDiscountThb ?? 0)}
+              vatAmountThb={order?.vatAmountThb ?? pricingPreview?.vatAmountThb}
+              totalAmountThb={order?.totalAmountThb ?? pricingPreview?.totalAmountThb}
+              vatEnabled={order?.vatEnabled ?? pricingPreview?.vatEnabled}
+              vatRate={order?.vatRate ?? pricingPreview?.vatRate}
+            />
+          )}
           <TrustBadgeRow />
         </div>
       </div>

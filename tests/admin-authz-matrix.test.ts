@@ -176,8 +176,10 @@ const ROUTE_COVERAGE: MatrixRow[] = [
   // customers
   { method: 'GET', path: '/customers', perm: 'customers:read' },
   { method: 'GET', path: '/customers/cust-1', perm: 'customers:read' },
+  { method: 'GET', path: '/customers/cust-1/history', perm: 'customers:read' },
   { method: 'PATCH', path: '/customers/cust-1', perm: 'customers:write', body: {} },
   { method: 'PATCH', path: '/customers/cust-1/block', perm: 'customers:block', body: {} },
+  { method: 'GET', path: '/customers/cust-1/history', perm: 'customers:read' },
   // dashboard — narrow dashboard:read, deliberately NOT reports:read, so the
   // dashboard does not double as a back door into Analytics & Reports.
   { method: 'GET', path: '/dashboard', perm: 'dashboard:read' },
@@ -186,7 +188,9 @@ const ROUTE_COVERAGE: MatrixRow[] = [
   { method: 'POST', path: '/inventory', perm: 'inventory:upload', body: {} },
   // orders
   { method: 'GET', path: '/orders', perm: 'orders:read' },
+  { method: 'GET', path: '/orders/search', perm: 'orders:read' },
   { method: 'GET', path: '/orders/ord-1', perm: 'orders:read' },
+  { method: 'GET', path: '/orders/ord-1/delivery', perm: 'orders:delivery:reveal' },
   {
     method: 'POST',
     path: '/orders/ord-1/verify-payment',
@@ -199,6 +203,8 @@ const ROUTE_COVERAGE: MatrixRow[] = [
     perm: 'orders:write',
     body: {},
   },
+  { method: 'GET', path: '/orders/search', perm: 'orders:read' },
+  { method: 'GET', path: '/orders/ord-1/delivery', perm: 'orders:delivery:reveal' },
   // record-only refund: 07-api.md §22. The gateway move happens in the
   // provider dashboard; this records it, voids codes and writes the audit row.
   {

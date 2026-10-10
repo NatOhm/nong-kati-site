@@ -1,12 +1,4 @@
-/**
- * Auth Types — RBAC permission registry.
- * 08-auth.md §7.1-7.3 — 6 roles, 35+ permissions.
- *
- * `as const` union per 18-coding.md §3.4 — enum keyword is banned project-wide.
- * Values match store.admin_role exactly (06-database.md §4).
- */
-
-// ─── Admin Roles ──────────────────────────────────────────
+/** Auth types: permission registry and route → permission map. */
 
 export const AdminRole = {
   SUPER_ADMIN: 'super_admin',
@@ -19,98 +11,69 @@ export const AdminRole = {
 
 export type AdminRole = (typeof AdminRole)[keyof typeof AdminRole];
 
-// ─── Permissions ──────────────────────────────────────────
-
 export const ALL_PERMISSIONS = [
-  // Products
   'products:read',
   'products:write',
   'products:publish',
   'products:delete',
-
-  // Categories
   'categories:read',
   'categories:write',
-
-  // Inventory
   'inventory:read',
   'inventory:upload',
   'inventory:void',
   'inventory:export',
   'inventory:reveal',
-
-  // Orders
   'orders:read',
   'orders:read:full',
   'orders:write',
   'orders:refund',
   'orders:export',
-
-  // Customers
+  'orders:delivery:reveal',
   'customers:read',
   'customers:read:full',
   'customers:block',
   'customers:write',
-
-  // Support tickets
   'tickets:read',
   'tickets:write',
-
-  // Wallet top-ups
   'topups:read',
-
-  // Reviews
   'reviews:read',
   'reviews:moderate',
-
-  // Coupons
   'coupons:read',
   'coupons:write',
   'coupons:delete',
-
-  // Promotions
   'promotions:read',
   'promotions:write',
   'promotions:delete',
-
-  // Dashboard
-  //
-  // Narrow, on purpose: the dashboard is the operational landing page, but it
-  // must not become a back door into Analytics & Reports. It used to require
-  // reports:read, which hid the menu entry (and then 403'd the page) for every
-  // role that does day-to-day work — catalogue/order/support managers.
   'dashboard:read',
-
-  // Reports
   'reports:read',
   'reports:export',
-
-  // Staff
   'staff:read',
   'staff:write',
   'staff:deactivate',
   'staff:reset-2fa',
-
-  // Audit
   'audit:read',
   'audit:export',
-
-  // Settings
   'settings:read',
   'settings:write',
-
-  // PDPA
   'pdpa:read',
   'pdpa:action',
 ] as const;
 
 export type Permission = (typeof ALL_PERMISSIONS)[number];
 
-// ─── Role → Permission Matrix ─────────────────────────────
+export interface AdminJwtPayload {
+  sub: string;
+  email: string;
+  role: AdminRole;
+  perms: Permission[];
+  iat: number;
+  exp: number;
+  jti: string;
+  passwordChangeRequired?: boolean;
+}
 
 export const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
   super_admin: ALL_PERMISSIONS as unknown as Permission[],
-
   catalogue_manager: [
     'products:read',
     'products:write',
@@ -124,30 +87,32 @@ export const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
     'inventory:export',
     'coupons:read',
     'coupons:write',
+    'coupons:delete',
     'promotions:read',
     'promotions:write',
+    'promotions:delete',
     'dashboard:read',
-    // Grants the Analytics & Reports section and nothing else — catalogue
-    // managers own stock decisions, and slow-moving stock is where they act.
     'reports:read',
+    'reports:export',
+    'customers:read',
+    'customers:block',
+    'customers:write',
   ],
-
   order_manager: [
+    'dashboard:read',
     'orders:read',
     'orders:read:full',
     'orders:write',
+    'orders:delivery:reveal',
     'orders:refund',
+    'orders:export',
     'customers:read',
     'customers:read:full',
     'customers:block',
     'customers:write',
-    'reviews:read',
-    'reviews:moderate',
-    'dashboard:read',
-    // Grants the Support section (tickets) and nothing else.
     'tickets:read',
+    'tickets:write',
   ],
-
   finance_viewer: [
     'orders:read',
     'orders:read:full',
@@ -156,9 +121,9 @@ export const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
     'reports:export',
     'dashboard:read',
   ],
-
   support_agent: [
     'orders:read',
+    'orders:delivery:reveal',
     'customers:read',
     'tickets:read',
     'tickets:write',
@@ -166,91 +131,75 @@ export const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
     'reviews:read',
     'dashboard:read',
   ],
-
   marketing_manager: [
     'products:read',
     'categories:read',
     'coupons:read',
     'coupons:write',
+    'coupons:delete',
     'promotions:read',
     'promotions:write',
+    'promotions:delete',
     'reports:read',
     'dashboard:read',
   ],
 };
 
-// ─── Admin JWT Payload ────────────────────────────────────
-
-export interface AdminJwtPayload {
-  sub: string; // admin UUID
-  email: string;
-  role: AdminRole;
-  perms: Permission[];
-  iat: number;
-  exp: number;
-  jti: string; // unique token ID
-  /**
-   * NOT part of the signed token. Set by `verifyAdminJwt` when `perms` was
-   * emptied because `mustChangePassword` is still pending, so callers can
-   * report the real reason instead of a misleading permission error.
-   */
-  passwordChangeRequired?: boolean;
-}
-
-// ─── Route → Permission Map ───────────────────────────────
-
+/**
+ * Route → permission map.
+ *
+ * Every entry must exist on disk with a matching `export async function
+ * <METHOD>`, or sit on the KNOWN_UNBUILT ratchet in
+ * tests/admin-stored-accounts.test.ts (delete each ratchet entry as it is
+ * built — a NEW gap fails that suite). Keep in sync with ROUTE_COVERAGE in
+ * tests/admin-authz-matrix.test.ts.
+ */
 export const ROUTE_PERMISSIONS: Record<string, Permission[]> = {
+  'GET /api/v1/admin/announcement': ['settings:read'],
+  'PUT /api/v1/admin/announcement': ['settings:write'],
+  'GET /api/v1/admin/audit-log': ['audit:read'],
+  'GET /api/v1/admin/categories': ['categories:read'],
+  'POST /api/v1/admin/categories': ['categories:write'],
+  'GET /api/v1/admin/coupons': ['coupons:read'],
+  'POST /api/v1/admin/coupons': ['coupons:write'],
+  'GET /api/v1/admin/customers': ['customers:read'],
+  'GET /api/v1/admin/customers/:id': ['customers:read'],
+  'GET /api/v1/admin/customers/:id/history': ['customers:read'],
+  'PATCH /api/v1/admin/customers/:id/block': ['customers:block'],
+  // ratchet: KNOWN_UNBUILT (tier picker not built)
+  'PATCH /api/v1/admin/customers/:id/tier': ['customers:write'],
+  'GET /api/v1/admin/dashboard': ['dashboard:read'],
+  // ratchet: KNOWN_UNBUILT (stats endpoint superseded by GET /dashboard)
+  'GET /api/v1/admin/dashboard/stats': ['dashboard:read'],
+  'GET /api/v1/admin/inventory': ['inventory:read'],
+  'POST /api/v1/admin/inventory': ['inventory:upload'],
+  // ratchet: KNOWN_UNBUILT (bulk code upload)
+  'POST /api/v1/admin/inventory/:id/upload': ['inventory:upload'],
+  // ratchet: KNOWN_UNBUILT (per-variant code generation)
+  'POST /api/v1/admin/inventory/:id/codes': ['inventory:upload'],
+  'GET /api/v1/admin/orders': ['orders:read'],
+  'GET /api/v1/admin/orders/:id': ['orders:read'],
+  'GET /api/v1/admin/orders/search': ['orders:read'],
+  'GET /api/v1/admin/orders/:id/delivery': ['orders:delivery:reveal'],
+  'POST /api/v1/admin/orders/:id/assign-code': ['orders:write'],
+  'POST /api/v1/admin/orders/:id/refund': ['orders:refund'],
+  'POST /api/v1/admin/orders/:id/resend-email': ['orders:write'],
+  'POST /api/v1/admin/orders/:id/verify-payment': ['orders:write'],
   'GET /api/v1/admin/products': ['products:read'],
   'POST /api/v1/admin/products': ['products:write'],
   'PUT /api/v1/admin/products/:id': ['products:write'],
-  'PATCH /api/v1/admin/products/:id/status': ['products:publish'],
-  'DELETE /api/v1/admin/products/:id': ['products:delete'],
-
-  'GET /api/v1/admin/categories': ['categories:read'],
-  'POST /api/v1/admin/categories': ['categories:write'],
-  'PUT /api/v1/admin/categories/:id': ['categories:write'],
-  'DELETE /api/v1/admin/categories/:id': ['categories:write'],
-
-  'GET /api/v1/admin/inventory': ['inventory:read'],
-  'POST /api/v1/admin/inventory/:id/upload': ['inventory:upload'],
-  'POST /api/v1/admin/inventory/:id/codes': ['inventory:upload'],
-  'PATCH /api/v1/admin/inventory/codes/:id/void': ['inventory:void'],
-  // Correcting an unsold account. `inventory:reveal`, not `inventory:write`:
-  // rewriting a stored credential is at least as sensitive as reading one, so
-  // the staff who paste but cannot read must not be able to alter what they
-  // cannot see.
-  'PATCH /api/v1/admin/inventory/codes/:id': ['inventory:reveal'],
-  'GET /api/v1/admin/inventory/codes/:id/reveal': ['inventory:reveal'],
-  // Masked listing that backs the "did my paste land?" view. Deliberately
-  // NOT reveal — reading the list must not hand out live credentials to
-  // everyone with inventory:read.
-  'GET /api/v1/admin/inventory/variants/:variantId/codes': ['inventory:read'],
-
-  'GET /api/v1/admin/orders': ['orders:read'],
-  'GET /api/v1/admin/orders/:id': ['orders:read'],
-  'POST /api/v1/admin/orders/:id/resend-email': ['orders:write'],
-  'POST /api/v1/admin/orders/:id/assign-code': ['orders:write'],
-  'POST /api/v1/admin/orders/:id/refund': ['orders:refund'],
-
-  'GET /api/v1/admin/customers': ['customers:read'],
-  'GET /api/v1/admin/customers/:id': ['customers:read'],
-  'PATCH /api/v1/admin/customers/:id/block': ['customers:block'],
-  'PATCH /api/v1/admin/customers/:id/tier': ['customers:write'],
-
+  'DELETE /api/v1/admin/products/:id': ['products:write'],
+  // ratchet: KNOWN_UNBUILT (status toggle endpoint)
+  'PATCH /api/v1/admin/products/:id/status': ['products:write'],
+  'GET /api/v1/admin/reports/customer-sales': ['reports:read'],
+  'GET /api/v1/admin/reports/customer-sales/export': ['reports:export'],
+  'GET /api/v1/admin/settings/vat': ['settings:read'],
+  'PUT /api/v1/admin/settings/vat': ['settings:write'],
   'GET /api/v1/admin/staff': ['staff:read'],
-  'POST /api/v1/admin/staff': ['staff:write'],
+  // ratchet: KNOWN_UNBUILT (role change)
   'PATCH /api/v1/admin/staff/:id/role': ['staff:write'],
+  // ratchet: KNOWN_UNBUILT (deactivate)
   'PATCH /api/v1/admin/staff/:id/deactivate': ['staff:deactivate'],
-
-  'GET /api/v1/admin/dashboard/stats': ['products:read'],
+  'GET /api/v1/admin/tickets': ['tickets:read'],
+  'GET /api/v1/admin/topups': ['topups:read'],
 };
-
-// ─── Admin Account Status ─────────────────────────────────
-
-export const AdminAccountStatus = {
-  ACTIVE: 'active',
-  DEACTIVATED: 'deactivated',
-  LOCKED: 'locked',
-} as const;
-
-export type AdminAccountStatus = (typeof AdminAccountStatus)[keyof typeof AdminAccountStatus];

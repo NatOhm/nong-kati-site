@@ -400,8 +400,9 @@ export default function AdminManualPage(): React.JSX.Element {
             </li>
             <li>คัดลอกจากไฟล์ Excel/Notion วางตรง ๆ ได้ ไม่ต้องแก้รูปแบบ</li>
             <li>
-              สต๊อกใกล้หมด → ระบบแจ้งเตือนใน <strong>Discord</strong> ตั้งค่าได้ที่{' '}
-              <strong>ตั้งค่า</strong>
+              Discord จะเริ่มส่งการแจ้งเตือนเมื่อผู้ดูแลระบบตั้ง{' '}
+              <code>NK_DISCORD_WEBHOOK_URL</code> ใน server environment; หน้า{' '}
+              <strong>ตั้งค่า</strong> ปรับ threshold ได้และไม่แสดง secret
             </li>
           </ul>
 

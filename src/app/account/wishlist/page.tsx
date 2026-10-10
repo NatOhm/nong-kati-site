@@ -21,7 +21,7 @@ interface WishProduct {
   shortDescription: string | null;
   imageUrl: string | null;
   category: { name: string; slug: string };
-  variants: { id: string; label: string; price: number; effectivePrice: number; stock: number }[];
+  variants: { id: string; label: string; price: number; effectivePrice: number; stock: number; promotion?: { name: string; originalPriceThb: number; discountedPriceThb: number; expiresAt: string | null } }[];
 }
 
 export default function WishlistPage(): React.JSX.Element {
@@ -78,6 +78,7 @@ export default function WishlistPage(): React.JSX.Element {
               categoryName={p.category.name}
               categorySlug={p.category.slug}
               price={p.variants[0]?.effectivePrice ?? 0}
+              promotion={p.variants[0]?.promotion}
               stock={p.variants.reduce((sum, v) => sum + v.stock, 0)}
               variantId={p.variants[0]?.id}
               variantCount={p.variants.length}

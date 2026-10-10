@@ -16,6 +16,9 @@ export interface CartItemData {
   thumbnailUrl: string | null;
   denominationThb: number;
   unitPriceThb: number;
+  originalUnitPriceThb?: number;
+  promotionName?: string;
+  promotionExpiresAt?: string | null;
   vatAmountThb: number;
   quantity: number;
   lineTotalThb: number;
@@ -67,7 +70,13 @@ export function clearSessionKey(): void {
 
 /**
  * Calculate cart summary from items.
- * Server-side re-validation happens at checkout; this is client-side display only.
+ * Client-side display only. Prices are VAT-inclusive (matching the server-side
+ * authoritative calculation). VAT is shown as informational only; the actual
+ * VAT component is derived server-side from the final charge.
+ *
+ * When VAT is disabled or the rate is unknown client-side, VAT is shown as 0
+ * and the total equals the subtotal. The server will recompute VAT correctly
+ * at checkout (see src/lib/promotions.ts calculateReconciledOrderPricing).
  */
 export function calculateCartSummary(items: CartItemData[]): CartSummary {
   let subtotalThb = 0;
@@ -79,8 +88,11 @@ export function calculateCartSummary(items: CartItemData[]): CartSummary {
     itemCount += item.quantity;
   }
 
-  const vatAmountThb = Math.round(subtotalThb * 0.07 * 100) / 100;
-  const totalAmountThb = Math.round((subtotalThb + vatAmountThb) * 100) / 100;
+  // Prices are VAT-inclusive. The cart summary shows subtotal = total when
+  // VAT breakdown is not available client-side. The server derives the VAT
+  // component from the final charge at checkout.
+  const vatAmountThb = 0;
+  const totalAmountThb = subtotalThb;
 
   return {
     subtotalThb,

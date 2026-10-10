@@ -27,6 +27,8 @@ export interface InvoiceData {
   }>;
   subtotalThb: number;
   vatAmountThb: number;
+  vatEnabled: boolean;
+  vatRate: number;
   totalAmountThb: number;
   createdAt: string;
   // Tax invoice specific
@@ -168,7 +170,7 @@ function generateReceiptHtml(data: InvoiceData): string {
 
       <div class="total">
         <p>ยอดรวม: ${formatThb(data.subtotalThb)}</p>
-        <p>VAT 7%: ${formatThb(data.vatAmountThb)}</p>
+        ${data.vatEnabled ? `<p>VAT ${(data.vatRate * 100).toLocaleString('th-TH')}%: ${formatThb(data.vatAmountThb)}</p>` : ''}
         <p>รวมทั้งสิ้น: ${formatThb(data.totalAmountThb)}</p>
       </div>
 
@@ -251,7 +253,7 @@ function generateTaxInvoiceHtml(data: InvoiceData): string {
 
       <div class="total">
         <p>ยอดรวม (ก่อน VAT): ${formatThb(data.subtotalThb)}</p>
-        <p>VAT 7%: ${formatThb(data.vatAmountThb)}</p>
+        ${data.vatEnabled ? `<p>VAT ${(data.vatRate * 100).toLocaleString('th-TH')}%: ${formatThb(data.vatAmountThb)}</p>` : ''}
         <p>รวมทั้งสิ้น: ${formatThb(data.totalAmountThb)}</p>
       </div>
     </body>

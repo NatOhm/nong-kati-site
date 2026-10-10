@@ -6,11 +6,11 @@ import { FacebookLayout } from '@/components/layout/FacebookLayout';
 import { SiteMascot } from '@/components/ui/SiteMascot';
 
 export const dynamic = 'force-dynamic';
-import { Footer } from '@/components/layout/Footer';
 import { PageShell } from '@/components/layout/PageShell';
 import { Breadcrumb } from '@/components/data-display/Breadcrumb';
 import { TrustBadgeRow } from '@/components/checkout/TrustBadgeRow';
 import { OrderStatusBadge } from '@/components/order/OrderStatusBadge';
+import { CodeBlock } from '@/components/order/CodeBlock';
 import { getOrderByConfirmationUuid } from '@/api/orders';
 import { getAvailableCodeCount } from '@/lib/delivery/reservation';
 import { getDeliveredCodes } from '@/lib/delivery/customerCodes';
@@ -107,15 +107,12 @@ export default async function ConfirmationPage({
 
                 <div className="space-y-3">
                   {deliveredCodes.map((delivered, idx) => (
-                    <div
+                    <CodeBlock
                       key={`${delivered.code}-${idx}`}
-                      className="rounded-md border border-line-brand bg-surface p-4"
-                    >
-                      <p className="mb-2 text-sm text-fg-muted">
-                        {delivered.productName} ฿{delivered.denomination.toLocaleString('th-TH')}
-                      </p>
-                      <p className="font-mono text-sm font-bold text-fg-brand">{delivered.code}</p>
-                    </div>
+                      code={delivered.code}
+                      productName={delivered.productName}
+                      denomination={delivered.denomination}
+                    />
                   ))}
                   {deliveredCodes.length === 0 && (
                     <div className="rounded-md border border-line-brand bg-surface p-4">
@@ -158,10 +155,12 @@ export default async function ConfirmationPage({
                   <span>ยอดรวม</span>
                   <span>{formatThb(order.subtotalThb)}</span>
                 </div>
-                <div className="flex items-center justify-between text-sm text-fg-muted">
-                  <span>VAT 7%</span>
-                  <span>{formatThb(order.vatAmountThb)}</span>
-                </div>
+                {order.vatEnabled && (
+                  <div className="flex items-center justify-between text-sm text-fg-muted">
+                    <span>VAT {(order.vatRate * 100).toLocaleString('th-TH')}% (รวมในราคา)</span>
+                    <span>{formatThb(order.vatAmountThb)}</span>
+                  </div>
+                )}
                 <div className="mt-2 flex items-center justify-between border-t border-line-subtle pt-2">
                   <span className="font-bold text-fg">รวมทั้งสิ้น</span>
                   <span className="text-lg font-bold text-fg-brand">
@@ -209,7 +208,6 @@ export default async function ConfirmationPage({
         </PageShell>
       </FacebookLayout>
 
-      <Footer />
     </>
   );
 }

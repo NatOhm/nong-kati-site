@@ -8,10 +8,33 @@
  *
  * SERVER-ONLY: imports Prisma. Client code must go through
  * /api/v1/orders — never import this from a client component.
+ *
+ * Pricing semantics (Codex-approved, 2026-10-07):
+ *  - Prices are VAT-inclusive storefront prices.
+ *  - VAT is DERIVED from the final VAT-inclusive charge, never added on top.
+ *  - Order.subtotalThb = gross tier-price subtotal BEFORE any promotion/coupon.
+ *  - Order.promotionDiscountThb = aggregate automatic-promotion discount.
+ *  - Order.discountThb = coupon discount.
+ *  - Order.totalAmountThb = max(0, subtotalThb - promotionDiscountThb - discountThb).
+ *  - VAT component is derived from totalAmountThb via calculateVatFromInclusive().
+ *  - Per-line promotion evidence is snapshot on OrderItem (no FK, survives deletion).
+ *  - originalUnitPriceThb = resolved tier price BEFORE promotion.
+ *  - unitPriceThb on OrderItem = effective post-promotion unit price.
  */
 
 import { prisma } from '@/lib/db';
-import { generateOrderNumber, normalizeTier, tierPrice } from '@/lib/pricing';
+import {
+  generateOrderNumber,
+} from '@/lib/pricing';
+import {
+  getVatConfig,
+  getEligiblePromotions,
+  calculateReconciledOrderPricing,
+  PersistedOrderItemSnapshot,
+  resolveOrderPricing,
+  checkCoupon,
+} from '@/lib/promotions';
+import type { CouponCheck } from '@/lib/promotions';
 import { mintSlipUploadToken } from '@/lib/slipSecurity';
 
 export interface OrderItem {
@@ -27,6 +50,18 @@ export interface OrderItem {
   unitVatAmount: number;
   lineTotalThb: number;
   deliveryStatus: string;
+  // Final line fields after coupon allocation (Blocker 1 — new schema fields).
+  couponDiscountThb: number;
+  finalLineTotalThb: number;
+  finalLineExVat: number;
+  finalLineVatAmount: number;
+  // Promotion evidence snapshot (historical record — survives promotion edit/delete).
+  originalUnitPriceThb: number;
+  appliedPromotionId: string | null;
+  promotionName: string | null;
+  promotionType: string | null;
+  promotionValue: number | null;
+  promotionDiscountThb: number;
 }
 
 export interface Order {
@@ -39,7 +74,10 @@ export interface Order {
   paymentMethod: string | null;
   items: OrderItem[];
   subtotalThb: number;
+  promotionDiscountThb: number;
   vatAmountThb: number;
+  vatEnabled: boolean;
+  vatRate: number;
   discountThb: number;
   totalAmountThb: number;
   requiresTaxInvoice: boolean;
@@ -95,6 +133,10 @@ interface DbOrderItem {
   unitVatAmount: unknown;
   lineTotalThb: unknown;
   deliveryStatus: string;
+  couponDiscountThb: unknown;
+  finalLineTotalThb: unknown;
+  finalLineExVat: unknown;
+  finalLineVatAmount: unknown;
 }
 
 interface DbOrder {
@@ -106,7 +148,10 @@ interface DbOrder {
   status: string;
   paymentMethod: string | null;
   subtotalThb: unknown;
+  promotionDiscountThb?: unknown;
   vatAmountThb: unknown;
+  vatEnabled?: boolean;
+  vatRate?: unknown;
   discountThb: unknown;
   totalAmountThb: unknown;
   requiresTaxInvoice: boolean;
@@ -126,22 +171,44 @@ function mapOrder(o: DbOrder): Order {
     customerPhone: o.customerPhone,
     status: o.status,
     paymentMethod: o.paymentMethod,
-    items: o.items.map((i) => ({
-      id: i.id,
-      variantId: i.variantId,
-      productNameTh: i.productNameTh,
-      productNameEn: i.productNameEn,
-      skuCode: i.skuCode,
-      denominationThb: Number(i.denominationThb),
-      quantity: i.quantity,
-      unitPriceThb: Number(i.unitPriceThb),
-      unitPriceExVat: Number(i.unitPriceExVat),
-      unitVatAmount: Number(i.unitVatAmount),
-      lineTotalThb: Number(i.lineTotalThb),
-      deliveryStatus: i.deliveryStatus,
-    })),
+    items: o.items.map((i) => {
+      const _i = i as {
+        couponDiscountThb?: number; finalLineTotalThb?: number;
+        finalLineExVat?: number; finalLineVatAmount?: number;
+        originalUnitPriceThb?: number; appliedPromotionId?: string | null;
+        promotionName?: string | null; promotionType?: string | null;
+        promotionValue?: number | null; promotionDiscountThb?: number;
+      };
+      return {
+        id: i.id,
+        variantId: i.variantId,
+        productNameTh: i.productNameTh,
+        productNameEn: i.productNameEn,
+        skuCode: i.skuCode,
+        denominationThb: Number(i.denominationThb),
+        quantity: i.quantity,
+        unitPriceThb: Number(i.unitPriceThb),
+        unitPriceExVat: Number(i.unitPriceExVat),
+        unitVatAmount: Number(i.unitVatAmount),
+        lineTotalThb: Number(i.lineTotalThb),
+        deliveryStatus: i.deliveryStatus,
+        couponDiscountThb: Number(_i.couponDiscountThb ?? 0),
+        finalLineTotalThb: Number(_i.finalLineTotalThb ?? i.lineTotalThb),
+        finalLineExVat: Number(_i.finalLineExVat ?? 0),
+        finalLineVatAmount: Number(_i.finalLineVatAmount ?? 0),
+        originalUnitPriceThb: Number(_i.originalUnitPriceThb ?? 0),
+        appliedPromotionId: _i.appliedPromotionId ?? null,
+        promotionName: _i.promotionName ?? null,
+        promotionType: _i.promotionType ?? null,
+        promotionValue: _i.promotionValue != null ? Number(_i.promotionValue) : null,
+        promotionDiscountThb: Number(_i.promotionDiscountThb ?? 0),
+      };
+    }),
     subtotalThb: Number(o.subtotalThb),
+    promotionDiscountThb: Number(o.promotionDiscountThb ?? 0),
     vatAmountThb: Number(o.vatAmountThb),
+    vatEnabled: o.vatEnabled === true,
+    vatRate: Number(o.vatRate ?? 0),
     discountThb: Number(o.discountThb ?? 0),
     totalAmountThb: Number(o.totalAmountThb),
     requiresTaxInvoice: o.requiresTaxInvoice,
@@ -154,38 +221,9 @@ function mapOrder(o: DbOrder): Order {
 
 const orderInclude = { items: true } as const;
 
-// ─── Coupon validation (server-authoritative) ────────────
-
-export interface CouponCheck {
-  ok: boolean;
-  discountThb: number;
-  error?: 'NOT_FOUND' | 'INACTIVE' | 'NOT_STARTED' | 'EXPIRED' | 'MIN_SPEND' | 'USAGE_LIMIT';
-  couponId?: string;
-}
-
-export async function checkCoupon(code: string, subtotalThb: number): Promise<CouponCheck> {
-  const coupon = await prisma.coupon.findUnique({ where: { code: code.toUpperCase() } });
-  if (!coupon || !coupon.isActive) return { ok: false, discountThb: 0, error: 'INACTIVE' };
-  const now = new Date();
-  if (coupon.startsAt && coupon.startsAt > now)
-    return { ok: false, discountThb: 0, error: 'NOT_STARTED' };
-  if (coupon.expiresAt && coupon.expiresAt < now)
-    return { ok: false, discountThb: 0, error: 'EXPIRED' };
-  if (coupon.usageLimit !== null && coupon.usageCount >= coupon.usageLimit) {
-    return { ok: false, discountThb: 0, error: 'USAGE_LIMIT' };
-  }
-  // Per-customer limit checked at creation for UX (the authoritative check
-  // is at the payment claim — see claimOrderForConfirmation).
-  const min = Number(coupon.minSpendThb ?? 0);
-  if (min > 0 && subtotalThb < min) return { ok: false, discountThb: 0, error: 'MIN_SPEND' };
-
-  const value = Number(coupon.discountValue);
-  const discountThb =
-    coupon.discountType === 'percent'
-      ? Math.min(Math.round(subtotalThb * (value / 100) * 100) / 100, subtotalThb)
-      : Math.min(value, subtotalThb);
-  return { ok: true, discountThb, couponId: coupon.id };
-}
+// Re-export coupon check from the shared promotions module.
+export { checkCoupon } from '@/lib/promotions';
+export type { CouponCheck } from '@/lib/promotions';
 
 /**
  * HTTP status for a createOrder failure code. Lives here (not the route) so
@@ -208,6 +246,115 @@ export function orderErrorStatus(code: string): number {
   }
 }
 
+// ─── Order preview (shared pricing contract with createOrder) ──
+
+/**
+ * Preview-order output: the same totals and per-line snapshots that
+ * createOrder would persist, minus any write. This shares the exact same
+ * pricing engine as createOrder so preview/order parity is structural, not
+ * approximate.
+ */
+export interface PreviewOrderResult {
+  grossSubtotalThb: number;
+  promotionDiscountThb: number;
+  couponDiscountThb: number;
+  totalAmountThb: number;
+  vatAmountThb: number;
+  vatEnabled: boolean;
+  vatRate: number;
+  couponCheck: CouponCheck;
+  items: Array<{
+    variantId: string;
+    quantity: number;
+    tierUnitPriceThb: number;
+    unitPriceThb: number;
+    unitPriceExVat: number;
+    unitVatAmount: number;
+    promotionDiscountThb: number;
+    couponDiscountThb: number;
+    finalLineTotalThb: number;
+    finalLineExVat: number;
+    finalLineVatAmount: number;
+    originalUnitPriceThb: number;
+    appliedPromotionId: string | null;
+    promotionName: string | null;
+    promotionType: string | null;
+    promotionValue: number | null;
+  }>;
+}
+
+/**
+ * Server-side order preview: resolve tier, VAT, promotions, coupon, and
+ * item snapshots through the shared resolver (same code path as createOrder)
+ * without any database writes. Used by the checkout page so displayed totals
+ * and coupon eligibility match what order creation will persist.
+ */
+export async function previewOrder(input: {
+  customerEmail: string;
+  customerId?: string | null;
+  items: { variantId: string; quantity: number }[];
+  couponCode?: string;
+}): Promise<PreviewOrderResult> {
+  if (input.customerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.customerEmail)) {
+    throw new Error('INVALID_EMAIL');
+  }
+  if (!input.items || input.items.length === 0) throw new Error('CART_EMPTY');
+
+  // Go through the shared resolver — same variant/tier/quantity/promotion/
+  // coupon code path as createOrderInner, just without the write.
+  const resolved = await resolveOrderPricing(
+    { items: input.items, customerId: input.customerId, couponCode: input.couponCode },
+    prisma,
+  );
+
+  const pricing = calculateReconciledOrderPricing(
+    [...resolved.quantityMap.entries()].map(([variantId, qty]) => {
+      const item = resolved.itemInputs.find((i) => i.variantId === variantId)!;
+      const v = resolved.byId.get(variantId)!;
+      return {
+        variantId,
+        quantity: qty,
+        tierUnitPriceThb: item.unitPriceThb,
+        productNameTh: item.productNameTh,
+        productNameEn: item.productNameEn,
+        skuCode: v.label,
+      };
+    }),
+    resolved.vatConfig,
+    resolved.promotionResults,
+    resolved.couponDiscountThb,
+  );
+
+  return {
+    grossSubtotalThb: pricing.grossSubtotalThb,
+    promotionDiscountThb: pricing.promotionDiscountThb,
+    couponDiscountThb: pricing.couponDiscountThb,
+    totalAmountThb: pricing.totalAmountThb,
+    vatAmountThb: pricing.vatAmountThb,
+    vatEnabled: resolved.vatConfig.enabled,
+    vatRate: resolved.vatConfig.rate,
+    couponCheck: resolved.couponCheck,
+    items: pricing.items.map((s) => ({
+      variantId: s.variantId,
+      quantity: s.quantity,
+      tierUnitPriceThb: s.denominationThb,
+      unitPriceThb: s.unitPriceThb,
+      unitPriceExVat: s.unitPriceExVat,
+      unitVatAmount: s.unitVatAmount,
+      promotionDiscountThb: s.promotionDiscountThb,
+      couponDiscountThb: s.couponDiscountThb,
+      finalLineTotalThb: s.finalLineTotalThb,
+      finalLineExVat: s.finalLineExVat,
+      finalLineVatAmount: s.finalLineVatAmount,
+      originalUnitPriceThb: s.originalUnitPriceThb,
+      appliedPromotionId: s.appliedPromotionId,
+      promotionName: s.promotionName,
+      promotionType: s.promotionType,
+      promotionValue: s.promotionValue,
+    })),
+  };
+}
+
 // ─── Create order ────────────────────────────────────────
 
 /**
@@ -223,162 +370,158 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
   if (!input.items || input.items.length === 0) throw new Error('CART_EMPTY');
 
   const variantIds = input.items.map((i) => i.variantId);
-  const variants = await prisma.productVariant.findMany({
-    where: { id: { in: variantIds }, isActive: true },
-    include: { product: true },
-  });
-  const byId = new Map(variants.map((v) => [v.id, v]));
 
-  let subtotal = 0;
-  const rows: {
-    variantId: string;
-    productNameTh: string;
-    productNameEn: string;
-    skuCode: string;
-    denominationThb: number;
-    quantity: number;
-    unitPriceThb: number;
-    unitPriceExVat: number;
-    unitVatAmount: number;
-    lineTotalThb: number;
-  }[] = [];
-
-  // Tier-aware pricing: resolve the tier from input.customerId (set by the
-  // route from the session cookie — never from the client body).
-  let tier: 'retail' | 'member' | 'dealer' = 'retail';
-  if (input.customerId) {
-    const customer = await prisma.customer.findUnique({
-      where: { id: input.customerId },
-      select: { tier: true },
-    });
-    if (customer) tier = normalizeTier(customer.tier);
-  }
-
-  for (const item of input.items) {
-    const v = byId.get(item.variantId);
-    if (!v) throw new Error('VARIANT_NOT_FOUND');
-    if (!Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 50) {
-      throw new Error('INVALID_QUANTITY');
-    }
-    // Client report 2026-10-01: a persisted cart (or a direct API call) could
-    // order a variant whose stock hit 0 after the item was added — the UI
-    // disables it but createOrder never re-checked. Reject before any write;
-    // the fulfilment-time GiftCode guard stays as the second line of defense.
-    if (v.stock < item.quantity) {
-      throw new Error('OUT_OF_STOCK');
-    }
-
-    const unit = tierPrice(Number(v.price), tier, {
-      memberPrice: v.memberPrice != null ? Number(v.memberPrice) : null,
-      dealerPrice: v.dealerPrice != null ? Number(v.dealerPrice) : null,
-    });
-    const exVat = Math.round((unit / 1.07) * 100) / 100;
-    const vatAmount = Math.round((unit - exVat) * 100) / 100;
-    const lineTotal = Math.round(unit * item.quantity * 100) / 100;
-    subtotal = Math.round((subtotal + lineTotal) * 100) / 100;
-
-    rows.push({
-      variantId: v.id,
-      productNameTh: v.product.name,
-      productNameEn: v.product.name,
-      skuCode: v.label,
-      denominationThb: unit,
-      quantity: item.quantity,
-      unitPriceThb: unit,
-      unitPriceExVat: exVat,
-      unitVatAmount: vatAmount,
-      lineTotalThb: lineTotal,
-    });
-  }
-
-  // VAT-inclusive pricing: VAT is derived from the subtotal, not added on top.
-  const vat = Math.round((subtotal - Math.round((subtotal / 1.07) * 100) / 100) * 100) / 100;
-
-  // Coupon (optional) — validated against the subtotal.
-  let discount = 0;
-  let couponId: string | null = null;
-  let couponCode: string | null = null;
-  let couponError: string | null = null;
-  if (input.couponCode) {
-    const check = await checkCoupon(input.couponCode, subtotal);
-    if (check.ok && check.couponId) {
-      discount = check.discountThb;
-      couponId = check.couponId;
-      couponCode = input.couponCode.toUpperCase();
-    } else {
-      couponError = check.error ?? 'INACTIVE';
-    }
-  }
-
-  const total = Math.max(Math.round((subtotal - discount) * 100) / 100, 0);
-
-  // Order number allocation. The count-based seed is only a starting point:
-  // concurrent checkouts can all pass the old lookup-then-insert together, so
-  // the insert itself retries on the orderNumber unique violation (P2002)
-  // with the next candidate. The unique constraint is the source of truth.
-  const count = await prisma.order.count();
-  let created: DbOrder | null = null;
-  for (let attempt = 0; attempt < 5 && !created; attempt++) {
-    const orderNumber = generateOrderNumber(count + 1 + attempt);
+  // All authoritative reads and the write happen inside one Serializable
+  // transaction so price, tier, VAT, promotion eligibility, coupon state,
+  // and stock cannot change between calculation and persistence. The entire
+  // transaction is retried on serialization failure (P2034) — the established
+  // project pattern from tests/admin-refund.test.ts and
+  // tests/wallet-coupon-race.test.ts. Retry is NOT scoped to tx.order.create()
+  // because any database error inside the transaction aborts it.
+  //
+  // Order-number collision is handled by trying successive sequence numbers
+  // inside each attempt (not by re-running the whole transaction), so a
+  // duplicate only wastes one attempt rather than a full recalculation.
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 5; attempt++) {
     try {
-      created = (await prisma.order.create({
-        data: {
-          orderNumber,
-          customerId: input.customerId ?? null,
-          customerEmail: input.customerEmail,
-          customerPhone: input.customerPhone ?? null,
-          status: 'pending_payment',
-          paymentMethod: input.paymentMethod,
-          subtotalThb: subtotal,
-          vatAmountThb: vat,
-          discountThb: discount,
-          totalAmountThb: total,
-          couponId,
-          lineOptIn: input.lineOptIn,
-          marketingOptIn: input.marketingOptIn,
-          tosAcceptedAt: new Date(),
-          tosVersion: input.tosVersion,
-          requiresTaxInvoice: input.requiresTaxInvoice,
-          taxInvoiceName: input.taxInvoiceName ?? null,
-          taxInvoiceTaxId: input.taxInvoiceTaxId ?? null,
-          confirmationUuid: crypto.randomUUID(),
-          items: { create: rows },
+      const result = await prisma.$transaction(
+        async (tx) => {
+          const result = await createOrderInner(input, tx);
+          return result;
         },
-        include: orderInclude,
-      })) as unknown as DbOrder;
+        { isolationLevel: 'Serializable' },
+      );
+      return result;
     } catch (err) {
-      // P2002 = unique constraint. orderNumber is the only realistically
-      // colliding key here (confirmationUuid is a fresh UUID), so retry with
-      // the next candidate number; anything else is a real failure.
+      lastError = err;
       if (
         attempt < 4 &&
         typeof err === 'object' &&
         err !== null &&
+        (err as { code?: string }).code === 'P2034' ||
         (err as { code?: string }).code === 'P2002'
       ) {
+        // serialization failure (P2034) or order-number collision (P2002)
+        // — retry the whole transaction; the inner loop tries 5 sequence
+        // numbers per attempt so a single collision wastes one attempt.
         continue;
       }
       throw err;
     }
   }
-  if (!created) {
-    throw new Error('ORDER_NUMBER_ALLOCATION_FAILED');
-  }
-
-  return {
-    order: mapOrder(created),
-    discountThb: discount,
-    couponCode,
-    couponError,
-    // Capability token for slip upload (finding: order ID alone must not
-    // authorize replacing payment evidence). Only the checkout response of
-    // the creating customer receives it.
-    slipUploadToken: mintSlipUploadToken(created.id, created.confirmationUuid),
-  };
+  throw lastError;
 }
 
-// ─── Lookups ─────────────────────────────────────────────
+/**
+ * Inner order-creation body, run inside a Serializable transaction.
+ * Everything the order needs (variants, tier, VAT, promotions, coupon,
+ * stock, and the write) happens here against `tx`.
+ */
+async function createOrderInner(
+  input: CreateOrderInput,
+  tx: import('@prisma/client').Prisma.TransactionClient,
+): Promise<CreateOrderResult> {
+  if (!input.tosAccepted) throw new Error('TOS_NOT_ACCEPTED');
+  if (!input.customerEmail || !/^[^s@]+@[^s@]+.[^s@]+$/.test(input.customerEmail)) {
+    throw new Error('INVALID_EMAIL');
+  }
+  if (!input.items || input.items.length === 0) throw new Error('CART_EMPTY');
 
+  // Go through the shared resolver — same variant/tier/quantity/promotion/
+  // coupon code path as previewOrder, just inside the transaction.
+  const resolved = await resolveOrderPricing(
+    { items: input.items, customerId: input.customerId, couponCode: input.couponCode },
+    tx,
+  );
+
+  const pricing = calculateReconciledOrderPricing(
+    [...resolved.quantityMap.entries()].map(([variantId, qty]) => {
+      const item = resolved.itemInputs.find((i) => i.variantId === variantId)!;
+      const v = resolved.byId.get(variantId)!;
+      return {
+        variantId,
+        quantity: qty,
+        tierUnitPriceThb: item.unitPriceThb,
+        productNameTh: item.productNameTh,
+        productNameEn: item.productNameEn,
+        skuCode: v.label,
+      };
+    }),
+    resolved.vatConfig,
+    resolved.promotionResults,
+    resolved.couponDiscountThb,
+  );
+
+  const count = await tx.order.count();
+  // Try successive order numbers; a duplicate key (P2002) on one attempt
+  // wastes only that attempt, not the whole transaction. If all 5 numbers
+  // collide the P2002 bubbles up to the outer retry (Blocker 6).
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const orderNumber = generateOrderNumber(count + 1 + attempt);
+    try {
+      const created = (await tx.order.create({
+        data: {
+          orderNumber, customerId: input.customerId ?? null,
+          customerEmail: input.customerEmail, customerPhone: input.customerPhone ?? null,
+          status: 'pending_payment', paymentMethod: input.paymentMethod,
+          subtotalThb: pricing.grossSubtotalThb,
+          promotionDiscountThb: pricing.promotionDiscountThb,
+          discountThb: pricing.couponDiscountThb,
+          vatAmountThb: pricing.vatAmountThb, totalAmountThb: pricing.totalAmountThb,
+          vatEnabled: resolved.vatConfig.enabled, vatRate: resolved.vatConfig.rate,
+          couponId: resolved.couponCheck.couponId ?? null,
+          lineOptIn: input.lineOptIn, marketingOptIn: input.marketingOptIn,
+          tosAcceptedAt: new Date(), tosVersion: input.tosVersion,
+          requiresTaxInvoice: input.requiresTaxInvoice,
+          taxInvoiceName: input.taxInvoiceName ?? null, taxInvoiceTaxId: input.taxInvoiceTaxId ?? null,
+          confirmationUuid: crypto.randomUUID(),
+          items: {
+            create: pricing.items.map((s) => ({
+              variantId: s.variantId,
+              productNameTh: s.productNameTh,
+              productNameEn: s.productNameEn,
+              skuCode: s.skuCode,
+              denominationThb: s.denominationThb,
+              quantity: s.quantity,
+              unitPriceThb: s.unitPriceThb,
+              unitPriceExVat: s.unitPriceExVat,
+              unitVatAmount: s.unitVatAmount,
+              lineTotalThb: s.finalLineTotalThb,
+              originalUnitPriceThb: s.originalUnitPriceThb,
+              appliedPromotionId: s.appliedPromotionId,
+              promotionName: s.promotionName,
+              promotionType: s.promotionType,
+              promotionValue: s.promotionValue,
+              promotionDiscountThb: s.promotionDiscountThb,
+              couponDiscountThb: s.couponDiscountThb,
+              finalLineTotalThb: s.finalLineTotalThb,
+              finalLineExVat: s.finalLineExVat,
+              finalLineVatAmount: s.finalLineVatAmount,
+              deliveryStatus: 'pending',
+            })),
+          },
+        },
+        include: orderInclude,
+      })) as unknown as DbOrder;
+      return {
+        order: mapOrder(created), discountThb: pricing.couponDiscountThb,
+        couponCode: resolved.couponCheck.ok ? (input.couponCode?.toUpperCase() ?? null) : null,
+        couponError: resolved.couponCheck.ok ? null : (resolved.couponCheck.error ?? 'INACTIVE'),
+        slipUploadToken: mintSlipUploadToken(created.id, created.confirmationUuid),
+      };
+    } catch (err) {
+      // P2002 (unique constraint on orderNumber) — try the next sequence
+      // number. Do NOT catch other errors here; they must propagate so the
+      // outer retry (which now also covers P2002) can handle them.
+      if (attempt < 4 && typeof err === 'object' && err !== null && (err as { code?: string }).code === 'P2002') {
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error('ORDER_NUMBER_ALLOCATION_FAILED');
+}
 export async function getOrderByConfirmationUuid(uuid: string): Promise<Order | null> {
   const o = await prisma.order.findUnique({
     where: { confirmationUuid: uuid },

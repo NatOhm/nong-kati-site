@@ -1,32 +1,25 @@
 /**
  * Pricing Utilities — Server-authoritative price calculation.
  * 01-prd.md FR-050: All amounts computed server-side; client display is advisory only.
- * 01-prd.md FR-052: VAT = round(subtotal × 0.07, 2); Total = subtotal + VAT
+ * Configured VAT is informational within VAT-inclusive displayed prices; it is never added on top.
  *
  * All monetary values are NUMERIC(10,2) — 2 decimal places, Thai Baht.
  *
- * VAT is configurable: shop-wide setting (default 7%, disabled initially).
- * Consumer prices remain VAT-inclusive when VAT is enabled.
+ * VAT configuration is passed explicitly to pure money functions.
+ * No mutable module-global state — safe for serverless/parallel execution.
  */
 
-let vatRate = 0.07;
-let vatEnabled = false;
-
-/** Configure VAT rate and enabled state (called from settings). */
-export function configureVat(rate: number, enabled: boolean): void {
-  vatRate = rate;
-  vatEnabled = enabled;
+/** Immutable VAT configuration. */
+export interface VatConfig {
+  enabled: boolean;
+  rate: number; // fraction, e.g. 0.07 for 7%
 }
 
-/** Get current VAT rate (returns 0 if disabled). */
-export function getVatRate(): number {
-  return vatEnabled ? vatRate : 0;
-}
-
-/** Check if VAT is enabled. */
-export function isVatEnabled(): boolean {
-  return vatEnabled;
-}
+/** Default VAT config (disabled). */
+export const DEFAULT_VAT_CONFIG: VatConfig = {
+  enabled: false,
+  rate: 0,
+};
 
 // ─── Price tiers (ราคาปลีก vs สมาชิก vs ตัวแทนจำหน่าย) ──────────
 
@@ -64,24 +57,30 @@ export function tierPrice(
 /**
  * Calculate VAT amount from a VAT-inclusive price.
  * @param inclusivePrice - The price including VAT (e.g. 107.00)
+ * @param config - VAT configuration (enabled flag and rate as fraction)
  * @returns VAT amount rounded to 2 decimal places
  */
-export function calculateVatFromInclusive(inclusivePrice: number): number {
-  const rate = getVatRate();
-  if (rate === 0) return 0;
-  const exVat = inclusivePrice / (1 + rate);
+export function calculateVatFromInclusive(
+  inclusivePrice: number,
+  config: VatConfig = DEFAULT_VAT_CONFIG,
+): number {
+  if (!config.enabled || config.rate <= 0) return 0;
+  const exVat = inclusivePrice / (1 + config.rate);
   return Math.round((inclusivePrice - exVat) * 100) / 100;
 }
 
 /**
  * Calculate ex-VAT price from a VAT-inclusive price.
  * @param inclusivePrice - The price including VAT
+ * @param config - VAT configuration (enabled flag and rate as fraction)
  * @returns Price excluding VAT
  */
-export function calculateExVat(inclusivePrice: number): number {
-  const rate = getVatRate();
-  if (rate === 0) return inclusivePrice;
-  const exVat = inclusivePrice / (1 + rate);
+export function calculateExVat(
+  inclusivePrice: number,
+  config: VatConfig = DEFAULT_VAT_CONFIG,
+): number {
+  if (!config.enabled || config.rate <= 0) return inclusivePrice;
+  const exVat = inclusivePrice / (1 + config.rate);
   return Math.round(exVat * 100) / 100;
 }
 
@@ -89,12 +88,12 @@ export function calculateExVat(inclusivePrice: number): number {
  * Calculate VAT from a subtotal (ex-VAT).
  * FR-052: VAT = round(subtotal × rate, 2)
  * @param subtotal - Ex-VAT subtotal
+ * @param config - VAT configuration (enabled flag and rate as fraction)
  * @returns VAT amount
  */
-export function calculateVat(subtotal: number): number {
-  const rate = getVatRate();
-  if (rate === 0) return 0;
-  return Math.round(subtotal * rate * 100) / 100;
+export function calculateVat(subtotal: number, config: VatConfig = DEFAULT_VAT_CONFIG): number {
+  if (!config.enabled || config.rate <= 0) return 0;
+  return Math.round(subtotal * config.rate * 100) / 100;
 }
 
 /**
@@ -121,7 +120,10 @@ export interface OrderSummary {
   itemCount: number;
 }
 
-export function calculateOrderSummary(items: OrderSummaryInput[]): OrderSummary {
+export function calculateOrderSummary(
+  items: OrderSummaryInput[],
+  vatConfig: VatConfig = DEFAULT_VAT_CONFIG,
+): OrderSummary {
   let subtotal = 0;
   let itemCount = 0;
 
@@ -131,7 +133,7 @@ export function calculateOrderSummary(items: OrderSummaryInput[]): OrderSummary 
     itemCount += item.quantity;
   }
 
-  const vat = calculateVat(subtotal);
+  const vat = calculateVat(subtotal, vatConfig);
   const total = calculateTotal(subtotal, vat);
 
   return {

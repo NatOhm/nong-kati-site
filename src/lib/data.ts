@@ -7,6 +7,7 @@ import { cache } from 'react';
 
 import { prisma } from '@/lib/db';
 import { normalizeTier, tierPrice, type PriceTier } from '@/lib/pricing';
+import { getEligiblePromotions } from '@/lib/promotions';
 
 // ─── Tier-aware price resolution ──────────────────────
 
@@ -60,6 +61,12 @@ export interface ProductVariant {
   stock: number;
   isActive: boolean;
   sortOrder: number;
+  promotion?: {
+    name: string;
+    originalPriceThb: number;
+    discountedPriceThb: number;
+    expiresAt: string | null;
+  };
 }
 
 export interface ProductItem {
@@ -327,6 +334,41 @@ function mapProduct(
   };
 }
 
+/** Attach only unconditional product-page promotion prices; cart thresholds are
+ * evaluated against the whole eligible cart by the authoritative preview. */
+async function decoratePromotionPrices(products: ProductItem[]): Promise<ProductItem[]> {
+  if (products.length === 0) return products;
+  const promotions = (await getEligiblePromotions(products.map((product) => product.id)))
+    .filter((promotion) => promotion.minSpendThb === null || promotion.minSpendThb <= 0);
+  if (promotions.length === 0) return products;
+  return products.map((product) => ({
+    ...product,
+    variants: product.variants.map((variant) => {
+      const applicable = promotions.filter((promotion) =>
+        promotion.scope === 'all' || promotion.productIds.includes(product.id),
+      );
+      const candidates = applicable.map((promotion) => {
+        const original = variant.effectivePrice;
+        const discounted = promotion.discountType === 'percent'
+          ? Math.round(original * (1 - promotion.discountValue / 100) * 100) / 100
+          : Math.round((original - promotion.discountValue) * 100) / 100;
+        return { promotion, original, discounted };
+      }).filter((candidate) => candidate.discounted > 0 && candidate.discounted < candidate.original);
+      candidates.sort((a, b) => a.discounted - b.discounted);
+      const best = candidates[0];
+      return best ? {
+        ...variant,
+        promotion: {
+          name: best.promotion.name,
+          originalPriceThb: best.original,
+          discountedPriceThb: best.discounted,
+          expiresAt: best.promotion.expiresAt?.toISOString() ?? null,
+        },
+      } : variant;
+    }),
+  }));
+}
+
 // ─── Catalog ordering (review finding #3, 2026-10-05) ───
 
 /**
@@ -444,7 +486,7 @@ export async function getFeaturedProducts(): Promise<ProductItem[]> {
   });
 
   const tier = await resolveTier();
-  return products.map((p) => mapProduct(p, p.category, tier));
+  return decoratePromotionPrices(products.map((p) => mapProduct(p, p.category, tier)));
 }
 
 export async function getProductsByCategory(
@@ -489,10 +531,10 @@ export async function getProductsByCategory(
   const rowById = new Map(rows.map((r) => [r.id, r]));
 
   return {
-    products: pageIds
+    products: await decoratePromotionPrices(pageIds
       .map((id) => rowById.get(id))
       .filter((r): r is NonNullable<typeof r> => Boolean(r))
-      .map((p) => mapProduct(p, p.category, tier)),
+      .map((p) => mapProduct(p, p.category, tier))),
     total,
   };
 }
@@ -509,7 +551,7 @@ export async function getProductBySlug(slug: string): Promise<ProductItem | null
   });
 
   if (!p) return null;
-  return mapProduct(p, p.category, await resolveTier());
+  return (await decoratePromotionPrices([mapProduct(p, p.category, await resolveTier())]))[0] ?? null;
 }
 
 export async function getAllProductSlugs(): Promise<string[]> {
@@ -597,10 +639,10 @@ export async function getCatalogProducts(
   const rowById = new Map(rows.map((r) => [r.id, r]));
 
   return {
-    products: pageIds
+    products: await decoratePromotionPrices(pageIds
       .map((id) => rowById.get(id))
       .filter((r): r is NonNullable<typeof r> => Boolean(r))
-      .map((p) => mapProduct(p, p.category, tier)),
+      .map((p) => mapProduct(p, p.category, tier))),
     total,
   };
 }
@@ -639,7 +681,7 @@ export async function searchProducts(
   ]);
 
   return {
-    products: products.map((p) => mapProduct(p, p.category, tier)),
+    products: await decoratePromotionPrices(products.map((p) => mapProduct(p, p.category, tier))),
     total,
     query: trimmed,
   };
@@ -689,9 +731,9 @@ export async function getWishlistProducts(customerId: string): Promise<ProductIt
     },
   });
   const tier = await resolveTier();
-  return wishes
+  return decoratePromotionPrices(wishes
     .filter((w) => w.product.isActive)
-    .map((w) => mapProduct(w.product, w.product.category, tier));
+    .map((w) => mapProduct(w.product, w.product.category, tier)));
 }
 
 /** Ids the customer has wished — for heart states on cards. */
@@ -739,7 +781,8 @@ export async function getMostWishedProducts(
     },
   });
   const tier = await resolveTier();
-  const byId = new Map(products.map((p) => [p.id, mapProduct(p, p.category, tier)]));
+  const decorated = await decoratePromotionPrices(products.map((p) => mapProduct(p, p.category, tier)));
+  const byId = new Map(decorated.map((p) => [p.id, p]));
   return ranked.flatMap((r) => {
     const product = byId.get(r.productId);
     return product ? [{ product, wishCount: r._count.productId }] : [];
