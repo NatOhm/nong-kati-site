@@ -188,6 +188,102 @@ describe('pricing persistence — seven-blocker coverage', () => {
     );
   });
 
+  // Regression (2026-10-10, CI run 38031541054): createOrderInner's copy of
+  // the email guard lost its backslashes during the round-3 refactor
+  // (`[^s@]` instead of `[^\s@]`), so any local part containing the letter
+  // "s" was rejected INSIDE the transaction — after createOrder's own
+  // correct check had already passed — rolling the order back. The browser
+  // smoke walks `smoke+<ts>@nong-kati.test`, so guest checkout died on
+  // step 1 while unit suites kept passing on `a@b.co`. The email below is
+  // deliberately the exact CI shape: plus-address, digits, letter "s",
+  // hyphenated `.test` domain.
+  it('createOrder accepts a plus-addressed local part containing "s" (inner email-guard regression)', async () => {
+    const tx = makeTx({
+      siteSetting: { findUnique: vi.fn(async () => null) }, // VAT off
+      order: {
+        count: vi.fn(async () => 0),
+        create: vi.fn(async () => ({
+          id: 'o1',
+          orderNumber: 'NK-2026-000001',
+          confirmationUuid: 'u1',
+          customerEmail: 'smoke+1791615442225@nong-kati.test',
+          customerPhone: null,
+          status: 'pending_payment',
+          paymentMethod: 'promptpay',
+          subtotalThb: 100,
+          vatAmountThb: 0,
+          discountThb: 0,
+          totalAmountThb: 100,
+          requiresTaxInvoice: false,
+          taxInvoiceName: null,
+          taxInvoiceTaxId: null,
+          manualFulfilmentReason: null,
+          createdAt: new Date('2026-10-01T00:00:00Z'),
+          items: [
+            {
+              id: 'i1',
+              variantId: 'v1',
+              productNameTh: 'Test Product',
+              productNameEn: 'Test Product',
+              skuCode: 'SKU-001',
+              denominationThb: 100,
+              quantity: 1,
+              unitPriceThb: 100,
+              unitPriceExVat: 100,
+              unitVatAmount: 0,
+              lineTotalThb: 100,
+              deliveryStatus: 'pending',
+              couponDiscountThb: 0,
+              finalLineTotalThb: 100,
+              finalLineExVat: 100,
+              finalLineVatAmount: 0,
+              originalUnitPriceThb: 100,
+              appliedPromotionId: null,
+              promotionName: null,
+              promotionType: null,
+              promotionValue: null,
+              promotionDiscountThb: 0,
+            },
+          ],
+        })),
+      },
+    });
+
+    vi.doMock('@/lib/db', () => ({
+      prisma: {
+        $transaction: vi.fn(async (fn: (tx: TxMock) => Promise<unknown>) => {
+          return typeof fn === 'function' ? await fn(tx) : null;
+        }),
+      },
+    }));
+    vi.doMock('@/lib/slipSecurity', () => ({
+      mintSlipUploadToken: vi.fn(() => 'tok'),
+    }));
+
+    const { createOrder } = await import('@/api/orders');
+    const input = {
+      paymentMethod: 'promptpay' as const,
+      tosAccepted: true,
+      tosVersion: '1.0',
+      lineOptIn: false,
+      marketingOptIn: false,
+      requiresTaxInvoice: false,
+      items: [{ variantId: 'v1', quantity: 1 }],
+    };
+
+    // With the mangled guard this rejected INVALID_EMAIL after the variant
+    // resolution, rolling the whole transaction back.
+    await expect(createOrder({ ...input, customerEmail: 'smoke+1791615442225@nong-kati.test' })).resolves.toMatchObject(
+      { order: { status: 'pending_payment' } },
+    );
+
+    // The guard still denies genuinely malformed addresses (thrown up-front,
+    // before any transaction work).
+    await expect(createOrder({ ...input, customerEmail: 'not-an-email' })).rejects.toThrow(
+      'INVALID_EMAIL',
+    );
+  });
+
   // ── Blocker 5: VAT reconciliation with 7% VAT, multi-line ──
 
   it('allocates order VAT across lines in satang so line VAT sums to order VAT (7%)', async () => {

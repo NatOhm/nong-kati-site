@@ -30,6 +30,19 @@ export const RATE_LIMIT_RULES: RateLimitRule[] = [
   { route: '/api/v1/cart', maxRequests: 60, windowMs: 60_000, keyBy: 'ip' },
 
   // Checkout / Orders
+  // The checkout READS fire alongside order creation and must not share its
+  // strict bucket: the pricing-preview POST goes out on every cart/coupon
+  // change and the VAT config is fetched on mount (plus product/cart
+  // surfaces). Prefix-matching them onto the 10/min creation rule made the
+  // real POST /api/v1/orders answer 429 mid-checkout once the round-3
+  // preview call was added — caught by the Browser Smoke gate (CI run
+  // 38031541054 follow-up): three earlier tests plus the checkout page's own
+  // calls exhausted the shared bucket before the order could be placed.
+  // Order CREATION stays at 10/min, and _order_velocity_ip (30/24h) still
+  // caps true order velocity underneath. Order matters: findMatchingRule
+  // takes the first prefix hit, so the specific reads must come first.
+  { route: '/api/v1/orders/preview', maxRequests: 60, windowMs: 60_000, keyBy: 'ip' },
+  { route: '/api/v1/orders/vat', maxRequests: 60, windowMs: 60_000, keyBy: 'ip' },
   { route: '/api/v1/orders', maxRequests: 10, windowMs: 60_000, keyBy: 'ip' },
 
   // Auth (per-IP; per-account brute force is additionally covered by the

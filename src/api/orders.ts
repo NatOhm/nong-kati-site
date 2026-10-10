@@ -423,7 +423,7 @@ async function createOrderInner(
   tx: import('@prisma/client').Prisma.TransactionClient,
 ): Promise<CreateOrderResult> {
   if (!input.tosAccepted) throw new Error('TOS_NOT_ACCEPTED');
-  if (!input.customerEmail || !/^[^s@]+@[^s@]+.[^s@]+$/.test(input.customerEmail)) {
+  if (!input.customerEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.customerEmail)) {
     throw new Error('INVALID_EMAIL');
   }
   if (!input.items || input.items.length === 0) throw new Error('CART_EMPTY');

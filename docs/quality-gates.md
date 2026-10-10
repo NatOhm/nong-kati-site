@@ -48,6 +48,7 @@
 | PP    | Pricing persistence — coupon/VAT allocation, preview parity, promotion snapshots | `tests/pricing-persistence.test.ts` | `npm test` (vitest) | Unit Tests |
 | PS    | Promotion percent/fixed discounts, timing/scope/minimum-spend, and no coupon stacking; coupon-only checkout remains available | `tests/promotion-stacking.test.ts` | `npm test` (vitest) | Unit Tests |
 | VD    | VAT inclusive display, disabled state, configurable rate | `tests/vat-display.test.ts` | `npm test` (vitest) | Unit Tests |
+| RL2   | Rate-limit rule table — checkout reads (`orders/preview`, `orders/vat`) ต้องมี bucket ของตัวเอง 60/min ไม่ให้ share กับ rule สร้างออเดอร์ 10/min (มิฉะนั้น preview ที่ยิงทุกครั้งที่แก้ตะกร้าจะทำให้ `POST /orders` จริงโดน 429 กลาง checkout — คว่ำโดย Browser Smoke gate) + rule เฉพาะต้องอยู่ เหนือ rule รวม ในตาราง เพราะ prefix match เจอตัวแรกก่อน | `tests/rate-limit-rules.test.ts` | `npm test` (vitest) | Unit Tests |
 | IU    | Admin image upload 5 MB byte limit, dimensions, and pixel-area limits | `tests/image-upload-validation.test.ts` | `npm test` (vitest) | Unit Tests |
 | DS    | Discord webhook is environment-only; legacy DB value is ignored | `tests/discord-secret-config.test.ts` | `npm test` (vitest) | Unit Tests |
 | SI    | Store contact settings persist a configurable HTTPS LINE URL | `tests/store-info-settings.test.ts` | `npm test` (vitest) | Unit Tests |
