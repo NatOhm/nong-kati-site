@@ -23,7 +23,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { RATE_LIMIT_RULES, type RateLimitRule } from '@/lib/rateLimit';
+import { getClientIp, RATE_LIMIT_RULES, type RateLimitRule } from '@/lib/rateLimit';
 
 /** Same lookup middleware/lib use: exact route, then first prefix hit. */
 function matchingRule(route: string): RateLimitRule | undefined {
@@ -68,5 +68,52 @@ describe('rate-limit rules — checkout reads vs order creation', () => {
         genericIndex,
       );
     }
+  });
+});
+
+// ─── getClientIp — rightmost X-Forwarded-For trust ──────────
+// MEDIUM-1: taking the first entry trusts a client-spoofable value.
+// Hostatom nginx appends via proxy_add_x_forwarded_for, so the
+// rightmost entry is the real client IP.
+
+function mkReq(headers: Record<string, string>): Request {
+  return new Request('http://localhost/api/v1/test', { headers });
+}
+
+describe('getClientIp — X-Forwarded-For trust model', () => {
+  it('returns the rightmost entry when nginx appends to a client-set header', () => {
+    // Client spoofs "1.1.1.1" → nginx appends the real IP "203.0.113.1"
+    const req = mkReq({ 'x-forwarded-for': '1.1.1.1, 203.0.113.1' });
+    expect(getClientIp(req)).toBe('203.0.113.1');
+  });
+
+  it('handles multiple proxy hops (rightmost is the nearest trusted hop)', () => {
+    const req = mkReq({ 'x-forwarded-for': 'spoof, proxy-a, proxy-b, 203.0.113.1' });
+    expect(getClientIp(req)).toBe('203.0.113.1');
+  });
+
+  it('falls back to x-real-ip when x-forwarded-for is missing', () => {
+    const req = mkReq({ 'x-real-ip': '203.0.113.1' });
+    expect(getClientIp(req)).toBe('203.0.113.1');
+  });
+
+  it('falls back to "unknown" when both headers are missing', () => {
+    const req = mkReq({});
+    expect(getClientIp(req)).toBe('unknown');
+  });
+
+  it('trims whitespace from entries', () => {
+    const req = mkReq({ 'x-forwarded-for': ' 1.1.1.1 ,  203.0.113.1 ' });
+    expect(getClientIp(req)).toBe('203.0.113.1');
+  });
+
+  it('rejects an empty x-forwarded-for and falls back to x-real-ip', () => {
+    const req = mkReq({ 'x-forwarded-for': '', 'x-real-ip': '203.0.113.1' });
+    expect(getClientIp(req)).toBe('203.0.113.1');
+  });
+
+  it('rejects a commas-only x-forwarded-for', () => {
+    const req = mkReq({ 'x-forwarded-for': ' , , ', 'x-real-ip': '203.0.113.1' });
+    expect(getClientIp(req)).toBe('203.0.113.1');
   });
 });

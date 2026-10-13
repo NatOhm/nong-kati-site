@@ -177,3 +177,72 @@ describe('CRITICAL-1 — no bare JSON.stringify may render into a script tag', (
     expect(src).not.toContain('dangerouslySetInnerHTML={{ __html: JSON.stringify(');
   });
 });
+
+describe('2026-10-12 — an itemless order must never be claimed as paid', () => {
+  /**
+   * Production contained 13 orders with zero OrderItem rows and one of them
+   * had been flipped to `completed`. These pin both halves of the fix: the
+   * claim refuses such rows (behaviour), and it does so because the `where`
+   * carries an items filter (static — a mocked DB cannot assert the SQL).
+   */
+  it('behaviour: a claim the DB rejects because the order has no items returns null and stops', async () => {
+    // The DB reports 0 rows matched: `pending_payment` but no `items` to match
+    // `items: { some: {} }`.
+    txMock.order.updateMany.mockResolvedValue({ count: 0 });
+
+    const claimed = await claimOrderForConfirmation('ord-empty', TX);
+
+    expect(claimed).toBeNull();
+    // It must stop at the claim — no coupon, redemption or status work.
+    expect(txMock.coupon.findUnique).not.toHaveBeenCalled();
+    expect(txMock.couponRedemption.create).not.toHaveBeenCalled();
+    expect(txMock.order.update).not.toHaveBeenCalled();
+  });
+
+  it('behaviour: an order WITH items still claims normally (guard does not over-block)', async () => {
+    seedClaimOrder(null, null);
+    txMock.order.updateMany.mockResolvedValue({ count: 1 });
+
+    const claimed = await claimOrderForConfirmation('ord-1', TX);
+
+    expect(claimed).not.toBeNull();
+    expect(txMock.order.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ items: { some: {} } }),
+      }),
+    );
+  });
+
+  it('static: the claim filter requires at least one item, and orders cannot be created empty', async () => {
+    const fs = await import('node:fs');
+    const src = fs.readFileSync('src/api/orders.ts', 'utf8');
+
+    // The claim's updateMany where-clause carries the items filter.
+    expect(src).toContain('items: { some: {} }');
+
+    // createOrder still rejects an empty cart before any row is written, so
+    // this guard is defence in depth and never the only line of defence.
+    expect(src).toContain("throw new Error('CART_EMPTY')");
+  });
+});
+
+describe('2026-10-12 — createOrder retry predicate is scoped by attempt', () => {
+  it('static: the retryable-code check is parenthesised so `attempt < 4` guards BOTH arms', async () => {
+    const fs = await import('node:fs');
+    const src = fs.readFileSync('src/api/orders.ts', 'utf8');
+
+    // Before the fix the catch read `attempt < 4 && … P2034 || … P2002`.
+    // `&&` binds tighter than `||`, so that parsed as
+    //   (attempt < 4 && … P2034) || (… P2002)
+    // and the P2002 arm ignored `attempt < 4` entirely. Worse, the guard only
+    // ever applied to the P2034 arm, so a non-retryable error carrying either
+    // code could be retried on every iteration. The fix groups the two code
+    // comparisons so the attempt guard covers both.
+    expect(src).toMatch(/\(\(err as \{ code\?: string \}\)\.code === 'P2034' \|\|/);
+
+    // The un-parenthesised form must not come back.
+    expect(src).not.toMatch(
+      /typeof err === 'object' &&\s*err !== null &&\s*\(err as \{ code\?: string \}\)\.code === 'P2034' \|\|/,
+    );
+  });
+});

@@ -18,7 +18,7 @@
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { applyRateLimit } from '@/lib/rateLimit';
+import { applyRateLimit, getClientIp } from '@/lib/rateLimit';
 import { CSRF_COOKIE_NAME, generateCsrfToken } from '@/lib/adminCsrf';
 
 const isDev = process.env.NODE_ENV === 'development';
@@ -99,10 +99,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   // adminLogin. Only API routes are limited.
   let limited: NextResponse | null = null;
   if (pathname.startsWith('/api/')) {
-    const ip =
-      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-      request.headers.get('x-real-ip') ??
-      'unknown';
+    const ip = getClientIp(request);
     limited = await applyRateLimit(pathname, ip);
     limited.headers.set('X-RateLimit-Scoped-By', 'ip');
     if (limited.status === 429) {

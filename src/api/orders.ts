@@ -395,12 +395,18 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
       return result;
     } catch (err) {
       lastError = err;
+      // NOTE: the parentheses below are load-bearing. `&&` binds tighter than
+      // `||`, so an un-parenthesised form would evaluate as
+      // `(attempt < 4 && … P2034) || (… P2002)` — which drops the attempt guard
+      // from the P2002 arm and, worse, lets ANY error whose `code` happens to be
+      // P2002/P2034 look retryable on every iteration. Non-retryable errors must
+      // surface on the first catch rather than being retried 5x.
       if (
         attempt < 4 &&
         typeof err === 'object' &&
         err !== null &&
-        (err as { code?: string }).code === 'P2034' ||
-        (err as { code?: string }).code === 'P2002'
+        ((err as { code?: string }).code === 'P2034' ||
+          (err as { code?: string }).code === 'P2002')
       ) {
         // serialization failure (P2034) or order-number collision (P2002)
         // — retry the whole transaction; the inner loop tries 5 sequence
@@ -609,8 +615,21 @@ export async function claimOrderForConfirmation(
   opts?: { paidExternally?: boolean },
 ): Promise<Order | null> {
   const db = tx ?? prisma;
+
+  // Defence in depth (2026-10-12): an itemless order must never be claimed as
+  // paid. Production already contained 13 such rows (Sep 22, all with zero
+  // OrderItem rows), and one of them had been flipped to `completed` — a paid-
+  // for order with nothing to deliver. `createOrder` cannot produce one (the
+  // nested `items.create` runs in the same transaction, so a failure rolls the
+  // whole order back), so this only ever trips on rows written outside that
+  // path. Refusing the claim keeps the order in `pending_payment` where an
+  // operator can see and resolve it, instead of silently completing it.
   const claimed = await db.order.updateMany({
-    where: { id: orderId, status: 'pending_payment' },
+    where: {
+      id: orderId,
+      status: 'pending_payment',
+      items: { some: {} },
+    },
     data: { status: 'payment_confirmed' },
   });
   if (claimed.count !== 1) return null;

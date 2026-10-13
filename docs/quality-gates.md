@@ -35,6 +35,7 @@
 | RL    | Customer resend-email cap (3/order/hour, no quota burn on a failed email match) | `tests/customer-resend-rate-limit.test.ts` | `npm test` (vitest) | Unit Tests |
 | AR    | Admin resend-email — error contract (EMAIL_SEND_FAILED, not a transport string) | `tests/admin-resend-email.test.ts` | `npm test` (vitest) | Unit Tests |
 | CE    | CI env secrets meet the minimums the code enforces | `tests/ci-env-secrets.test.ts`   | `npm test` (vitest)  | Unit Tests             |
+| RG    | Respan gateway + tracing config — one key, one endpoint, routing fields only when asked | `tests/respan-gateway-config.test.ts` | `npm test` (vitest) | Unit Tests |
 | NB    | Navbar layout — nav keeps natural width, search yields (no one-glyph-per-line Thai) | `tests/navbar-layout-gates.test.ts` | `npm test` (vitest) | Unit Tests             |
 | CK    | Combobox keyboard — arrow nav, aria-activedescendant, Enter fallthrough (WCAG 2.1.1) | `tests/combobox-keyboard.test.ts` | `npm test` (vitest) + `e2e/smoke.spec.ts` | Unit Tests + Browser Smoke |
 | NV    | Admin sidebar IA — 17 items → 7 sections, narrow `dashboard:read`, route preservation | `tests/admin-nav-sections.test.ts` | `npm test` (vitest) | Unit Tests |
@@ -653,3 +654,14 @@ job นี้แดงมาตั้งแต่รอบที่ 88 และ
 - [ ] export ใหม่ที่โหลดไฟล์ออกจากระบบ → ผ่าน formula-injection guard (`isFormulaInjection`)
 
 **ปิดแล้วเดิม:** route `POST /api/v1/admin/settings/email-test` (ปุ่ม Test connection ของ Email settings) พร้อมครบตาม checklist — row ใน `ROUTE_COVERAGE` (perm `settings:write`), SSRF guard ที่ `probeSmtp` + แบน localhost ใน route, audit `settings.email_test` (เก็บแค่ผล per-step ไม่มี credential) — คลุมด้วย `tests/admin-email-test.test.ts` (fake SMTP server ต่อ TCP จริง + route guard/override/fallback)
+
+## Respan gateway + tracing (2026-10-13) — `tests/respan-gateway-config.test.ts`
+
+Respan ทำให้ทุกโมเดลวิ่งผ่าน endpoint เดียว (`https://api.respan.ai/api/`) และใช้ `RESPAN_API_KEY` ตัวเดียวทั้ง **gateway** (routing + fallback + cache + spend limit) และ **tracing** — `src/lib/ai/respan.ts` ห่อ OpenAI SDK ที่ Respan instrument ให้ ทุก span มี input/output, latency, tokens, cost ส่วน config ล้วนอยู่ใน `src/lib/ai/respanConfig.ts` ที่ไม่ import SDK เลย จึงเทสต์ได้โดยไม่ต้องมี key หรือ network
+
+- **base URL ผิด = เงียบทั้งระบบ:** ถ้า endpoint พิมพ์ผิดหรือเผลอใช้ `/v1` ทุก call จะไม่ผ่าน gateway เลย ทำให้ fallback/cache/spend limit/trace ไม่ทำงาน แต่ error ที่ได้หน้าตาเหมือน LLM error ธรรมดา — gate จึงตรึงค่าเริ่มต้น `https://api.respan.ai/api/` และรองรับ `RESPAN_BASE_URL` เฉพาะ Respan Enterprise (trim ก่อนใช้)
+- **key ว่าง = ยังไม่ตั้ง (fail closed):** `RESPAN_API_KEY` ที่เป็นช่องว่างหรือ whitespace ถือว่า "ไม่ตั้ง" — `isRespanConfigured()` ต้อง false และ `getRespanGatewayClient()` / `getRespanTracer()` จะ throw พร้อมชื่อ env var แทนการยิง request ที่จะได้ 401
+- **ห้ามส่ง field ที่ไม่ได้สั่ง:** `buildRespanParams()` map `fallbackModels` → `fallback_models`, `cache` → `cache_enabled` (+`cache_ttl`), `customerIdentifier` → `customer_identifier`, `threadIdentifier` → `thread_identifier`, `metadata` → `metadata`; โดยเฉพาะ `fallbackModels: []` **ต้องไม่ถูกส่ง** เพราะจะไปล้าง fallback chain ระดับ org ที่ตั้งไว้ใน dashboard (docs: `/docs/documentation/features/gateway/retries`)
+- **spend limit ไม่ใช่ field ต่อ request:** ตั้งที่ API key (Gateway › API keys) และ budget ต่อลูกค้า (Observability › Users & identifiers) — โค้ดมีหน้าที่ส่ง `customer_identifier` ให้ถูกเพื่อให้ budget นั้นมีผล
+- **ทดสอบส่วนที่แตะ SDK แยกออก:** `src/lib/ai/respan.ts` (import `openai` + `@respan/respan`) ไม่ถูก import ในเทสต์นี้ — ยืนยันด้วย live gateway request ตาม step 5 ของ Respan docs ซึ่งต้องมี `RESPAN_API_KEY` (ต้องติดตั้ง `openai` + `@respan/respan` ก่อน)
+- **วิธีแก้เมื่อแดง:** แก้ที่ `src/lib/ai/respanConfig.ts` ให้ตรงกับ Respan docs (`/docs/integrations/gateway/open-ai-sdk`) อย่าแก้เทสต์ให้ตามโค้ดที่ผิด

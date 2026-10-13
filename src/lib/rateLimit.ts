@@ -75,6 +75,7 @@ type WindowEntry = {
 };
 
 const store = new Map<string, WindowEntry>();
+const MAX_STORE_SIZE = 10_000;
 
 // Cleanup expired entries every 5 minutes
 if (typeof setInterval !== 'undefined') {
@@ -86,6 +87,23 @@ if (typeof setInterval !== 'undefined') {
       }
     }
   }, 300_000);
+}
+
+/** Evict expired entries; if still over limit, clear oldest entries. */
+function evictIfNeeded(): void {
+  if (store.size < MAX_STORE_SIZE) return;
+  const now = Date.now();
+  // First pass: delete expired
+  for (const [key, entry] of store.entries()) {
+    if (entry.resetAt <= now) store.delete(key);
+  }
+  if (store.size < MAX_STORE_SIZE) return;
+  // Second pass: delete oldest (sorted by resetAt ascending)
+  const sorted = [...store.entries()].sort((a, b) => a[1].resetAt - b[1].resetAt);
+  for (let i = 0; i < sorted.length && store.size >= MAX_STORE_SIZE; i++) {
+    const entry = sorted[i];
+    if (entry) store.delete(entry[0]);
+  }
 }
 
 // ─── Shared Store (Upstash Redis REST) ─────────────────
@@ -201,6 +219,7 @@ export async function checkRateLimit(
   if (!entry || entry.resetAt <= now) {
     // New window
     const resetAt = now + matchedRule.windowMs;
+    evictIfNeeded();
     store.set(key, { count: 1, resetAt });
     return {
       allowed: true,
@@ -313,11 +332,18 @@ function findMatchingRule(route: string): RateLimitRule | undefined {
 
 /**
  * Get the client IP from request headers.
+ *
+ * Hostatom Plesk runs nginx → Passenger — nginx appends with
+ * `proxy_add_x_forwarded_for`, so the RIGHTMOST entry in
+ * X-Forwarded-For is the real client IP the proxy added. Taking
+ * the first entry trusts a client-spoofable value (MEDIUM-1 bypass).
  */
 export function getClientIp(request: Request): string {
-  return (
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-    request.headers.get('x-real-ip') ??
-    'unknown'
-  );
+  const xff = request.headers.get('x-forwarded-for');
+  if (xff) {
+    const entries = xff.split(',').map((s) => s.trim()).filter(Boolean);
+    const real = entries[entries.length - 1];
+    if (real) return real;
+  }
+  return request.headers.get('x-real-ip') ?? 'unknown';
 }

@@ -7,8 +7,16 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // Migrations (`prisma migrate deploy`, run by the Vercel build) must use the
+  // DIRECT connection (db.*.supabase.co:5432), not the pgbouncer pooler on
+  // 6543: pgbouncer's transaction pooling breaks DDL/migrations and Vercel's
+  // build network cannot reach the pooler at all (consistent P1001 timeouts
+  // that killed every production build for a week while the runtime, which
+  // uses DATABASE_URL below, connected fine). Runtime queries keep using the
+  // pooler; only migrate/db commands switch to the direct URL.
+  directUrl = env("DATABASE_DIRECT_URL")
 }
 
 // ─── Categories ───────────────────────────────────────────
