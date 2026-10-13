@@ -158,6 +158,11 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+      # prisma/schema.prisma declares directUrl, and Prisma's CLI resolves it
+      # before it connects — without this the migrate deploy step exits P1012
+      # ("Environment variable not found"). PrismaClient itself reads only
+      # DATABASE_URL at runtime, which is why the app never needed it.
+      DATABASE_DIRECT_URL: postgresql://ci:ci@localhost:5432/ci
       NK_JWT_SECRET: ci-test-secret-0123456789abcdef0123456789abcdef
       NK_GIFT_CODE_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
       NK_OTP_DEV_MODE: '1'
