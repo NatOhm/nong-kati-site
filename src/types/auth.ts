@@ -1,4 +1,4 @@
-/** Auth types: permission registry and route → permission map. */
+/**\n * Auth types: permission registry and route → permission map.\n */
 
 export const AdminRole = {
   SUPER_ADMIN: 'super_admin',
@@ -146,14 +146,7 @@ export const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
 };
 
 /**
- * Route → permission map.
- *
- * Every entry must exist on disk with a matching `export async function
- * <METHOD>`, or sit on the KNOWN_UNBUILT ratchet in
- * tests/admin-stored-accounts.test.ts (delete each ratchet entry as it is
- * built — a NEW gap fails that suite). Keep in sync with ROUTE_COVERAGE in
- * tests/admin-authz-matrix.test.ts.
- */
+ * Route → permission map.\n *\n * Every entry must exist on disk with a matching `export async function`\n * <METHOD>`, or sit on the KNOWN_UNBUILT ratchet in\n * tests/admin-stored-accounts.test.ts (delete each ratchet entry as it is\n * built — a NEW gap fails that suite). Keep in sync with ROUTE_COVERAGE in\n * tests/admin-authz-matrix.test.ts.\n */
 export const ROUTE_PERMISSIONS: Record<string, Permission[]> = {
   'GET /api/v1/admin/announcement': ['settings:read'],
   'PUT /api/v1/admin/announcement': ['settings:write'],
@@ -167,6 +160,8 @@ export const ROUTE_PERMISSIONS: Record<string, Permission[]> = {
   'GET /api/v1/admin/customers/:id/history': ['customers:read'],
   'PATCH /api/v1/admin/customers/:id/block': ['customers:block'],
   // ratchet: KNOWN_UNBUILT (tier picker not built)
+  'POST /api/v1/admin/orders/:id/gateway-verify': ['orders:write'],
+  // ratchet: KNOWN_UNBUILT (tier picker not built) (see docs/payment-verification-plan.md)
   'PATCH /api/v1/admin/customers/:id/tier': ['customers:write'],
   'GET /api/v1/admin/dashboard': ['dashboard:read'],
   // ratchet: KNOWN_UNBUILT (stats endpoint superseded by GET /dashboard)
@@ -195,6 +190,8 @@ export const ROUTE_PERMISSIONS: Record<string, Permission[]> = {
   'GET /api/v1/admin/reports/customer-sales/export': ['reports:export'],
   'GET /api/v1/admin/settings/vat': ['settings:read'],
   'PUT /api/v1/admin/settings/vat': ['settings:write'],
+  'GET /api/v1/admin/settings/faq': ['settings:read'],
+  'PUT /api/v1/admin/settings/faq': ['settings:write'],
   'GET /api/v1/admin/staff': ['staff:read'],
   // ratchet: KNOWN_UNBUILT (role change)
   'PATCH /api/v1/admin/staff/:id/role': ['staff:write'],

@@ -3,33 +3,43 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/utils/cn';
+import { sanitizeFaqHtml } from '@/lib/faqRichText';
+import type { FaqItem } from '@/lib/faqSettings';
 
-const FAQ_DATA = [
-  {
-    q: 'สินค้าใช้งานได้จริงไหม?',
-    a: 'ใช่ครับ สินค้าทุกชิ้นใช้งานได้จริง พร้อมรับประกันเปลี่ยนใหม่หากมีปัญหาภายใน 7 วัน',
-  },
-  {
-    q: 'รับประกันอย่างไร?',
-    a: 'เรารับประกัน 7 วัน หากสินค้ามีปัญหาภายในระยะเวลาที่กำหนด เราจะเปลี่ยนบัญชีใหม่ให้ทันที โดยไม่มีค่าใช้จ่ายเพิ่มเติม',
-  },
-  {
-    q: 'ชำระเงินช่องทางไหนได้บ้าง?',
-    a: 'รองรับโอนเงินเข้าบัญชีร้าน โดยอัปโหลดสลิปเพื่อยืนยันการชำระเงิน (PromptPay QR เร็ว ๆ นี้)',
-  },
-  {
-    q: 'ใช้เวลานานแค่ไหนกว่าจะได้โค้ด?',
-    a: 'หลังทีมงานยืนยันการชำระเงิน โค้ดจะแสดงในหน้ายืนยันคำสั่งซื้อและส่งทางอีเมลทันที (ปกติใช้เวลาไม่นานในเวลาทำการ)',
-  },
-  {
-    q: 'สินค้าหมดหรือยัง?',
-    a: 'สต๊อกสินค้าอัปเดตแบบเรียลไทม์ หากสินค้าหมด จะแสดงสถานะ "หมดชั่วคราว" และสามารถติดตามได้ทาง LINE Official',
-  },
-  {
-    q: 'มีโปรโมชั่นอะไรบ้าง?',
-    a: 'ติดตามโปรโมชั่นได้ทาง LINE Official Account หรือหน้าเว็บไซต์ เรามีโปรโมชั่นใหม่ๆ ทุกสัปดาห์',
-  },
-];
+/**
+ * Public FAQ accordion. Rows are fetched server-side by the force-dynamic
+ * homepage (getFaqSettings) and passed in as props — visitors never call the
+ * permission-gated admin endpoint. Answers are sanitized rich text
+ * (bold/links) rendered through dangerouslySetInnerHTML after allowlisting.
+ */
+export function FAQAccordion({ items }: { items: FaqItem[] }): React.JSX.Element {
+  if (items.length === 0) {
+    return (
+      <section className="px-4 py-8 md:px-8">
+        <h2 className="mb-6 text-center text-lg font-bold text-fg">คำถามที่พบบ่อย</h2>
+        <div className="clay-card mx-auto max-w-2xl rounded-2xl border border-line-subtle bg-surface p-6 text-center text-sm text-fg-placeholder">
+          ยังไม่มีคำถาม
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="px-4 py-8 md:px-8">
+      <h2 className="mb-6 text-center text-lg font-bold text-fg">คำถามที่พบบ่อย</h2>
+      <div className="clay-card mx-auto max-w-2xl rounded-2xl">
+        {items.map((item, i) => (
+          <FAQItem
+            key={`${item.question}-${i}`}
+            id={`faq-${i + 1}`}
+            q={item.question}
+            a={item.answer}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
 
 function FAQItem({ q, a, id }: { q: string; a: string; id: string }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -55,24 +65,14 @@ function FAQItem({ q, a, id }: { q: string; a: string; id: string }) {
         hidden={!isOpen}
         className={cn(
           'transition-smart overflow-hidden duration-300',
-          isOpen ? 'max-h-40' : 'max-h-0',
+          isOpen ? 'max-h-96' : 'max-h-0',
         )}
       >
-        <p className="px-4 pb-4 text-sm leading-relaxed text-fg-muted">{a}</p>
+        <div
+          className="prose prose-sm max-w-none px-4 pb-4 leading-relaxed text-fg-muted"
+          dangerouslySetInnerHTML={{ __html: sanitizeFaqHtml(a) }}
+        />
       </div>
     </div>
-  );
-}
-
-export function FAQAccordion() {
-  return (
-    <section className="px-4 py-8 md:px-8">
-      <h2 className="mb-6 text-center text-lg font-bold text-fg">คำถามที่พบบ่อย</h2>
-      <div className="clay-card mx-auto max-w-2xl rounded-2xl">
-        {FAQ_DATA.map((item, i) => (
-          <FAQItem key={item.q} id={`faq-${i + 1}`} q={item.q} a={item.a} />
-        ))}
-      </div>
-    </section>
   );
 }

@@ -59,6 +59,8 @@
 | GC    | Stored accounts + manual assignment to an order — audited reveal, atomic void, masked list; declared-vs-built route ratchet | `tests/admin-stored-accounts.test.ts` | `npm test` (vitest) | Unit Tests |
 | FP    | Forced password change — never looks like a permissions problem; layout redirect cannot loop | `tests/admin-forced-password-change.test.ts` | `npm test` (vitest) | Unit Tests |
 | PP    | Pricing persistence — seven-blocker coverage (VAT satang allocation across lines, snapshot sums reconcile to order totals) | `tests/pricing-persistence.test.ts` | `npm test` (vitest) | Unit Tests |
+| FR    | FAQ rich-text answers — allowlisted tags only, hardened links, browser block markup normalized to line breaks | `tests/faq-richtext.test.ts` | `npm test` (vitest) | Unit Tests |
+| BK    | Bulk account-paste — counter นับเท่ากับที่ route แยกจริง (CRLF / NBSP blank-run / บล็อกในบัญชีเดียว) และ raw error code ห้ามหลุดถึงจอ (NO_VARIANTS → ข้อความไทย) | `tests/bulk-stock-records.test.ts` | `npm test` (vitest) | Unit Tests |
 | E1    | Disabled-state affordance (WCAG 1.4.1)                | `e2e/disabled-state.spec.ts`       | `npm run test:e2e`   | (local/preview)        |
 | E2    | No hardcoded white in dark mode                       | `e2e/no-hardcoded-white.spec.ts`   | `npm run test:e2e`   | (local/preview)        |
 | E3    | Duplicate DOM ids (ทั้งไซต์ผ่าน sitemap)              | `e2e/duplicate-ids.spec.ts`        | `npm run test:e2e`   | (local/preview)        |
@@ -493,6 +495,25 @@ ffmpeg -hide_banner -loglevel error -y -ss 5.0 -i admin-walkthrough-th.mp4 -fram
 - เปลี่ยนคำว่า `เติมสต๊อกบัญชี` ในคู่มือทั้งไฟล์เป็น `เติมสต๊อกโค้ด` → 2 เคสแดง
 - คืนไฟล์แล้วรันซ้ำ → 25 เคสผ่าน
 
+## บัญชีวางยาว + NO_VARIANTS หลุดถึงจอ (14 ต.ค. 2569) — `tests/bulk-stock-records.test.ts`
+
+รีพอร์ตจริงจากลูกค้า (`freebuff-note-add-stock-error.md`): วางข้อมูลบัญชีแบบยาว (ONED/HBO MAX ตัวอย่าง supplier จริง) แล้ว dialog ขึ้น `ตอนนี้: 1 รายการ` + `0 ไอดี` + กล่องแดง `NO_VARIANTS` + ปุ่มบันทึกถูก disable — ตรวจแล้ว 2 คนละสาเหตุ:
+
+1. **`NO_VARIANTS` ถูกต้องแล้วแต่บอกเป็นภาษาอังกฤษดิบ** — สินค้า fixture มี variant 60 ตัว แต่ `isActive:false` ทั้งหมด → route กรอง active ได้ 0 → 400 ก่อน parse (chain นี้ตรวจกับ DB จริงแล้ว) — ตอนนี้ `bulkErrorMessage` map เป็นข้อความไทย — รหัสที่ไม่รู้จักต้องไม่หลุด (fallback เสมอ)
+2. **ตัวนับ client เคยนับผิด** — regex เดิมใช้ `[ \t]*` แต่ server ใช้ `l.trim()===''` (NBSP/zero-width จาก copy-paste ถือว่างฝั่ง server แต่ไม่ฝั่ง client) — ตอนนี้นับผ่าน `countBulkRecords` ที่ mirror loop ของ route เป๊ะ
+
+| ตัว | บังคับว่า |
+|---|---|
+| BK1 | fixture จากโน้ตจริง: ONED บล็อกเดียวมี blank ข้างใน = 1 · HBO 2 บล็อกคั่น 2 บรรทัดว่าง = 2 · CRLF เท่ากันทั้งคู่ |
+| BK2 | บรรทัดว่างที่เป็น NBSP ยัง split ถูก · blank เดียว = 1 ก้อน (by design) · ว่างเปล่า = 0 (placeholder ไม่นับ) |
+| BK3 | `NO_VARIANTS` → ข้อความไทยไม่มีคำว่า `NO_VARIANTS` · รหัสแปลก → fallback · ข้อความ non-code (network) คงเดิม |
+| BK4 | dialog ใช้ `countBulkRecords` + `bulkErrorMessage` จริงทั้ง 2 handler (regex เดิมถูกลบจริง) |
+
+**พังได้จริง — ทดสอบด้วยการใส่มั๊กกลับ**
+
+- คืน regex เดิมใน dialog → BK4 แดง (เจอ `[ \t]` split เดิม)
+- ให้ catch block คืน `e.message` ตรง ๆ → BK4 แดง (นับ `bulkErrorMessage` ไม่ครบ 2)
+
 ## กวาดออเดอร์ที่ยังไม่จ่าย (5 ต.ค. 2569) — `tests/order-expiry-sweep.test.ts`
 
 รีวิวหน้าร้านข้อ 2: checkout สร้างออเดอร์ `pending_payment` **จริง** ตั้งแต่กด "Continue" ก่อนลูกค้าจะยืนยันการจ่ายเงิน (`src/app/checkout/page.tsx` `handleContactSubmit` → `createOrder`) แต่ **ไม่มีโค้ดสักบรรทัดใน repo ที่หมดอายุมันได้** — `updateOrderStatus` อนุญาต `pending_payment → expired` แต่ไม่มีผู้เรียกเลย และคิว inventory ที่ `mockQueue.ts` เขียนไว้ว่า *"Reservation sweep (5min), expiry sweep (15min)"* มี `registerJobHandler` ที่ **ไม่เคยถูกเรียกที่ไหนเลย**
@@ -626,6 +647,15 @@ job นี้แดงมาตั้งแต่รอบที่ 88 และ
 - **พิสูจน์ว่า gate ยังแดงได้ (ไม่ใช่ตรายประทับ):** ใส่ `lodash@4.17.15` ที่มี CVE ลง `dependencies` ชั่วคราว → gate exit 1 พร้อมชี้ `node_modules/lodash` แล้วคืนค่าเดิม
 - **ผล:** `brace-expansion` 1.1.18 → 1.1.21 (eslint ได้) ส่วน 5.0.12 ของ @typescript-eslint **ไม่ถูกแตะ** · high ทั้งหมด 8 → 7 · lockfile เปลี่ยน 7 บรรทัด · eslint/tsc/345 tests/`next build` เขียว (สำคัญ: `brace-expansion` อยู่ในเส้นทาง `minimatch` ของ eslint เอง)
 - **ค้างไว้ให้ตัดสินใจทีหลัง:** การย้าย Tailwind 3 → 4 จะเคลียร์ `braces` ได้ แต่เป็นงานระดับ migration ไม่ใช่งานแก้บั๊กความปลอดภัย อย่าให้ CI ตัดสินใจแทน
+
+## FAQ rich-text answers (2026-10-14) — `tests/faq-richtext.test.ts`
+
+คำตอบ FAQ ในหน้าแอดมินแก้ผ่าน contentEditable WYSIWYG (ตัวหนา + ลิงก์) เก็บเป็น HTML จำกัด — gate นี้ล็อก `src/lib/faqRichText.ts` ซึ่งเป็นจุดเดียวทั้งฝั่ง server (`PUT/GET /api/v1/admin/settings/faq` เรียก `faqAnswerValue` ตอน parse/normalize) และ client (หน้า `/management/faq` sanitize ก่อนส่ง, `FAQAccordion` sanitize ก่อน `dangerouslySetInnerHTML`):
+
+- **Allowlist เท่านั้น:** `strong/b/em/i/u/a/br` เท่านั้น นอกนั้นถูกลบ — script/style/iframe/template ถูกทิ้งทั้งเนื้อหา ไม่ใช่แค่แท็ก
+- **ลิงก์ต้องปลอดภัย:** `href` ต้องขึ้นต้น `https://` `http://` หรือ `mailto:` เท่านั้น (กัน `javascript:`) และทุกลิงก์ถูกบังคับ `target="_blank" rel="noopener noreferrer"`
+- **Markup ที่เบราว์เซอร์สร้างตอนพิมพ์ Enter (`div/p/li`) ถูก normalize เป็น `<br />`** และเบรกต่อเนื่องถูกยุบ — ทำให้ข้อมูลที่วน editor แล้วไม่เพี้ยน และ plain text เดิมยังคงอ่านได้เหมือนเดิม
+- **คำตอบที่ไม่มีข้อความจริง (มีแต่แท็ก) ถูกตีตก** ไม่ให้บันทึก (`faqAnswerValue` → `''`)
 
 ## CI pipeline (`.github/workflows/ci.yml`)
 

@@ -56,12 +56,20 @@ const { prismaMock, auditMock } = vi.hoisted(() => {
       updateMany: vi.fn(async () => ({ count: 1 })),
     },
     productVariant: {
-      findUnique: vi.fn(async (_w?: unknown) => ({ id: 'var_1', label: '30 วัน', stock: 5, product: { name: 'Netflix' } })),
+      findUnique: vi.fn(async (_w?: unknown) => ({
+        id: 'var_1',
+        label: '30 วัน',
+        stock: 5,
+        product: { name: 'Netflix' },
+      })),
       update: vi.fn(async (_data: Record<string, unknown>) => ({})),
     },
     stockMove: { create: vi.fn(async (_data: Record<string, unknown>) => ({})) },
     order: { findUnique: vi.fn(), update: vi.fn(async (_d: Record<string, unknown>) => ({})) },
-    orderItem: { count: vi.fn(async () => 0), update: vi.fn(async (_d: Record<string, unknown>) => ({})) },
+    orderItem: {
+      count: vi.fn(async () => 0),
+      update: vi.fn(async (_d: Record<string, unknown>) => ({})),
+    },
     // Interactive-tx shape: the mock passes ITSELF as the tx client.
     $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(prismaMock)),
   };
@@ -125,8 +133,13 @@ beforeEach(async () => {
   if (!superToken) {
     const { issueAdminJwt } = await import('@/lib/jwt');
     const { ALL_PERMISSIONS } = await import('@/types/auth');
-    superToken = await issueAdminJwt('adm_root', 'oil@test.local', 'super_admin', [...ALL_PERMISSIONS]);
-    catalogueToken = await issueAdminJwt('adm_cat', 'cat@test.local', 'catalogue_manager', ['inventory:read', 'products:write']);
+    superToken = await issueAdminJwt('adm_root', 'oil@test.local', 'super_admin', [
+      ...ALL_PERMISSIONS,
+    ]);
+    catalogueToken = await issueAdminJwt('adm_cat', 'cat@test.local', 'catalogue_manager', [
+      'inventory:read',
+      'products:write',
+    ]);
   }
 });
 
@@ -140,19 +153,24 @@ beforeEach(async () => {
   });
   prismaMock.giftCode.findUnique.mockResolvedValue(await codeRow());
   prismaMock.giftCode.updateMany.mockResolvedValue({ count: 1 });
-  prismaMock.productVariant.findUnique.mockResolvedValue({ id: 'var_1', label: '30 วัน', stock: 5, product: { name: 'Netflix' } });
+  prismaMock.productVariant.findUnique.mockResolvedValue({
+    id: 'var_1',
+    label: '30 วัน',
+    stock: 5,
+    product: { name: 'Netflix' },
+  });
 });
 
 describe('reveal — permission and audit', () => {
-  const call = async (
-    path: string,
-    id = 'gc_1',
-  ): Promise<Response> => {
+  const call = async (path: string, id = 'gc_1'): Promise<Response> => {
     const mod = (await import(/* @vite-ignore */ path)) as Record<string, unknown>;
     const fn = mod['GET'] as (r: NextRequest, c: unknown) => Promise<Response>;
-    return fn(new NextRequest('http://localhost/x', { headers: { cookie: `nk_admin_at=${superToken}` } }), {
-      params: Promise.resolve({ id }),
-    });
+    return fn(
+      new NextRequest('http://localhost/x', { headers: { cookie: `nk_admin_at=${superToken}` } }),
+      {
+        params: Promise.resolve({ id }),
+      },
+    );
   };
 
   it('401 with no session', async () => {
@@ -189,7 +207,7 @@ describe('reveal — permission and audit', () => {
     // The audit payload is serialised in full; a ciphertext blob may appear,
     // the revealed secret must not.
     expect(arg).not.toContain(revealed);
-    expect((arg.length)).toBeGreaterThan(0);
+    expect(arg.length).toBeGreaterThan(0);
   });
 
   it('404 for a code that does not exist', async () => {
@@ -228,10 +246,7 @@ describe('reveal — permission and audit', () => {
 
 describe('void — the honest inverse of restock', () => {
   it('flips status, decrements stock, writes the movement and audits — atomically', async () => {
-    const mod = (await import(/* @vite-ignore */ VOID)) as Record<
-      string,
-      unknown
-    >;
+    const mod = (await import(/* @vite-ignore */ VOID)) as Record<string, unknown>;
     const fn = mod['PATCH'] as (r: NextRequest, c: unknown) => Promise<Response>;
     const res = await fn(
       new NextRequest('http://localhost/x', {
@@ -258,7 +273,9 @@ describe('void — the honest inverse of restock', () => {
 
     // 3. the ledger
     expect(prismaMock.stockMove.create).toHaveBeenCalled();
-    const move = JSON.parse(JSON.stringify(prismaMock.stockMove.create.mock.calls[0] as object[]))[0] as Record<string, unknown>;
+    const move = JSON.parse(
+      JSON.stringify(prismaMock.stockMove.create.mock.calls[0] as object[]),
+    )[0] as Record<string, unknown>;
     const moveData = move['data'] as Record<string, unknown>;
     expect(moveData['delta']).toBe(-1);
     expect(moveData['reason']).toBe('void');
@@ -273,10 +290,7 @@ describe('void — the honest inverse of restock', () => {
 
   it('CAS: a second void matches 0 rows and never double-decrements', async () => {
     prismaMock.giftCode.updateMany.mockResolvedValue({ count: 0 });
-    const mod = (await import(/* @vite-ignore */ VOID)) as Record<
-      string,
-      unknown
-    >;
+    const mod = (await import(/* @vite-ignore */ VOID)) as Record<string, unknown>;
     const fn = mod['PATCH'] as (r: NextRequest, c: unknown) => Promise<Response>;
     const res = await fn(
       new NextRequest('http://localhost/x', {
@@ -296,10 +310,7 @@ describe('void — the honest inverse of restock', () => {
 
   it('409 for a delivered code — sold stock cannot be quietly pulled', async () => {
     prismaMock.giftCode.findUnique.mockResolvedValue(await codeRow({ status: 'delivered' }));
-    const mod = (await import(/* @vite-ignore */ VOID)) as Record<
-      string,
-      unknown
-    >;
+    const mod = (await import(/* @vite-ignore */ VOID)) as Record<string, unknown>;
     const fn = mod['PATCH'] as (r: NextRequest, c: unknown) => Promise<Response>;
     const res = await fn(
       new NextRequest('http://localhost/x', {
@@ -318,14 +329,14 @@ describe('masked list — inventory:read must not mean "hand over credentials"',
   it('returns masks, never plaintext', async () => {
     const { maskCode } = await import('@/lib/crypto/giftCode');
     prismaMock.giftCode.findMany.mockResolvedValue([await codeRow()]);
-    const mod = (await import(/* @vite-ignore */ LIST)) as Record<
-      string,
-      unknown
-    >;
+    const mod = (await import(/* @vite-ignore */ LIST)) as Record<string, unknown>;
     const fn = mod['GET'] as (r: NextRequest, c: unknown) => Promise<Response>;
-    const res = await fn(new NextRequest('http://localhost/x', { headers: { cookie: `nk_admin_at=${superToken}` } }), {
-      params: Promise.resolve({ variantId: 'var_1' }),
-    });
+    const res = await fn(
+      new NextRequest('http://localhost/x', { headers: { cookie: `nk_admin_at=${superToken}` } }),
+      {
+        params: Promise.resolve({ variantId: 'var_1' }),
+      },
+    );
 
     const body = (await res.json()) as { codes: { masked: string }[] };
     // The contract that actually matters: the secret never leaves via the
@@ -447,6 +458,9 @@ describe('the blind spot is closed', () => {
       'PATCH /api/v1/admin/staff/:id/role',
       'PATCH /api/v1/admin/staff/:id/deactivate',
       'GET /api/v1/admin/dashboard/stats',
+      // Declared with the payment-verification plan; route not built yet
+      // (see docs/payment-verification-plan.md).
+      'POST /api/v1/admin/orders/:id/gateway-verify',
     ];
 
     const missing = declared.filter((entry) => {
@@ -544,7 +558,9 @@ describe('manual assignment — send a chosen account to a chosen customer', () 
   });
 
   it('REFUSES an unpaid order — the account is the product', async () => {
-    prismaMock.order.findUnique = vi.fn(async () => orderRow({ status: 'pending_payment' })) as never;
+    prismaMock.order.findUnique = vi.fn(async () =>
+      orderRow({ status: 'pending_payment' }),
+    ) as never;
     const res = await post({ codeId: 'gc_1' });
     expect(res.status).toBe(409);
     // Nothing was taken out of the pool.

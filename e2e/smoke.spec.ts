@@ -165,7 +165,7 @@ test.describe('checkout flow creates an order', () => {
     //    its sessionKey matches 'nk_cart_session', and the provider's
     //    persist effect races any direct seeding — driving the UI is
     //    deterministic and covers the actual customer path.
-    await page.goto('/product/hbo-max-7-4k');
+    await page.goto('/product/hbo-max-7-4k-4');
     const addBtn = page.getByRole('button', { name: 'เพิ่มลงตะกร้า' });
     await expect(addBtn).toBeVisible({ timeout: 30_000 });
     await expect(addBtn).toBeEnabled();

@@ -23,7 +23,10 @@ export function StockBadge({ stock, className }: StockBadgeProps): React.JSX.Ele
         // fg (clay-900 light / warm-white dark) is 2.09 on topaz-400 in dark;
         // clay-900 passes on the amber fill in both themes (4.96).
         isLowStock && 'border border-topaz-200 bg-topaz-400 text-clay-900',
-        !isOutOfStock && !isLowStock && 'bg-jade-600 text-white',
+        // jade-700: the ramp has no 600 step, so the old `bg-jade-600`
+        // generated no CSS — white text landed on the card (1.11:1). jade-700
+        // (#0A5C30) + white = 8.1:1.
+        !isOutOfStock && !isLowStock && 'bg-jade-700 text-white',
         className,
       )}
     >

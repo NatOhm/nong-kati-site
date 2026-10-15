@@ -24,6 +24,7 @@ import { HamsterCelebrating, HamsterFace, HamsterWorried } from '@/components/ui
 
 import {
   getCategoriesWithProductCounts,
+  getFaqSettings,
   getFeaturedProducts,
   getHeroSlides,
   getStorefrontStats,
@@ -51,12 +52,14 @@ export default async function HomePage(): Promise<React.JSX.Element> {
   let featuredProducts: Awaited<ReturnType<typeof getFeaturedProducts>> = [];
   let heroSlides: Awaited<ReturnType<typeof getHeroSlides>> = [];
   let stats: Awaited<ReturnType<typeof getStorefrontStats>> | null = null;
+  let faqItems: Awaited<ReturnType<typeof getFaqSettings>> = [];
   let dbDown = false;
   try {
     categories = await getCategoriesWithProductCounts();
     featuredProducts = await getFeaturedProducts();
     heroSlides = await getHeroSlides();
     stats = await getStorefrontStats();
+    faqItems = await getFaqSettings();
   } catch (e) {
     dbDown = true;
     console.error(
@@ -216,24 +219,45 @@ export default async function HomePage(): Promise<React.JSX.Element> {
                 ดูทั้งหมด
               </Link>
             </div>
-            <div className="shadow-clay-md rounded-2xl bg-clay-950 p-4">
+            {/* Panel follows the theme like the client's reference: warm cream
+                in light mode, the original dark clay panel in dark mode. */}
+            <div className="shadow-clay-md rounded-2xl bg-clay-100 p-4 dark:bg-clay-950">
               {appGroups.map((group) => (
                 <section key={group.id} className="mb-6 last:mb-0">
-                  {/* Main group heading — the link goes to the group page, which
-                      already lists every descendant product. */}
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <h3 className="flex min-w-0 items-center gap-2 text-sm font-bold text-fg">
+                  {/* Main group heading as a glossy full-width pill (client
+                      reference): warm gradient bar, folder + name + count chip
+                      inside, ดูทั้งหมด kept at the right. Theme-aware — cream /
+                      peach in light mode, caramel clay in dark mode, dark text
+                      on both so the contrast gate stays green.
+                      Underlay = bg-clay-300, a luminance stand-in for the
+      gradient's darkest stop (clay-300 ≈ peach-200); the gradient paints
+      over it, so users never see the flat color, but the contrast scanner
+      (background-color chain only) reads a conservative stand-in instead of
+      falling through to the dark panel. Deliberately NOT bg-peach-200: the
+      globals legibility patch `[data-theme='dark'] .bg-peach-200
+      .text-peach-800` would force the dark-mode link back to peach-800 and
+      drop it to 3.13 on the caramel pill. */}
+                  <div className="relative mb-3 flex items-center justify-between gap-3 overflow-hidden rounded-full bg-clay-300 bg-gradient-to-r from-peach-100 via-fawn-50 to-peach-200 px-4 py-2.5 shadow-clay-sm ring-1 ring-white/70 dark:bg-clay-500 dark:from-clay-500 dark:via-clay-400 dark:to-clay-500 dark:ring-clay-600/60">
+                    {/* Gloss band — the client reference pills are candy-glossy:
+                        a bright wash over the top half. Overlay only (no
+                        background-color), so the contrast scanner still reads
+                        the underlay beneath it. */}
+                    <span
+                      aria-hidden
+                      className="pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/55 to-transparent"
+                    />
+                    <h3 className="flex min-w-0 items-center gap-2 text-sm font-bold text-clay-900">
                       <span aria-hidden className="shrink-0 text-base">
                         {group.icon || '📁'}
                       </span>
                       <span className="truncate">{group.name}</span>
-                      <span className="shrink-0 text-xs font-normal text-fg-muted">
+                      <span className="shrink-0 rounded-full bg-clay-100/80 px-2 py-0.5 text-xs font-semibold text-clay-800 dark:bg-clay-100">
                         {group.productCount ?? 0} รายการ
                       </span>
                     </h3>
                     <Link
                       href={`/category/${group.slug}`}
-                      className="shrink-0 text-xs font-medium text-peach-200 hover:text-peach-100"
+                      className="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold text-peach-800 transition-colors hover:bg-clay-100/70 hover:text-peach-900 dark:text-clay-950 dark:hover:bg-clay-950/10 dark:hover:text-clay-950"
                     >
                       ดูทั้งหมด →
                     </Link>
@@ -326,7 +350,7 @@ export default async function HomePage(): Promise<React.JSX.Element> {
 
         {/* FAQ */}
         <ScrollReveal>
-          <FAQAccordion />
+          <FAQAccordion items={faqItems} />
         </ScrollReveal>
 
         {/* Stats — real counts, plain numbers, horizontal, at the bottom (client ask).

@@ -64,7 +64,7 @@ test.describe('200% zoom reflow', () => {
   for (const path of [
     '/',
     '/search',
-    '/product/hbo-max-7-4k',
+    '/product/hbo-max-7-4k-4',
     '/account/login',
     '/legal/privacy-policy',
   ] as const) {

@@ -83,9 +83,12 @@ function AccountLayoutInner({
   if (isPublicPage) {
     return (
       <>
+        {/* focus-visible (not focus): touch/programmatic focus must not pop
+            the pill out; keyboard Tab still reveals it, fixed so it is on
+            screen at any scroll depth. */}
         <a
           href="#main-content"
-          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-peach-700 focus:px-4 focus:py-2.5 focus:text-sm focus:font-semibold focus:text-white focus:shadow-clay"
+          className="sr-only focus-visible:not-sr-only focus-visible:fixed focus-visible:left-4 focus-visible:top-4 focus-visible:z-[100] focus-visible:rounded-md focus-visible:bg-peach-700 focus-visible:px-4 focus-visible:py-2.5 focus-visible:text-sm focus-visible:font-semibold focus-visible:text-white focus-visible:shadow-clay"
         >
           ข้ามไปยังเนื้อหาหลัก
         </a>
@@ -116,10 +119,11 @@ function AccountLayoutInner({
 
   return (
     <>
-      {/* Skip link — first focusable element (same spec as the storefront). */}
+      {/* Skip link — first focusable element (same spec as the storefront).
+          focus-visible keeps touch/restored focus from popping it out. */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-peach-700 focus:px-4 focus:py-2.5 focus:text-sm focus:font-semibold focus:text-white focus:shadow-clay"
+        className="sr-only focus-visible:not-sr-only focus-visible:fixed focus-visible:left-4 focus-visible:top-4 focus-visible:z-[100] focus-visible:rounded-md focus-visible:bg-peach-700 focus-visible:px-4 focus-visible:py-2.5 focus-visible:text-sm focus-visible:font-semibold focus-visible:text-white focus-visible:shadow-clay"
       >
         ข้ามไปยังเนื้อหาหลัก
       </a>

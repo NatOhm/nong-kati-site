@@ -6,6 +6,7 @@
 import { cache } from 'react';
 
 import { prisma } from '@/lib/db';
+import { parseFaqSettings, type FaqItem } from '@/lib/faqSettings';
 import { normalizeTier, tierPrice, type PriceTier } from '@/lib/pricing';
 import { getEligiblePromotions } from '@/lib/promotions';
 
@@ -338,33 +339,41 @@ function mapProduct(
  * evaluated against the whole eligible cart by the authoritative preview. */
 async function decoratePromotionPrices(products: ProductItem[]): Promise<ProductItem[]> {
   if (products.length === 0) return products;
-  const promotions = (await getEligiblePromotions(products.map((product) => product.id)))
-    .filter((promotion) => promotion.minSpendThb === null || promotion.minSpendThb <= 0);
+  const promotions = (await getEligiblePromotions(products.map((product) => product.id))).filter(
+    (promotion) => promotion.minSpendThb === null || promotion.minSpendThb <= 0,
+  );
   if (promotions.length === 0) return products;
   return products.map((product) => ({
     ...product,
     variants: product.variants.map((variant) => {
-      const applicable = promotions.filter((promotion) =>
-        promotion.scope === 'all' || promotion.productIds.includes(product.id),
+      const applicable = promotions.filter(
+        (promotion) => promotion.scope === 'all' || promotion.productIds.includes(product.id),
       );
-      const candidates = applicable.map((promotion) => {
-        const original = variant.effectivePrice;
-        const discounted = promotion.discountType === 'percent'
-          ? Math.round(original * (1 - promotion.discountValue / 100) * 100) / 100
-          : Math.round((original - promotion.discountValue) * 100) / 100;
-        return { promotion, original, discounted };
-      }).filter((candidate) => candidate.discounted > 0 && candidate.discounted < candidate.original);
+      const candidates = applicable
+        .map((promotion) => {
+          const original = variant.effectivePrice;
+          const discounted =
+            promotion.discountType === 'percent'
+              ? Math.round(original * (1 - promotion.discountValue / 100) * 100) / 100
+              : Math.round((original - promotion.discountValue) * 100) / 100;
+          return { promotion, original, discounted };
+        })
+        .filter(
+          (candidate) => candidate.discounted > 0 && candidate.discounted < candidate.original,
+        );
       candidates.sort((a, b) => a.discounted - b.discounted);
       const best = candidates[0];
-      return best ? {
-        ...variant,
-        promotion: {
-          name: best.promotion.name,
-          originalPriceThb: best.original,
-          discountedPriceThb: best.discounted,
-          expiresAt: best.promotion.expiresAt?.toISOString() ?? null,
-        },
-      } : variant;
+      return best
+        ? {
+            ...variant,
+            promotion: {
+              name: best.promotion.name,
+              originalPriceThb: best.original,
+              discountedPriceThb: best.discounted,
+              expiresAt: best.promotion.expiresAt?.toISOString() ?? null,
+            },
+          }
+        : variant;
     }),
   }));
 }
@@ -408,10 +417,7 @@ const AVAILABILITY_FILTER = { some: { stock: { gt: 0 }, isActive: true } } as co
 
 /** Sellable units across ACTIVE variants only. */
 function totalStock(key: CatalogOrderKey): number {
-  return key.variants.reduce(
-    (sum, v) => (v.isActive ? sum + Number(v.stock ?? 0) : sum),
-    0,
-  );
+  return key.variants.reduce((sum, v) => (v.isActive ? sum + Number(v.stock ?? 0) : sum), 0);
 }
 
 /**
@@ -462,8 +468,7 @@ function orderCatalogKeys<T extends CatalogOrderKey>(keys: T[], sort: CatalogSor
           ? (a, b) => b.createdAt.getTime() - a.createdAt.getTime() || byName(a, b) || byId(a, b)
           : sort === 'available'
             ? // Best-stocked first; the most likely to actually be bought.
-              (a, b) =>
-                totalStock(b) - totalStock(a) || byName(a, b) || byId(a, b)
+              (a, b) => totalStock(b) - totalStock(a) || byName(a, b) || byId(a, b)
             : // featured: featured first, then name, then id — deterministic
               (a, b) => Number(b.isFeatured) - Number(a.isFeatured) || byName(a, b) || byId(a, b);
 
@@ -531,10 +536,12 @@ export async function getProductsByCategory(
   const rowById = new Map(rows.map((r) => [r.id, r]));
 
   return {
-    products: await decoratePromotionPrices(pageIds
-      .map((id) => rowById.get(id))
-      .filter((r): r is NonNullable<typeof r> => Boolean(r))
-      .map((p) => mapProduct(p, p.category, tier))),
+    products: await decoratePromotionPrices(
+      pageIds
+        .map((id) => rowById.get(id))
+        .filter((r): r is NonNullable<typeof r> => Boolean(r))
+        .map((p) => mapProduct(p, p.category, tier)),
+    ),
     total,
   };
 }
@@ -551,7 +558,9 @@ export async function getProductBySlug(slug: string): Promise<ProductItem | null
   });
 
   if (!p) return null;
-  return (await decoratePromotionPrices([mapProduct(p, p.category, await resolveTier())]))[0] ?? null;
+  return (
+    (await decoratePromotionPrices([mapProduct(p, p.category, await resolveTier())]))[0] ?? null
+  );
 }
 
 export async function getAllProductSlugs(): Promise<string[]> {
@@ -639,10 +648,12 @@ export async function getCatalogProducts(
   const rowById = new Map(rows.map((r) => [r.id, r]));
 
   return {
-    products: await decoratePromotionPrices(pageIds
-      .map((id) => rowById.get(id))
-      .filter((r): r is NonNullable<typeof r> => Boolean(r))
-      .map((p) => mapProduct(p, p.category, tier))),
+    products: await decoratePromotionPrices(
+      pageIds
+        .map((id) => rowById.get(id))
+        .filter((r): r is NonNullable<typeof r> => Boolean(r))
+        .map((p) => mapProduct(p, p.category, tier)),
+    ),
     total,
   };
 }
@@ -731,9 +742,11 @@ export async function getWishlistProducts(customerId: string): Promise<ProductIt
     },
   });
   const tier = await resolveTier();
-  return decoratePromotionPrices(wishes
-    .filter((w) => w.product.isActive)
-    .map((w) => mapProduct(w.product, w.product.category, tier)));
+  return decoratePromotionPrices(
+    wishes
+      .filter((w) => w.product.isActive)
+      .map((w) => mapProduct(w.product, w.product.category, tier)),
+  );
 }
 
 /** Ids the customer has wished — for heart states on cards. */
@@ -781,7 +794,9 @@ export async function getMostWishedProducts(
     },
   });
   const tier = await resolveTier();
-  const decorated = await decoratePromotionPrices(products.map((p) => mapProduct(p, p.category, tier)));
+  const decorated = await decoratePromotionPrices(
+    products.map((p) => mapProduct(p, p.category, tier)),
+  );
   const byId = new Map(decorated.map((p) => [p.id, p]));
   return ranked.flatMap((r) => {
     const product = byId.get(r.productId);
@@ -948,6 +963,25 @@ export async function getHeroSlides(): Promise<HeroSlideContent[]> {
   }
 }
 
+// ─── FAQ (admin-managed, public storefront accordion) ───────
+
+/**
+ * Read the FAQ list (SiteSetting key 'faq') for the storefront accordion.
+ * The admin API stays permission-gated, so the force-dynamic homepage reads
+ * the rows directly here — visitors never hit the authenticated endpoint.
+ * Answers come back sanitized via parseFaqSettings (see lib/faqRichText).
+ */
+export async function getFaqSettings(): Promise<FaqItem[]> {
+  try {
+    const row = await prisma.siteSetting.findUnique({ where: { key: 'faq' } });
+    if (!row) return [];
+    return parseFaqSettings(row.value).items;
+  } catch (e) {
+    console.error('[data] getFaqSettings failed:', e instanceof Error ? e.message : e);
+    return [];
+  }
+}
+
 // ─── Appearance (runtime theme) ─────────────────────────
 
 export interface AppearanceContent {
@@ -1026,7 +1060,7 @@ export async function getStoreInfo(): Promise<StoreInfoContent> {
       description: str(parsed.description),
       email: str(parsed.email),
       phone: str(parsed.phone),
-        line: str(parsed.line),
+      line: str(parsed.line),
       lineUrl: str(parsed.lineUrl),
       facebook: str(parsed.facebook),
     };

@@ -16,11 +16,12 @@ import type { HeroSlideContent } from '@/lib/data';
  * translate with the site's 550ms ease-out-quart motion token. Fully
  * keyboard navigable; swipe works on touch screens.
  *
- * Sizing: the frame runs to `max-w-7xl` with tight gutters and a 16/7
- * desktop ratio (was 5xl / 21/8), because the banner is the storefront's
- * largest piece of real estate and the old cap left a wide screen mostly
- * empty margin. A taller frame crops more of a wide source, which is what
- * the per-slide focal point in ตั้งค่า → แบนเนอร์หน้าแรก compensates for.
+ * Sizing: the frame runs to `max-w-7xl` with tight gutters and a 16/9
+ * desktop / 16/7 mobile ratio (was 16/7 / 16/6 — client: "this part was
+ * too small"), because the banner is the storefront's largest piece of
+ * real estate and the old cap left a wide screen mostly empty margin.
+ * A taller frame crops more of a wide source, which is what the per-slide
+ * focal point in ตั้งค่า → แบนเนอร์หน้าแรก compensates for.
  */
 
 const AUTOPLAY_MS = 5000;
@@ -93,7 +94,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlideContent[] }): React.
                     <img
                       src={s.imageUrl}
                       alt={s.alt}
-                      className="aspect-[16/6] w-full object-cover sm:aspect-[16/7]"
+                      className="aspect-[16/7] w-full object-cover sm:aspect-[16/9]"
                       loading={i === 0 ? 'eager' : 'lazy'}
                       draggable={false}
                       style={{ objectPosition: s.imageFocus ?? '50% 50%' }}
@@ -107,7 +108,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlideContent[] }): React.
                   <img
                     src={s.imageUrl}
                     alt={s.alt}
-                    className="aspect-[16/6] w-full object-cover sm:aspect-[16/7]"
+                    className="aspect-[16/7] w-full object-cover sm:aspect-[16/9]"
                     loading={i === 0 ? 'eager' : 'lazy'}
                     draggable={false}
                     style={{ objectPosition: s.imageFocus ?? '50% 50%' }}
@@ -116,7 +117,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlideContent[] }): React.
                   <div
                     role="img"
                     aria-label={s.alt}
-                    className="flex aspect-[16/6] w-full items-center justify-center bg-gradient-to-br from-peach-100 via-surface-base to-peach-50 sm:aspect-[16/7]"
+                    className="flex aspect-[16/7] w-full items-center justify-center bg-gradient-to-br from-peach-100 via-surface-base to-peach-50 sm:aspect-[16/9]"
                   >
                     {/* A text-only slide used to be a lone line of copy floating
                         in an empty gradient, which is the blandest thing on the

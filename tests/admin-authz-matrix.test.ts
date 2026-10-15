@@ -233,9 +233,22 @@ const ROUTE_COVERAGE: MatrixRow[] = [
   { method: 'PUT', path: '/settings/some-key', perm: 'settings:write', body: { value: 'x' } },
   // VAT settings
   { method: 'GET', path: '/settings/vat', perm: 'settings:read' },
-  { method: 'PUT', path: '/settings/vat', perm: 'settings:write', body: { enabled: true, rate: 7 } },
+  {
+    method: 'PUT',
+    path: '/settings/vat',
+    perm: 'settings:write',
+    body: { enabled: true, rate: 7 },
+  },
   // SMTP connectivity probe for the email settings panel (no save, no send)
   { method: 'POST', path: '/settings/email-test', perm: 'settings:write', body: {} },
+  // FAQ settings — drives the public accordion; answers are sanitized rich text
+  { method: 'GET', path: '/settings/faq', perm: 'settings:read' },
+  {
+    method: 'PUT',
+    path: '/settings/faq',
+    perm: 'settings:write',
+    body: { items: [{ question: 'q', answer: 'a', order: 0 }] },
+  },
   // staff
   { method: 'GET', path: '/staff', perm: 'staff:read' },
   { method: 'POST', path: '/staff', perm: 'staff:write', body: {} },

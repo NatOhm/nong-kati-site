@@ -37,6 +37,11 @@ export function SiteMascot({
         aria-hidden="true"
         width={size}
         height={size}
+        // Inline style, not just the width/height attributes: consumer
+        // classNames (e.g. `w-fit` on the homepage announcement board) win
+        // over the HTML attributes and the uploaded image then renders at
+        // its full intrinsic size — a 1000px logo where an 84px mark belongs.
+        style={{ width: size, height: size }}
         className={cn('object-contain', className)}
       />
     );

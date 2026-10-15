@@ -17,6 +17,7 @@ import {
   BarChart3,
   FileText,
   Hash,
+  HelpCircle,
   type LucideIcon,
   LayoutDashboard,
   LifeBuoy,
@@ -70,7 +71,12 @@ export const ADMIN_NAV: AdminNavNode[] = [
     permission: 'orders:read',
     children: [
       { label: 'คำสั่งซื้อ', href: '/management/orders', permission: 'orders:read' },
-      { label: 'ประวัติเติมเงิน', href: '/management/topups', permission: 'topups:read', icon: Wallet },
+      {
+        label: 'ประวัติเติมเงิน',
+        href: '/management/topups',
+        permission: 'topups:read',
+        icon: Wallet,
+      },
       {
         label: 'กระทบยอด (Reconciliation)',
         href: '/management/reconciliation',
@@ -107,8 +113,18 @@ export const ADMIN_NAV: AdminNavNode[] = [
     permission: 'customers:read',
     children: [
       { label: 'ลูกค้า', href: '/management/customers', permission: 'customers:read' },
-      { label: 'คูปองส่วนลด', href: '/management/coupons', permission: 'coupons:read', icon: Ticket },
-      { label: 'โปรโมชัน', href: '/management/promotions', permission: 'promotions:read', icon: Gift },
+      {
+        label: 'คูปองส่วนลด',
+        href: '/management/coupons',
+        permission: 'coupons:read',
+        icon: Ticket,
+      },
+      {
+        label: 'โปรโมชัน',
+        href: '/management/promotions',
+        permission: 'promotions:read',
+        icon: Gift,
+      },
     ],
   },
   {
@@ -151,7 +167,18 @@ export const ADMIN_NAV: AdminNavNode[] = [
       { label: 'พนักงาน', href: '/management/staff', permission: 'staff:read', icon: ShieldCheck },
       { label: 'Audit Log', href: '/management/audit', permission: 'audit:read', icon: FileText },
       { label: 'คำขอ PDPA', href: '/management/pdpa', permission: 'pdpa:read', icon: ShieldCheck },
-      { label: 'ตั้งค่า', href: '/management/settings', permission: 'settings:read', icon: Settings },
+      {
+        label: 'คำถามที่พบบ่อย',
+        href: '/management/faq',
+        permission: 'settings:read',
+        icon: HelpCircle,
+      },
+      {
+        label: 'ตั้งค่า',
+        href: '/management/settings',
+        permission: 'settings:read',
+        icon: Settings,
+      },
     ],
   },
 ];

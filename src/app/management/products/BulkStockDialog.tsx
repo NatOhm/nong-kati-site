@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { Check, Loader2, X } from 'lucide-react';
 
 import { adminJson } from '@/lib/adminSession';
+import { bulkErrorMessage, countBulkRecords } from '@/lib/bulkRecords';
 import { cn } from '@/utils/cn';
 
 /**
@@ -64,17 +65,12 @@ export function BulkStockDialog({
   const [done, setDone] = useState<ApplyResponse | null>(null);
 
   /**
-   * Client-side record estimate — MUST mirror the server's split rule exactly
-   * (stock/bulk route): short = one record per line; long = blocks separated by
-   * 2+ consecutive blank lines (a single blank line is kept INSIDE a block so
-   * vendor templates survive delivery).
+   * Client-side record estimate — shared with the server's split rule via
+   * lib/bulkRecords (the old inline regex drifted from the route's blank-run
+   * loop: whitespace-only lines with paste artifacts made the counter
+   * disagree with the server's actual split).
    */
-  const recordCount = useMemo(() => {
-    if (raw.trim() === '') return 0;
-    if (format === 'short') return raw.split(/\r?\n/).filter((l) => l.trim() !== '').length;
-    return raw.split(/(?:\r?\n)[ \t]*(?:\r?\n)[ \t]*(?:\r?\n)/).filter((b) => b.trim() !== '')
-      .length;
-  }, [raw, format]);
+  const recordCount = useMemo(() => countBulkRecords(raw, format), [raw, format]);
 
   /**
    * Rough account-count heuristic (mail/user/pass/id-ish lines). When it
@@ -83,7 +79,12 @@ export function BulkStockDialog({
    */
   const accountGuess = useMemo(() => {
     if (format !== 'long' || raw.trim() === '') return 0;
-    return raw.split(/\r?\n/).filter((l) => /mail|user|pass|ไอดี|บัญชี|id\s*[:：]/i.test(l)).length;
+    // NFKC folds supplier "fancy fonts" (𝗠𝗮𝗶𝗹 → Mail) so the heuristic sees
+    // the label it expects; parsing itself never touches the original text.
+    return raw
+      .normalize('NFKC')
+      .split(/\r?\n/)
+      .filter((l) => /mail|user|pass|ไอดี|บัญชี|id\s*[:：]/i.test(l)).length;
   }, [raw, format]);
 
   const dirty = raw.trim() !== '';
@@ -100,7 +101,7 @@ export function BulkStockDialog({
       });
       setPreview(data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'แยกข้อมูลไม่สำเร็จ');
+      setError(bulkErrorMessage(e, 'แยกข้อมูลไม่สำเร็จ'));
     } finally {
       setChecking(false);
     }
@@ -119,7 +120,7 @@ export function BulkStockDialog({
       setDone(data);
       onSaved();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
+      setError(bulkErrorMessage(e, 'บันทึกไม่สำเร็จ'));
     } finally {
       setSaving(false);
     }

@@ -101,7 +101,7 @@ test.describe('P0 purchase flow (guest -> order -> slip -> admin confirm -> conf
     expect(created, 'POST /api/v1/orders must have returned the order').toBeTruthy();
 
     // Most recent product has stock; the real UI walk is deterministic.
-    await addVariantToCart(page, 'hbo-max-7-4k', '7 วัน 4K (÷4)', 1);
+    await addVariantToCart(page, 'hbo-max-7-4k-4', '7 วัน 4K (÷4)', 1);
 
     // Step 1 - contact form -> creates a pending_payment order (server truth).
     await page.goto('/checkout');

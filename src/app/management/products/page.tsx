@@ -119,6 +119,82 @@ export default function AdminProductsPage(): React.JSX.Element {
     variantLabel: string;
     productName: string;
   } | null>(null);
+
+  /** Cap the admin-table variant-chip wall for very long variant lists.
+   *  The raw list is still fully available in the detail/edit screen and the
+   *  stored-account reveal; this only changes the compact in-row presentation
+   *  so the table stays scannable. */
+  const VARIANT_CHIP_PREVIEW = 4;
+  function variantChipsFor(product: AdminProduct): React.ReactNode {
+    const v = product.variants;
+    if (v.length === 0) return null;
+    if (v.length <= VARIANT_CHIP_PREVIEW) {
+      return (
+        <div className="mt-1 flex flex-wrap gap-1">
+          {v.map((x) => (
+            <button
+              key={x.id}
+              type="button"
+              onClick={() =>
+                setCodesTarget({
+                  variantId: x.id,
+                  variantLabel: x.label || 'ตัวเลือกหลัก',
+                  productName: product.name,
+                })
+              }
+              aria-label={`ดูบัญชีที่เก็บไว้ ${product.name} ${x.label}`}
+              title={`ดูบัญชีที่เก็บไว้ — ${x.label} (เหลือ ${x.stock})`}
+              className="inline-flex min-h-[24px] items-center gap-1 rounded-md border border-line-subtle bg-surface px-1.5 py-0.5 text-[11px] text-fg-secondary transition-colors hover:border-line-brand hover:text-fg-brand"
+            >
+              <Eye size={12} />
+              <span className="max-w-[9rem] truncate">{x.label || 'บัญชี'}</span>
+              <span className="font-mono text-fg-placeholder">{x.stock}</span>
+            </button>
+          ))}
+        </div>
+      );
+    }
+    const shown = v.slice(0, VARIANT_CHIP_PREVIEW);
+    const last = shown[shown.length - 1];
+    const remaining = v.length - shown.length;
+    return (
+      <div className="mt-1 flex flex-wrap gap-1 items-baseline">
+        {shown.map((x, i) => (
+          <button
+            key={x.id}
+            type="button"
+            onClick={() =>
+              setCodesTarget({
+                variantId: x.id,
+                variantLabel: x.label || 'ตัวเลือกหลัก',
+                productName: product.name,
+              })
+            }
+            aria-label={`ดูบัญชีที่เก็บไว้ ${product.name} ${x.label}`}
+            title={`ดูบัญชีที่เก็บไว้ — ${x.label} (เหลือ ${x.stock})`}
+            className="inline-flex min-h-[24px] items-center gap-1 rounded-md border border-line-subtle bg-surface px-1.5 py-0.5 text-[11px] text-fg-secondary transition-colors hover:border-line-brand hover:text-fg-brand"
+          >
+            <Eye size={12} />
+            <span className="max-w-[9rem] truncate">{x.label || 'บัญชี'}</span>
+            <span className="font-mono text-fg-placeholder">{x.stock}</span>
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() => {
+            if (product.variants.length <= 1) openCodesFor(product);
+            else setCodesPicker(product);
+          }}
+          aria-label={`ดูบัญชีที่เก็บไว้ทั้งหมด ${product.name} — เหลือ ${remaining} ตัวเลือก`}
+          title={`ดูบัญชีที่เก็บไว้ทั้งหมด — เหลือ ${remaining} ตัวเลือก`}
+          className="inline-flex items-center gap-1 rounded-md border border-line bg-surface px-1.5 py-0.5 text-[11px] text-fg-brand transition-colors hover:bg-surface-elevated"
+        >
+          <Eye size={12} />
+          +{remaining}
+        </button>
+      </div>
+    );
+  }
   /**
    * A product can have several packs, and the accounts live per pack. Rather
    * than guessing which one the admin meant, ask — a chooser is one click and
@@ -422,32 +498,7 @@ export default function AdminProductsPage(): React.JSX.Element {
                               would be ambiguous the moment a product has more
                               than one pack — and which variant you are reading
                               is exactly what you must not guess. */}
-                          {product.variants.length > 0 && (
-                            <div className="mt-1 flex flex-wrap gap-1">
-                              {product.variants.map((v) => (
-                                <button
-                                  key={v.id}
-                                  type="button"
-                                  onClick={() =>
-                                    setCodesTarget({
-                                      variantId: v.id,
-                                      variantLabel: v.label || 'ตัวเลือกหลัก',
-                                      productName: product.name,
-                                    })
-                                  }
-                                  aria-label={`ดูบัญชีที่เก็บไว้ ${product.name} ${v.label}`}
-                                  title={`ดูบัญชีที่เก็บไว้ — ${v.label} (เหลือ ${v.stock})`}
-                                  className="inline-flex min-h-[24px] items-center gap-1 rounded-md border border-line-subtle bg-surface px-1.5 py-0.5 text-[11px] text-fg-secondary transition-colors hover:border-line-brand hover:text-fg-brand"
-                                >
-                                  <Eye size={12} />
-                                  <span className="max-w-[9rem] truncate">
-                                    {v.label || 'บัญชี'}
-                                  </span>
-                                  <span className="font-mono text-fg-placeholder">{v.stock}</span>
-                                </button>
-                              ))}
-                            </div>
-                          )}
+                          {variantChipsFor(product)}
                         </div>
                       </div>
                     </td>

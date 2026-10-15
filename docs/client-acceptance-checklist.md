@@ -88,11 +88,16 @@
 | G4  | Total lifetime spending                     |   ✅   | ภาพรวม: **ยอดใช้จ่ายสะสม**                                                         |
 | G5  | Referenced section → top-up history         |   ✅   | ภาพรวม: **ประวัติการเติมเงิน** (แทนคำสั่งซื้อล่าสุด — คำสั่งซื้อมีหน้าแยกอยู่แล้ว) |
 
+## H. Later feedback — needs source review
+
+| #   | Item                                                     | Status | Evidence / next step |
+| H1  | Investigate Buffy/Solar Pro 4 unexpected behavior       |   ⬜   | User clarified that “weird acting” refers to Buffy after switching to Solar Pro 4 for efficiency. There may be an error around product adding, but do not assume a general client UX request. Find the reported error/repro and classify model/tool issue versus product bug before proposing code changes. Keep distinct from CSV and stock/account import. |
+
 ---
 
-## สรุป (อัปเดต 9 ต.ค. 2569)
+## สรุป (อัปเดต 14 ต.ค. 2569)
 
-- **✅ 38 ข้อ** · **🟡 2 ข้อ** (ตรวจสลิปอัตโนมัติ — รอใส่คีย์ผู้ให้บริการ; Discord — รอ webhook จากลูกค้า) · **⬜ 0 ข้อ**
+- **✅ 38 ข้อ** · **🟡 2 ข้อ** (ตรวจสลิปอัตโนมัติ — รอใส่คีย์ผู้ให้บริการ; Discord — รอ webhook จากลูกค้า) · **⬜ 1 ข้อ** (H1 — สืบอาการ Buffy/Solar Pro 4 ก่อนเสนอแก้โค้ด)
 - ยกเป็น ✅ 3 ข้อสะสม: **ยอดซื้อรายคน (A12)**, **สินค้าค้างสต๊อก (A15)** และ **เปลี่ยนรูปมาสคอต (A16 — อัปได้จากหน้าแอดมินแล้ว)**
 - **เพิ่มใหม่สัปดาห์นี้ (26 ก.ย., ไม่ได้อยู่ในลิสต์เดิม):**
   - ล็อกอินลูกค้าครบ 4 ช่องทาง: Google / LINE / Facebook / เบอร์โทร (SMS OTP) — ปุ่มแสดงเมื่อใส่คีย์; โทรศัพท์ทำงานแล้วใน dev รอคีย์ Twilio
