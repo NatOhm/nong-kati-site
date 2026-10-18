@@ -25,6 +25,7 @@
 import { prisma } from '@/lib/db';
 import {
   generateOrderNumber,
+  nextOrderSequence,
 } from '@/lib/pricing';
 import {
   getVatConfig,
@@ -459,74 +460,78 @@ async function createOrderInner(
     resolved.couponDiscountThb,
   );
 
-  const count = await tx.order.count();
-  // Try successive order numbers; a duplicate key (P2002) on one attempt
-  // wastes only that attempt, not the whole transaction. If all 5 numbers
-  // collide the P2002 bubbles up to the outer retry (Blocker 6).
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const orderNumber = generateOrderNumber(count + 1 + attempt);
-    try {
-      const created = (await tx.order.create({
-        data: {
-          orderNumber, customerId: input.customerId ?? null,
-          customerEmail: input.customerEmail, customerPhone: input.customerPhone ?? null,
-          status: 'pending_payment', paymentMethod: input.paymentMethod,
-          subtotalThb: pricing.grossSubtotalThb,
-          promotionDiscountThb: pricing.promotionDiscountThb,
-          discountThb: pricing.couponDiscountThb,
-          vatAmountThb: pricing.vatAmountThb, totalAmountThb: pricing.totalAmountThb,
-          vatEnabled: resolved.vatConfig.enabled, vatRate: resolved.vatConfig.rate,
-          couponId: resolved.couponCheck.couponId ?? null,
-          lineOptIn: input.lineOptIn, marketingOptIn: input.marketingOptIn,
-          tosAcceptedAt: new Date(), tosVersion: input.tosVersion,
-          requiresTaxInvoice: input.requiresTaxInvoice,
-          taxInvoiceName: input.taxInvoiceName ?? null, taxInvoiceTaxId: input.taxInvoiceTaxId ?? null,
-          confirmationUuid: crypto.randomUUID(),
-          items: {
-            create: pricing.items.map((s) => ({
-              variantId: s.variantId,
-              productNameTh: s.productNameTh,
-              productNameEn: s.productNameEn,
-              skuCode: s.skuCode,
-              denominationThb: s.denominationThb,
-              quantity: s.quantity,
-              unitPriceThb: s.unitPriceThb,
-              unitPriceExVat: s.unitPriceExVat,
-              unitVatAmount: s.unitVatAmount,
-              lineTotalThb: s.finalLineTotalThb,
-              originalUnitPriceThb: s.originalUnitPriceThb,
-              appliedPromotionId: s.appliedPromotionId,
-              promotionName: s.promotionName,
-              promotionType: s.promotionType,
-              promotionValue: s.promotionValue,
-              promotionDiscountThb: s.promotionDiscountThb,
-              couponDiscountThb: s.couponDiscountThb,
-              finalLineTotalThb: s.finalLineTotalThb,
-              finalLineExVat: s.finalLineExVat,
-              finalLineVatAmount: s.finalLineVatAmount,
-              deliveryStatus: 'pending',
-            })),
-          },
-        },
-        include: orderInclude,
-      })) as unknown as DbOrder;
-      return {
-        order: mapOrder(created), discountThb: pricing.couponDiscountThb,
-        couponCode: resolved.couponCheck.ok ? (input.couponCode?.toUpperCase() ?? null) : null,
-        couponError: resolved.couponCheck.ok ? null : (resolved.couponCheck.error ?? 'INACTIVE'),
-        slipUploadToken: mintSlipUploadToken(created.id, created.confirmationUuid),
-      };
-    } catch (err) {
-      // P2002 (unique constraint on orderNumber) — try the next sequence
-      // number. Do NOT catch other errors here; they must propagate so the
-      // outer retry (which now also covers P2002) can handle them.
-      if (attempt < 4 && typeof err === 'object' && err !== null && (err as { code?: string }).code === 'P2002') {
-        continue;
-      }
-      throw err;
-    }
-  }
-  throw new Error('ORDER_NUMBER_ALLOCATION_FAILED');
+  // Number from the HIGHEST existing current-year number, never COUNT(*).
+  // Count-based allocation breaks permanently the moment one order row is
+  // deleted: count lags behind reality, `count + 1` hands out an EXISTING
+  // number, the insert violates the unique index, and Postgres aborts the
+  // transaction — the old in-transaction retry then failed with 25P02 and
+  // every checkout 500'd until the row came back.
+  const existingNumbers = await tx.order.findMany({
+    where: { orderNumber: { startsWith: `NK-${new Date().getFullYear()}-` } },
+    select: { orderNumber: true },
+    orderBy: { orderNumber: 'desc' },
+    take: 1000,
+  });
+  const sequence = nextOrderSequence(
+    existingNumbers.map((r) => r.orderNumber),
+    await tx.order.count(),
+  );
+  const orderNumber = generateOrderNumber(sequence);
+  // A P2002 here (two concurrent orders read the same maximum) aborts this
+  // Postgres transaction, so it must propagate to the OUTER retry in
+  // createOrder(), which starts a fresh transaction and re-reads the maximum.
+  // Catching it and retrying the insert inside the same — already aborted —
+  // transaction only ever produced 25P02.
+  const created = (await tx.order.create({
+    data: {
+      orderNumber, customerId: input.customerId ?? null,
+      customerEmail: input.customerEmail, customerPhone: input.customerPhone ?? null,
+      status: 'pending_payment', paymentMethod: input.paymentMethod,
+      subtotalThb: pricing.grossSubtotalThb,
+      promotionDiscountThb: pricing.promotionDiscountThb,
+      discountThb: pricing.couponDiscountThb,
+      vatAmountThb: pricing.vatAmountThb, totalAmountThb: pricing.totalAmountThb,
+      vatEnabled: resolved.vatConfig.enabled, vatRate: resolved.vatConfig.rate,
+      couponId: resolved.couponCheck.couponId ?? null,
+      lineOptIn: input.lineOptIn, marketingOptIn: input.marketingOptIn,
+      tosAcceptedAt: new Date(), tosVersion: input.tosVersion,
+      requiresTaxInvoice: input.requiresTaxInvoice,
+      taxInvoiceName: input.taxInvoiceName ?? null, taxInvoiceTaxId: input.taxInvoiceTaxId ?? null,
+      confirmationUuid: crypto.randomUUID(),
+      items: {
+        create: pricing.items.map((s) => ({
+          variantId: s.variantId,
+          productNameTh: s.productNameTh,
+          productNameEn: s.productNameEn,
+          skuCode: s.skuCode,
+          denominationThb: s.denominationThb,
+          quantity: s.quantity,
+          unitPriceThb: s.unitPriceThb,
+          unitPriceExVat: s.unitPriceExVat,
+          unitVatAmount: s.unitVatAmount,
+          lineTotalThb: s.finalLineTotalThb,
+          originalUnitPriceThb: s.originalUnitPriceThb,
+          appliedPromotionId: s.appliedPromotionId,
+          promotionName: s.promotionName,
+          promotionType: s.promotionType,
+          promotionValue: s.promotionValue,
+          promotionDiscountThb: s.promotionDiscountThb,
+          couponDiscountThb: s.couponDiscountThb,
+          finalLineTotalThb: s.finalLineTotalThb,
+          finalLineExVat: s.finalLineExVat,
+          finalLineVatAmount: s.finalLineVatAmount,
+          deliveryStatus: 'pending',
+        })),
+      },
+    },
+    include: orderInclude,
+  })) as unknown as DbOrder;
+  return {
+    order: mapOrder(created), discountThb: pricing.couponDiscountThb,
+    couponCode: resolved.couponCheck.ok ? (input.couponCode?.toUpperCase() ?? null) : null,
+    couponError: resolved.couponCheck.ok ? null : (resolved.couponCheck.error ?? 'INACTIVE'),
+    slipUploadToken: mintSlipUploadToken(created.id, created.confirmationUuid),
+  };
 }
 export async function getOrderByConfirmationUuid(uuid: string): Promise<Order | null> {
   const o = await prisma.order.findUnique({

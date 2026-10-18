@@ -199,3 +199,40 @@ export function generateOrderNumber(sequence: number): string {
   const padded = String(sequence).padStart(6, '0');
   return `NK-${year}-${padded}`;
 }
+
+/** Strict shape generateOrderNumber produces: NK-YYYY-NNNNNN (6 digits). */
+const ORDER_NUMBER_RE = /^NK-(\d{4})-(\d{6})$/;
+
+/**
+ * Next sequence to hand out for a NEW order — read from the HIGHEST existing
+ * current-year number, never from COUNT(*).
+ *
+ * Why count-based allocation is unsafe: the moment one order row is deleted,
+ * `count + 1` points at a number that already exists. The insert violates the
+ * unique index, Postgres aborts the whole transaction, and (because the old
+ * code retried the insert INSIDE that aborted transaction) every subsequent
+ * statement failed with 25P02 — so a single deleted row turned into
+ * "checkout 500s for every customer" until the sequence logic changed.
+ *
+ * @param rows  Existing order numbers (any sample — newest-first is ideal).
+ *              Values that are not `NK-YYYY-NNNNNN` for `year` are ignored, so
+ *              a stray timestamp-suffixed number cannot push the sequence
+ *              into 13 digits.
+ * @param count COUNT(*) fallback, used only when the sample holds no
+ *              well-formed current-year number (legacy / first order).
+ */
+export function nextOrderSequence(
+  rows: readonly string[],
+  count: number,
+  year: number = new Date().getFullYear(),
+): number {
+  let max = 0;
+  for (const row of rows) {
+    const m = ORDER_NUMBER_RE.exec(row);
+    if (!m || Number(m[1]) !== year) continue;
+    const value = Number(m[2]);
+    if (value > max) max = value;
+  }
+  if (max === 0) return count + 1;
+  return max + 1;
+}

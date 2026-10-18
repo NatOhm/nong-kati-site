@@ -168,6 +168,14 @@ export async function sendEmailWithRetry(
     if (result.success) {
       return result;
     }
+    // Configuration errors are NOT retryable (same contract as sendEmail):
+    // sleeping 2s+4s cannot conjure a missing env var, and the outbox drain
+    // runs inside the admin request that triggered it — each pointless retry
+    // compounded into 20-50s fulfilment actions in unconfigured environments
+    // (seen live in the reconciliation e2e, 2026-10-17).
+    if (result.error?.startsWith('EMAIL_NOT_CONFIGURED')) {
+      return result;
+    }
     lastError = result.error;
   }
 

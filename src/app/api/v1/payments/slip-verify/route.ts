@@ -2,13 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { claimOrderForConfirmation, getOrderById } from '@/api/orders';
 import { prisma } from '@/lib/db';
-import { getNotificationSettings, notifyPaymentConfirmed, notifyStockLow } from '@/lib/notify';
+import {
+  getNotificationSettings,
+  notifyPaymentConfirmed,
+  notifyPaymentPending,
+  notifyStockLow,
+} from '@/lib/notify';
 import { fulfilOrder, scheduleOutboxDrain } from '@/lib/fulfilment';
 import { recordPaymentReconciliation } from '@/lib/paymentReconciliation';
 import { getClientIp, checkRateLimit } from '@/lib/rateLimit';
 import { isSlip2GoEnabled, verifySlip2Go } from '@/lib/payment/slip2go';
 import { isSlipVerificationEnabled, verifySlip } from '@/lib/payment/slipok';
-import { isValidSlipUploadToken } from '@/lib/slipSecurity';
+import { isValidSlipUploadToken, mintSlipStorageKey, slipImageRoute } from '@/lib/slipSecurity';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,6 +25,24 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // SlipOK accepts up to ~10MB; we cap t
  */
 function isSlipAutoVerifyEnabled(): boolean {
   return isSlip2GoEnabled() || isSlipVerificationEnabled();
+}
+
+type ProviderResult =
+  | Awaited<ReturnType<typeof verifySlip>>
+  | Awaited<ReturnType<typeof verifySlip2Go>>;
+
+/** Transient/config failures worth retrying on the other provider. */
+const RETRYABLE_ON_FALLBACK = new Set(['UPSTREAM_ERROR', 'QUOTA_EXCEEDED', 'NOT_CONFIGURED']);
+
+/** Best-effort MIME from the image bytes — used only for the stored data URL. */
+function sniffImageMime(imageBase64: string): string {
+  const head = Buffer.from(imageBase64.slice(0, 32), 'base64');
+  if (head.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) {
+    return 'image/png';
+  }
+  if (head[0] === 0xff && head[1] === 0xd8) return 'image/jpeg';
+  if (head.subarray(0, 4).toString('latin1') === 'RIFF') return 'image/webp';
+  return 'image/png';
 }
 
 /** GET — feature probe for the checkout page (panel renders only when on). */
@@ -110,10 +133,42 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
   const expected = Number(order.totalAmountThb);
 
-  // ── Ask the configured provider (Slip2Go preferred, SlipOK fallback) ──
-  const result = isSlip2GoEnabled()
+  // ── Keep the evidence FIRST ──────────────────────────────────────────────
+  // Whatever the provider answers (pass, amount mismatch, outage), the
+  // customer's slip must land in หน้าจัดการคำสั่งซื้อ so the admin fallback
+  // always sees what was submitted — including on paths where the client
+  // never gets a chance to re-upload. Private `slip:` namespace, one NEW key
+  // per attempt (nothing overwritten). Failures here never block a check.
+  let slipStored = false;
+  try {
+    const key = mintSlipStorageKey();
+    await prisma.siteSetting.create({
+      data: { key, value: `data:${sniffImageMime(imageBase64)};base64,${imageBase64}` },
+    });
+    await prisma.order.update({
+      where: { id: order.id },
+      data: { slipImageUrl: slipImageRoute(key), slipUploadedAt: new Date() },
+    });
+    slipStored = true;
+  } catch (err) {
+    console.error('[slip-verify] could not persist slip evidence:', err);
+  }
+
+  // ── Ask the configured providers (Slip2Go preferred, SlipOK fallback) ──
+  let result: ProviderResult = isSlip2GoEnabled()
     ? await verifySlip2Go({ imageBase64, expectedAmountThb: expected })
     : await verifySlip({ imageBase64, expectedAmountThb: expected });
+  if (!result.ok && RETRYABLE_ON_FALLBACK.has(result.code)) {
+    // Slip2Go down / quota spent / config broken — retry on the OTHER
+    // provider when one is configured, so a real slip can still confirm
+    // instead of being dumped into the manual queue.
+    const canRetry = isSlip2GoEnabled() ? isSlipVerificationEnabled() : isSlip2GoEnabled();
+    if (canRetry) {
+      result = isSlip2GoEnabled()
+        ? await verifySlip({ imageBase64, expectedAmountThb: expected })
+        : await verifySlip2Go({ imageBase64, expectedAmountThb: expected });
+    }
+  }
 
   if (!result.ok) {
     // Mapped, honest errors — the customer can fix and retry. Every branch
@@ -122,6 +177,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       NOT_CONFIGURED: 503,
       UPSTREAM_ERROR: 502,
       QUOTA_EXCEEDED: 502,
+      SLIP_DELAYED: 502,
       INVALID_SLIP: 422,
       AMOUNT_MISMATCH: 422,
       RECEIVER_MISMATCH: 422,
@@ -133,12 +189,23 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       INVALID_SLIP: 'ตรวจสลิปไม่ผ่าน — สลิปไม่ถูกต้อง/อ่านไม่ได้/ถูกใช้ไปแล้ว',
       AMOUNT_MISMATCH: 'ยอดโอนในสลิปไม่ตรงกับยอดสั่งซื้อ',
       RECEIVER_MISMATCH: 'บัญชีผู้รับในสลิปไม่ตรงกับร้าน',
+      SLIP_DELAYED: 'ธนาคารตอบกลับช้าชั่วคราว — รอสักครู่แล้วลองใหม่ หรือรอแอดมินตรวจให้',
     };
+    // The slip is stored and queued for manual review — ping the admin now
+    // instead of hoping they refresh จัดการคำสั่งซื้อ (fire-and-forget).
+    void notifyPaymentPending({
+      orderNumber: order.orderNumber,
+      totalThb: expected,
+      customerEmail: order.customerEmail,
+    });
     return NextResponse.json(
       {
         error: result.code,
         message: msgByCode[result.code] ?? 'ตรวจสลิปไม่สำเร็จ',
         detail: result.detail,
+        // The image is already in the admin queue — the client can skip the
+        // duplicate upload and just tell the customer to wait for review.
+        slipStored,
       },
       { status: statusByCode[result.code] ?? 502 },
     );

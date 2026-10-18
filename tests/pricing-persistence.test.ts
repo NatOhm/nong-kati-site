@@ -38,7 +38,11 @@ type TxMock = {
   customer: { findUnique: ReturnType<typeof vi.fn> };
   siteSetting: { findUnique: ReturnType<typeof vi.fn> };
   promotion: { findMany: ReturnType<typeof vi.fn> };
-  order: { count: ReturnType<typeof vi.fn>; create: ReturnType<typeof vi.fn> };
+  order: {
+    count: ReturnType<typeof vi.fn>;
+    create: ReturnType<typeof vi.fn>;
+    findMany: ReturnType<typeof vi.fn>;
+  };
 } & Record<string, unknown>;
 
 function makeTx(overrides: Record<string, unknown> = {}): TxMock {
@@ -69,9 +73,17 @@ function makeTx(overrides: Record<string, unknown> = {}): TxMock {
     order: {
       count: vi.fn(async () => 0),
       create: vi.fn(),
+      findMany: vi.fn(async () => []),
     },
   };
-  return { ...base, ...overrides } as TxMock;
+  const merged = { ...base, ...overrides } as TxMock;
+  // createOrderInner reads the existing order numbers to allocate the next
+  // one (gap-tolerant numbering). A test that overrides `order` keeps its own
+  // count/create stubs while findMany falls back to "no orders yet", so the
+  // sequence is count + 1 exactly as the old fixtures expect.
+  const overrideOrder = (overrides['order'] ?? {}) as Partial<TxMock['order']>;
+  merged.order = { ...base.order, ...overrideOrder } as TxMock['order'];
+  return merged;
 }
 
 /** Variant row override for multi-variant / promotion / tier tests. */

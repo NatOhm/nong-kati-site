@@ -12,6 +12,9 @@ import { prisma } from '@/lib/db';
 
 const SETTING_KEY = 'notifications';
 
+/** The ONLY accepted webhook shape — env value must match it to be used. */
+const DISCORD_WEBHOOK_RE = /^https:\/\/(canary\.|ptb\.)?discord(app)?\.com\/api\/webhooks\//;
+
 export interface NotificationSettings {
   discordWebhookUrl?: string;
   lowStockThreshold?: number;
@@ -50,7 +53,7 @@ async function sendDiscordEmbed(embeds: Array<{
   try {
     const cfg = await getNotificationSettings();
     const url = cfg.discordWebhookUrl;
-    if (!url || !/^https:\/\/(canary\.|ptb\.)?discord(app)?\.com\/api\/webhooks\//.test(url))
+    if (!url || !DISCORD_WEBHOOK_RE.test(url))
       return;
     await fetch(url, {
       method: 'POST',
@@ -84,6 +87,53 @@ const COLORS = {
   INFO: 0x3498db,          // blue
   PROMOTION: 0x9b59b6,     // purple
 } as const;
+
+export interface DiscordTestResult {
+  ok: boolean;
+  /** Discord's HTTP status when the request went out. */
+  status?: number;
+  /** WEBHOOK_NOT_CONFIGURED | HTTP_<code> | WEBHOOK_UNREACHABLE */
+  error?: string;
+}
+
+/**
+ * Send a one-off test embed so an admin can confirm the webhook setup from
+ * the settings page in one click (client ask 2026-10-16).
+ *
+ * Unlike the production notifications above (fire-and-forget — a Discord
+ * outage must never break checkout), THIS function exists to report the
+ * truth: configured or not, accepted or rejected, reachable or not. The
+ * webhook URL itself is never included in the result — only the outcome.
+ */
+export async function sendTestDiscordMessage(): Promise<DiscordTestResult> {
+  const url = process.env['NK_DISCORD_WEBHOOK_URL'];
+  if (!url || !DISCORD_WEBHOOK_RE.test(url)) {
+    return { ok: false, error: 'WEBHOOK_NOT_CONFIGURED' };
+  }
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: 'Nong-Kati แจ้งเตือน',
+        embeds: [
+          {
+            title: '🧪 ข้อความทดสอบ',
+            description:
+              'ตั้งค่า Discord webhook สำเร็จ — ต่อไปนี้การแจ้งเตือนออเดอร์ใหม่ การชำระเงิน และสต๊อกใกล้หมด จะเข้าห้องนี้อัตโนมัติ',
+            color: COLORS.SUCCESS,
+            footer: { text: 'Nong-Kati — ทดสอบจากหน้าตั้งค่าการแจ้งเตือน' },
+          },
+        ],
+      }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (res.ok) return { ok: true, status: res.status };
+    return { ok: false, status: res.status, error: `HTTP_${res.status}` };
+  } catch {
+    return { ok: false, error: 'WEBHOOK_UNREACHABLE' };
+  }
+}
 
 export async function notifyNewOrder(params: {
   orderNumber: string;

@@ -83,6 +83,11 @@ export default function CheckoutPage(): React.JSX.Element {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [slipEnabled, setSlipEnabled] = useState(false);
+  /** Set once automatic slip verification confirms the order — the checkout
+   *  flips to the paid state instead of leaving the upload panel up. */
+  const [slipConfirmed, setSlipConfirmed] = useState<
+    'confirmed' | 'pending_manual_fulfilment' | null
+  >(null);
   const [manualInfo, setManualInfo] = useState<{
     enabled: boolean;
     accountName: string | null;
@@ -611,12 +616,23 @@ export default function CheckoutPage(): React.JSX.Element {
                     </div>
                   </div>
 
-                  {order && paymentState?.status !== 'succeeded' && (
+                  {order && !slipConfirmed && paymentState?.status !== 'succeeded' && (
                     <SlipUploadPanel
                       orderId={order.id}
                       slipUploadToken={slipUploadToken}
                       slipVerifyEnabled={slipEnabled}
+                      onConfirmed={setSlipConfirmed}
                     />
+                  )}
+                  {slipConfirmed && (
+                    <div
+                      className="rounded-md border border-jade-500/40 bg-jade-900/20 px-4 py-3 text-sm text-jade-200"
+                      role="status"
+                    >
+                      {slipConfirmed === 'confirmed'
+                        ? '✓ ตรวจสลิปอัตโนมัติผ่าน — ยืนยันการชำระเงินเรียบร้อย กำลังส่งโค้ดทางอีเมล'
+                        : '✓ ตรวจสลิปแล้ว — สินค้าบางรายการกำลังรอเติมโค้ด แอดมินจะจัดส่งให้เร็วที่สุด'}
+                    </div>
                   )}
                 </div>
               )}
@@ -636,12 +652,24 @@ export default function CheckoutPage(): React.JSX.Element {
                     {/* Slip upload — ALWAYS available for pending PromptPay:
                         auto-verify first when SlipOK is on, otherwise the
                         slip goes straight to the admin for manual check. */}
-                    {order && paymentState.status !== 'succeeded' && (
+                    {order && !slipConfirmed && paymentState.status !== 'succeeded' && (
                       <SlipUploadPanel
                         orderId={order.id}
                         slipUploadToken={slipUploadToken}
                         slipVerifyEnabled={slipEnabled}
+                        onConfirmed={setSlipConfirmed}
                       />
+                    )}
+
+                    {slipConfirmed && (
+                      <div
+                        className="mt-4 rounded-md border border-jade-500/40 bg-jade-900/20 px-4 py-3 text-sm text-jade-200"
+                        role="status"
+                      >
+                        {slipConfirmed === 'confirmed'
+                          ? '✓ ตรวจสลิปอัตโนมัติผ่าน — ยืนยันการชำระเงินเรียบร้อย กำลังส่งโค้ดทางอีเมล'
+                          : '✓ ตรวจสลิปแล้ว — สินค้าบางรายการกำลังรอเติมโค้ด แอดมินจะจัดส่งให้เร็วที่สุด'}
+                      </div>
                     )}
 
                     {/* Status messages */}
@@ -683,7 +711,7 @@ export default function CheckoutPage(): React.JSX.Element {
               )}
 
               {/* Back to Step 1 */}
-              {!paymentState && (
+              {!paymentState && !slipConfirmed && (
                 <button
                   onClick={() => setStep(1)}
                   className="mt-6 w-full rounded-md border border-line bg-surface px-5 py-2.5 text-sm font-medium text-fg-secondary hover:border-clay-400 hover:text-fg"

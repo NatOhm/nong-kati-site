@@ -4,6 +4,7 @@ import { getOrderById } from '@/api/orders';
 import { prisma } from '@/lib/db';
 import { getClientIp, checkRateLimit } from '@/lib/rateLimit';
 import { isValidSlipUploadToken, mintSlipStorageKey, slipImageRoute } from '@/lib/slipSecurity';
+import { notifyPaymentPending } from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
 
@@ -100,6 +101,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   await prisma.order.update({
     where: { id: order.id },
     data: { slipImageUrl: imagePath, slipUploadedAt: new Date() },
+  });
+
+  // Manual-evidence fallback: tell the admin a slip is waiting for review.
+  // Without this the queue only changed when somebody happened to open
+  // จัดการคำสั่งซื้อ (fire-and-forget — Discord being down never breaks upload).
+  void notifyPaymentPending({
+    orderNumber: order.orderNumber,
+    totalThb: Number(order.totalAmountThb),
+    customerEmail: order.customerEmail,
   });
 
   return NextResponse.json({

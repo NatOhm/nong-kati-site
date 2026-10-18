@@ -7,24 +7,31 @@ import { cn } from '@/utils/cn';
 
 /**
  * SlipUploadPanel — customer slip upload under the PromptPay QR.
- * Two-step behavior in one panel:
+ * Behavior in one panel:
  * 1. If auto-verification is on (slipVerifyEnabled), the slip first goes to
- *    SlipOK — pass = order confirms instantly; fail = the same slip is then
- *    saved for the admin (manual check), no re-upload needed.
- * 2. If auto-verification is off (no NK_SLIP_OK_KEY), the slip goes straight
- *    to the admin: stored on the order and visible in the admin order
- *    detail — the admin clicks ยืนยันการชำระเงิน as before.
+ *    the bank provider — pass = the order confirms instantly (onConfirmed
+ *    fires so the page can show the paid state); any failure (wrong amount,
+ *    duplicate, provider outage) keeps the provider's reason in the message
+ *    and the slip ALREADY sits in the admin queue (the route stores it
+ *    server-side), so the manual fallback needs no second upload.
+ * 2. If auto-verification is off (no provider key) or the verify request
+ *    itself failed, the slip is uploaded directly to the admin:
+ *    stored on the order and visible in the admin order detail — the admin
+ *    clicks ยืนยันการชำระเงิน as before.
  */
 
 export function SlipUploadPanel({
   orderId,
   slipUploadToken,
   slipVerifyEnabled,
+  onConfirmed,
 }: {
   orderId: string;
   /** Capability token minted with the order — required by the upload API. */
   slipUploadToken: string | null;
   slipVerifyEnabled: boolean;
+  /** Auto verification passed → the page can flip to its paid state. */
+  onConfirmed?: (status: 'confirmed' | 'pending_manual_fulfilment') => void;
 }): React.JSX.Element {
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -87,27 +94,57 @@ export function SlipUploadPanel({
     setResult(null);
     try {
       if (slipVerifyEnabled) {
-        // Attempt instant bank verification; fall back to the manual queue
-        // with the same slip when it doesn't pass.
-        const res = await fetch('/api/v1/payments/slip-verify', {
-          method: 'POST',
-          body: buildForm(),
-          credentials: 'include',
-        });
-        const body = (await res.json().catch(() => ({}))) as {
-          status?: string;
-          message?: string;
-          error?: string;
-        };
-        if (
-          res.ok &&
-          (body.status === 'confirmed' || body.status === 'pending_manual_fulfilment')
-        ) {
-          setResult({ ok: true, message: body.message ?? 'ตรวจสลิปผ่าน — ส่งโค้ดแล้ว' });
-          return;
+        // 1) Instant bank verification. The route stores the slip BEFORE it
+        //    calls the provider, so no matter what comes back the admin can
+        //    already review this exact image.
+        let verifyMessage: string | null = null;
+        try {
+          const res = await fetch('/api/v1/payments/slip-verify', {
+            method: 'POST',
+            body: buildForm(),
+            credentials: 'include',
+          });
+          const body = (await res.json().catch(() => ({}))) as {
+            status?: string;
+            message?: string;
+            error?: string;
+            slipStored?: boolean;
+          };
+          if (
+            res.ok &&
+            (body.status === 'confirmed' || body.status === 'pending_manual_fulfilment')
+          ) {
+            setResult({ ok: true, message: body.message ?? 'ตรวจสลิปผ่าน — ส่งโค้ดแล้ว' });
+            onConfirmed?.(body.status as 'confirmed' | 'pending_manual_fulfilment');
+            return;
+          }
+          if (res.ok) {
+            // Unexpected success shape — still hand it to the admin below.
+            verifyMessage = body.message ?? null;
+          } else {
+            // Keep the provider's reason: "why did it not auto-confirm?"
+            verifyMessage = body.message ?? body.error ?? null;
+          }
+          if (body.slipStored) {
+            setResult({
+              ok: false,
+              message: `${verifyMessage ?? 'ระบบตรวจสลิปยังไม่ยืนยันอัตโนมัติ'} — สลิปถูกส่งให้แอดมินตรวจแล้ว แอดมินจะยืนยันให้เร็วที่สุด`,
+            });
+            return;
+          }
+        } catch {
+          // Network/parse failure below → fall through to the manual upload.
+          verifyMessage = 'ระบบตรวจสลิปขัดข้องชั่วคราว';
         }
-        // Not confirmed automatically → hand the same slip to the admin.
-        await sendToAdmin();
+        // 2) The server never stored it (verify call failed outright) →
+        //    upload the same file so the admin fallback still has evidence.
+        const uploaded = await sendToAdmin();
+        if (uploaded) {
+          setResult({
+            ok: false,
+            message: `${verifyMessage ?? 'ระบบตรวจสลิปยังไม่ยืนยันอัตโนมัติ'} — สลิปถูกส่งให้แอดมินตรวจแล้ว แอดมินจะยืนยันให้เร็วที่สุด`,
+          });
+        }
       } else {
         await sendToAdmin();
       }

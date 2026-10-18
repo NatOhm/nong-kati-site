@@ -51,6 +51,12 @@ export async function recordPaymentReconciliation(
     trigger: input.trigger,
     paymentRef: input.paymentRef ?? null,
     paymentAttemptId: input.paymentAttemptId ?? null,
+    // The failure reason is WHY the reconciliation row exists — the doc
+    // comment above promises it, and without it the row says a verified
+    // payment needs attention but not what actually broke (found while
+    // diagnosing the e2e rerun failure: the generic-catch reason was
+    // nowhere on the row, only recoveryError's placeholder).
+    failureReason: input.failureReason,
     recoveryError: input.recoveryError,
   };
 
@@ -95,6 +101,7 @@ export async function listReconciliationRecords(
     orderId: string;
     trigger: string;
     paymentRef: string | null;
+    failureReason: string;
     recoveryError: string;
     createdAt: Date;
   }>;
@@ -120,6 +127,7 @@ export async function listReconciliationRecords(
         orderId: r.recordId,
         trigger: String(meta['trigger'] ?? 'unknown'),
         paymentRef: (meta['paymentRef'] as string | null) ?? null,
+        failureReason: String(meta['failureReason'] ?? ''),
         recoveryError: String(meta['recoveryError'] ?? ''),
         createdAt: r.createdAt,
       };

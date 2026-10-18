@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Search, Eye, XCircle, CheckCircle, RefreshCw, ShieldCheck } from 'lucide-react';
 
 import { AdminShell } from '@/components/layout/AdminShell';
@@ -122,6 +122,8 @@ export default function AdminOrdersPage(): React.JSX.Element {
   const [refundCategory, setRefundCategory] = useState('other');
   const [refundDetail, setRefundDetail] = useState('');
   const [refundVoidCodes, setRefundVoidCodes] = useState(true);
+  /** Newest load() wins: its AbortController supersedes any in-flight one. */
+  const loadAbortRef = useRef<AbortController | null>(null);
   /** Draft inputs vs applied filters — search runs on Enter/ค้นหา only. */
   const [emailInput, setEmailInput] = useState('');
   const [orderNumberInput, setOrderNumberInput] = useState('');
@@ -133,6 +135,16 @@ export default function AdminOrdersPage(): React.JSX.Element {
   const [revealError, setRevealError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    // Latest-wins: abort the in-flight load before starting another, and
+    // only the still-current request may write orders/statusCounts. Without
+    // this, overlapping loads (StrictMode's double mount effect, quick
+    // filter changes) apply responses out of order and a stale unfiltered
+    // response silently clobbers the filter the user just applied — exactly
+    // the "never silently fall back to the unfiltered list" invariant the
+    // e2e filter spec guards (admin-search-history-reveal, 2026-10-17).
+    loadAbortRef.current?.abort();
+    const controller = new AbortController();
+    loadAbortRef.current = controller;
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -141,13 +153,17 @@ export default function AdminOrdersPage(): React.JSX.Element {
       if (orderNumberFilter) params.set('orderNumber', orderNumberFilter);
       const data = await adminJson<{ orders: OrderRow[]; statusCounts: Record<string, number> }>(
         `/api/v1/admin/orders/search${params.size ? `?${params}` : ''}`,
+        { signal: controller.signal },
       );
+      if (controller.signal.aborted || loadAbortRef.current !== controller) return;
       setOrders(data.orders);
       setStatusCounts(data.statusCounts);
     } catch {
+      // A superseded/aborted load is expected — only a live one is an error.
+      if (controller.signal.aborted || loadAbortRef.current !== controller) return;
       setActionError('โหลดคำสั่งซื้อไม่สำเร็จ');
     } finally {
-      setLoading(false);
+      if (loadAbortRef.current === controller) setLoading(false);
     }
   }, [statusFilter, emailFilter, orderNumberFilter]);
 
