@@ -2,6 +2,9 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { ImageResponse } from 'next/og';
 
+import { getOgShareSettings } from '@/lib/data';
+import { DEFAULT_OG_SHARE } from '@/lib/ogShareSettings';
+
 /**
  * Sitewide default OG/Twitter card (file convention — Next also emits
  * twitter:image from this when no twitter-image is defined).
@@ -24,6 +27,11 @@ import { ImageResponse } from 'next/og';
 export const alt = 'Nong-Kati — แอคดูหนัง ซีรีส์ ส่งถึงอีเมลทันที';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
+
+// The copy comes from SiteSetting['ogShare'] at request time (admin edits it
+// live at /management/og-share), so the card must never be prerendered at
+// build time — that would bake the defaults in and need a DB during build.
+export const dynamic = 'force-dynamic';
 
 type MitrFace = { name: string; data: Buffer; weight: 500 | 600 | 700; style: 'normal' };
 
@@ -230,6 +238,9 @@ function Ear({ diameter }: { diameter: number }): React.JSX.Element {
 
 export default async function OpengraphImage(): Promise<ImageResponse> {
   const fonts = loadMitrFaces();
+  // Admin-editable share copy; reader already falls back internally, the
+  // .catch keeps the card rendering even if data.ts itself blows up.
+  const og = await getOgShareSettings().catch(() => ({ ...DEFAULT_OG_SHARE }));
   return new ImageResponse(
     (
       <div
@@ -340,8 +351,8 @@ export default async function OpengraphImage(): Promise<ImageResponse> {
                 color: '#431407',
               }}
             >
-              <div style={{ display: 'flex' }}>แอคดูหนัง ซีรีส์</div>
-              <div style={{ display: 'flex' }}>ส่งถึงอีเมลทันที</div>
+              <div style={{ display: 'flex' }}>{og.headingLine1}</div>
+              <div style={{ display: 'flex' }}>{og.headingLine2}</div>
             </div>
 
             {/* Brands line */}
@@ -353,7 +364,7 @@ export default async function OpengraphImage(): Promise<ImageResponse> {
                 color: '#9A3412',
               }}
             >
-              Netflix · Spotify · YouTube · HBO Max
+              {og.channels}
             </div>
 
             {/* Trust pills — clay buttons */}
@@ -371,7 +382,7 @@ export default async function OpengraphImage(): Promise<ImageResponse> {
                     'inset 2px 3px 6px rgba(255, 255, 255, 0.30), inset -2px -3px 5px rgba(0, 0, 0, 0.16)',
                 }}
               >
-                โอนเงิน · ตรวจสลิป
+                {og.pill1}
               </div>
               <div
                 style={{
@@ -386,7 +397,7 @@ export default async function OpengraphImage(): Promise<ImageResponse> {
                     'inset 2px 3px 6px rgba(255, 255, 255, 0.18), inset -2px -3px 5px rgba(0, 0, 0, 0.22)',
                 }}
               >
-                ส่งโค้ดทันที
+                {og.pill2}
               </div>
             </div>
           </div>

@@ -8,6 +8,7 @@ import { cache } from 'react';
 import { prisma } from '@/lib/db';
 import { parseFaqSettings, type FaqSettings } from '@/lib/faqSettings';
 import { DEFAULT_TRUST_BADGES, parseTrustBadges, type TrustBadgesSettings } from '@/lib/trustBadges';
+import { DEFAULT_OG_SHARE, parseOgShare, type OgShareSettings } from '@/lib/ogShareSettings';
 import { normalizeTier, tierPrice, type PriceTier } from '@/lib/pricing';
 import { getEligiblePromotions } from '@/lib/promotions';
 
@@ -1001,6 +1002,27 @@ export async function getTrustBadgesSettings(): Promise<TrustBadgesSettings> {
   } catch (e) {
     console.error('[data] getTrustBadgesSettings failed:', e instanceof Error ? e.message : e);
     return structuredClone(DEFAULT_TRUST_BADGES);
+  }
+}
+
+// ─── Share-preview copy (OG card + homepage link preview) ─────────────────
+
+/**
+ * Read the share-preview settings (SiteSetting key 'ogShare'): weblink card
+ * headline/channels/pills + homepage og:title/og:description. Same reasoning
+ * as getTrustBadgesSettings — the force-dynamic homepage (and the
+ * opengraph-image route) reads the row directly, visitors never hit the
+ * authenticated admin endpoint. No row / failure falls back to the copy that
+ * shipped hardcoded.
+ */
+export async function getOgShareSettings(): Promise<OgShareSettings> {
+  try {
+    const row = await prisma.siteSetting.findUnique({ where: { key: 'ogShare' } });
+    if (!row) return structuredClone(DEFAULT_OG_SHARE);
+    return parseOgShare(row.value);
+  } catch (e) {
+    console.error('[data] getOgShareSettings failed:', e instanceof Error ? e.message : e);
+    return structuredClone(DEFAULT_OG_SHARE);
   }
 }
 

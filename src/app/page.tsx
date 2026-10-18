@@ -29,25 +29,34 @@ import {
   getHeroSlides,
   getStorefrontStats,
   getTrustBadgesSettings,
+  getOgShareSettings,
 } from '@/lib/data';
 import { DEFAULT_TRUST_BADGES } from '@/lib/trustBadges';
 import { splitAppGroups } from '@/lib/appGroups';
 import { publicOrigin } from '@/lib/siteConfig';
 
-export const metadata: Metadata = {
-  // No manual brand suffix — the root template appends "— Nong-Kati" (audit #12).
-  title: 'ซื้อแอคดูหนัง ซีรีส์ Netflix Spotify และอื่นๆ ราคาดี',
-  description:
-    'ซื้อแอคดูหนัง ซีรีส์ Netflix Spotify YouTube ราคาดี โอนเงินพร้อมส่งสลิปยืนยัน ทีมงานยืนยันแล้วส่งโค้ดถึงอีเมล',
-  openGraph: {
-    title: 'Nong-Kati — แอคดูหนัง ซีรีส์ ส่งถึงอีเมลทันที',
-    description: 'ราคาดี โอนเงินพร้อมส่งสลิปยืนยัน ทีมงานยืนยันแล้วส่งโค้ดถึงอีเมล',
-    type: 'website',
-    locale: 'th_TH',
-    url: './',
-  },
-  alternates: { canonical: './' },
-};
+/**
+ * og:title / og:description are admin-editable at /management/og-share
+ * (SiteSetting['ogShare'], see lib/ogShareSettings). The search snippet
+ * (title/description) stays fixed — only the share-preview copy moves.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const og = await getOgShareSettings();
+  return {
+    // No manual brand suffix — the root template appends "— Nong-Kati" (audit #12).
+    title: 'ซื้อแอคดูหนัง ซีรีส์ Netflix Spotify และอื่นๆ ราคาดี',
+    description:
+      'ซื้อแอคดูหนัง ซีรีส์ Netflix Spotify YouTube ราคาดี โอนเงินพร้อมส่งสลิปยืนยัน ทีมงานยืนยันแล้วส่งโค้ดถึงอีเมล',
+    openGraph: {
+      title: og.ogTitle,
+      description: og.ogDescription,
+      type: 'website',
+      locale: 'th_TH',
+      url: './',
+    },
+    alternates: { canonical: './' },
+  };
+}
 
 export default async function HomePage(): Promise<React.JSX.Element> {
   let categories: Awaited<ReturnType<typeof getCategoriesWithProductCounts>> = [];

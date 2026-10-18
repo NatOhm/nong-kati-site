@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { checkPermission } from '@/lib/rbac';
 import { getAdminToken } from '@/lib/adminRequest';
+import { normalizeProductShortDescription } from '@/lib/ogShareSettings';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,6 +47,7 @@ export async function PUT(
     name?: string;
     sku?: string | null;
     description?: string | null;
+    shortDescription?: string | null;
     imageUrl?: string | null;
     categoryId?: string;
     isActive?: boolean;
@@ -71,6 +73,14 @@ export async function PUT(
   }
   if (typeof b['description'] === 'string' || b['description'] === null) {
     data.description = b['description'] as string | null;
+  }
+  // Short description (link-preview copy): string เปลี่ยน, null เคลียร์,
+  // ไม่ส่งมา = ไม่แก้ — sanitize + cap ที่ normalizeProductShortDescription
+  if (b['shortDescription'] === null) {
+    data.shortDescription = null;
+  } else if (typeof b['shortDescription'] === 'string') {
+    const v = normalizeProductShortDescription(b['shortDescription']);
+    data.shortDescription = v === '' ? null : v;
   }
   // Image: either a served upload path (/products/...) or null to clear.
   if (b['imageUrl'] === null) {

@@ -20,6 +20,7 @@ import {
 
 import { AdminShell } from '@/components/layout/AdminShell';
 import { adminFetch } from '@/lib/adminSession';
+import { PRODUCT_SHORT_DESCRIPTION_MAX } from '@/lib/ogShareSettings';
 import { cn } from '@/utils/cn';
 import { ImportDialog } from './ImportDialog';
 import { BulkPricingDialog } from './BulkPricingDialog';
@@ -48,6 +49,8 @@ interface AdminProduct {
   name: string;
   slug: string;
   description: string | null;
+  /** Link-preview copy — og:description when someone shares the product link. */
+  shortDescription: string | null;
   imageUrl: string | null;
   categoryId: string;
   categoryName: string;
@@ -753,6 +756,7 @@ function ProductEditor({
 }) {
   const [name, setName] = useState(product?.name ?? '');
   const [description, setDescription] = useState(product?.description ?? '');
+  const [shortDescription, setShortDescription] = useState(product?.shortDescription ?? '');
   const [categoryId, setCategoryId] = useState(product?.categoryId ?? categories[0]?.id ?? '');
   const [imageUrl, setImageUrl] = useState<string | null>(product?.imageUrl ?? null);
   const [isFeatured, setIsFeatured] = useState(product?.isFeatured ?? false);
@@ -850,6 +854,7 @@ function ProductEditor({
       const body = {
         name: name.trim(),
         description: description.trim() || null,
+        shortDescription: shortDescription.trim() || null,
         imageUrl,
         categoryId,
         isFeatured,
@@ -968,6 +973,24 @@ function ProductEditor({
               placeholder="รายละเอียดที่ลูกค้าจะเห็นในหน้าสินค้า"
               className="w-full resize-none rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-fg-placeholder focus:ring-2 focus:ring-peach-500"
             />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-fg-muted">
+              คำอธิบายสั้น (ตอนแชร์ลิงก์ / ค้นหาใน Google)
+            </label>
+            <textarea
+              value={shortDescription}
+              onChange={(e) => setShortDescription(e.target.value)}
+              rows={2}
+              maxLength={PRODUCT_SHORT_DESCRIPTION_MAX}
+              placeholder="เช่น ส่งโค้ดถึงอีเมลทันที รับประกันทุกออเดอร์"
+              className="w-full resize-none rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-fg-placeholder focus:ring-2 focus:ring-peach-500"
+            />
+            <p className="mt-1 text-xs text-fg-placeholder">
+              ใช้เป็นคำอธิบายตอนแปะลิงก์ (og:description) · เว้นว่าง = ขึ้น &quot;ซื้อ {'{ชื่อสินค้า}'} ออนไลน์&quot;
+              · {shortDescription.length}/{PRODUCT_SHORT_DESCRIPTION_MAX}
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

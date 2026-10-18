@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { checkPermission } from '@/lib/rbac';
 import { getAdminToken } from '@/lib/adminRequest';
+import { normalizeProductShortDescription } from '@/lib/ogShareSettings';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,6 +41,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       slug: p.slug,
       sku: p.sku,
       description: p.description,
+      shortDescription: p.shortDescription,
       imageUrl: p.imageUrl,
       categoryId: p.categoryId,
       categoryName: p.category.name,
@@ -151,6 +153,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const slug = `${slugBase}-${Date.now().toString(36).slice(-4)}`;
 
   const description = typeof b['description'] === 'string' ? b['description'] : null;
+  // Short description — drives og:description on product link previews;
+  // normalized the same way as PUT [id] (control chars out, 160 cap).
+  const shortDescription =
+    typeof b['shortDescription'] === 'string'
+      ? normalizeProductShortDescription(b['shortDescription'])
+      : null;
   const imageUrl =
     typeof b['imageUrl'] === 'string' && b['imageUrl'].startsWith('/') ? b['imageUrl'] : null;
   const isFeatured = b['isFeatured'] === true;
@@ -185,6 +193,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       slug,
       sku: typeof b['sku'] === 'string' && b['sku'].trim() !== '' ? b['sku'].trim() : null,
       description,
+      shortDescription: shortDescription === '' ? null : shortDescription,
       imageUrl,
       categoryId,
       isFeatured,

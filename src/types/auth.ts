@@ -195,8 +195,14 @@ export const ROUTE_PERMISSIONS: Record<string, Permission[]> = {
   // Homepage trust badges ("ทำไมต้อง Nong-Kati?") — admin-editable copy
   'GET /api/v1/admin/settings/trust-badges': ['settings:read'],
   'PUT /api/v1/admin/settings/trust-badges': ['settings:write'],
+  // Weblink (OG) share card + homepage link-preview copy — /management/og-share
+  'GET /api/v1/admin/settings/og-share': ['settings:read'],
+  'PUT /api/v1/admin/settings/og-share': ['settings:write'],
   // One-click Discord webhook probe from the notifications settings page
   'POST /api/v1/admin/settings/discord-test': ['settings:write'],
+  // Slip2Go account-info probe — no-purchase connectivity check from the
+  // payment settings page (read-only GET; reports auth scheme + quota)
+  'POST /api/v1/admin/settings/slip-account': ['settings:write'],
   'GET /api/v1/admin/staff': ['staff:read'],
   // ratchet: KNOWN_UNBUILT (role change)
   'PATCH /api/v1/admin/staff/:id/role': ['staff:write'],

@@ -243,6 +243,8 @@ const ROUTE_COVERAGE: MatrixRow[] = [
   { method: 'POST', path: '/settings/email-test', perm: 'settings:write', body: {} },
   // Discord webhook probe — sends ONE test embed, reports the outcome
   { method: 'POST', path: '/settings/discord-test', perm: 'settings:write', body: {} },
+  // Slip2Go account-info probe — read-only no-purchase connectivity check
+  { method: 'POST', path: '/settings/slip-account', perm: 'settings:write', body: {} },
   // FAQ settings — drives the public accordion; answers are sanitized rich text
   { method: 'GET', path: '/settings/faq', perm: 'settings:read' },
   {
@@ -258,6 +260,14 @@ const ROUTE_COVERAGE: MatrixRow[] = [
     path: '/settings/trust-badges',
     perm: 'settings:write',
     body: { enabled: true, title: 'x', items: [{ icon: 'shield', title: 'a', desc: 'b', order: 0 }] },
+  },
+  // Weblink (OG) share card + homepage link-preview copy (/management/og-share)
+  { method: 'GET', path: '/settings/og-share', perm: 'settings:read' },
+  {
+    method: 'PUT',
+    path: '/settings/og-share',
+    perm: 'settings:write',
+    body: { headingLine1: 'x' },
   },
   // staff
   { method: 'GET', path: '/staff', perm: 'staff:read' },

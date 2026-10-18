@@ -180,3 +180,130 @@ export async function verifySlip2Go(input: Slip2GoVerifyInput): Promise<Slip2GoR
     raw: d as unknown as Record<string, unknown>,
   };
 }
+
+// ─── Account-info probe (no-purchase connectivity check) ─────────────
+
+/** Sanitized account summary — the ONLY shape that leaves this module. */
+export interface Slip2GoAccountSummary {
+  shopName: string | null;
+  package: string | null;
+  packageExpiredDate: string | null;
+  tokenLimit: number | null;
+  tokenRemaining: number | null;
+  creditRemaining: number | null;
+  estimatedQuotaSlip: number | null;
+  quotaQrLimit: number | null;
+  quotaQrRemaining: number | null;
+}
+
+export type Slip2GoAccountResult =
+  | { ok: true; account: Slip2GoAccountSummary; authScheme: 'raw' | 'bearer' }
+  | {
+      ok: false;
+      code: 'NOT_CONFIGURED' | 'AUTH_FAILED' | 'UPSTREAM_ERROR';
+      detail?: string;
+    };
+
+interface AccountInfoBody {
+  code?: string;
+  message?: string;
+  data?: Record<string, unknown>;
+}
+
+function numOrNull(v: unknown): number | null {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function strOrNull(v: unknown): string | null {
+  return typeof v === 'string' && v !== '' ? v : null;
+}
+
+function mapAccount(data: Record<string, unknown>): Slip2GoAccountSummary {
+  return {
+    shopName: strOrNull(data['shopName']),
+    package: strOrNull(data['package']),
+    packageExpiredDate: strOrNull(data['packageExpiredDate']),
+    tokenLimit: numOrNull(data['tokenLimit']),
+    tokenRemaining: numOrNull(data['tokenRemaining']),
+    creditRemaining: numOrNull(data['creditRemaining']),
+    estimatedQuotaSlip: numOrNull(data['estimatedQuotaSlip']),
+    quotaQrLimit: numOrNull(data['quotaQrLimit']),
+    quotaQrRemaining: numOrNull(data['quotaQrRemaining']),
+  };
+}
+
+type AccountAttempt =
+  | { kind: 'ok'; account: Slip2GoAccountSummary }
+  | { kind: 'auth' }
+  | { kind: 'error'; detail: string };
+
+async function fetchAccountInfoOnce(
+  secret: string,
+  scheme: 'raw' | 'bearer',
+): Promise<AccountAttempt> {
+  let res: Response;
+  try {
+    res = await fetch(`${SLIP2GO_BASE}/api/account/info`, {
+      method: 'GET',
+      headers: {
+        Authorization: scheme === 'bearer' ? `Bearer ${secret}` : secret,
+        Accept: 'application/json',
+      },
+      signal: AbortSignal.timeout(8_000),
+    });
+  } catch {
+    return { kind: 'error', detail: 'network' };
+  }
+  // Auth verdict from the status alone, before parsing — a rejecting proxy
+  // may answer HTML, and a 401 is still an auth failure we must retry past.
+  if (res.status === 401 || res.status === 403) return { kind: 'auth' };
+  let parsed: AccountInfoBody | null;
+  try {
+    parsed = (await res.json()) as AccountInfoBody;
+  } catch {
+    return { kind: 'error', detail: `HTTP ${res.status}` };
+  }
+  const code = typeof parsed?.code === 'string' ? parsed.code : '';
+  if (code.startsWith('401')) return { kind: 'auth' }; // 401001/2/3/4/7…
+  if (res.status !== 200 || !code.startsWith('200') || !parsed?.data) {
+    return { kind: 'error', detail: code || `HTTP ${res.status}` };
+  }
+  return { kind: 'ok', account: mapAccount(parsed.data) };
+}
+
+/**
+ * GET {SLIP2GO_BASE}/api/account/info — READ-ONLY account/package/quota
+ * probe: the "no-purchase connectivity check" (is the configured secret
+ * accepted, how much API quota is left). Officially documented at
+ * slip2go.com/guide/rest-api/account/info as an informational call — no
+ * verification credit is charged per the docs.
+ *
+ * What it deliberately does NOT establish: that slip verification,
+ * amount/receiver matching, duplicate detection, or production checkout
+ * works — those need a real slip through the customer flow.
+ *
+ * Auth-scheme note: the public guide documents the RAW secret as the
+ * `Authorization` value (no "Bearer"), while the merchant dashboard's
+ * copy-paste examples show `Bearer {secret}`. We try raw first, then
+ * Bearer only after an auth rejection, and REPORT which scheme worked —
+ * so this free informational call settles the contradiction empirically
+ * instead of guessing. The secret never appears in any result.
+ */
+export async function getSlip2GoAccountInfo(): Promise<Slip2GoAccountResult> {
+  const secret = process.env['NK_SLIP2GO_SECRET'];
+  if (!secret) return { ok: false, code: 'NOT_CONFIGURED' };
+
+  const first = await fetchAccountInfoOnce(secret, 'raw');
+  if (first.kind === 'ok') return { ok: true, account: first.account, authScheme: 'raw' };
+  if (first.kind === 'error') {
+    return { ok: false, code: 'UPSTREAM_ERROR', detail: first.detail };
+  }
+
+  const second = await fetchAccountInfoOnce(secret, 'bearer');
+  if (second.kind === 'ok') return { ok: true, account: second.account, authScheme: 'bearer' };
+  if (second.kind === 'error') {
+    return { ok: false, code: 'UPSTREAM_ERROR', detail: second.detail };
+  }
+  return { ok: false, code: 'AUTH_FAILED', detail: 'rejected with both raw and Bearer schemes' };
+}

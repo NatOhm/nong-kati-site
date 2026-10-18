@@ -31,6 +31,7 @@ import {
   Tags,
   Ticket,
   Gift,
+  Image as ImageIcon,
   Users,
   Wallet,
 } from 'lucide-react';
@@ -179,6 +180,12 @@ export const ADMIN_NAV: AdminNavNode[] = [
         href: '/management/trust-badges',
         permission: 'settings:read',
         icon: Award,
+      },
+      {
+        label: 'รูปแชร์ลิงก์ (OG)',
+        href: '/management/og-share',
+        permission: 'settings:read',
+        icon: ImageIcon,
       },
       {
         label: 'ตั้งค่า',
