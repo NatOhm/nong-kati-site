@@ -52,7 +52,7 @@
 | RL2   | Rate-limit rule table — checkout reads (`orders/preview`, `orders/vat`) ต้องมี bucket ของตัวเอง 60/min ไม่ให้ share กับ rule สร้างออเดอร์ 10/min (มิฉะนั้น preview ที่ยิงทุกครั้งที่แก้ตะกร้าจะทำให้ `POST /orders` จริงโดน 429 กลาง checkout — คว่ำโดย Browser Smoke gate) + rule เฉพาะต้องอยู่ เหนือ rule รวม ในตาราง เพราะ prefix match เจอตัวแรกก่อน | `tests/rate-limit-rules.test.ts` | `npm test` (vitest) | Unit Tests |
 | FV    | Vendored webfonts — ห้าม import `next/font/google` ใน `src/` (build ต้องไม่ fetch ฟอนต์จาก CDN ตอน build — เคสจริง: next/font พังบน CI runner 2 ใน 3 builds จน Browser Smoke แดงทั้งที่โค้ดปกติ) · ทุก `url()` ใน `fonts.css` ต้องชี้ไฟล์ woff2 จริงใน `public/fonts/` (wOF2 magic ครบ — ไฟล์หาย = ข้อความไทยเป็นสี่เหลี่ยม) · ตัวแปร `--font-mitr`/`--font-noto-sans-thai-looped`/`--font-jetbrains-mono` ยังถูกนิยามใน `fonts.css` (เดิม next/font ฉีดผ่าน `<html>` className) | `tests/font-vendoring.test.ts` | `npm test` (vitest) | Unit Tests |
 | IU    | Admin image upload 5 MB byte limit, dimensions, and pixel-area limits | `tests/image-upload-validation.test.ts` | `npm test` (vitest) | Unit Tests |
-| DS    | Discord webhook is environment-only; legacy DB value is ignored | `tests/discord-secret-config.test.ts` | `npm test` (vitest) | Unit Tests |
+| DS    | Discord webhook is environment-only; legacy DB value is ignored; one-click test probe (`sendTestDiscordMessage`) reports the truth — ไม่ config → ไม่ fetch, Discord ปฏิเสธ → คืน status จริง, เน็ตตาย → UNREACHABLE, ไม่ leak URL | `tests/discord-secret-config.test.ts` | `npm test` (vitest) | Unit Tests |
 | SI    | Store contact settings persist a configurable HTTPS LINE URL | `tests/store-info-settings.test.ts` | `npm test` (vitest) | Unit Tests |
 | PN    | Customer promotion alerts include discount, conditions, expiry, description, and item links | `tests/promotion-notifications.test.ts` | `npm test` (vitest) | Unit Tests |
 | RP    | Recommended catalog includes only active, admin-featured products | `tests/recommended-products.test.ts` | `npm test` (vitest) | Unit Tests |
@@ -60,6 +60,9 @@
 | FP    | Forced password change — never looks like a permissions problem; layout redirect cannot loop | `tests/admin-forced-password-change.test.ts` | `npm test` (vitest) | Unit Tests |
 | PP    | Pricing persistence — seven-blocker coverage (VAT satang allocation across lines, snapshot sums reconcile to order totals) | `tests/pricing-persistence.test.ts` | `npm test` (vitest) | Unit Tests |
 | FR    | FAQ rich-text answers — allowlisted tags only, hardened links, browser block markup normalized to line breaks | `tests/faq-richtext.test.ts` | `npm test` (vitest) | Unit Tests |
+| FQ    | FAQ section visibility toggle — flag `enabled` ใน `SiteSetting['faq']` (row เดิมที่ไม่มี flag = ยังแสดง, ปิด/เปิดได้โดยไม่ลบคำถามที่บันทึกไว้, PUT เปลี่ยนเฉพาะ visibility ต้องบันทึกได้แม้ item list ว่าง) | `tests/faq-settings.test.ts` | `npm test` (vitest) | Unit Tests |
+| TB    | Trust badges (ส่วน "ทำไมต้อง Nong-Kati?") — flag `enabled` + หัวข้อ + รายการป้ายใน `SiteSetting['trustBadges']` (row เดิม/JSON พัง = ใช้ชุดเริ่มต้น, icon ที่ไม่รู้จัก fallback เป็น shield แทนการลบป้าย, toggle/หัวข้อต้องรอดแม้ payload ไม่มี item ที่ใช้ได้, cap 8 ป้าย) | `tests/trust-badges.test.ts` | `npm test` (vitest) | Unit Tests |
+| ON    | Order-number allocation — numbering จากเลขสูงสุดของปีปัจจุบัน (ไม่ใช่ `COUNT(*)`) เพราะ row ถูกลบไป 1 อัน = count ตามจริงไม่ทัน → insert ซ้ำ → Postgres abort tx → เดิม retry ใน tx เดิมได้ 25P02 ทุกครั้ง = checkout 500 ทุกลูกค้า | `tests/order-numbering.test.ts` | `npm test` (vitest) | Unit Tests |
 | BK    | Bulk account-paste — counter นับเท่ากับที่ route แยกจริง (CRLF / NBSP blank-run / บล็อกในบัญชีเดียว) และ raw error code ห้ามหลุดถึงจอ (NO_VARIANTS → ข้อความไทย) | `tests/bulk-stock-records.test.ts` | `npm test` (vitest) | Unit Tests |
 | E1    | Disabled-state affordance (WCAG 1.4.1)                | `e2e/disabled-state.spec.ts`       | `npm run test:e2e`   | (local/preview)        |
 | E2    | No hardcoded white in dark mode                       | `e2e/no-hardcoded-white.spec.ts`   | `npm run test:e2e`   | (local/preview)        |
@@ -68,6 +71,7 @@
 | E5    | Touch targets 44px + stats consistency                | `e2e/touch-targets.spec.ts`        | `npm run test:e2e`   | (local/preview)        |
 | E6    | Admin refund + resend controls on the order detail modal | `e2e/order-refund-resend.spec.ts` | `npm run test:e2e`   | **Browser Smoke** (run ใน CI ด้วย) |
 | E7    | Admin order search / customer history / delivery reveal — masked vs full PII, cancel-path, allowed + denied roles | `e2e/admin-search-history-reveal.spec.ts` | `npm run test:e2e` | **Browser Smoke** (run ใน CI ด้วย) |
+| SF    | Slip flow — auto-verify dispatch (Slip2Go→SlipOK fallback), เก็บหลักฐานสลิป before check, ping แอดมินเมื่อต้องตรวจเอง | `tests/slip-flow.test.ts` | `npm test` (vitest) | Unit Tests             |
 
 **วิธีรัน:**
 
@@ -656,6 +660,45 @@ job นี้แดงมาตั้งแต่รอบที่ 88 และ
 - **ลิงก์ต้องปลอดภัย:** `href` ต้องขึ้นต้น `https://` `http://` หรือ `mailto:` เท่านั้น (กัน `javascript:`) และทุกลิงก์ถูกบังคับ `target="_blank" rel="noopener noreferrer"`
 - **Markup ที่เบราว์เซอร์สร้างตอนพิมพ์ Enter (`div/p/li`) ถูก normalize เป็น `<br />`** และเบรกต่อเนื่องถูกยุบ — ทำให้ข้อมูลที่วน editor แล้วไม่เพี้ยน และ plain text เดิมยังคงอ่านได้เหมือนเดิม
 - **คำตอบที่ไม่มีข้อความจริง (มีแต่แท็ก) ถูกตีตก** ไม่ให้บันทึก (`faqAnswerValue` → `''`)
+
+## FAQ section visibility toggle (2026-10-16) — `tests/faq-settings.test.ts`
+
+ส่วนคำถามที่พบบ่อยในหน้าแรกมีสวิต์เปิด/ปิดจาก `/management/faq` — ค่าเก็บใน flag `enabled` ของ `SiteSetting['faq']` (row เดิมเขียนก่อนมี flag จึงต้อง default = visible) gate นี้ล็อก `src/lib/faqSettings.ts` ซึ่งเป็นจุดแปลงค่าเดียวของทั้ง server (`GET/PUT /api/v1/admin/settings/faq`) และ client (หน้า `/management/faq`):
+
+- **row เก่าที่ไม่มี `enabled` → ยังแสดง** — flag หายไปไม่ใช่เหตุผลที่จะซ่อนร้านเงียบ ๆ (`parseFaqSettings` default `true`)
+- **toggle ปิด/เปิดต้องไม่ลบคำถาม** — payload ที่ `items: []` (หรือไม่มี item ที่ใช้ได้) คืนคำถามเดิมพร้อม apply `enabled` ตัวเก่า `return current` ทิ้ง flag ซะเอง อันนี้คือบั๊กที่ gate จับ
+- **save เฉพาะสวิต์ต้องผ่าน** — หน้า editor บันทึกได้แม้ไม่มีคำถาม (list ว่าง) เพราะ normalize กันไม่ให้ list ว่างล้างของเดิมอยู่แล้ว
+- **วิธีแก้เมื่อแดง:** แก้ `src/lib/faqSettings.ts` ให้ flag กับ item ถูก apply แยกกัน อย่าแก้เทสต์ให้ตามโค้ดที่ผิด
+
+## Trust-badge section settings (2026-10-16) — `tests/trust-badges.test.ts`
+
+ส่วน "ทำไมต้อง Nong-Kati?" ในหน้าแรกแก้ไขได้จาก `/management/trust-badges` (หัวข้อ, สวิต์แสดง/ซ่อน, ไอคอน/หัวข้อ/คำอธิบายต่อป้าย, ลากจัดลำดับ) — ค่าเก็บใน `SiteSetting['trustBadges']` gate นี้ล็อก `src/lib/trustBadges.ts` ซึ่งเป็นจุดแปลงค่าเดียวของทั้ง server (`GET/PUT /api/v1/admin/settings/trust-badges`, `getTrustBadgesSettings` ใน `lib/data.ts`) และ client (หน้า `/management/trust-badges`):
+
+- **row หาย/JSON พัง → ใช้ชุดเริ่มต้นเดิม** — ต่างจาก FAQ (ที่ row ว่าง = ปกติ) เพราะข้อมูลเสียห้ามลบป้ายความน่าเชื่อถือออกจากหน้าแรกเงียบ ๆ
+- **icon เก็บเป็น key เท่านั้น** (ไม่ใช่ markup) — key ที่ไม่อยู่ใน allowlist fallback เป็น `shield` ไม่ใช่ทิ้งทั้งป้าย
+- **toggle/หัวข้อ ต้องรอดแม้ payload ไม่มี item ที่ใช้ได้** — ปิดส่วน/เปลี่ยนหัวข้อพร้อม `items: []` ต้องไม่ลบป้ายที่บันทึกไว้ (บั๊กเดียวกับที่ gate ของ FAQ จับ)
+- **cap 8 ป้าย + trim/ตัดความยาว** — ป้ายไร้หัวข้อถูกตีตกตอน normalize
+- **วิธีแก้เมื่อแดง:** แก้ `src/lib/trustBadges.ts` อย่าแก้เทสต์ให้ตามโค้ดที่ผิด
+
+## Order-number allocation (2026-10-16) — `tests/order-numbering.test.ts`
+
+เลขออเดอร์ `NK-YYYY-NNNNNN` เดิมคำนวณจาก `COUNT(*) + 1` — พอลบออเดอร์ไปแม้แต่แถวเดียว count จะน้อยกว่าเลขสูงสุดจริง ทำให้ `count + 1` ชี้ไปที่เลขที่มีอยู่แล้ว: insert ชน unique index → Postgres **abort ทั้ง transaction** → โค้ดเดิม catch P2002 แล้ว retry insert **ใน transaction เดิมที่ถูก abort ไปแล้ว** → ได้ `25P02` ทุกครั้ง → ลูกค้าเจอ 500 ทุกคน (เคสจริง 16 ต.ค.: 77 rows / max `NK-2026-000079`) gate นี้ล็อกตัว alloc ใน `src/lib/pricing.ts` (`nextOrderSequence`):
+
+- **numbering จากเลขสูงสุดของปีปัจจุบัน** (`max + 1`) — ช่องว่างจาการลบ row ไม่ทำให้เลขซ้ำอีก
+- **แถวรูปแบบผิดถูกเมิน** — เช่น `NK-2026-1790058401895` ที่มีจริงในฐานข้อมูล) หรือคนละปี ห้ามดัน sequence ไป 13 หลัก
+- **sample ว่าง/legacy → fallback `count + 1`** เท่านั้น — ข้ามปีไม่ชนเพราะ year อยู่ในเลข
+- **ห้าม retry ใน transaction ที่ abort แล้ว:** P2002 ต้อง propagate ออกให้ outer retry สร้าง transaction ใหม่แล้วอ่าน max ใหม่ (โครงสร้างนี้ถูกล็อกโดย Blocker 6 ใน `tests/pricing-persistence.test.ts`)
+- **วิธีแก้เมื่อแดง:** แก้ `nextOrderSequence` ใน `src/lib/pricing.ts` หรือการเรียกใช้ใน `src/api/orders.ts` อย่าแก้เทสต์ให้ตามโค้ดที่ผิด
+
+## Slip auto-verify + admin fallback (2026-10-17) — `tests/slip-flow.test.ts`
+
+ลูกค้าขอ: ให้ slip verify อัตโนมัติ**ทำงานได้จริง** พร้อม fallback ตรวจอslipด้วยแอดมิน — โค้ดอยู่ `src/app/api/v1/payments/slip-verify/route.ts`, `src/app/api/v1/payments/slip-upload/route.ts`, `src/components/checkout/SlipUploadPanel.tsx`, `src/app/checkout/page.tsx`:
+
+- **Provider dispatch + fallback:** เรียก Slip2Go ก่อน (merchant account ของร้าน) ถ้า fail แบบชั่วคราว (`UPSTREAM_ERROR` / `QUOTA_EXCEEDED` / `NOT_CONFIGURED`) และมี SlipOK configured → retry ทันที ลูกค้าไม่ถูกโยนเข้าคิวมือถ้า provider ใด provider หนึ่งยังใช้ได้; verdict ชัดเจน (ยอดไม่ตรง/สลิปซ้ำ) **ไม่ retry** (ไม่เปลืองโควต้า)
+- **หลักฐานมาก่อน check:** route เก็บรูปสลิปลง namespace `slip:` + link ที่ order **ก่อน**เรียก provider — ไม่ว่าผลจะผ่าน/ยอดไม่ผ่าน/เน็ตตาย แอดมินเห็นรูปเดียวกับที่ลูกค้าส่งใน จัดการคำสั่งซื้อ เสมอ และ failure response คืน `slipStored: true` เพื่อกัน client อัปโหลดซ้ำ
+- **Admin fallback ping:** ทุกเคสที่ระบบยืนยันเองไม่ได้ (`slip-verify` fail) และทุกการอัปโหลด slip-upload (manual path เต็ม) → `notifyPaymentPending` ยิง Discord ให้แอดมินมาตรวจทันที (เดิมไม่มีใครถูกแจ้งเลย — คิวเปลี่ยนเฉพาะตอนมีคนเปิดหน้าเว็บ)
+- **UX ฝั่งลูกค้า:** panel เก็บเหตุผลจากระบบตรวจไว้ในข้อความตอนส่งให้แอดมิน (เดิมถูกแทนด้วยข้อความ generic), verify สำเร็จ → `onConfirmed` ให้ checkout flip เป็นสถานะชำระเงินแล้ว และ network fail ระหว่าง verify → ยัง upload ให้แอดมินต่อได้
+- **assert (node env):** dispatch 2 provider + fallback + ไม่ retry เมื่อ verdict ชัด · evidence row เขียนก่อน provider call ทั้งตอนผ่าน/ไม่ผ่าน · `notifyPaymentPending` ถูกเรียกตอน fail ทั้ง 2 route · token ผิด = 403 ไม่เก็บรูป · panel component (jsdom): เหตุผล+ข้อความแอดมินอยู่ครบ, เรียก slip-verify ครั้งเดียวเมื่อ `slipStored`, `onConfirmed('confirmed')` เมื่อผ่าน
 
 ## CI pipeline (`.github/workflows/ci.yml`)
 

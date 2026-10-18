@@ -1,17 +1,23 @@
 /**
- * E2E: seed 5 encrypted gift codes onto the Prime Video variant so the
- * purchase flow can be proven. Run: node scripts/seed-test-codes.mjs
+ * E2E: seed 5 encrypted gift codes onto a product's variant so the purchase
+ * flow can be proven. Run: node scripts/seed-test-codes.mjs [productName]
  * (NK_GIFT_CODE_ENCRYPTION_KEY must be set — the app throws without it.)
+ *
+ * The product-name filter is optional and defaults to 'Prime Video'. The
+ * e2e purchase-flow spec sells hbo-max-7-4k-4, so a repeatable full-suite
+ * run needs codes on THAT variant: node scripts/seed-test-codes.mjs 'HBO Max'
  */
 import { PrismaClient } from '@prisma/client';
 import { encryptCode, hashCode } from '../src/lib/crypto/giftCode.ts';
 
+const productName = process.argv[2] ?? 'Prime Video';
+
 const p = new PrismaClient();
 try {
   const v = await p.productVariant.findFirst({
-    where: { product: { name: { contains: 'Prime Video' } } },
+    where: { product: { name: { contains: productName } }, isActive: true },
   });
-  if (!v) throw new Error('no Prime Video variant');
+  if (!v) throw new Error(`no active variant for product containing "${productName}"`);
 
   const codes = [];
   for (let i = 0; i < 5; i++) {

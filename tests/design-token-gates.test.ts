@@ -137,8 +137,8 @@ const ALLOWLIST: ReadonlyArray<{
   {
     rule: 'R1',
     file: 'src/components/home/TrustBadges.tsx',
-    content: 'Headphones size={24}',
-    why: 'decorative icon',
+    content: "iconClass: 'text-coral-500'",
+    why: 'icon stroke colour in the BADGE_ICONS map — chip text stays text-fg-error',
   },
   {
     rule: 'R1',

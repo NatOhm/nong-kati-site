@@ -83,7 +83,7 @@ test.describe('200% zoom reflow', () => {
 test.describe('landscape phone (667×375)', () => {
   test.use({ viewport: { width: 667, height: 375 } });
 
-  for (const path of ['/', '/search', '/product/hbo-max-7-4k'] as const) {
+  for (const path of ['/', '/search', '/product/hbo-max-7-4k-4'] as const) {
     test(`${path}: renders + no horizontal overflow`, async ({ page }) => {
       await page.goto(path);
       await page.waitForTimeout(400);
@@ -104,7 +104,7 @@ for (const vp of [
   test.describe(vp.name, () => {
     test.use({ viewport: { width: vp.width, height: vp.height } });
 
-    for (const path of ['/', '/search', '/product/hbo-max-7-4k'] as const) {
+    for (const path of ['/', '/search', '/product/hbo-max-7-4k-4'] as const) {
       test(`${path}: renders with chrome, h1 and no overflow`, async ({ page }) => {
         await page.goto(path);
         await page.waitForTimeout(400);
@@ -216,7 +216,7 @@ test.describe('keyboard-only traversal', () => {
   test('add to cart via Enter, then cart drawer: focus-trapped, Escape closes, focus restored', async ({
     page,
   }) => {
-    await page.goto('/product/hbo-max-7-4k');
+    await page.goto('/product/hbo-max-7-4k-4');
 
     // 1. The primary buy action must be reachable and triggerable by keyboard.
     const add = await tabUntil(page, (f) => f.text === 'เพิ่มลงตะกร้า', 'add-to-cart button');

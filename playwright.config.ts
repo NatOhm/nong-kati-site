@@ -1,4 +1,19 @@
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+
 import { defineConfig, devices } from '@playwright/test';
+
+/**
+ * The specs drive PrismaClient directly (purchase-flow, management smoke:
+ * assertions + fixture reset run in the TEST-RUNNER process), and CI feeds
+ * those env vars through the job-level `env:` block. Locally nothing loads
+ * them for this process — Next only loads .env.local for the SERVER — so a
+ * local run used to die in beforeAll with "NK_GIFT_CODE_ENCRYPTION_KEY not
+ * set" (and Prisma would miss DATABASE_URL in any spec that connects).
+ * Load the same file here; existing process.env wins, exactly like CI.
+ */
+const envLocal = path.join(__dirname, '.env.local');
+if (existsSync(envLocal)) process.loadEnvFile(envLocal);
 
 /**
  * Storefront quality gates — contrast (WCAG 1.4.3), landmark structure,
