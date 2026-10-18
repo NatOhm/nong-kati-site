@@ -59,7 +59,7 @@ export async function generateMetadata({ searchParams }: SearchPageProps): Promi
   return {
     title: query ? `ค้นหา "${query}"` : `สินค้าทั้งหมด`,
     description: query
-      ? `ผลการค้นหา "${query}" — ซื้อบัตรเกม สตรีมมิ่ง และอีคอมเมิร์ซ ออนไลน์`
+      ? `ผลการค้นหา "${query}" — แอคดูหนัง ซีรีส์ ออนไลน์`
       : 'เลือกซื้อสินค้าทั้งหมด gift card ออนไลน์ โอนเงินแล้วทีมงานยืนยันและส่งโค้ด',
     robots: { index: false, follow: true },
     alternates: { canonical: '/search' },

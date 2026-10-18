@@ -175,7 +175,7 @@ function generateReceiptHtml(data: InvoiceData): string {
       </div>
 
       <div class="footer">
-        <p>Nong-Kati — ซื้อบัตรเกม สตรีมมิ่ง และอีคอมเมิร์ซ ออนไลน์</p>
+        <p>Nong-Kati — แอคดูหนัง ซีรีส์ ออนไลน์</p>
       </div>
     </body>
     </html>

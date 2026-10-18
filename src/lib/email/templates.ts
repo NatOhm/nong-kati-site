@@ -109,7 +109,7 @@ export function orderConfirmationTemplate(data: OrderConfirmationData): {
         <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
 
         <p style="font-size: 12px; color: #888; text-align: center;">
-          Nong-Kati — ซื้อบัตรเกม สตรีมมิ่ง และอีคอมเมิร์ซ ออนไลน์
+          Nong-Kati — แอคดูหนัง ซีรีส์ ออนไลน์
         </p>
       </body>
       </html>

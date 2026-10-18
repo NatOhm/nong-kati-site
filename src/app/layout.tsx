@@ -47,10 +47,10 @@ export const metadata: Metadata = {
   metadataBase: new URL(publicOrigin()),
   title: {
     template: '%s — Nong-Kati',
-    default: 'ซื้อบัตรเกม Netflix Steam และอื่นๆ — Nong-Kati',
+    default: 'ซื้อแอคดูหนัง ซีรีส์ Netflix Spotify และอื่นๆ — Nong-Kati',
   },
   description:
-    'ซื้อ gift card เกม สตรีมมิ่ง และอีคอมเมิร์ซ ราคาดี โอนเงินพร้อมส่งสลิปยืนยัน ทีมงานยืนยันแล้วส่งโค้ดถึงอีเมล',
+    'ซื้อแอคดูหนัง ซีรีส์ Netflix Spotify YouTube ราคาดี โอนเงินพร้อมส่งสลิปยืนยัน ทีมงานยืนยันแล้วส่งโค้ดถึงอีเมล',
   applicationName: 'Nong-Kati',
   robots: { index: true, follow: true },
 };
