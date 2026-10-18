@@ -192,6 +192,11 @@ export const ROUTE_PERMISSIONS: Record<string, Permission[]> = {
   'PUT /api/v1/admin/settings/vat': ['settings:write'],
   'GET /api/v1/admin/settings/faq': ['settings:read'],
   'PUT /api/v1/admin/settings/faq': ['settings:write'],
+  // Homepage trust badges ("ทำไมต้อง Nong-Kati?") — admin-editable copy
+  'GET /api/v1/admin/settings/trust-badges': ['settings:read'],
+  'PUT /api/v1/admin/settings/trust-badges': ['settings:write'],
+  // One-click Discord webhook probe from the notifications settings page
+  'POST /api/v1/admin/settings/discord-test': ['settings:write'],
   'GET /api/v1/admin/staff': ['staff:read'],
   // ratchet: KNOWN_UNBUILT (role change)
   'PATCH /api/v1/admin/staff/:id/role': ['staff:write'],

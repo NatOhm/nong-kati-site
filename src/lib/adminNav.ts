@@ -14,6 +14,7 @@
  */
 
 import {
+  Award,
   BarChart3,
   FileText,
   Hash,
@@ -172,6 +173,12 @@ export const ADMIN_NAV: AdminNavNode[] = [
         href: '/management/faq',
         permission: 'settings:read',
         icon: HelpCircle,
+      },
+      {
+        label: 'ป้ายความน่าเชื่อถือ',
+        href: '/management/trust-badges',
+        permission: 'settings:read',
+        icon: Award,
       },
       {
         label: 'ตั้งค่า',

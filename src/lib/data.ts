@@ -6,7 +6,8 @@
 import { cache } from 'react';
 
 import { prisma } from '@/lib/db';
-import { parseFaqSettings, type FaqItem } from '@/lib/faqSettings';
+import { parseFaqSettings, type FaqSettings } from '@/lib/faqSettings';
+import { DEFAULT_TRUST_BADGES, parseTrustBadges, type TrustBadgesSettings } from '@/lib/trustBadges';
 import { normalizeTier, tierPrice, type PriceTier } from '@/lib/pricing';
 import { getEligiblePromotions } from '@/lib/promotions';
 
@@ -966,19 +967,40 @@ export async function getHeroSlides(): Promise<HeroSlideContent[]> {
 // ─── FAQ (admin-managed, public storefront accordion) ───────
 
 /**
- * Read the FAQ list (SiteSetting key 'faq') for the storefront accordion.
- * The admin API stays permission-gated, so the force-dynamic homepage reads
- * the rows directly here — visitors never hit the authenticated endpoint.
+ * Read the FAQ settings (SiteSetting key 'faq') for the storefront accordion:
+ * the section's visibility flag plus its rows. The admin API stays
+ * permission-gated, so the force-dynamic homepage reads the row directly here
+ * — visitors never hit the authenticated endpoint.
  * Answers come back sanitized via parseFaqSettings (see lib/faqRichText).
  */
-export async function getFaqSettings(): Promise<FaqItem[]> {
+export async function getFaqSettings(): Promise<FaqSettings> {
   try {
     const row = await prisma.siteSetting.findUnique({ where: { key: 'faq' } });
-    if (!row) return [];
-    return parseFaqSettings(row.value).items;
+    if (!row) return { enabled: true, items: [] };
+    return parseFaqSettings(row.value);
   } catch (e) {
     console.error('[data] getFaqSettings failed:', e instanceof Error ? e.message : e);
-    return [];
+    return { enabled: true, items: [] };
+  }
+}
+
+// ─── Trust badges (admin-managed homepage "ทำไมต้อง Nong-Kati?" section) ──
+
+/**
+ * Read the trust-badge settings (SiteSetting key 'trustBadges'): section
+ * visibility + heading + the badge rows. Same reasoning as getFaqSettings —
+ * the force-dynamic homepage reads the row directly, visitors never hit the
+ * authenticated admin endpoint. No row / failure falls back to the built-in
+ * section so the storefront keeps the copy that shipped hardcoded.
+ */
+export async function getTrustBadgesSettings(): Promise<TrustBadgesSettings> {
+  try {
+    const row = await prisma.siteSetting.findUnique({ where: { key: 'trustBadges' } });
+    if (!row) return structuredClone(DEFAULT_TRUST_BADGES);
+    return parseTrustBadges(row.value);
+  } catch (e) {
+    console.error('[data] getTrustBadgesSettings failed:', e instanceof Error ? e.message : e);
+    return structuredClone(DEFAULT_TRUST_BADGES);
   }
 }
 

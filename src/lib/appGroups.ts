@@ -21,7 +21,7 @@ export interface AppGroupNode {
   productCount?: number | undefined;
   imageUrl?: string | null | undefined;
   productSlug?: string | null | undefined;
-  children: AppGroupNode[];
+  children: readonly AppGroupNode[];
 }
 
 export interface AppGroupSplit {
@@ -41,7 +41,8 @@ export function splitAppGroups(categories: readonly AppGroupNode[]): AppGroupSpl
   const groups: AppGroupNode[] = [];
   const looseApps: AppGroupNode[] = [];
   for (const category of categories) {
-    const bucket = category.children.length > 0 ? groups : looseApps;
+    const childrenOrEmpty = category.children ?? [];
+    const bucket = childrenOrEmpty.length > 0 ? groups : looseApps;
     bucket.push(category);
   }
   return { groups, looseApps };

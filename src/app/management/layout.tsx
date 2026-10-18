@@ -60,13 +60,22 @@ export default function ManagementLayout({
       return;
     }
 
-    // Session exists → refresh if the expiry hint is stale, then admit. A
-    // dead refresh triggers the expiry event below, which redirects.
-    void ensureFreshAdminSession().then((ok) => {
-      if (ok || hasAdminSession()) {
-        setIsAuthenticated(true);
-      }
-    });
+    // Session marker is live → admit, WITHOUT touching the refresh token.
+    //
+    // Rotating on every entry is not free: the server revokes the old
+    // refresh token the instant the request is processed, so a navigation
+    // that aborts the in-flight response (login → dashboard → goto, or a
+    // user clicking through quickly) loses the replacement cookie. The
+    // browser is then left holding an already-revoked token, and the next
+    // refresh gets 401 TOKEN_INVALID → cookies cleared → a perfectly live
+    // session bounced to the login page (seen in e2e
+    // admin-search-history-reveal, 2026-10-17, and on the live build).
+    //
+    // Freshness has coverage without an entry rotation: the 15-minute
+    // access cookie, adminFetch's single-flight refresh on the first 401,
+    // and the expiry-hint tick below. A dead refresh still dispatches the
+    // expiry event from those paths, which redirects here.
+    setIsAuthenticated(true);
   }, [isPublic, redirectToLogin]);
 
   // Proactive refresh: while the tab is open and a session exists, refresh

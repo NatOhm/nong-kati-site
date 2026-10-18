@@ -790,7 +790,7 @@ function StoreSettings({
               value={form.description}
               onChange={(e) => set('description', e.target.value)}
               rows={3}
-              placeholder="ซื้อบัตรเกม Netflix Steam และอื่นๆ ได้ที่ Nong-Kati ส่งโค้ดทันที"
+              placeholder="ซื้อแอคดูหนัง ซีรีส์ Netflix Spotify และอื่นๆ ได้ที่ Nong-Kati ส่งโค้ดทันที"
               className="w-full resize-none rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
             />
           </Field>
@@ -2179,6 +2179,10 @@ function NotificationSettings({
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // One-click webhook probe (client ask 2026-10-16): send ONE test embed and
+  // report what actually happened — configured/accepted/reachable.
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -2231,6 +2235,53 @@ function NotificationSettings({
     return () => registerSaver(null);
   }, [save, registerSaver]);
 
+  async function runDiscordTest(): Promise<void> {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await adminFetch('/api/v1/admin/settings/discord-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        status?: number;
+      };
+      if (!res.ok) {
+        setTestResult({ ok: false, message: 'ทดสอบไม่สำเร็จ — ลองใหม่อีกครั้ง' });
+        return;
+      }
+      if (data.ok) {
+        setTestResult({
+          ok: true,
+          message: 'ส่งสำเร็จ — เปิดห้อง Discord เพื่อดูข้อความทดสอบได้เลย',
+        });
+      } else if (data.error === 'WEBHOOK_NOT_CONFIGURED') {
+        setTestResult({
+          ok: false,
+          message:
+            'ยังไม่ได้ตั้งค่า webhook — เพิ่ม NK_DISCORD_WEBHOOK_URL ใน environment ของแอป แล้ว Restart App ก่อนทดสอบ',
+        });
+      } else if (data.error === 'WEBHOOK_UNREACHABLE') {
+        setTestResult({
+          ok: false,
+          message: 'ติดต่อ Discord ไม่สำเร็จ — ตรวจสอบการเชื่อมต่อเน็ตเวิร์กของเซิร์ฟเวอร์',
+        });
+      } else {
+        setTestResult({
+          ok: false,
+          message: `Discord ปฏิเสธข้อความ${data.status ? ` (HTTP ${data.status})` : ''} — ตรวจสอบว่า webhook ยังไม่ถูกลบ`,
+        });
+      }
+    } catch {
+      setTestResult({ ok: false, message: 'เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ' });
+    } finally {
+      setTesting(false);
+    }
+  }
+
   return (
     <Section
       title="การแจ้งเตือน"
@@ -2240,9 +2291,32 @@ function NotificationSettings({
         <p className="py-6 text-center text-sm text-fg-muted">กำลังโหลด...</p>
       ) : (
         <div className="space-y-5">
-          <p className="rounded-md border border-line-subtle bg-surface px-3 py-2 text-sm text-fg-secondary">
-            Discord: {discordConfigured ? 'ตั้งค่า webhook ใน environment แล้ว' : 'ยังไม่เปิดใช้งาน — รอการตั้งค่า webhook ใน environment'}
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-line-subtle bg-surface px-3 py-2">
+            <p className="text-sm text-fg-secondary">
+              Discord: {discordConfigured ? 'ตั้งค่า webhook ใน environment แล้ว' : 'ยังไม่เปิดใช้งาน — รอการตั้งค่า webhook ใน environment'}
+            </p>
+            <button
+              type="button"
+              onClick={() => void runDiscordTest()}
+              disabled={testing}
+              className="flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-fg transition-colors hover:border-peach-400 disabled:opacity-50"
+            >
+              {testing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+              {testing ? 'กำลังส่ง…' : 'ส่งข้อความทดสอบ'}
+            </button>
+          </div>
+          {testResult && (
+            <p
+              className={cn(
+                'rounded-md border px-3 py-2 text-sm',
+                testResult.ok
+                  ? 'border-jade-500/40 bg-jade-500/10 text-jade-700'
+                  : 'border-error bg-error text-fg-error',
+              )}
+            >
+              {testResult.message}
+            </p>
+          )}
           <div>
             <label className="mb-1 block text-sm font-medium text-fg">
               เตือนเมื่อสต๊อกเหลือไม่เกิน (ชิ้น)

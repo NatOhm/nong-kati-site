@@ -241,6 +241,8 @@ const ROUTE_COVERAGE: MatrixRow[] = [
   },
   // SMTP connectivity probe for the email settings panel (no save, no send)
   { method: 'POST', path: '/settings/email-test', perm: 'settings:write', body: {} },
+  // Discord webhook probe — sends ONE test embed, reports the outcome
+  { method: 'POST', path: '/settings/discord-test', perm: 'settings:write', body: {} },
   // FAQ settings — drives the public accordion; answers are sanitized rich text
   { method: 'GET', path: '/settings/faq', perm: 'settings:read' },
   {
@@ -248,6 +250,14 @@ const ROUTE_COVERAGE: MatrixRow[] = [
     path: '/settings/faq',
     perm: 'settings:write',
     body: { items: [{ question: 'q', answer: 'a', order: 0 }] },
+  },
+  // Trust badges — homepage "ทำไมต้อง Nong-Kati?" section copy + icons
+  { method: 'GET', path: '/settings/trust-badges', perm: 'settings:read' },
+  {
+    method: 'PUT',
+    path: '/settings/trust-badges',
+    perm: 'settings:write',
+    body: { enabled: true, title: 'x', items: [{ icon: 'shield', title: 'a', desc: 'b', order: 0 }] },
   },
   // staff
   { method: 'GET', path: '/staff', perm: 'staff:read' },

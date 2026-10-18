@@ -28,17 +28,19 @@ import {
   getFeaturedProducts,
   getHeroSlides,
   getStorefrontStats,
+  getTrustBadgesSettings,
 } from '@/lib/data';
+import { DEFAULT_TRUST_BADGES } from '@/lib/trustBadges';
 import { splitAppGroups } from '@/lib/appGroups';
 import { publicOrigin } from '@/lib/siteConfig';
 
 export const metadata: Metadata = {
   // No manual brand suffix — the root template appends "— Nong-Kati" (audit #12).
-  title: 'ซื้อบัตรเกม Netflix Steam และอีคอมเมิร์ซ',
+  title: 'ซื้อแอคดูหนัง ซีรีส์ Netflix Spotify และอื่นๆ ราคาดี',
   description:
-    'ซื้อ gift card เกม สตรีมมิ่ง และอีคอมเมิร์ซ ราคาดี โอนเงินพร้อมส่งสลิปยืนยัน ทีมงานยืนยันแล้วส่งโค้ดถึงอีเมล',
+    'ซื้อแอคดูหนัง ซีรีส์ Netflix Spotify YouTube ราคาดี โอนเงินพร้อมส่งสลิปยืนยัน ทีมงานยืนยันแล้วส่งโค้ดถึงอีเมล',
   openGraph: {
-    title: 'Nong-Kati — ซื้อบัตรเกม สตรีมมิ่ง และอีคอมเมิร์ซ',
+    title: 'Nong-Kati — แอคดูหนัง ซีรีส์ ส่งถึงอีเมลทันที',
     description: 'ราคาดี โอนเงินพร้อมส่งสลิปยืนยัน ทีมงานยืนยันแล้วส่งโค้ดถึงอีเมล',
     type: 'website',
     locale: 'th_TH',
@@ -52,14 +54,19 @@ export default async function HomePage(): Promise<React.JSX.Element> {
   let featuredProducts: Awaited<ReturnType<typeof getFeaturedProducts>> = [];
   let heroSlides: Awaited<ReturnType<typeof getHeroSlides>> = [];
   let stats: Awaited<ReturnType<typeof getStorefrontStats>> | null = null;
-  let faqItems: Awaited<ReturnType<typeof getFaqSettings>> = [];
+  let faqSettings: Awaited<ReturnType<typeof getFaqSettings>> = {
+    enabled: true,
+    items: [],
+  };
+  let trustBadges = DEFAULT_TRUST_BADGES;
   let dbDown = false;
   try {
     categories = await getCategoriesWithProductCounts();
     featuredProducts = await getFeaturedProducts();
     heroSlides = await getHeroSlides();
     stats = await getStorefrontStats();
-    faqItems = await getFaqSettings();
+    faqSettings = await getFaqSettings();
+    trustBadges = await getTrustBadgesSettings();
   } catch (e) {
     dbDown = true;
     console.error(
@@ -103,7 +110,7 @@ export default async function HomePage(): Promise<React.JSX.Element> {
             {/* Site-wide h1 (landmark spec): the notice-board headline is the
                 page's main heading — p→h1 keeps the identical clay styling. */}
             <h1 className="font-display text-xl font-bold leading-snug text-fg-brand-strong sm:text-2xl">
-              โค้ดเกม สตรีมมิ่ง และอีคอมเมิร์ซ ส่งถึงอีเมลหลังยืนยันการชำระเงิน
+              แอคดูหนัง ซีรีส์ ส่งถึงอีเมลหลังยืนยันการชำระเงิน
             </h1>
             {/* clay-700 lands exactly 4.50 on the peach-50 card — use clay-800
                 for headroom (7.11). Dark keeps the muted token. */}
@@ -345,13 +352,15 @@ export default async function HomePage(): Promise<React.JSX.Element> {
 
         {/* Trust Badges */}
         <ScrollReveal>
-          <TrustBadges />
+          <TrustBadges settings={trustBadges} />
         </ScrollReveal>
 
-        {/* FAQ */}
-        <ScrollReveal>
-          <FAQAccordion items={faqItems} />
-        </ScrollReveal>
+        {/* FAQ — admin-switchable: hidden entirely when the section is off */}
+        {faqSettings.enabled && (
+          <ScrollReveal>
+            <FAQAccordion items={faqSettings.items} />
+          </ScrollReveal>
+        )}
 
         {/* Stats — real counts, plain numbers, horizontal, at the bottom (client ask).
             Hidden entirely during an outage: zero rows read as “no business”
