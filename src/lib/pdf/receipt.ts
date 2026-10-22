@@ -46,34 +46,6 @@ export interface PdfGenerationResult {
   contentType: string;
 }
 
-// In-memory invoice number sequences (mock)
-const receiptSequences = new Map<string, number>();
-const taxInvoiceSequences = new Map<string, number>();
-
-/**
- * Generate next receipt number.
- * Format: REC-YYYY-NNNNNN
- */
-export function generateReceiptNumber(): string {
-  const year = new Date().getFullYear();
-  const current = receiptSequences.get(String(year)) ?? 0;
-  const next = current + 1;
-  receiptSequences.set(String(year), next);
-  return `REC-${year}-${String(next).padStart(6, '0')}`;
-}
-
-/**
- * Generate next tax invoice number.
- * Format: NK-YYYY-NNNNNN (sequential, non-guessable per FR-092)
- */
-export function generateTaxInvoiceNumber(): string {
-  const year = new Date().getFullYear();
-  const current = taxInvoiceSequences.get(String(year)) ?? 0;
-  const next = current + 1;
-  taxInvoiceSequences.set(String(year), next);
-  return `NK-${year}-${String(next).padStart(6, '0')}`;
-}
-
 /**
  * Generate a receipt PDF.
  * 01-prd.md FR-088-089 — Receipt generated for every completed order.

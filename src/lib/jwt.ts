@@ -79,6 +79,18 @@ function getRandomHex(length: number): string {
     .join('');
 }
 
+/**
+ * Constant-time string equality (length-checked first). The signature
+ * compare below uses it so a forged token's signature can't be probed
+ * byte-by-byte via a short-circuiting `!==`.
+ */
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return result === 0;
+}
+
 async function hmacSha256(key: string, message: string): Promise<string> {
   const encoder = new TextEncoder();
   const keyData = encoder.encode(key);
@@ -147,7 +159,7 @@ export async function verifyJwt<T>(token: string): Promise<T | null> {
     // Verify signature
     const expectedSig = await hmacSha256(getSecret(), `${headerB64}.${payloadB64}`);
 
-    if (signature !== expectedSig) return null;
+    if (!timingSafeEqual(signature, expectedSig)) return null;
 
     // Decode payload
     const payload = JSON.parse(base64UrlToString(payloadB64));
