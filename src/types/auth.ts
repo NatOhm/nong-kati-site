@@ -168,6 +168,8 @@ export const ROUTE_PERMISSIONS: Record<string, Permission[]> = {
   'GET /api/v1/admin/dashboard/stats': ['dashboard:read'],
   'GET /api/v1/admin/inventory': ['inventory:read'],
   'POST /api/v1/admin/inventory': ['inventory:upload'],
+  'POST /api/v1/admin/stock/bulk': ['products:write'],
+  'POST /api/v1/admin/stock/bulk-void': ['inventory:void'],
   // ratchet: KNOWN_UNBUILT (bulk code upload)
   'POST /api/v1/admin/inventory/:id/upload': ['inventory:upload'],
   // ratchet: KNOWN_UNBUILT (per-variant code generation)

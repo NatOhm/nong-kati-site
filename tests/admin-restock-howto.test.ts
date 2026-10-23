@@ -33,6 +33,10 @@ const read = (...p: string[]): string => readFileSync(path.join(ROOT, ...p), 'ut
 const HOWTO = read('docs', 'admin-restock-howto-th.md');
 const MANUAL = read('docs', 'admin-manual-th.md');
 const ROUTE = read('src', 'app', 'api', 'v1', 'admin', 'stock', 'bulk', 'route.ts');
+// The parse moved into one shared file (Phase 3) used by BOTH the route and
+// the dialog — the gates below scan it and then prove each caller calls it,
+// which is stronger than scanning the route alone.
+const SHARED = read('src', 'lib', 'bulkRecords.ts');
 const DIALOG = read('src', 'app', 'management', 'products', 'BulkStockDialog.tsx');
 const PRODUCTS = read('src', 'app', 'management', 'products', 'page.tsx');
 const INVENTORY = read('src', 'app', 'management', 'inventory', 'page.tsx');
@@ -94,13 +98,16 @@ describe('เติมสต๊อกบัญชี — permissions', () => {
 });
 
 describe('เติมสต๊อกบัญชี — data formats', () => {
-  it('short format is one record per line in both client and route', () => {
+  it('short format is one record per line — single-sourced, both callers call it', () => {
     expect(DIALOG).toContain("format === 'short'");
-    expect(ROUTE).toContain('one record per line');
+    expect(SHARED).toContain('export function parseBulkRecords');
+    expect(ROUTE).toContain('parseBulkRecords(raw, format)');
+    expect(DIALOG).toContain('parseBulkRecords(raw, format)');
   });
 
   it('long format splits on 2+ blank lines, and the how-to says exactly that', () => {
-    expect(ROUTE).toContain('blankRun >= 2');
+    expect(SHARED).toContain('blankRun >= 2');
+    expect(ROUTE).toContain('routeBulkRecords(');
     expect(HOWTO).toContain('บรรทัดว่าง 2 บรรทัด');
   });
 
@@ -167,16 +174,19 @@ describe('เติมสต๊อกบัญชี — what saving does', () =
 });
 
 describe('เติมสต๊อกบัญชี — multi-variant distribution', () => {
-  it('unpinned records round-robin and a label pins one', () => {
-    expect(ROUTE).toContain('order[cursor % order.length]');
-    expect(ROUTE).toContain('v.label === pinLabel');
+  it('unpinned records round-robin and a label pins one (shared parser, both callers)', () => {
+    expect(SHARED).toContain('order[cursor % order.length]');
+    expect(SHARED).toContain('v.label === pinLabel');
+    expect(ROUTE).toContain('routeBulkRecords(');
+    expect(DIALOG).toContain('routeBulkRecords(');
     expect(HOWTO).toContain('วนรอบ');
   });
 });
 
 describe('เติมสต๊อกบัญชี — the reference-prefix trap', () => {
-  it('the route drops a whole line that starts with a reference prefix', () => {
-    expect(ROUTE).toContain('REF_RE');
+  it('the parser drops a whole line that starts with a reference prefix', () => {
+    expect(SHARED).toContain('REF_RE');
+    expect(ROUTE).toContain('routeBulkRecords(');
     for (const prefix of ['ID:', 'Ref:', 'Order:', 'Inv:']) {
       expect(HOWTO).toContain(prefix);
     }

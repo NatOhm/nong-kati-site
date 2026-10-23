@@ -5,6 +5,7 @@ import { checkPermission } from '@/lib/rbac';
 import { getAdminToken } from '@/lib/adminRequest';
 import { encryptCode, hashCode } from '@/lib/crypto/giftCode';
 import { writeAuditLog } from '@/lib/auditLog';
+import { parseBulkRecords, routeBulkRecords } from '@/lib/bulkRecords';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,15 +15,17 @@ function bearer(req: NextRequest): string | null {
   return token;
 }
 
-/** Reference-prefix/column cleanup (client list: Long/detailed format with refs). */
-const REF_RE = /^[[(]?(?:id|ref|order|inv|refid)\s*[:：\-]\s*.*$/i;
-
 /**
  * POST /api/v1/admin/stock/bulk — paste-in stock for a product (products:write).
  *
  * Body:
  *   { productId, format: 'short' | 'long', separator: ',' | ';' | 'tab' | 'newline',
- *     raw: string, apply?: boolean }
+ *     raw: string, apply?: boolean, variantId?: string }
+ *
+ * - variantId (optional): pin EVERY record to that variant instead of the
+ *   round-robin — the inventory panel's "เติมบัญชี" button passes it so a
+ *   paste opened from a variant lands in that variant, not spread across all.
+ *   Unknown/inactive variant → 400 UNKNOWN_VARIANT (never a silent fallback).
  *
  * - short   → one account per line: "user:pass" (whole line = the code text)
  * - long    → fields joined by `separator`: code[,code,...][,ref] — every field
@@ -56,6 +59,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     : ',';
   const raw = typeof b['raw'] === 'string' ? b['raw'] : '';
   const apply = b['apply'] === true;
+  const variantId = typeof b['variantId'] === 'string' ? b['variantId'] : '';
 
   if (!productId || !raw.trim()) {
     return NextResponse.json({ error: 'MISSING_FIELDS' }, { status: 400 });
@@ -75,81 +79,27 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (product.variants.length === 0) {
     return NextResponse.json({ error: 'NO_VARIANTS' }, { status: 400 });
   }
+  if (variantId && !product.variants.some((v) => v.id === variantId)) {
+    return NextResponse.json({ error: 'UNKNOWN_VARIANT' }, { status: 400 });
+  }
 
   // ── Parse ────────────────────────────────────────────────
-  // Round-robin across the product's variants so multi-variant products can be
-  // filled in one paste. An explicit "label:" prefix pins a record.
-  const perVariant = new Map<string, { variantId: string; label: string; codes: string[] }>(
-    product.variants.map((v) => [v.id, { variantId: v.id, label: v.label, codes: [] }]),
+  // Split + round-robin live in lib/bulkRecords (shared with the dialog's
+  // live distribution preview) so client estimate and server write cannot
+  // drift apart.
+  const records = parseBulkRecords(raw, format);
+  const routed = routeBulkRecords(
+    records,
+    product.variants.map((v) => ({ id: v.id, label: v.label })),
+    format,
+    variantId,
   );
-  const order = product.variants.map((v) => v.id);
-  let cursor = 0;
-
-  // Records: long format = blocks separated by 2+ consecutive blank lines
-  // (single blank lines are preserved INSIDE a record — vendor templates keep
-  // their pretty spacing); short format = one record per line.
-  const records: string[] = [];
-  if (format === 'long') {
-    let block: string[] = [];
-    let blankRun = 0;
-    for (const l of raw.split(/\r?\n/)) {
-      if (l.trim() === '') {
-        blankRun += 1;
-        if (blankRun === 1 && block.length > 0) block.push('');
-        continue;
-      }
-      if (blankRun >= 2 && block.length > 0) {
-        while (block.length > 0 && block[block.length - 1] === '') block.pop();
-        records.push(block.join('\n'));
-        block = [];
-      }
-      blankRun = 0;
-      block.push(l);
-    }
-    if (block.length > 0) {
-      while (block.length > 0 && block[block.length - 1] === '') block.pop();
-      records.push(block.join('\n'));
-    }
-  } else {
-    for (const l of raw.split(/\r?\n/)) {
-      const t = l.trim();
-      if (t !== '') records.push(t);
-    }
-  }
-
-  for (const record of records) {
-    let work = record;
-    let pinned: string | null = null;
-
-    const pin = work.match(/^([^,:;]+)\s*[:：]\s*(.+)$/);
-    const pinLabel = pin?.[1]?.trim();
-    if (pin && pinLabel && product.variants.some((v) => v.label === pinLabel)) {
-      pinned = product.variants.find((v) => v.label === pinLabel)!.id;
-      work = pin[2]!.trim();
-    }
-
-    if (format === 'long') {
-      // Whole multi-line block = one account record, delivered as-is.
-      push(work);
-    } else {
-      // Short format: strip a reference prefix, whole remainder is the code text.
-      const code = work.replace(REF_RE, '').trim();
-      if (code) push(code);
-    }
-
-    function push(code: string): void {
-      const target = pinned ?? order[cursor % order.length]!;
-      const bucket = perVariant.get(target)!;
-      bucket.codes.push(code);
-      if (!pinned) cursor += 1;
-    }
-  }
 
   // Dedupe: within the pasted batch, and against codes already stored.
   // Re-pasting the same file must be a no-op for duplicates, never a 500.
   const seen = new Set<string>();
-  for (const bucket of perVariant.values()) {
-    bucket.codes = bucket.codes.filter((c) => {
+  for (const plan of routed) {
+    plan.codes = plan.codes.filter((c) => {
       const h = hashCode(c).toString('hex');
       if (seen.has(h)) return false;
       seen.add(h);
@@ -166,16 +116,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       : [];
   const existingHashes = new Set(existingRows.map((r) => r.codeHash.toString('hex')));
   let duplicates = 0;
-  for (const bucket of perVariant.values()) {
-    const fresh = bucket.codes.filter((c) => {
+  for (const plan of routed) {
+    const fresh = plan.codes.filter((c) => {
       const isDup = existingHashes.has(hashCode(c).toString('hex'));
       if (isDup) duplicates += 1;
       return !isDup;
     });
-    bucket.codes = fresh;
+    plan.codes = fresh;
   }
 
-  const plans = [...perVariant.values()]
+  const plans = routed
     .map((p) => ({
       variantId: p.variantId,
       label: p.label,
@@ -194,17 +144,34 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   // ── Apply ────────────────────────────────────────────────
-  const results: { variantId: string; label: string; added: number }[] = [];
+  const results: { variantId: string; label: string; added: number; batchId: string }[] = [];
   const adminId = check.payload?.sub ?? null;
 
   for (const plan of plans) {
     if (plan.codes.length === 0) continue;
-    const added = await prisma.$transaction(async (tx) => {
+    const applied = await prisma.$transaction(async (tx) => {
       const variant = await tx.productVariant.findUnique({
         where: { id: plan.variantId },
         select: { stock: true },
       });
       if (!variant) throw new Error('VARIANT_DELETED');
+
+      // One batch row per variant-plan: GiftCode.uploadBatchId is a real FK,
+      // so a void must be able to find "every code this paste added to this
+      // variant" after the fact. This is also what the stock-history chip
+      // points at (StockMove.refId below) — paste and undo share one id.
+      const batch = await tx.codeUploadBatch.create({
+        data: {
+          variantId: plan.variantId,
+          uploadedById: adminId ?? 'unknown',
+          // Paste has no file; the column is NOT NULL, so name the source.
+          originalFilename: 'pasted text',
+          totalRows: plan.codes.length,
+          importedCount: plan.codes.length,
+          status: 'completed',
+          completedAt: new Date(),
+        },
+      });
 
       const rows = plan.codes.map((code) => {
         const { ciphertext, nonce, keyVersion } = encryptCode(code);
@@ -216,6 +183,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           keyVersion,
           status: 'available',
           uploadedById: adminId,
+          uploadBatchId: batch.id,
         };
       });
       await tx.giftCode.createMany({ data: rows });
@@ -230,6 +198,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           delta: rows.length,
           reason: 'restock',
           refType: 'upload',
+          refId: batch.id,
           note: `bulk paste ${rows.length} accounts`,
           stockAfter,
           actorId: adminId,
@@ -258,12 +227,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           variantLabel: plan.label,
           accountsAdded: rows.length,
           duplicatesSkipped: duplicates,
+          batchId: batch.id,
         },
         tx,
       });
-      return rows.length;
+      return { added: rows.length, batchId: batch.id };
     });
-    results.push({ variantId: plan.variantId, label: plan.label, added });
+    results.push({ variantId: plan.variantId, label: plan.label, added: applied.added, batchId: applied.batchId });
   }
 
   return NextResponse.json({

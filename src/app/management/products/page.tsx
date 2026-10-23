@@ -673,6 +673,9 @@ export default function AdminProductsPage(): React.JSX.Element {
         <BulkStockDialog
           productId={stockTarget.id}
           productName={stockTarget.name}
+          variants={stockTarget.variants
+            .filter((v) => v.isActive)
+            .map((v) => ({ id: v.id, label: v.label }))}
           onClose={() => setStockTarget(null)}
           onSaved={() => void load()}
         />

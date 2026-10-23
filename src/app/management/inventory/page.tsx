@@ -16,7 +16,9 @@ import {
 } from 'lucide-react';
 
 import { AdminShell } from '@/components/layout/AdminShell';
+import { useAdminIdentity } from '@/components/layout/useAdminIdentity';
 import { adminFetch, adminJson } from '@/lib/adminSession';
+import { ROLE_PERMISSIONS } from '@/types/auth';
 import { cn } from '@/utils/cn';
 import { BulkStockDialog } from '../products/BulkStockDialog';
 import { VariantCodesDialog } from './VariantCodesDialog';
@@ -32,6 +34,14 @@ interface InventoryItem {
   variantId: string | null;
   variantLabel: string | null;
   variantCount: number;
+  variants: {
+    id: string;
+    label: string;
+    stock: number;
+    codesAvailable: number;
+    /** Needed to route pastes like the server does (active variants only). */
+    isActive: boolean;
+  }[];
   sku: string | null;
   name: string;
   categoryName: string;
@@ -53,6 +63,8 @@ interface StockMoveRow {
   reason: string;
   note: string | null;
   stockAfter: number;
+  /** Batch id on bulk paste/void rows — powers the undo chip (additive). */
+  refId: string | null;
   createdAt: string;
 }
 
@@ -62,6 +74,7 @@ const REASON_LABELS: Record<string, string> = {
   sale: 'ขาย',
   refund: 'คืนสินค้า',
   import: 'นำเข้า',
+  void: 'ยกเลิกบัญชี',
 };
 
 const LOW_STOCK_THRESHOLD = 5;
@@ -105,13 +118,27 @@ export default function AdminInventoryPage(): React.JSX.Element {
   const [saving, setSaving] = useState(false);
   const [toggling, setToggling] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
-  const [stockTarget, setStockTarget] = useState<{ id: string; name: string } | null>(null);
-  /** Variant whose stored accounts are being browsed (review 2026-10-05). */
-  const [codesTarget, setCodesTarget] = useState<{
-    variantId: string;
-    variantLabel: string;
-    productName: string;
+  const [stockTarget, setStockTarget] = useState<{
+    id: string;
+    name: string;
+    /** Active variants — the paste dialog's live routing chips mirror the route. */
+    variants: { id: string; label: string }[];
+    /** Pre-pin the paste dialog to one variant (the เติมบัญชี button). */
+    pin?: { variantId: string; label: string };
   } | null>(null);
+  /** Product whose stored accounts are being browsed (review 2026-10-05). */
+  const [codesTarget, setCodesTarget] = useState<{
+    productId: string;
+    productName: string;
+    variants: { variantId: string; label: string }[];
+  } | null>(null);
+  // Client-side gating mirrors ROLE_PERMISSIONS so staff never see buttons
+  // that would 403. While identity is still loading: show everything — the
+  // server enforces the permission either way.
+  const { identity } = useAdminIdentity();
+  const perms = identity ? (ROLE_PERMISSIONS[identity.role] ?? []) : null;
+  const canReveal = perms ? perms.includes('inventory:reveal') : true;
+  const canVoid = perms ? perms.includes('inventory:void') : true;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -131,6 +158,49 @@ export default function AdminInventoryPage(): React.JSX.Element {
   useEffect(() => {
     void load();
   }, [load]);
+
+  /** Undo one bulk paste from its stock-history row (batchId correlation). */
+  const [voidingBatch, setVoidingBatch] = useState<string | null>(null);
+  const undoBatch = useCallback(
+    async (m: StockMoveRow) => {
+      if (
+        !confirm(
+          `ยกเลิกการวางรหัส ${m.delta} รหัสของ "${m.productName} · ${m.variantLabel}"?\n(รหัสที่ขายไปแล้วจะไม่ถูกแตะ)`,
+        )
+      ) {
+        return;
+      }
+      setVoidingBatch(m.id);
+      try {
+        const r = await adminJson<{ voided: number; stockAfter: number }>(
+          '/api/v1/admin/stock/bulk-void',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ batchId: m.refId }),
+          },
+        );
+        setMsg(
+          r.voided > 0
+            ? `ยกเลิก ${r.voided} รหัสเรียบร้อย (เหลือ ${r.stockAfter})`
+            : 'ชุดนี้ถูกยกเลิกไปแล้วหรือขายไปหมดแล้ว',
+        );
+        await load();
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : '';
+        setErr(
+          msg.includes('BATCH_NOT_FOUND')
+            ? 'ไม่พบชุดรหัสนี้แล้ว'
+            : msg.includes('FORBIDDEN')
+              ? 'ไม่มีสิทธิ์ยกเลิกบัญชี'
+              : 'ยกเลิกไม่สำเร็จ',
+        );
+      } finally {
+        setVoidingBatch(null);
+      }
+    },
+    [load],
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -411,7 +481,15 @@ export default function AdminInventoryPage(): React.JSX.Element {
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1.5">
                           <button
-                            onClick={() => setStockTarget({ id: item.id, name: item.name })}
+                            onClick={() =>
+                              setStockTarget({
+                                id: item.id,
+                                name: item.name,
+                                variants: item.variants
+                                  .filter((v) => v.isActive)
+                                  .map((v) => ({ id: v.id, label: v.label })),
+                              })
+                            }
                             aria-label={`จัดการบัญชี ${item.name}`}
                             title="จัดการบัญชีสต๊อก"
                             className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-line-subtle text-fg-secondary transition-colors hover:border-line-brand hover:text-fg-brand"
@@ -428,9 +506,12 @@ export default function AdminInventoryPage(): React.JSX.Element {
                             <button
                               onClick={() =>
                                 setCodesTarget({
-                                  variantId: item.variantId!,
-                                  variantLabel: item.variantLabel ?? 'ตัวเลือกหลัก',
+                                  productId: item.id,
                                   productName: item.name,
+                                  variants: item.variants.map((v) => ({
+                                    variantId: v.id,
+                                    label: v.label,
+                                  })),
                                 })
                               }
                               aria-label={`ดูบัญชีที่เก็บไว้ ${item.name}`}
@@ -532,6 +613,20 @@ export default function AdminInventoryPage(): React.JSX.Element {
                         </td>
                         <td className="px-4 py-2.5 text-fg-secondary">
                           {REASON_LABELS[m.reason] ?? m.reason}
+                          {m.refId && m.reason === 'restock' && m.delta > 0 && canVoid && (
+                            <button
+                              type="button"
+                              disabled={voidingBatch === m.id}
+                              onClick={() => void undoBatch(m)}
+                              className="ml-2 inline-flex items-center gap-1 rounded-full border border-line-subtle bg-surface-elevated px-2 py-0.5 text-[11px] font-medium text-fg-muted transition-colors hover:border-fg-error hover:text-fg-error disabled:opacity-50"
+                              title={`batch ${m.refId} — ยกเลิกการวางรหัสชุดนี้`}
+                            >
+                              <span className="font-mono">
+                                #{m.refId.slice(-6)}
+                              </span>
+                              {voidingBatch === m.id ? '…' : 'ยกเลิกชุดนี้'}
+                            </button>
+                          )}
                         </td>
                         <td className="px-4 py-2.5 text-fg-placeholder">{m.note ?? '—'}</td>
                       </tr>
@@ -549,6 +644,8 @@ export default function AdminInventoryPage(): React.JSX.Element {
         <BulkStockDialog
           productId={stockTarget.id}
           productName={stockTarget.name}
+          variants={stockTarget.variants}
+          {...(stockTarget.pin ? { pinVariant: stockTarget.pin } : {})}
           onClose={() => setStockTarget(null)}
           onSaved={() => void load()}
         />
@@ -556,9 +653,23 @@ export default function AdminInventoryPage(): React.JSX.Element {
 
       {codesTarget && (
         <VariantCodesDialog
-          variantId={codesTarget.variantId}
-          variantLabel={codesTarget.variantLabel}
+          variantId={codesTarget.variants[0]!.variantId}
+          variantLabel={codesTarget.variants[0]!.label}
           productName={codesTarget.productName}
+          variants={codesTarget.variants}
+          canReveal={canReveal}
+          canVoid={canVoid}
+          onAddStock={(variantId, label) => {
+            setCodesTarget(null);
+            setStockTarget({
+              id: codesTarget.productId,
+              name: codesTarget.productName,
+              variants: (items.find((i) => i.id === codesTarget.productId)?.variants ?? [])
+                .filter((v) => v.isActive)
+                .map((v) => ({ id: v.id, label: v.label })),
+              pin: { variantId, label },
+            });
+          }}
           onClose={() => setCodesTarget(null)}
           onChanged={() => void load()}
         />

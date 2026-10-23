@@ -19,7 +19,13 @@ import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { bulkErrorMessage, countBulkRecords, splitLongRecords } from '../src/lib/bulkRecords';
+import {
+  bulkErrorMessage,
+  countBulkRecords,
+  parseBulkRecords,
+  routeBulkRecords,
+  splitLongRecords,
+} from '../src/lib/bulkRecords';
 
 // ── Fixtures (verbatim from freebuff-note-add-stock-error.md §2) ──────────
 
@@ -115,11 +121,101 @@ describe('bulkErrorMessage — never leaks a raw route code to the screen', () =
   });
 });
 
-describe('BulkStockDialog source actually uses the shared helpers', () => {
+describe('parseBulkRecords — THE paste parser (server writes exactly this)', () => {
+  it('short: one record per non-blank line, trimmed', () => {
+    expect(parseBulkRecords('a:1\n \n b:2\n', 'short')).toEqual(['a:1', 'b:2']);
+  });
+
+  it('long: 2+ blank lines split, a single blank stays inside the record', () => {
+    expect(parseBulkRecords('x\n\ny', 'long')).toEqual(['x\n\ny']);
+    expect(parseBulkRecords('x\n\n\ny', 'long')).toEqual(['x', 'y']);
+  });
+
+  it('empty / whitespace-only paste = []', () => {
+    expect(parseBulkRecords('', 'short')).toEqual([]);
+    expect(parseBulkRecords(' \n\u00a0\n', 'long')).toEqual([]);
+  });
+});
+
+describe('routeBulkRecords — where each record lands (dialog preview == server)', () => {
+  const variants = [
+    { id: 'v1', label: 'แพ็กเกจ A' },
+    { id: 'v2', label: 'แพ็กเกจ B' },
+  ];
+  const codes = (plans: ReturnType<typeof routeBulkRecords>, id: string): string[] =>
+    plans.find((p) => p.variantId === id)!.codes;
+
+  it('unpinned short records round-robin across active variants', () => {
+    const plans = routeBulkRecords(parseBulkRecords('a\nb\nc', 'short'), variants, 'short');
+    expect(codes(plans, 'v1')).toEqual(['a', 'c']);
+    expect(codes(plans, 'v2')).toEqual(['b']);
+  });
+
+  it('a "label:" prefix pins one record to that variant', () => {
+    const plans = routeBulkRecords(
+      parseBulkRecords('แพ็กเกจ B:secret1\nplain', 'short'),
+      variants,
+      'short',
+    );
+    expect(codes(plans, 'v2')).toEqual(['secret1']);
+    expect(codes(plans, 'v1')).toEqual(['plain']);
+  });
+
+  it('variantId pins the whole paste; other variants still get an empty bucket', () => {
+    const plans = routeBulkRecords(parseBulkRecords('a\nb', 'short'), variants, 'short', 'v2');
+    expect(codes(plans, 'v2')).toEqual(['a', 'b']);
+    expect(codes(plans, 'v1')).toEqual([]);
+  });
+
+  it('short format drops a whole reference-prefix line', () => {
+    const plans = routeBulkRecords(
+      parseBulkRecords('ID: 12345\nuser:pass', 'short'),
+      variants,
+      'short',
+    );
+    const all = [...codes(plans, 'v1'), ...codes(plans, 'v2')];
+    expect(all).toEqual(['user:pass']);
+  });
+
+  it('no active variants = [] (route turns this into 400 NO_VARIANTS)', () => {
+    expect(routeBulkRecords(['a'], [], 'short')).toEqual([]);
+  });
+});
+
+describe('route + dialog both call the shared parser (single source, no drift)', () => {
+  const ROUTE = readFileSync(
+    path.join(
+      __dirname,
+      '..',
+      'src',
+      'app',
+      'api',
+      'v1',
+      'admin',
+      'stock',
+      'bulk',
+      'route.ts',
+    ),
+    'utf8',
+  );
   const DIALOG = readFileSync(
     path.join(__dirname, '..', 'src', 'app', 'management', 'products', 'BulkStockDialog.tsx'),
     'utf8',
   );
+
+  it('the route parses and routes through the lib, not a private copy', () => {
+    expect(ROUTE).toContain('parseBulkRecords(raw, format)');
+    expect(ROUTE).toContain('routeBulkRecords(');
+    expect(ROUTE).not.toContain('blankRun');
+    expect(ROUTE).not.toContain('REF_RE');
+  });
+
+  it('the dialog previews the distribution with the same routeBulkRecords', () => {
+    expect(DIALOG).toContain('parseBulkRecords(raw, format)');
+    expect(DIALOG).toContain('routeBulkRecords(');
+    expect(DIALOG).toContain('onDrop');
+    expect(DIALOG).toContain('PREVIEW_LIMIT');
+  });
 
   it('counter comes from countBulkRecords, not a private regex split', () => {
     expect(DIALOG).toContain('countBulkRecords(raw, format)');

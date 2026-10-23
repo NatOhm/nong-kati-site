@@ -45,6 +45,17 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       variantId: v?.id ?? null,
       variantLabel: v?.label ?? null,
       variantCount: p.variants.length,
+      // Every variant, not just the first — the codes dialog needs real tabs
+      // for multi-variant products (previously only variant[0] was reachable).
+      variants: p.variants.map((vv) => ({
+        id: vv.id,
+        label: vv.label,
+        stock: vv.stock,
+        codesAvailable: vv._count.giftCodes,
+        // The paste dialog routes only active variants (like stock/bulk), so
+        // its live preview needs to know which these are.
+        isActive: vv.isActive,
+      })),
       sku: p.sku,
       name: p.name,
       categoryName: p.category.name,
@@ -76,6 +87,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       reason: m.reason,
       note: m.note,
       stockAfter: m.stockAfter,
+      // Batch correlation for bulk paste/void rows (additive): the chip in
+      // the stock history uses it to offer "undo this paste".
+      refId: m.refId,
       createdAt: m.createdAt.toISOString(),
     })),
   });

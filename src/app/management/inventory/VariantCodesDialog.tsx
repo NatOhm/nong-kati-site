@@ -68,20 +68,43 @@ const STATUS_CLASS: Record<string, string> = {
 
 const PAGE = 25;
 
+/** Raw server error codes → the Thai a staff member can act on. */
+function apiError(code: string | undefined, fallback: string): string {
+  if (!code) return fallback;
+  if (code === 'FORBIDDEN' || code.includes('INSUFFICIENT_PERMISSIONS')) {
+    return 'ไม่มีสิทธิ์ทำรายการนี้ (ต้องเป็นผู้ดูแลระดับสูง)';
+  }
+  return code;
+}
+
 export function VariantCodesDialog({
   variantId,
   variantLabel,
   productName,
+  variants,
+  canReveal = true,
+  canVoid = true,
+  onAddStock,
   onClose,
   onChanged,
 }: {
   variantId: string;
   variantLabel: string;
   productName: string;
+  /** All variants of the product — rendered as tabs when more than one. */
+  variants?: { variantId: string; label: string }[];
+  /** Mirrors the viewer holding `inventory:reveal` (super_admin). */
+  canReveal?: boolean;
+  /** Mirrors the viewer holding `inventory:void`. */
+  canVoid?: boolean;
+  /** Opens the bulk-paste dialog for the variant currently on screen. */
+  onAddStock?: (variantId: string, label: string) => void;
   onClose: () => void;
   /** Fires after a void so the page behind can refresh its stock numbers. */
   onChanged: () => void;
 }): React.JSX.Element {
+  /** Which variant the tabs switch — owns the list URL, so switching reloads. */
+  const [active, setActive] = useState({ variantId, label: variantLabel });
   const [rows, setRows] = useState<CodeRow[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
@@ -104,7 +127,7 @@ export function VariantCodesDialog({
       setError(null);
       try {
         const data = await adminJson<ListResponse>(
-          `/api/v1/admin/inventory/variants/${variantId}/codes?limit=${PAGE}&offset=${nextOffset}`,
+          `/api/v1/admin/inventory/variants/${active.variantId}/codes?limit=${PAGE}&offset=${nextOffset}`,
         );
         setRows(data.codes);
         setTotal(data.total);
@@ -120,7 +143,7 @@ export function VariantCodesDialog({
         setLoading(false);
       }
     },
-    [variantId],
+    [active.variantId],
   );
 
   useEffect(() => {
@@ -136,7 +159,7 @@ export function VariantCodesDialog({
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
-        setError(body.error ?? `HTTP ${res.status}`);
+        setError(apiError(body.error, 'เปิดดูบัญชีไม่สำเร็จ'));
         return;
       }
       const body = (await res.json()) as { code: string };
@@ -170,7 +193,7 @@ export function VariantCodesDialog({
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
-        setError(body.error ?? `HTTP ${res.status}`);
+        setError(apiError(body.error, 'เปิดบัญชีเพื่อแก้ไขไม่สำเร็จ'));
         return;
       }
       const body = (await res.json()) as { code: string };
@@ -206,7 +229,7 @@ export function VariantCodesDialog({
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
-        setError(body.error ?? `HTTP ${res.status}`);
+        setError(apiError(body.error, 'บันทึกการแก้ไขไม่สำเร็จ'));
         return;
       }
       const body = (await res.json()) as { changed: boolean };
@@ -277,7 +300,7 @@ export function VariantCodesDialog({
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
-        setError(body.error ?? `HTTP ${res.status}`);
+        setError(apiError(body.error, 'ปิดใช้งานไม่สำเร็จ'));
         return;
       }
       setMessage('ปิดใช้งานบัญชีเรียบร้อยแล้ว');
@@ -315,7 +338,7 @@ export function VariantCodesDialog({
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
-        setError(body.error ?? `HTTP ${res.status}`);
+        setError(apiError(body.error, 'ส่งบัญชีไม่สำเร็จ'));
         return;
       }
       const body = (await res.json()) as { orderComplete?: boolean; productName?: string };
@@ -340,17 +363,49 @@ export function VariantCodesDialog({
           <div>
             <h2 className="text-lg font-bold text-fg">บัญชีที่เก็บไว้</h2>
             <p className="text-sm text-fg-muted">
-              {productName} — {variantLabel}
+              {productName} — {active.label}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md px-2 py-1 text-sm text-fg-muted hover:bg-surface-sunken"
-          >
-            ปิด
-          </button>
+          <div className="flex items-center gap-2">
+            {onAddStock && (
+              <button
+                type="button"
+                onClick={() => onAddStock(active.variantId, active.label)}
+                className="rounded-md bg-surface-brand px-3 py-1.5 text-sm font-semibold text-fg-inverse hover:opacity-90"
+              >
+                เติมบัญชี
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md px-2 py-1 text-sm text-fg-muted hover:bg-surface-sunken"
+            >
+              ปิด
+            </button>
+          </div>
         </div>
+
+        {/* Variant tabs — every option of the product, not just the first. */}
+        {variants && variants.length > 1 && (
+          <div className="flex flex-wrap gap-2 border-b border-line px-5 py-2">
+            {variants.map((v) => (
+              <button
+                key={v.variantId}
+                type="button"
+                onClick={() => setActive({ variantId: v.variantId, label: v.label })}
+                className={cn(
+                  'rounded-full px-3 py-1 text-xs font-semibold transition-colors',
+                  active.variantId === v.variantId
+                    ? 'bg-surface-brand text-fg-inverse'
+                    : 'border border-line text-fg-secondary hover:border-line-brand',
+                )}
+              >
+                {v.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
           <p className="mb-3 text-sm text-fg-muted">
@@ -432,29 +487,33 @@ export function VariantCodesDialog({
                               {copiedId === c.id ? 'คัดลอกแล้ว' : 'คัดลอก'}
                             </button>
                           )}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (revealed[c.id]) hideCode(c.id);
-                              else void reveal(c.id);
-                            }}
-                            disabled={busyId === c.id}
-                            title={revealed[c.id] ? 'ซ่อน' : 'ดูบัญชีเต็ม'}
-                            className="inline-flex min-h-[36px] min-w-[36px] items-center justify-center rounded-md border border-line px-2 text-fg-secondary hover:border-line-brand hover:text-fg-brand disabled:opacity-50"
-                          >
-                            {revealed[c.id] ? <EyeOff size={15} /> : <Eye size={15} />}
-                          </button>
+                          {canReveal && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (revealed[c.id]) hideCode(c.id);
+                                else void reveal(c.id);
+                              }}
+                              disabled={busyId === c.id}
+                              title={revealed[c.id] ? 'ซ่อน' : 'ดูบัญชีเต็ม'}
+                              className="inline-flex min-h-[36px] min-w-[36px] items-center justify-center rounded-md border border-line px-2 text-fg-secondary hover:border-line-brand hover:text-fg-brand disabled:opacity-50"
+                            >
+                              {revealed[c.id] ? <EyeOff size={15} /> : <Eye size={15} />}
+                            </button>
+                          )}
                           {c.status === 'available' && (
                             <>
-                              <button
-                                type="button"
-                                onClick={() => void startEdit(c.id)}
-                                disabled={busyId === c.id || assignBusy}
-                                title="แก้ไขบัญชีนี้"
-                                className="inline-flex min-h-[36px] min-w-[36px] items-center justify-center rounded-md border border-line px-2 text-fg-secondary hover:border-line-brand hover:text-fg-brand disabled:opacity-50"
-                              >
-                                <Pencil size={15} />
-                              </button>
+                              {canReveal && (
+                                <button
+                                  type="button"
+                                  onClick={() => void startEdit(c.id)}
+                                  disabled={busyId === c.id || assignBusy}
+                                  title="แก้ไขบัญชีนี้"
+                                  className="inline-flex min-h-[36px] min-w-[36px] items-center justify-center rounded-md border border-line px-2 text-fg-secondary hover:border-line-brand hover:text-fg-brand disabled:opacity-50"
+                                >
+                                  <Pencil size={15} />
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 onClick={() => void assignToOrder(c.id)}
@@ -464,15 +523,17 @@ export function VariantCodesDialog({
                               >
                                 <Send size={15} />
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => void voidCode(c.id)}
-                                disabled={busyId === c.id || assignBusy}
-                                title="ปิดใช้งานบัญชีนี้"
-                                className="inline-flex min-h-[36px] min-w-[36px] items-center justify-center rounded-md border border-line px-2 text-fg-error hover:border-error disabled:opacity-50"
-                              >
-                                <Ban size={15} />
-                              </button>
+                              {canVoid && (
+                                <button
+                                  type="button"
+                                  onClick={() => void voidCode(c.id)}
+                                  disabled={busyId === c.id || assignBusy}
+                                  title="ปิดใช้งานบัญชีนี้"
+                                  className="inline-flex min-h-[36px] min-w-[36px] items-center justify-center rounded-md border border-line px-2 text-fg-error hover:border-error disabled:opacity-50"
+                                >
+                                  <Ban size={15} />
+                                </button>
+                              )}
                             </>
                           )}
                         </>

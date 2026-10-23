@@ -73,6 +73,8 @@
 | E6    | Admin refund + resend controls on the order detail modal | `e2e/order-refund-resend.spec.ts` | `npm run test:e2e`   | **Browser Smoke** (run ใน CI ด้วย) |
 | E7    | Admin order search / customer history / delivery reveal — masked vs full PII, cancel-path, allowed + denied roles | `e2e/admin-search-history-reveal.spec.ts` | `npm run test:e2e` | **Browser Smoke** (run ใน CI ด้วย) |
 | SF    | Slip flow — auto-verify dispatch (Slip2Go→SlipOK fallback), เก็บหลักฐานสลิป before check, ping แอดมินเมื่อต้องตรวจเอง | `tests/slip-flow.test.ts` | `npm test` (vitest) | Unit Tests             |
+| VS    | Inventory shelf panel (21 ต.ค. 2569) — `POST /stock/bulk` รับ `variantId` pin ได้ (unknown variant = 400 ห้าม fallback เงียบ ๆ) + round-robin เดิมไม่เปลี่ยน · `GET /admin/inventory` คืน `variants[]` ครบทุกตัว (additive — field เดิมครบ) | `tests/inventory-variants-shelf.test.ts` | `npm test` (vitest) | Unit Tests |
+| BV    | Bulk-void + batchId correlation (22 ต.ค. 2569) — paste ทุก plan สร้าง batch + stamp ลง codes/StockMove/audit · `POST /stock/bulk-void` CAS เฉพาะ available, stock ไม่ติดลบ, idempotent, tx เดียว · `GET /admin/inventory` คืน `refId` (additive) ให้ chip ในตารางประวัติ | `tests/inventory-bulk-void.test.ts` | `npm test` (vitest) | Unit Tests |
 
 **วิธีรัน:**
 
@@ -738,3 +740,40 @@ job นี้แดงมาตั้งแต่รอบที่ 88 และ
 - **PUT แบบไม่เปลี่ยนไม่เขียน:** body ที่ normalize แล้วเหมือนค่าปัจจุบัน → ตอบจากค่าเดิมไม่ upsert (กัน row churn + audit noise), unknown keys ถูกเมินไม่หลุดเข้า settings
 - **`Product.shortDescription`:** ข้อความสั้นที่ admin กรอกในตัวแก้สินค้า = `og:description` ตอนแชร์ลิงก์สินค้า (เดิม fallback "ซื้อ {name} ออนไลน์") — API create/update/list ส่งกลับ+รับเข้า, sanitize + cap 160 ที่ `normalizeProductShortDescription` ตัวเดียวทั้งสอง route
 - **wiring tests:** สแกน source ยืนยันทุก consumer (opengraph-image, generateMetadata, admin route, nav, products API + editor) ยังเรียก lib ตัวเดียว — ใครเอาโค้ดกลับไป hardcode หรือถอด nav ออก = เทสต์แดง
+
+## Inventory shelf panel — bulk paste pin + full variants list (2026-10-21) — `tests/inventory-variants-shelf.test.ts`
+
+แผงจัดการบัญชีที่เก็บไว้ (Phase 1) รวม 3 การเปลี่ยนแปลง server ที่ตัว UI ของ `VariantCodesDialog` พึ่งพา:
+
+| ตัว | บังคับว่า |
+|---|---|
+| VS1 | `POST /stock/bulk` รับ `variantId` (optional) — pin ทุก record ไป variant เดียว ไม่ spread แบบ round-robin; **unknown/inactive variant ต้องตอบ 400 `UNKNOWN_VARIANT`** ห้าม fallback เงียบ ๆ เพราะจะทำให้บัญชีไปอยู่ผิด shelf โดย admin ไม่รู้ตัว |
+| VS2 | **ไม่มี `variantId` = round-robin เดิมไม่เปลี่ยน** — pasted records กระจายครบทุก variant ตามลำดับ `sortOrder` |
+| VS3 | `GET /admin/inventory` คืน `variants[]` เต็ม (id/label/stock/codesAvailable) — ทุก field เดิม (`variantId`, `variantStock` ฯลฯ) ยังอยู่ครบ (additive) เพราะ Hyrum's Law: จออื่นที่ใช้ field เก่าต้องไม่พัง |
+| VS4 | preview (`apply=false`) pin เหมือน apply — ไม่งั้น admin เห็นแผน round-robin แล้วกดบันทึกได้คนละ variant กับที่ preview บอก |
+
+**พังได้จริง — ทดสอบด้วยการใส่มั๊กกลับ**
+
+- เปลี่ยน `target = pinned ?? (variantId || order[...])` กลับเป็น `pinned ?? variantId ?? order[...]` → VS2 แดง (empty string `''` ไม่ใช่ nullish, `??` จะส่งมันผ่านต่อไปที่ `Map.get('')` = `undefined` → crash) — **บั๊กจริงที่เจอตอนรันครั้งแรก แก้แล้ว**
+- ลบ `if (variantId && !product.variants.some(...)) return 400` → VS1 แดง
+- ลบ `variants` จาก include ของ GET /admin/inventory → VS3 แดง
+
+## Bulk-void + batchId correlation (2026-10-22) — `tests/inventory-bulk-void.test.ts`
+
+Phase 2 ของแผงจัดการบัญชี: ยกเลิกการวางรหัสทั้งชุดได้ในคลิกเดียว และรอยัลตี้ของ batch เชื่อมทุกบันทึกเข้าด้วยกัน:
+
+| ตัว | บังคับว่า |
+|---|---|
+| BV1 | `POST /stock/bulk` (apply=true) ทุก plan สร้าง `CodeUploadBatch` 1 แถว + stamp `uploadBatchId` ลงทุก GiftCode + `StockMove.refId` + `audit.metadata.batchId` + คืน `results[].batchId` — preview ห้ามเขียนอะไรทั้งสิ้น |
+| BV2 | `POST /stock/bulk-void` CAS เฉพาะ `uploadBatchId + status:'available'` — sold ที่หลุดไปต้องไม่โดนแตะ, stock ห้ามติดลบ (floor ที่ 0) |
+| BV3 | tx เดียว: flip + StockMove + audit (ทุกส่วนถือ batchId เดียวกับตอน paste) — ขาดอย่างใดอย่างหนึ่ง = ledger ขัดกัน |
+| BV4 | idempotent: re-void flip 0 แถว → ไม่เขียน StockMove/audit, ตอบ 200 `alreadyProcessed:true` (double-click ห้าม decrement ซ้ำ) |
+| BV5 | `GET /admin/inventory` คืน `refId` ใน moves (additive) — chip "ยกเลิกชุดนี้" ในตารางประวัติใช้มัน + เฉพาะ `reason:'restock'` ที่มี refId เท่านั้นถึงแสดง |
+| BV6 | matrix: `POST /stock/bulk-void` → `inventory:void` (permission เดียวกับ void ต่อรหัส) + declared ใน `ROUTE_PERMISSIONS` |
+
+**พังได้จริง — ทดสอบด้วยการใส่มั๊กกลับ**
+
+- เอา `status: 'available'` ออกจาก where ของ flip → BV2 แดง (sold จะถูก void ด้วย = รหัสที่ลูกค้าได้ไปถูกดึงกลับ)
+- เขียน StockMove/audit ก่อนเช็ค `flipped.count === 0` → BV4 แดง (re-void เผา ledger ทุกครั้งที่กด)
+- ตัด `refId: batch.id` ออกจาก stockMove.create ตอน paste → BV1 แดง
+- ลบ `refId` จากคำตอบของ GET /admin/inventory → BV5 แดง

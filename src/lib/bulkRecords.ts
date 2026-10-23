@@ -48,9 +48,89 @@ export function splitLongRecords(raw: string): string[] {
 
 /** Record estimate shown under the textarea ("ตอนนี้: N รายการ"). */
 export function countBulkRecords(raw: string, format: 'short' | 'long'): number {
-  if (raw.trim() === '') return 0;
-  if (format === 'short') return raw.split(/\r?\n/).filter((l) => l.trim() !== '').length;
-  return splitLongRecords(raw).length;
+  return parseBulkRecords(raw, format).length;
+}
+
+/** One variant a pasted record can land in (active ones only, like the route). */
+export interface BulkVariant {
+  id: string;
+  label: string;
+}
+
+/** Records routed to one variant — the shape preview and route share. */
+export interface BulkPlan {
+  variantId: string;
+  label: string;
+  codes: string[];
+}
+
+/** Reference-prefix/column cleanup (client list: Long/detailed format with refs). */
+const REF_RE = /^[[(]?(?:id|ref|order|inv|refid)\s*[:：\-]\s*.*$/i;
+
+/**
+ * THE paste parser — the stock/bulk route and the dialog's live preview both
+ * call this, so the record count under the textarea, the distribution chips,
+ * and what the server actually writes can never drift apart (the 2026-10-14
+ * counter/server split disagreement, once and for all).
+ */
+export function parseBulkRecords(raw: string, format: 'short' | 'long'): string[] {
+  if (raw.trim() === '') return [];
+  if (format === 'short') {
+    return raw.split(/\r?\n/).map((l) => l.trim()).filter((t) => t !== '');
+  }
+  return splitLongRecords(raw);
+}
+
+/**
+ * Round-robin records across variants: an explicit "label:" prefix pins one
+ * record, `variantId` pins the whole paste, short format strips a reference
+ * prefix. Shared so the dialog's live distribution preview shows exactly what
+ * the route will write. Returns every variant's bucket (even empty ones) —
+ * callers filter on count.
+ */
+export function routeBulkRecords(
+  records: string[],
+  variants: BulkVariant[],
+  format: 'short' | 'long',
+  variantId = '',
+): BulkPlan[] {
+  if (variants.length === 0) return [];
+  const perVariant = new Map<string, BulkPlan>(
+    variants.map((v) => [v.id, { variantId: v.id, label: v.label, codes: [] }]),
+  );
+  const order = variants.map((v) => v.id);
+  let cursor = 0;
+
+  for (const record of records) {
+    let work = record;
+    let pinned: string | null = null;
+
+    const pin = work.match(/^([^,:;]+)\s*[:：]\s*(.+)$/);
+    const pinLabel = pin?.[1]?.trim();
+    if (pin && pinLabel && variants.some((v) => v.label === pinLabel)) {
+      pinned = variants.find((v) => v.label === pinLabel)!.id;
+      work = pin[2]!.trim();
+    }
+
+    if (format === 'long') {
+      // Whole multi-line block = one account record, delivered as-is.
+      push(work);
+    } else {
+      // Short format: strip a reference prefix, whole remainder is the code text.
+      const code = work.replace(REF_RE, '').trim();
+      if (code) push(code);
+    }
+
+    function push(code: string): void {
+      // `variantId` is '' when absent — `??` would pass an empty string through
+      // and miss the map, so branch on truthiness instead of nullishness.
+      const target = pinned ?? (variantId || order[cursor % order.length]!);
+      const bucket = perVariant.get(target)!;
+      bucket.codes.push(code);
+      if (!pinned && !variantId) cursor += 1;
+    }
+  }
+  return [...perVariant.values()];
 }
 
 /** Route error codes → Thai-first copy (never leak a raw code on screen). */

@@ -1,10 +1,16 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type DragEvent } from 'react';
 import { Check, Loader2, X } from 'lucide-react';
 
 import { adminJson } from '@/lib/adminSession';
-import { bulkErrorMessage, countBulkRecords } from '@/lib/bulkRecords';
+import {
+  bulkErrorMessage,
+  countBulkRecords,
+  parseBulkRecords,
+  routeBulkRecords,
+  type BulkVariant,
+} from '@/lib/bulkRecords';
 import { cn } from '@/utils/cn';
 
 /**
@@ -13,12 +19,20 @@ import { cn } from '@/utils/cn';
  * big paste textarea, and a สิ่งที่จะได้ในการเพิ่มบัญชี preview of ไอดี #1…
  * cards. Long format keeps blank-line-separated multi-line blocks as ONE
  * account each (the pretty emoji text is delivered to the customer as-is).
+ * A file can be dropped on the paste box; the live chips under it show where
+ * each record will land (same shared parser the route writes with).
  * Save → POST /api/v1/admin/stock/bulk (encrypted GiftCodes + StockMove).
  */
 
 interface BulkStockDialogProps {
   productId: string;
   productName: string;
+  /** Active variants of this product — drives the live routing chips. The
+   *  route routes only active variants, so callers pass that same set. */
+  variants: BulkVariant[];
+  /** Pin every pasted record to this variant (the inventory panel's
+   *  เติมบัญชี button) instead of the default round-robin across all. */
+  pinVariant?: { variantId: string; label: string };
   onClose: () => void;
   onSaved: () => void;
 }
@@ -49,9 +63,14 @@ const SEPARATORS: { value: ',' | ';' | 'tab'; label: string }[] = [
   { value: 'tab', label: 'Tab' },
 ];
 
+/** Rendered preview-card cap — a 500-row paste must not build 500 cards. */
+const PREVIEW_LIMIT = 50;
+
 export function BulkStockDialog({
   productId,
   productName,
+  variants,
+  pinVariant,
   onClose,
   onSaved,
 }: BulkStockDialogProps) {
@@ -63,6 +82,7 @@ export function BulkStockDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<ApplyResponse | null>(null);
+  const [dragOver, setDragOver] = useState(false);
 
   /**
    * Client-side record estimate — shared with the server's split rule via
@@ -71,6 +91,24 @@ export function BulkStockDialog({
    * disagree with the server's actual split).
    */
   const recordCount = useMemo(() => countBulkRecords(raw, format), [raw, format]);
+
+  /**
+   * Live distribution preview — the SAME parse+round-robin the route runs
+   * (lib/bulkRecords), so the chips say where each record lands while typing.
+   * The server-side แยกข้อมูล pass stays authoritative for DB duplicates.
+   */
+  const distribution = useMemo(() => {
+    if (raw.trim() === '') return [];
+    const routed = routeBulkRecords(
+      parseBulkRecords(raw, format),
+      variants,
+      format,
+      pinVariant?.variantId ?? '',
+    );
+    return routed
+      .filter((p) => p.codes.length > 0)
+      .map((p) => ({ variantId: p.variantId, label: p.label, count: p.codes.length }));
+  }, [raw, format, variants, pinVariant]);
 
   /**
    * Rough account-count heuristic (mail/user/pass/id-ish lines). When it
@@ -97,7 +135,7 @@ export function BulkStockDialog({
       const data = await adminJson<PreviewResponse>('/api/v1/admin/stock/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productId, format, separator, raw }),
+        body: JSON.stringify({ productId, format, separator, raw, ...(pinVariant ? { variantId: pinVariant.variantId } : {}) }),
       });
       setPreview(data);
     } catch (e) {
@@ -115,7 +153,7 @@ export function BulkStockDialog({
       const data = await adminJson<ApplyResponse>('/api/v1/admin/stock/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productId, format, separator, raw, apply: true }),
+        body: JSON.stringify({ productId, format, separator, raw, apply: true, ...(pinVariant ? { variantId: pinVariant.variantId } : {}) }),
       });
       setDone(data);
       onSaved();
@@ -127,6 +165,33 @@ export function BulkStockDialog({
   }
 
   const totalNew = preview?.plans.reduce((s, p) => s + p.count, 0) ?? 0;
+
+  /** Dropped files fill the paste box (2 MB cap — these are pastes, not uploads). */
+  async function handleDrop(e: DragEvent<HTMLDivElement>): Promise<void> {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    if (file.size > 2_000_000) {
+      setError('ไฟล์ใหญ่เกินไป (จำกัด 2 MB) — แบ่งไฟล์ หรือวางข้อความแทน');
+      return;
+    }
+    try {
+      setRaw(await file.text());
+      setPreview(null);
+      setError(null);
+    } catch {
+      setError('อ่านไฟล์ไม่สำเร็จ — ลองลากไฟล์ .txt/.csv ใหม่');
+    }
+  }
+
+  /** Cards flattened for render — capped so a huge paste cannot stall the DOM. */
+  const previewCards = preview
+    ? preview.plans.flatMap((plan) =>
+        plan.codes.map((code) => ({ variantId: plan.variantId, label: plan.label, code })),
+      )
+    : [];
+  const shownCards = previewCards.slice(0, PREVIEW_LIMIT);
 
   return (
     <div
@@ -143,6 +208,11 @@ export function BulkStockDialog({
             <p className="mt-0.5 text-xs text-fg-muted">
               กรอกข้อมูลบัญชีผู้ใช้ในรูปแบบที่กำหนด เพื่อเพิ่มจำนวนข้อมูลให้สินค้านี้
             </p>
+            {pinVariant && (
+              <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-peach-500/10 px-2.5 py-0.5 text-[11px] font-medium text-fg-brand">
+                บันทึกเข้า: {pinVariant.label} เท่านั้น
+              </p>
+            )}
           </div>
           <button
             onClick={onClose}
@@ -244,26 +314,50 @@ export function BulkStockDialog({
               >
                 ข้อมูลไอดีและรหัสผ่าน *
               </label>
-              <textarea
-                id="bulk-stock-input"
-                value={raw}
-                onChange={(e) => {
-                  setRaw(e.target.value);
-                  setPreview(null);
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragOver(true);
                 }}
-                rows={10}
-                spellCheck={false}
-                placeholder={
-                  format === 'short'
-                    ? 'user1:pass1\nuser2:pass2\nuser3:pass3'
-                    : '🍎 ➤ HBO MAX 4K  7 days 💜\n\n✅ Mail : mansdevt@gmail.com\n✅ pass : baby123456hii\n\n\n✅ Mail : บัญชีถัดไป@gmail.com\n✅ pass : xxxxxxxx\n\n\n(บล็อกถัดไป คั่นด้วยบรรทัดว่าง 2 บรรทัดติดกัน)'
-                }
-                className="min-h-[220px] w-full resize-y rounded-lg border border-line-subtle bg-surface-elevated p-3 font-mono text-sm text-fg placeholder:text-fg-placeholder focus:border-line-brand"
-              />
+                onDragLeave={() => setDragOver(false)}
+                onDrop={(e) => void handleDrop(e)}
+                className={cn('rounded-lg', dragOver && 'ring-2 ring-peach-500')}
+              >
+                <textarea
+                  id="bulk-stock-input"
+                  value={raw}
+                  onChange={(e) => {
+                    setRaw(e.target.value);
+                    setPreview(null);
+                  }}
+                  rows={10}
+                  spellCheck={false}
+                  placeholder={
+                    format === 'short'
+                      ? 'user1:pass1\nuser2:pass2\nuser3:pass3'
+                      : '🍎 ➤ HBO MAX 4K  7 days 💜\n\n✅ Mail : mansdevt@gmail.com\n✅ pass : baby123456hii\n\n\n✅ Mail : บัญชีถัดไป@gmail.com\n✅ pass : xxxxxxxx\n\n\n(บล็อกถัดไป คั่นด้วยบรรทัดว่าง 2 บรรทัดติดกัน)'
+                  }
+                  className="min-h-[220px] w-full resize-y rounded-lg border border-line-subtle bg-surface-elevated p-3 font-mono text-sm text-fg placeholder:text-fg-placeholder focus:border-line-brand"
+                />
+              </div>
               <p className="mt-1 text-xs text-fg-placeholder">
                 ตอนนี้: {recordCount} รายการ
-                {format === 'long' && ' (แยกบล็อกด้วยบรรทัดว่าง 2 บรรทัดติดกัน)'}
+                {format === 'long' && ' (แยกบล็อกด้วยบรรทัดว่าง 2 บรรทัดติดกัน)'} ·
+                ลากไฟล์ .txt/.csv มาวางได้ (สูงสุด 2 MB)
               </p>
+              {distribution.length > 0 && (
+                <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-fg-secondary">
+                  <span>จะกระจายเข้า:</span>
+                  {distribution.map((d) => (
+                    <span
+                      key={d.variantId}
+                      className="rounded-full bg-peach-500/10 px-2 py-0.5 font-medium text-fg-brand"
+                    >
+                      {d.label} · {d.count}
+                    </span>
+                  ))}
+                </p>
+              )}
               {format === 'long' && accountGuess > recordCount && recordCount > 0 && (
                 <p className="mt-1 text-xs font-medium text-fg-error" role="alert">
                   ⚠️ ดูเหมือนมีราวๆ {accountGuess} บัญชี แต่จะถูกรวมเป็น {recordCount} ก้อน —
@@ -294,28 +388,33 @@ export function BulkStockDialog({
                 ) : totalNew === 0 ? (
                   <p className="text-sm text-fg-error">ไม่พบบัญชีที่แยกได้ — ตรวจรูปแบบอีกครั้ง</p>
                 ) : (
+                  <>
                   <div className="space-y-2.5">
-                    {preview.plans.flatMap((plan, pi) =>
-                      plan.codes.map((code, i) => (
-                        <div
-                          key={`${plan.variantId}-${i}`}
-                          className="rounded-lg border border-line-subtle bg-surface p-3"
-                        >
-                          <p className="mb-1 text-sm font-bold text-fg">
-                            ไอดี #{pi + i + 1}
-                            {preview.plans.length > 1 && (
-                              <span className="ml-2 rounded-full bg-peach-500/10 px-2 py-0.5 text-[11px] font-medium text-fg-brand">
-                                {plan.label}
-                              </span>
-                            )}
-                          </p>
-                          <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap break-words font-mono text-xs text-fg-secondary">
-                            {code}
-                          </pre>
-                        </div>
-                      )),
-                    )}
+                    {shownCards.map((card, idx) => (
+                      <div
+                        key={`${card.variantId}-${idx}`}
+                        className="rounded-lg border border-line-subtle bg-surface p-3"
+                      >
+                        <p className="mb-1 text-sm font-bold text-fg">
+                          ไอดี #{idx + 1}
+                          {preview.plans.length > 1 && (
+                            <span className="ml-2 rounded-full bg-peach-500/10 px-2 py-0.5 text-[11px] font-medium text-fg-brand">
+                              {card.label}
+                            </span>
+                          )}
+                        </p>
+                        <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap break-words font-mono text-xs text-fg-secondary">
+                          {card.code}
+                        </pre>
+                      </div>
+                    ))}
                   </div>
+                  {previewCards.length > shownCards.length && (
+                    <p className="mt-2 text-center text-xs text-fg-placeholder">
+                      แสดง {shownCards.length} จาก {previewCards.length} รายการแรก
+                    </p>
+                  )}
+                  </>
                 )}
               </div>
             </div>

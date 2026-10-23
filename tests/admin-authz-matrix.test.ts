@@ -281,6 +281,7 @@ const ROUTE_COVERAGE: MatrixRow[] = [
   { method: 'POST', path: '/staff/s-1', perm: 'staff:reset-2fa', body: { action: 'unlock' } },
   // stock
   { method: 'POST', path: '/stock/bulk', perm: 'products:write', body: {} },
+  { method: 'POST', path: '/stock/bulk-void', perm: 'inventory:void', body: {} },
   // tags
   { method: 'GET', path: '/tags', perm: 'products:read' },
   { method: 'POST', path: '/tags', perm: 'products:write', body: {} },
