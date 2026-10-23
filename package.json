@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "infisical run --env=dev -- next dev",
     "dev:direct": "next dev",
-    "build": "next build",
+    "build": "next build && node scripts/stamp-git-sha.mjs",
     "postinstall": "prisma generate",
     "start": "infisical run --env=dev -- next start",
     "start:direct": "next start",

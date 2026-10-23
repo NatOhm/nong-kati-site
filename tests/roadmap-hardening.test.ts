@@ -9,7 +9,9 @@
  *  §4  Payment-channel union gate: Opn-only / manual-only / wallet-only
  *      succeed; a channel-less environment fails closed.
  *  §5  /api/v1/version answers the running build id publicly (no auth, no
- *      secrets), read from .next/BUILD_ID so it cannot report a stale sha.
+ *      secrets), read from .next/BUILD_ID so it cannot report a stale sha;
+ *      the git sha comes from the bundle-stamped .next/GIT_SHA first and the
+ *      hand-maintained env var only as a fallback.
  *  §6  ops-health requires auth and reports the monitored signals;
  *      the admin reconciliation queue resolves entries from live order state.
  */
@@ -104,17 +106,27 @@ describe('§4 payment-channel union gate', () => {
 // ─── §5 /api/v1/version ──────────────────────────────────
 describe('§5 public version endpoint', () => {
   /**
-   * Import the route with fs/promises stubbed. The route reads exactly one
-   * path (.next/BUILD_ID); any other read is a bug worth failing on, so the
-   * stub asserts the caller is asking for that file.
+   * Import the route with fs/promises stubbed. The route reads exactly two
+   * on-disk release-identity files (.next/BUILD_ID and .next/GIT_SHA); any
+   * other read is a bug worth failing on, so the stub asserts the caller only
+   * asks for those. Pass `undefined` for the stamp to mean "file not there".
    */
-  async function loadRoute(contents: string | Error): Promise<() => Promise<Response>> {
+  async function loadRoute(
+    buildIdContents: string | Error,
+    gitShaStamp?: string | Error,
+  ): Promise<() => Promise<Response>> {
     vi.resetModules();
     vi.doMock('fs/promises', () => ({
       readFile: vi.fn(async (p: string) => {
-        expect(String(p)).toContain(join('next', 'BUILD_ID'));
-        if (contents instanceof Error) throw contents;
-        return contents;
+        const path = String(p);
+        if (path.includes(join('next', 'GIT_SHA'))) {
+          if (gitShaStamp === undefined) throw new Error('ENOENT');
+          if (gitShaStamp instanceof Error) throw gitShaStamp;
+          return gitShaStamp;
+        }
+        expect(path).toContain(join('next', 'BUILD_ID'));
+        if (buildIdContents instanceof Error) throw buildIdContents;
+        return buildIdContents;
       }),
     }));
     const { GET } = await import('@/app/api/v1/version/route');
@@ -144,18 +156,28 @@ describe('§5 public version endpoint', () => {
     expect(res.headers.get('Cache-Control')).toContain('no-store');
   });
 
-  it('never lets a stale injected sha shadow the build actually running', async () => {
+  it('the bundle-stamped sha wins over a stale injected GIT_SHA', async () => {
     // This is the bug that made the endpoint lie: GIT_SHA lives in Infisical
-    // and no deploy step updates it, so it kept naming an old commit.
-    process.env['GIT_SHA'] = '2ee2ae7';
-    const GET = await loadRoute('gUxcV6SEGUgIp6nFJf8hR');
+    // and no deploy step updates it, so it kept naming an old commit. The
+    // fix: deploy scripts stamp git HEAD into .next/GIT_SHA inside the
+    // artifact, and the route reads that first.
+    process.env['GIT_SHA'] = '2ee2ae7'; // stale panel value
+    const GET = await loadRoute('gUxcV6SEGUgIp6nFJf8hR', 'd05c48ec4756a2d0c9fff4c1a456d3da2ab165ba\n');
     const body = (await (await GET()).json()) as Record<string, string>;
 
     expect(body['buildId']).toBe('gUxcV6SEGUgIp6nFJf8hR');
-    // The stale value is still reported on its legacy field...
+    // The SHA the build was actually made from, not the panel's echo.
+    expect(body['gitSha']).toBe('d05c48ec4756a2d0c9fff4c1a456d3da2ab165ba');
+    expect(body['gitSha']).not.toBe('2ee2ae7');
+  });
+
+  it('a junk GIT_SHA stamp degrades to the env value instead of shipping nonsense', async () => {
+    // A truncated extraction can leave an HTML error page where GIT_SHA
+    // should be; the same shape-check that guards BUILD_ID guards this.
+    process.env['GIT_SHA'] = '2ee2ae7';
+    const GET = await loadRoute('gUxcV6SEGUgIp6nFJf8hR', '<html>502 Bad Gateway</html>');
+    const body = (await (await GET()).json()) as Record<string, string>;
     expect(body['gitSha']).toBe('2ee2ae7');
-    // ...but a caller can always tell what is really serving requests.
-    expect(body['buildId']).not.toBe(body['gitSha']);
   });
 
   it('degrades to "unknown" instead of failing when no env identity is set', async () => {

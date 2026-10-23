@@ -18,11 +18,12 @@ export const dynamic = 'force-dynamic';
  * injected env var can — the whole reason this endpoint used to lie was that
  * GIT_SHA lived in Infisical, which no deploy step updates.
  *
- * `gitSha`/`gitRef` are kept for backward compatibility with the documented
- * response shape and with the deploy runbook's expectations. They are only
- * reported when the environment supplies them; we never let them shadow the
- * buildId, because a human-set env var and the code actually serving
- * requests can disagree.
+ * `gitSha` now follows the same rule: the deploy scripts stamp
+ * `git rev-parse HEAD` into .next/GIT_SHA as they bundle, and the artifact
+ * ships it next to BUILD_ID, so it names the commit the running build was
+ * made from. The GIT_SHA / VERCEL_GIT_COMMIT_SHA env vars remain only as a
+ * fallback for paths that build without stamping (CI's browser smoke, a
+ * local `next start`) — the disk stamp always wins when present.
  */
 
 /**
@@ -42,10 +43,30 @@ async function readBuildId(): Promise<string | null> {
   }
 }
 
+/**
+ * Same shape-check philosophy as BUILD_ID: the stamp is written by our own
+ * bundle scripts, but a junk value (empty file, an error page from a broken
+ * extraction) must degrade to "not stamped" rather than become a fake sha.
+ */
+const GIT_SHA_RE = /^[0-9a-f]{7,40}$/i;
+
+async function readStampedGitSha(): Promise<string | null> {
+  try {
+    const raw = await readFile(path.join(process.cwd(), '.next', 'GIT_SHA'), 'utf8');
+    const trimmed = raw.trim();
+    return GIT_SHA_RE.test(trimmed) ? trimmed : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(): Promise<NextResponse> {
   const buildId = await readBuildId();
 
-  const gitSha = process.env['GIT_SHA'] ?? process.env['VERCEL_GIT_COMMIT_SHA'];
+  // The stamped file ships inside the build artifact, so it names the commit
+  // this build was actually made from; env vars are hand-maintained echoes.
+  const gitSha =
+    (await readStampedGitSha()) ?? process.env['GIT_SHA'] ?? process.env['VERCEL_GIT_COMMIT_SHA'];
   const gitRef = process.env['VERCEL_GIT_COMMIT_REF'];
 
   return NextResponse.json(
