@@ -15,7 +15,8 @@ services:
       - DATABASE_DIRECT_URL=postgresql://nongkati:nongkati@db:5432/nong_kati?schema=store
       - NEXT_PUBLIC_SITE_URL=http://localhost:3000
       - NODE_ENV=development
-      - NK_JWT_SECRET=dev-only-jwt-secret
+      # Must clear jwt.ts's >=32-char entropy floor or every sign/verify 500s.
+      - NK_JWT_SECRET=compose-dev-secret-0123456789abcdef0123456789abcdef
       - NK_CSP_REPORT_ONLY=true
     depends_on:
       db:
