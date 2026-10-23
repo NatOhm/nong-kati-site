@@ -49,3 +49,10 @@ deploy-bundle.tar.gz
 .prod-health-state.json
 .prod-health-history.ndjson
 .tmp-monitor/
+
+# Root-level session scratch (check scripts, dev-state dumps, local deploy
+# bundles) — recurs after every agent session; nothing tracked matches.
+/check-*
+/*-state*.js
+/.vitest/
+/*.zip

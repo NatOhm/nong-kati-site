@@ -1,0 +1,16 @@
+# ─── Nong-Kati deploy install steps — paste into Plesk → Websites & Domains → Terminal (or Remote SSH) ───
+# Prerequisite: deploy-bundle.tar.gz (31 MB, built from 4f44b7b) uploaded via
+# Plesk → Files → httpdocs. Migrations were already applied earlier; NOT included, NOT needed.
+
+set -euo pipefail
+cd ~/httpdocs 2>/dev/null || cd /var/www/vhosts/nongkatistore.com/httpdocs
+ls -la deploy-bundle.tar.gz   # must exist before continuing
+tar -xzf deploy-bundle.tar.gz
+npm ci
+npx prisma generate
+npm prune --omit=dev
+mkdir -p tmp && touch tmp/restart.txt   # Passenger restart signal
+rm -f deploy-bundle.tar.gz
+echo "server install done — wait ~20s, then verify:"
+echo "  curl -s https://nongkatistore.com/api/v1/version"
+echo "  Expected gitSha starts with 4f44b7b (was cc9758d before this deploy)."

@@ -1,0 +1,55 @@
+# ─── Nong-Kati → Hostatom Plesk — GUI deploy (NO SSH needed) ──────────────
+# For when Plesk → SSH access shows "Forbidden" (this subscription).
+# Artifact: deploy-bundle.zip (33 MB / 1045 files, built 2026-10-13 from git
+#   4f44b7b + the uncommitted 12-Oct security fixes in the working tree:
+#   itemless-order claim guard, rightmost X-Forwarded-For, retry-predicate
+#   parens — plus openai + @respan/respan now in package.json.
+#   Verified: forward-slash entry names, 0 secret-shaped entries, extracts to
+#   an identical tree. Rebuild: powershell -NoProfile -ExecutionPolicy Bypass
+#   -File .make-bundle.ps1
+# Migrations were already applied earlier — not included, not needed.
+
+## 1) Upload the zip
+Plesk → Websites & Domains → nongkatistore.com → Files  (opens File Manager)
+  → go into  httpdocs
+  → Upload → select  deploy-bundle.zip
+  (file is in the workspace: webapp/nong-kati/nong-kati/deploy-bundle.zip)
+
+## 2) Extract it over httpdocs
+  In File Manager: right-click deploy-bundle.zip → Extract Files
+  → destination: current folder (httpdocs) → OK
+  (It overwrites .next, public, prisma, package.json, server.js, next.config.js
+   with the rebuilt .next/public/prisma/configs. Old files that no longer
+   exist stay behind — harmless.)
+   NOTE: keep deploy-bundle.zip itself out of httpdocs if you can; if it ends
+   up there, delete it after extracting (it is 33 MB of dead weight).
+
+## 3) Install dependencies + Prisma client (runs npm install server-side)
+Plesk → Websites & Domains → nongkatistore.com → Node.js
+  → "NPM Modules" / Dependencies section → click  "Run NPM Install"
+  Wait for "OK"/completed. (npm install triggers `postinstall => prisma generate`
+  automatically, so the Linux Prisma client is rebuilt on the server.)
+
+## 4) Restart the app
+  Same Node.js page → "Restart App" (or Applications → Restart)
+
+## 5) Verify (or ask Buffy — it auto-detects)
+  https://nongkatistore.com/api/v1/version
+  Expected: buildId becomes cFhe9g2K9tZ5i0uxx6VcH (was 8doWw3qlBcwC_nMtHOskj)
+  NOTE: gitSha will STILL read 4f44b7b — GIT_SHA is a Plesk env var, not
+  derived from the bundle, and the base commit really is still 4f44b7b. So
+  the buildId is the only reliable "did the new bundle land" signal.
+  Then: https://nongkatistore.com → 200, /api/v1/health → database:ok,
+  products API → 200, /api/v1/orders/vat → 200
+
+## Rollback (if anything breaks)
+  Plesk → Files → httpdocs: the previous .next/public/prisma were overwritten;
+  easiest rollback = re-run the deploy script from a checkout of the old commit,
+  or ask Buffy to rebuild the previous state. Passenger restart is instant.
+
+## Notes
+- No .env ships in the zip: runtime env stays in Plesk → Node.js →
+  Custom environment variables (already set — the app runs today).
+- Startup file must remain  server.js  (set once, long ago).
+- npm install on the server installs dev deps too; the SSH script would prune
+  them afterwards. Harmless, just slightly larger disk usage.
