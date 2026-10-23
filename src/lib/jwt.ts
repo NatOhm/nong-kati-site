@@ -63,14 +63,14 @@ function base64UrlToString(b64: string): string {
 
 function getRandomHex(length: number): string {
   const bytes = new Uint8Array(length);
-  // Use crypto.getRandomValues (browser) or Math.random fallback
-  if (typeof globalThis.crypto !== 'undefined' && globalThis.crypto.getRandomValues) {
-    globalThis.crypto.getRandomValues(bytes);
-  } else {
-    for (let i = 0; i < length; i++) {
-      bytes[i] = Math.floor(Math.random() * 256);
-    }
+  // These bytes become jti, session tokens and backup codes — fail closed
+  // rather than mint guessable secrets with a weak PRNG (audit #4). Every
+  // supported runtime has WebCrypto: Node >= 19 (deploy runs 20.20.2) and
+  // any real browser.
+  if (typeof globalThis.crypto === 'undefined' || !globalThis.crypto.getRandomValues) {
+    throw new Error('WebCrypto getRandomValues unavailable — refusing to generate tokens');
   }
+  globalThis.crypto.getRandomValues(bytes);
   return Array.from(bytes)
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
