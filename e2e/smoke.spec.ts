@@ -165,7 +165,11 @@ test.describe('checkout flow creates an order', () => {
     //    its sessionKey matches 'nk_cart_session', and the provider's
     //    persist effect races any direct seeding — driving the UI is
     //    deterministic and covers the actual customer path.
-    await page.goto('/product/hbo-max-7-4k-4');
+    // Slug must be one prisma/seed.ts creates: CI seeds a fresh database with
+    // `npx prisma db seed` only, and the -4 catalog lives in seed-nongkatistore
+    // (real store), which CI never runs — visiting it 404s and the button below
+    // never appears.
+    await page.goto('/product/hbo-max-7-4k');
     const addBtn = page.getByRole('button', { name: 'เพิ่มลงตะกร้า' });
     await expect(addBtn).toBeVisible({ timeout: 30_000 });
     await expect(addBtn).toBeEnabled();
