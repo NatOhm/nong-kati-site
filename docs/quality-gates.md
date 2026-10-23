@@ -17,7 +17,7 @@
 | C     | Concurrency (DB races — refresh CAS, lockout)         | `tests/admin-concurrency.test.ts`  | vitest + live server | Concurrency (DB races) |
 | S1    | Admin auth-mutation CSRF (origin + double-submit)      | `tests/admin-csrf.test.ts`          | `npm test` (vitest)  | Unit Tests             |
 | S2    | Webhook signature length-safe + production review fixes | `tests/security-fixes.test.ts`     | `npm test` (vitest)  | Unit Tests             |
-| S3    | Secrets fail closed in prod, entropy floor, magic-link deliverability | `tests/security-remediations.test.ts` | `npm test` (vitest) | Unit Tests |
+| S3    | Secrets fail closed in every environment (no fallback literal), entropy floor, magic-link deliverability | `tests/security-remediations.test.ts` | `npm test` (vitest) | Unit Tests |
 | S4    | Same-origin redirect sanitiser                        | `tests/safe-redirect.test.ts`       | `npm test` (vitest)  | Unit Tests             |
 | I1    | Identity hardening (logout invalidation, atomic fail counters, PDPA persist) | `tests/identity-hardening.test.ts` | `npm test` (vitest) | Unit Tests             |
 | I2    | Lockout / lockout-expiry boundaries                   | `tests/lockout-expiry.test.ts`     | `npm test` (vitest)  | Unit Tests             |

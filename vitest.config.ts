@@ -11,6 +11,12 @@ export default defineConfig({
     include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
     environment: 'node',
     globals: true,
+    // JWT/slip secrets fail closed in every environment now, so every worker
+    // needs a value; per-file vi.stubEnv still overrides for fail-closed
+    // assertions.
+    env: {
+      NK_JWT_SECRET: 'vitest-worker-secret-0123456789abcdef0123456789abcdef',
+    },
   },
   resolve: {
     alias: {

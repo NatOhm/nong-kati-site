@@ -29,16 +29,13 @@ function getSecret(): string {
     }
     return configured;
   }
-  // Review finding (High): the dev fallback must never run in production —
-  // a publicly known secret would let anyone forge customer/admin tokens.
-  // Fail closed instead: signing throws (routes answer 500) and verification
-  // returns null, so no auth route is usable until the variable is set.
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error(
-      'NK_JWT_SECRET is not configured — refusing to sign or verify tokens with the dev fallback',
-    );
-  }
-  return 'dev-only-insecure-secret';
+  // Fail closed in EVERY environment (audit #1): this repo is public, so a
+  // dev-mode literal would be a published signing key — any exposed
+  // next-dev or staging process could mint customer/admin tokens. Signing
+  // throws (routes answer 500) and verification returns null until the
+  // variable is set; local dev gets it from .env.local, tests from
+  // vitest.config.
+  throw new Error('NK_JWT_SECRET is not configured — refusing to sign or verify tokens');
 }
 
 // ─── Browser-compatible helpers ──────────────────────────

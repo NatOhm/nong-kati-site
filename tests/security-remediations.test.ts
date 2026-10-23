@@ -1,6 +1,6 @@
 /**
  * Unit tests for the security-review remediations (review of 25 Sep 2026):
- *  - JWT + slip-token secrets fail closed in production (no public fallback)
+ *  - JWT + slip-token secrets fail closed in every environment (no fallback)
  *  - Minimum entropy floor for configured secrets
  *  - Magic-link tokens report deliverability (mail only for real accounts)
  * Pure logic — no network. Run: npm test
@@ -34,11 +34,10 @@ beforeEach(() => {
 // ─── JWT secret fail-closed (review High #1) ──────────────
 
 describe('jwt secret handling', () => {
-  it('uses the dev fallback outside production', async () => {
+  it('refuses to sign when no secret is set, in any environment', async () => {
     vi.stubEnv('NODE_ENV', 'development');
-    const { signJwt, verifyJwt } = await import('@/lib/jwt');
-    const token = await signJwt({ sub: 'x', typ: 'customer' });
-    await expect(verifyJwt(token)).resolves.toMatchObject({ sub: 'x' });
+    const { signJwt } = await import('@/lib/jwt');
+    await expect(signJwt({ sub: 'x', typ: 'customer' })).rejects.toThrow(/NK_JWT_SECRET/);
   });
 
   it('refuses to sign in production without a configured secret', async () => {
@@ -47,15 +46,16 @@ describe('jwt secret handling', () => {
     await expect(signJwt({ sub: 'x', typ: 'customer' })).rejects.toThrow(/NK_JWT_SECRET/);
   });
 
-  it('rejects tokens signed with the publicly known dev fallback once in production', async () => {
+  it('rejects tokens signed under a different secret', async () => {
     vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('NK_JWT_SECRET', 'a'.repeat(48));
     const { signJwt, verifyJwt } = await import('@/lib/jwt');
-    const forged = await signJwt({ sub: 'attacker', typ: 'customer' });
+    const token = await signJwt({ sub: 'attacker', typ: 'customer' });
 
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('NK_JWT_SECRET', 'x'.repeat(48));
-    // A known-fallback signature must not verify under the real secret.
-    await expect(verifyJwt(forged)).resolves.toBeNull();
+    // verify must read the secret at verify time — never a cached or literal one.
+    await expect(verifyJwt(token)).resolves.toBeNull();
   });
 
   it('enforces the entropy floor on configured secrets', async () => {
@@ -138,12 +138,19 @@ describe('generateTotpSecret', () => {
 // ─── Slip capability secret fail-closed (review High #1) ──
 
 describe('slip token secret handling', () => {
-  it('mints and verifies capability tokens in dev (fallback secret)', async () => {
+  it('mints and verifies capability tokens in dev when a secret is set', async () => {
     vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('NK_SLIP_TOKEN_SECRET', 'b'.repeat(48));
     const { mintSlipUploadToken, isValidSlipUploadToken } = await import('@/lib/slipSecurity');
     const token = mintSlipUploadToken('order_1', 'uuid_1');
     expect(isValidSlipUploadToken('order_1', token)).toBe(true);
     expect(isValidSlipUploadToken('order_2', token)).toBe(false);
+  });
+
+  it('refuses to mint without a secret outside production too', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    const { mintSlipUploadToken } = await import('@/lib/slipSecurity');
+    expect(() => mintSlipUploadToken('order_1', 'uuid_1')).toThrow(/NK_SLIP_TOKEN_SECRET/);
   });
 
   it('refuses to mint capability tokens in production without a secret', async () => {

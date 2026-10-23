@@ -22,10 +22,10 @@ import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
 function macKey(): string {
   // Server-side only. Distinct env var keeps rotation independent from the
-  // JWT secret. Review finding (High): the dev fallback must never run in
-  // production — capability tokens would be forgeable with the publicly
-  // known literal. Fail closed: minting/verification throws until a secret
-  // is configured (weakest link wins — falls back to NK_JWT_SECRET rules).
+  // JWT secret. Fail closed in EVERY environment (same reasoning as jwt.ts):
+  // the repo is public, so a dev literal would be a published signing key and
+  // any exposed dev/staging process could mint slip capability tokens
+  // (weakest link wins — falls back to NK_JWT_SECRET rules).
   const configured = process.env['NK_SLIP_TOKEN_SECRET'] ?? process.env['NK_JWT_SECRET'];
   if (configured) {
     if (configured.length < 32) {
@@ -33,12 +33,9 @@ function macKey(): string {
     }
     return configured;
   }
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error(
-      'NK_SLIP_TOKEN_SECRET (or NK_JWT_SECRET) is not configured — refusing to mint or verify slip capability tokens',
-    );
-  }
-  return 'dev-only-insecure-secret';
+  throw new Error(
+    'NK_SLIP_TOKEN_SECRET (or NK_JWT_SECRET) is not configured — refusing to mint or verify slip capability tokens',
+  );
 }
 
 function mac(orderId: string, confirmationUuid: string): string {
