@@ -1,8 +1,9 @@
 # ─── Nong-Kati → Hostatom Plesk — GUI deploy (NO SSH needed) ──────────────
 # For when Plesk → SSH access shows "Forbidden" (this subscription).
-# Artifact: deploy-bundle.zip (33 MB / 1090 files, sha256 d890a523d5c068dd…,
-#   built 2026-10-24 from git a7184e7 = master tip. Replaces the Oct-19 bundle
-#   3JjzeE83J8uSW-ZR8TBgc (d05c48e) that production has been running.
+# Artifact: deploy-bundle.zip (33 MB / 1091 files, built 2026-10-24 from git
+#   4eed948 = master tip. Replaces the Oct-19 bundle 3JjzeE83J8uSW-ZR8TBgc
+#   (d05c48e) that production has been running. Carries the new .next/GIT_SHA
+#   stamp, so /api/v1/version now reports the real commit of the build.
 #   Verified: forward-slash entry names, 0 secret-shaped entries, round-trip
 #   diff clean (RESULT=PASS). Rebuild: powershell -NoProfile -ExecutionPolicy
 #   Bypass -File .make-bundle.ps1
@@ -34,10 +35,11 @@ Plesk → Websites & Domains → nongkatistore.com → Node.js
 
 ## 5) Verify (or ask Buffy — it auto-detects)
   https://nongkatistore.com/api/v1/version
-  Expected: buildId becomes JF1OAwWXayP9qlREdy7mj (was 3JjzeE83J8uSW-ZR8TBgc)
-  NOTE: gitSha will STILL read 4f44b7b — GIT_SHA is a stale Plesk env var, not
-  derived from the bundle (the running build would really be a7184e7). So the
-  buildId is the only reliable "did the new bundle land" signal.
+  Expected: buildId becomes d6W9CqWicE6mtvzHj18g3 (was 3JjzeE83J8uSW-ZR8TBgc)
+  AND gitSha becomes 4eed948… (was the stale env echo 4f44b7b) — the bundle
+  carries .next/GIT_SHA stamped at build time, so gitSha finally names the
+  running build's commit. If gitSha still reads 4f44b7b, the zip was the old
+  one: re-download it and re-extract.
   Then: https://nongkatistore.com → 200, /api/v1/health → database:ok,
   products API → 200, /api/v1/orders/vat → 200
 
