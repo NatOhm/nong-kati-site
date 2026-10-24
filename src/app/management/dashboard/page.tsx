@@ -8,7 +8,6 @@ import {
   Package,
   AlertTriangle,
   TrendingUp,
-  TrendingDown,
   Users,
   ArrowUpRight,
   Clock,
@@ -17,6 +16,8 @@ import {
   RotateCcw,
   CreditCard,
   QrCode,
+  Banknote,
+  Wallet,
   BarChart3,
   Zap,
   Eye,
@@ -25,6 +26,7 @@ import {
 } from 'lucide-react';
 import { AdminShell } from '@/components/layout/AdminShell';
 import { formatThb } from '@/lib/pricing';
+import { paymentMethodLabel } from '@/lib/paymentMethods';
 import { adminJson } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
 
@@ -38,6 +40,17 @@ const STATUS_MAP: Record<string, { label: string; color: string }> = {
   pending_payment: {
     label: 'รอชำระเงิน',
     color: 'bg-sapphire-400/15 text-sapphire-200 border-sapphire-700/50',
+  },
+  // Both were MISSING (review 2026-10-24): payment_confirmed is the state an
+  // order sits in right after slip verification, so the recent-orders table
+  // rendered the raw enum `payment_confirmed` to staff.
+  payment_confirmed: {
+    label: 'ชำระแล้ว',
+    color: 'bg-jade-500/15 text-jade-700 border-jade-500/40',
+  },
+  code_delivered: {
+    label: 'ส่งโค้ดสำเร็จ',
+    color: 'bg-jade-500/15 text-jade-700 border-jade-500/40',
   },
   refunded: { label: 'คืนเงิน', color: 'bg-coral-500/15 text-fg-error border-coral-300' },
   expired: { label: 'หมดอายุ', color: 'bg-surface text-fg-placeholder border-line-subtle' },
@@ -53,26 +66,44 @@ const STATUS_MAP: Record<string, { label: string; color: string }> = {
 const PAYMENT_ICONS: Record<string, typeof QrCode> = {
   promptpay: QrCode,
   card: CreditCard,
+  credit_card: CreditCard,
+  wallet: Wallet,
+  manual_transfer: Banknote,
 };
+
+/** One local formatter for every relative timestamp on this page (review
+ * 2026-10-24: the orders table used to print the raw ISO string beside the
+ * feed's nicely formatted copy of the same value). */
+function formatOrderTime(iso: string): string {
+  return new Date(iso).toLocaleString('th-TH', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
 
 // ─── Mini Bar Chart (pure CSS) ────────────────────────────
 function MiniBarChart({
   data,
   maxHeight = 80,
 }: {
-  data: { date: string; revenue: number }[];
+  data: { date: string; revenue: number; isToday?: boolean }[];
   maxHeight?: number;
 }) {
   const max = Math.max(...data.map((d) => d.revenue));
-  const today = new Date().toISOString().slice(0, 10);
 
   return (
     <div className="flex items-end gap-1.5" style={{ height: maxHeight }}>
-      {data.map((d) => {
+      {data.map((d, i) => {
         const height = max > 0 ? (d.revenue / max) * 100 : 0;
-        const isToday = d.date === today;
+        // isToday comes from the SERVER (local date keys) — the client clock
+        // used to compute a UTC key that never matched in ICT (review 2026-10-24).
+        const isToday = d.isToday ?? false;
         return (
-          <div key={d.date} className="group relative flex flex-1 items-end">
+          // EMPTY-loading rows share date:'' — fall back to the index so the
+          // first paint doesn't log 7 duplicate-key errors.
+          <div key={d.date || `day-${i}`} className="group relative flex flex-1 items-end">
             <div
               className={cn(
                 'transition-smart w-full rounded-t-sm duration-200 group-hover:opacity-80',
@@ -105,32 +136,6 @@ function HBar({ value, max, color }: { value: number; max: number; color: string
   );
 }
 
-// ─── Sparkline (mini SVG) ─────────────────────────────────
-function Sparkline({ values, color = '#F0A020' }: { values: number[]; color?: string }) {
-  if (values.length < 2) return null;
-  const max = Math.max(...values);
-  const min = Math.min(...values);
-  const range = max - min || 1;
-  const h = 32;
-  const w = 80;
-  const points = values
-    .map((v, i) => `${(i / (values.length - 1)) * w},${h - ((v - min) / range) * h}`)
-    .join(' ');
-
-  return (
-    <svg width={w} height={h} className="flex-shrink-0">
-      <polyline
-        fill="none"
-        stroke={color}
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        points={points}
-      />
-    </svg>
-  );
-}
-
 // ─── Main Dashboard ───────────────────────────────────────
 interface DashboardData {
   sales: {
@@ -144,8 +149,6 @@ interface DashboardData {
     weekRevenue: number;
     monthOrders: number;
     monthRevenue: number;
-    completedOrders: number;
-    itemsSold: number;
   };
   revenue: {
     grossRevenue: number;
@@ -153,24 +156,19 @@ interface DashboardData {
     vatCollected: number;
     refundAmount: number;
     discountAmount: number;
-    averageOrderValue: number;
-    revenueByDay: { date: string; revenue: number }[];
+    revenueByDay: { date: string; revenue: number; isToday: boolean }[];
     revenueByPaymentMethod: { method: string; count: number; total: number }[];
-  };
-  profitReport: {
-    revenueThb: number;
-    discountsThb: number;
-    costThb: number;
-    grossProfitThb: number;
+    promptpaySharePct: number;
+    revenueThisMonth: {
+      grossRevenue: number;
+      netRevenue: number;
+      vatCollected: number;
+      discountAmount: number;
+      refundAmount: number;
+    };
   };
   products: {
     topProducts: { productId: string; name: string; totalSold: number; totalRevenue: number }[];
-    categoryPerformance: {
-      categoryId: string;
-      name: string;
-      orderCount: number;
-      revenue: number;
-    }[];
   };
   customers: {
     totalCustomers: number;
@@ -209,8 +207,6 @@ const EMPTY: DashboardData = {
     weekRevenue: 0,
     monthOrders: 0,
     monthRevenue: 0,
-    completedOrders: 0,
-    itemsSold: 0,
   },
   revenue: {
     grossRevenue: 0,
@@ -218,12 +214,18 @@ const EMPTY: DashboardData = {
     vatCollected: 0,
     refundAmount: 0,
     discountAmount: 0,
-    averageOrderValue: 0,
-    revenueByDay: Array.from({ length: 7 }, (_, i) => ({ date: '', revenue: 0 })),
+    revenueByDay: Array.from({ length: 7 }, () => ({ date: '', revenue: 0, isToday: false })),
     revenueByPaymentMethod: [],
+    promptpaySharePct: 0,
+    revenueThisMonth: {
+      grossRevenue: 0,
+      netRevenue: 0,
+      vatCollected: 0,
+      discountAmount: 0,
+      refundAmount: 0,
+    },
   },
-  profitReport: { revenueThb: 0, discountsThb: 0, costThb: 0, grossProfitThb: 0 },
-  products: { topProducts: [], categoryPerformance: [] },
+  products: { topProducts: [] },
   customers: {
     totalCustomers: 0,
     activeCustomers: 0,
@@ -275,7 +277,6 @@ export default function AdminDashboardPage(): React.JSX.Element {
 
   return (
     <AdminShell
-      staffName="Founder"
       staffRole="super_admin"
       notificationCount={sales.lowStockAlerts + sales.pendingManualFulfilment}
       breadcrumbs={[{ label: 'แดชบอร์ด' }]}
@@ -313,25 +314,20 @@ export default function AdminDashboardPage(): React.JSX.Element {
             icon={ShoppingCart}
             label="คำสั่งซื้อ"
             value={current.orders.toString()}
-            change={activeTab === 'today' ? 12 : activeTab === 'week' ? 8 : 15}
-            sparkline={[18, 22, 19, 24, 21, 26, current.orders]}
-            subtitle={`${sales.todayCompleted} สำเร็จ · ${sales.todayFailed} ล้มเหลว`}
+            subtitle={`วันนี้: ${sales.todayCompleted} สำเร็จ · ${sales.todayFailed} ล้มเหลว`}
             iconBg="bg-sapphire-400/15 text-sapphire-700"
           />
           <KPICard
             icon={DollarSign}
             label="รายได้"
             value={formatThb(current.revenue)}
-            change={activeTab === 'today' ? -5 : activeTab === 'week' ? 10 : 18}
-            sparkline={[4280, 5350, 6420, 3210, 7490, 8560, current.revenue]}
-            subtitle={`เฉลี่ย ${formatThb(revenue.averageOrderValue)}/ออเดอร์`}
+            subtitle={`เฉลี่ย ${formatThb(current.orders > 0 ? current.revenue / current.orders : 0)}/ออเดอร์`}
             iconBg="bg-jade-500/15 text-jade-700"
           />
           <KPICard
             icon={Package}
             label="รอส่งโค้ด"
             value={sales.pendingManualFulfilment.toString()}
-            change={0}
             subtitle="ต้องดำเนินการด่วน"
             iconBg="bg-peach-200 text-peach-800"
             alert={sales.pendingManualFulfilment > 0}
@@ -340,8 +336,6 @@ export default function AdminDashboardPage(): React.JSX.Element {
             icon={Users}
             label="ลูกค้าทั้งหมด"
             value={customers.totalCustomers.toLocaleString()}
-            change={12.5}
-            sparkline={[980, 1020, 1080, 1150, 1200, 1230, customers.totalCustomers]}
             subtitle={`+${customers.newCustomersThisMonth} เดือนนี้ · ${customers.returningCustomerRate}% กลับมาซื้อ`}
             iconBg="bg-surface text-fg-muted"
           />
@@ -351,36 +345,38 @@ export default function AdminDashboardPage(): React.JSX.Element {
         <div className="rounded-xl border border-line-subtle bg-surface p-5">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-fg-secondary">รายได้เดือนนี้</h2>
-            <span className="text-xs text-fg-placeholder">กรกฎาคม 2026</span>
+            <span className="text-xs text-fg-placeholder">
+              {new Date().toLocaleDateString('th-TH', { month: 'long', year: 'numeric' })}
+            </span>
           </div>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
             <MiniStat
               label="รายได้รวม"
-              value={formatThb(revenue.grossRevenue)}
+              value={formatThb(revenue.revenueThisMonth.grossRevenue)}
               icon={DollarSign}
               color="text-jade-600"
             />
             <MiniStat
               label="รายได้สุทธิ"
-              value={formatThb(revenue.netRevenue)}
+              value={formatThb(revenue.revenueThisMonth.netRevenue)}
               icon={TrendingUp}
               color="text-fg-brand"
             />
             <MiniStat
               label=" VAT"
-              value={formatThb(revenue.vatCollected)}
+              value={formatThb(revenue.revenueThisMonth.vatCollected)}
               icon={BarChart3}
               color="text-fg-muted"
             />
             <MiniStat
               label="ส่วนลด"
-              value={formatThb(revenue.discountAmount)}
+              value={formatThb(revenue.revenueThisMonth.discountAmount)}
               icon={Zap}
               color="text-sapphire-700"
             />
             <MiniStat
               label="คืนเงิน"
-              value={formatThb(revenue.refundAmount)}
+              value={formatThb(revenue.revenueThisMonth.refundAmount)}
               icon={RotateCcw}
               color="text-fg-error"
             />
@@ -402,8 +398,8 @@ export default function AdminDashboardPage(): React.JSX.Element {
             </div>
             <MiniBarChart data={revenue.revenueByDay} maxHeight={120} />
             <div className="mt-2 flex justify-between text-[10px] text-clay-400">
-              {revenue.revenueByDay.map((d) => (
-                <span key={d.date}>{d.date.slice(5)}</span>
+              {revenue.revenueByDay.map((d, i) => (
+                <span key={d.date || `label-${i}`}>{d.date.slice(5)}</span>
               ))}
             </div>
           </div>
@@ -420,7 +416,7 @@ export default function AdminDashboardPage(): React.JSX.Element {
                       <div className="flex items-center gap-2">
                         <Icon size={14} className="text-fg-placeholder" />
                         <span className="text-xs font-medium text-fg-secondary">
-                          {pm.method === 'promptpay' ? 'PromptPay' : 'บัตรเครดิต'}
+                          {paymentMethodLabel(pm.method)}
                         </span>
                       </div>
                       <span className="text-xs text-fg-placeholder">{pm.count} ออเดอร์</span>
@@ -437,12 +433,7 @@ export default function AdminDashboardPage(): React.JSX.Element {
             </div>
             <div className="mt-4 rounded-lg bg-surface p-3 text-center">
               <p className="text-xs text-fg-placeholder">PromptPay คิดเป็น</p>
-              <p className="text-lg font-bold text-fg-brand">
-                {Math.round(
-                  ((revenue.revenueByPaymentMethod[0]?.total ?? 0) / revenue.grossRevenue) * 100,
-                )}
-                %
-              </p>
+              <p className="text-lg font-bold text-fg-brand">{revenue.promptpaySharePct}%</p>
               <p className="text-[10px] text-clay-400">ของรายได้ทั้งหมด</p>
             </div>
           </div>
@@ -522,7 +513,7 @@ export default function AdminDashboardPage(): React.JSX.Element {
                         </td>
                         <td className="px-5 py-3 text-right text-xs text-clay-400">
                           <Clock size={10} className="mr-1 inline" />
-                          {order.time}
+                          {formatOrderTime(order.time)}
                         </td>
                       </tr>
                     );
@@ -557,14 +548,7 @@ export default function AdminDashboardPage(): React.JSX.Element {
                       <p className="text-xs leading-relaxed text-fg-secondary">
                         {order.customer} สั่งซื้อ {order.product}
                       </p>
-                      <p className="mt-0.5 text-[10px] text-clay-400">
-                        {new Date(order.time).toLocaleString('th-TH', {
-                          day: 'numeric',
-                          month: 'short',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </p>
+                      <p className="mt-0.5 text-[10px] text-clay-400">{formatOrderTime(order.time)}</p>
                     </div>
                   </div>
                 ))
@@ -590,7 +574,13 @@ export default function AdminDashboardPage(): React.JSX.Element {
               {products.topProducts.map((p, i) => {
                 const maxRevenue = products.topProducts[0]?.totalRevenue ?? 1;
                 return (
-                  <div key={p.productId}>
+                  // productId alone is NOT unique here: groupBy splits one
+                  // variant into a row per historical productNameTh, so a
+                  // renamed product showed up twice under the same variantId
+                  // and React logged duplicate-key errors (live check
+                  // 2026-10-24). The (variantId, name) pair is the group's
+                  // own granularity — unique by construction.
+                  <div key={`${p.productId}-${p.name}`}>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span
@@ -635,7 +625,11 @@ export default function AdminDashboardPage(): React.JSX.Element {
               <MetricRow
                 label="ลูกค้า ACTIVE"
                 value={customers.activeCustomers.toLocaleString()}
-                sub={`${Math.round((customers.activeCustomers / customers.totalCustomers) * 100)}%`}
+                sub={
+                  customers.totalCustomers > 0
+                    ? `${Math.round((customers.activeCustomers / customers.totalCustomers) * 100)}%`
+                    : '0%'
+                }
               />
               <MetricRow
                 label="ลูกค้าใหม่เดือนนี้"
@@ -679,7 +673,7 @@ export default function AdminDashboardPage(): React.JSX.Element {
               {lowStockItems.map((item) => {
                 const pct = Math.round((item.stock / item.threshold) * 100);
                 return (
-                  <div key={item.sku} className="hover:bg-surface/30 px-5 py-3 transition-colors">
+                  <div key={item.id} className="hover:bg-surface/30 px-5 py-3 transition-colors">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-xs font-medium text-fg-secondary">{item.name}</p>
@@ -744,8 +738,6 @@ function KPICard({
   icon: Icon,
   label,
   value,
-  change,
-  sparkline,
   subtitle,
   iconBg,
   alert = false,
@@ -753,13 +745,10 @@ function KPICard({
   icon: React.ComponentType<Record<string, unknown>>;
   label: string;
   value: string;
-  change?: number;
-  sparkline?: number[];
   subtitle: string;
   iconBg: string;
   alert?: boolean;
 }) {
-  const isPositive = (change ?? 0) >= 0;
   return (
     <div
       className={cn(
@@ -771,23 +760,10 @@ function KPICard({
         <div className={cn('flex h-9 w-9 items-center justify-center rounded-lg', iconBg)}>
           <Icon size={18} strokeWidth={1.5} />
         </div>
-        {sparkline && <Sparkline values={sparkline} color={isPositive ? '#22C76E' : '#E8203C'} />}
       </div>
       <p className="text-xs font-medium text-fg-placeholder">{label}</p>
       <div className="mt-1 flex items-baseline gap-2">
         <p className="text-2xl font-bold text-fg">{value}</p>
-        {change !== undefined && change !== 0 && (
-          <span
-            className={cn(
-              'flex items-center gap-0.5 text-xs font-medium',
-              isPositive ? 'text-jade-600' : 'text-fg-error',
-            )}
-          >
-            {isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-            {isPositive ? '+' : ''}
-            {change}%
-          </span>
-        )}
       </div>
       <p className="mt-1 text-[11px] text-clay-400">{subtitle}</p>
     </div>

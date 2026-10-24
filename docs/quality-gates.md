@@ -75,6 +75,7 @@
 | SF    | Slip flow — auto-verify dispatch (Slip2Go→SlipOK fallback), เก็บหลักฐานสลิป before check, ping แอดมินเมื่อต้องตรวจเอง | `tests/slip-flow.test.ts` | `npm test` (vitest) | Unit Tests             |
 | VS    | Inventory shelf panel (21 ต.ค. 2569) — `POST /stock/bulk` รับ `variantId` pin ได้ (unknown variant = 400 ห้าม fallback เงียบ ๆ) + round-robin เดิมไม่เปลี่ยน · `GET /admin/inventory` คืน `variants[]` ครบทุกตัว (additive — field เดิมครบ) | `tests/inventory-variants-shelf.test.ts` | `npm test` (vitest) | Unit Tests |
 | BV    | Bulk-void + batchId correlation (22 ต.ค. 2569) — paste ทุก plan สร้าง batch + stamp ลง codes/StockMove/audit · `POST /stock/bulk-void` CAS เฉพาะ available, stock ไม่ติดลบ, idempotent, tx เดียว · `GET /admin/inventory` คืน `refId` (additive) ให้ chip ในตารางประวัติ | `tests/inventory-bulk-void.test.ts` | `npm test` (vitest) | Unit Tests |
+| DM    | Dashboard money scope — panel "รายได้เดือนนี้" ต้องเป็นยอดเดือนนี้ไม่ใช่ all-time · PromptPay share หาจาก method name (ไม่ใช่ `[0]` ที่ DB คืน wallet ก่อน) · store ว่าง = 0% ไม่ใช่ NaN% | `tests/dashboard-month-scope.test.ts` | `npm test` (vitest) | Unit Tests |
 
 **วิธีรัน:**
 
@@ -154,7 +155,7 @@ Playwright เลือก target ตาม `E2E_BASE_URL` > localhost:4200 (dev
 - **กฎ:** endpoint เดียวกันคืนข้อมูลต่างกันตาม permission:
   - โดยปกติ role ที่ไม่มี `customers:read:full` / `orders:read:full` → ต้องได้ **masked**: `s***@gmail.com`, `08****78`, และใน topups **ต้องไม่มี key `customerName` อยู่เลย**
   - role ที่มี permission ดังกล่าว → ต้องได้ raw ครบ
-- **คลุม (8 surface):** `GET /customers` (list + [id]), `GET /orders` (list + [id]), `GET /topups`, **`GET /dashboard` (topCustomers + recentOrders)**, **`GET /reports/customer-sales` (JSON)** และ **`GET /reports/customer-sales/export` (CSV — mask ในไฟล์ที่ดาวน์โหลดจริง)**
+- **คลุม (8 surface):** `GET /customers` (list + [id]), `GET /orders` (list + [id]), `GET /topups`, **`GET /dashboard` (recentOrders)**, **`GET /reports/customer-sales` (JSON)** และ **`GET /reports/customer-sales/export` (CSV — mask ในไฟล์ที่ดาวน์โหลดจริง)**
 - **เคส CSV สำคัญ:** `finance_viewer` มี `reports:export` (ดาวน์โหลดได้) แต่ไม่มี `customers:read:full` → ไฟล์ CSV ที่ได้ต้องมีแค่ `s***@gmail.com` และ **ห้ามมี raw email/ชื่ออยู่เลย** — พิสูจน์ว่า mask เกิดก่อนเขียนไฟล์ ไม่ใช่แค่หน้าจอ ส่วน role ที่มี read:full ได้ CSV แบบ raw + มี BOM (ตรวจจาก bytes เพราะ `Response.text()` ตัด BOM ตาม spec)
 - **CSV formula-injection guard:** ทุก cell ผ่าน `isFormulaInjection` (นำหน้าด้วย `= + - @ TAB CR` จะโดน prefix `'`) — customer-controlled strings (ชื่อ/อีเมล) จึงปลอดภัยเมื่อเปิดใน Excel/Sheets (unit-tested ผ่าน `lib/reports/customerSales`)
 - **สถาปัตยกรรม:** JSON กับ CSV ผ่าน `aggregateCustomerSales` + `maskCustomerSalesRows` ฟังก์ชันเดียวกันใน `lib/reports/customerSales` — ห้ามแยก masking ออก ไม่อย่างนั้น CSV หลุด
@@ -777,3 +778,21 @@ Phase 2 ของแผงจัดการบัญชี: ยกเลิก�
 - เขียน StockMove/audit ก่อนเช็ค `flipped.count === 0` → BV4 แดง (re-void เผา ledger ทุกครั้งที่กด)
 - ตัด `refId: batch.id` ออกจาก stockMove.create ตอน paste → BV1 แดง
 - ลบ `refId` จากคำตอบของ GET /admin/inventory → BV5 แดง
+
+---
+
+## Dashboard money scope (2026-10-24) — `tests/dashboard-month-scope.test.ts`
+
+บั๊กตัวเลขฝั่งแดชบอร์ดแอดมินที่เคยแสดงตัวเลขผิดโดยดูน่าเชื่อถือ:
+
+| ตัว | บังคับว่า |
+|---|---|
+| DM1 | `revenue.revenueThisMonth` (gross/net/vat/discount/refund) กรองจาก `createdAt >= ต้นเดือน` เท่านั้น — ห้ามชี้ all-time aggregate (`grossRevenue`) ใต้หัวข้อ "รายได้เดือนนี้" (เคสจริง: ฿972 ทั้งร้านถูกนำเสนอเป็นยอดเดือน ต.ค. ฿312) |
+| DM2 | `revenue.promptpaySharePct` หาจาก `revenueByPaymentMethod.find(p => p.method === 'promptpay')` — groupBy คืนกลุ่มตามลำดับที่ DB เลือก (wallet มาก่อน) เคส `[0]` จึงโชว์ส่วนแบ่งของ wallet เป็น "PromptPay" (28% ทั้งที่จริง 66%) |
+| DM3 | `grossRevenue > 0` เท่านั้นถึงหาร — store ว่างต้องคืน `0` ไม่ใช่ `NaN` |
+
+**พังได้จริง — ทดสอบด้วยการใส่มั๊กกลับ**
+
+- คืน `revenueThisMonth` จาก allAgg → DM1 แดง
+- เรียง payment groups โดย wallet อยู่ `[0]` แล้วอ่าน `[0]` เป็น promptpay → DM2 แดง
+- ตัด guard `grossRevenue > 0` → DM3 แดง (NaN% ขึ้นหน้าจอ)

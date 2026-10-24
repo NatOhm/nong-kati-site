@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { checkPermission, maskEmail } from '@/lib/rbac';
 import { getAdminToken } from '@/lib/adminRequest';
+import { LOW_STOCK_THRESHOLD } from '@/lib/lowStock';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,56 +50,71 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   // Same canonical set the customer-sales report uses.
   const REVENUE_STATUSES = ['payment_confirmed', 'code_delivered', 'completed'];
 
-  const [todayAgg, weekAgg, monthAgg, allAgg, statusCounts, monthDiscountAgg, refundsAgg] =
-    await Promise.all([
-      prisma.order.aggregate({
-        where: { createdAt: { gte: today }, status: { in: REVENUE_STATUSES } },
-        _count: { _all: true },
-        _sum: { totalAmountThb: true, discountThb: true },
-      }),
-      prisma.order.aggregate({
-        where: { createdAt: { gte: weekAgo }, status: { in: REVENUE_STATUSES } },
-        _count: { _all: true },
-        _sum: { totalAmountThb: true },
-      }),
-      prisma.order.aggregate({
-        where: { createdAt: { gte: month }, status: { in: REVENUE_STATUSES } },
-        _count: { _all: true },
-        _sum: { totalAmountThb: true },
-      }),
-      prisma.order.aggregate({
-        where: { status: 'completed' },
-        _count: { _all: true },
-        _sum: { totalAmountThb: true, discountThb: true },
-      }),
-      prisma.order.groupBy({ by: ['status'], _count: { _all: true } }),
-      prisma.order.aggregate({
-        where: { createdAt: { gte: month }, status: 'completed' },
-        _sum: { discountThb: true },
-      }),
-      prisma.refund.aggregate({ _sum: { amountThb: true } }),
-    ]);
+  const [
+    todayAgg,
+    weekAgg,
+    monthAgg,
+    allAgg,
+    statusCounts,
+    monthVatAgg,
+    refundsAgg,
+    monthRefundsAgg,
+  ] = await Promise.all([
+    prisma.order.aggregate({
+      where: { createdAt: { gte: today }, status: { in: REVENUE_STATUSES } },
+      _count: { _all: true },
+      _sum: { totalAmountThb: true, discountThb: true },
+    }),
+    prisma.order.aggregate({
+      where: { createdAt: { gte: weekAgo }, status: { in: REVENUE_STATUSES } },
+      _count: { _all: true },
+      _sum: { totalAmountThb: true },
+    }),
+    prisma.order.aggregate({
+      where: { createdAt: { gte: month }, status: { in: REVENUE_STATUSES } },
+      _count: { _all: true },
+      // discountThb rides along so the month panel's discount needs no extra
+      // aggregate (the old monthDiscountAgg was a separate completed-only
+      // query whose scope disagreed with the month revenue it sat beside).
+      _sum: { totalAmountThb: true, discountThb: true },
+    }),
+    prisma.order.aggregate({
+      where: { status: 'completed' },
+      _count: { _all: true },
+      _sum: { totalAmountThb: true, discountThb: true },
+    }),
+    prisma.order.groupBy({ by: ['status'], _count: { _all: true } }),
+    prisma.order.aggregate({
+      where: { createdAt: { gte: month }, status: 'completed', vatEnabled: true },
+      _sum: { vatAmountThb: true },
+    }),
+    prisma.refund.aggregate({ _sum: { amountThb: true } }),
+    prisma.refund.aggregate({
+      where: { createdAt: { gte: month } },
+      _sum: { amountThb: true },
+    }),
+  ]);
 
   const statusCount = (s: string) => statusCounts.find((x) => x.status === s)?._count._all ?? 0;
 
   // Status cards are TIME-SCOPED (review): the groupBy above is all-time, so
-  // today/failed counts re-aggregate within the window instead of reusing it.
-  const [todayStatusGroups, weekCompletedAgg] = await Promise.all([
-    prisma.order.groupBy({
-      by: ['status'],
-      where: { createdAt: { gte: today } },
-      _count: { _all: true },
-    }),
-    prisma.order.aggregate({
-      where: { status: 'completed', createdAt: { gte: weekAgo } },
-      _count: { _all: true },
-    }),
-  ]);
+  // today counts re-aggregate within the window instead of reusing it.
+  const todayStatusGroups = await prisma.order.groupBy({
+    by: ['status'],
+    where: { createdAt: { gte: today } },
+    _count: { _all: true },
+  });
   const todayStatusCount = (s: string) =>
     todayStatusGroups.find((x) => x.status === s)?._count._all ?? 0;
 
-  // Revenue by day (last 7 days, completed only)
-  const revenueByDay: { date: string; revenue: number }[] = [];
+  // Revenue by day (last 7 days, completed only). Keys are LOCAL date parts:
+  // toISOString() renders the local-midnight Date in UTC, which in ICT (UTC+7)
+  // shifted every key back a day — bars labelled one day early and the client
+  // clock could never match "today" (review 2026-10-24). `isToday` is decided
+  // here so the client no longer needs its own clock at all.
+  const localDayKey = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const revenueByDay: { date: string; revenue: number; isToday: boolean }[] = [];
   for (let i = 6; i >= 0; i--) {
     const start = dayStart(i);
     const end = dayStart(i - 1);
@@ -107,8 +123,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       _sum: { totalAmountThb: true },
     });
     revenueByDay.push({
-      date: start.toISOString().slice(0, 10),
+      date: localDayKey(start),
       revenue: Number(agg._sum.totalAmountThb ?? 0),
+      isToday: i === 0,
     });
   }
 
@@ -127,7 +144,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       total: Number(p._sum.totalAmountThb ?? 0),
     }));
 
-  // Cost of goods + top products (completed orders)
+  // Top products (completed orders)
   const topItemGroups = await prisma.orderItem.groupBy({
     by: ['variantId', 'productNameTh'],
     where: { order: { status: 'completed' } },
@@ -135,62 +152,38 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     orderBy: { _sum: { quantity: 'desc' } },
     take: 8,
   });
-  const costItems = await prisma.orderItem.findMany({
-    where: { order: { status: 'completed' } },
-    select: { quantity: true, variant: { select: { costThb: true } } },
-  });
-  const totalCost = costItems.reduce(
-    (sum, it) => sum + (it.variant.costThb === null ? 0 : Number(it.variant.costThb)) * it.quantity,
-    0,
-  );
-
-  const itemsSoldAgg = await prisma.orderItem.aggregate({
-    where: { order: { status: 'completed' } },
-    _sum: { quantity: true },
-  });
 
   // Customer analytics
-  const [totalCustomers, activeCustomers, newCustomers, topCustomers] = await Promise.all([
+  const [totalCustomers, activeCustomers, newCustomers, repeatBase] = await Promise.all([
     prisma.customer.count(),
     prisma.customer.count({ where: { orders: { some: { status: 'completed' } } } }),
     prisma.customer.count({ where: { createdAt: { gte: month } } }),
+    // Repeat-buyer numerator for returningCustomerRate: the same 500-customer
+    // analytical set as before, selecting only the completed-order count. The
+    // old query also pulled full email PII plus every order row to build a
+    // top-customers list nothing ever rendered (deleted review 2026-10-24).
     prisma.customer.findMany({
-      where: { orders: { some: { status: 'completed' } } },
-      select: {
-        id: true,
-        email: true,
-        _count: { select: { orders: { where: { status: 'completed' } } } },
-        orders: { where: { status: 'completed' }, select: { totalAmountThb: true } },
-      },
+      select: { _count: { select: { orders: { where: { status: 'completed' } } } } },
       orderBy: { createdAt: 'asc' },
       take: 500,
     }),
   ]);
-  // Review [High]: full customer PII (email) is only for holders of
-  // customers:read:full. Everyone else with reports:read gets masked emails
-  // (maskEmail from lib/rbac — the same helper the order/topup routes use).
-  const canSeeFullPii = check.payload?.perms.includes('customers:read:full') ?? false;
-
-  const fullCustomerOrders = topCustomers
-    .map((c) => ({
-      customerId: c.id,
-      email: canSeeFullPii ? c.email : maskEmail(c.email),
-      totalOrders: c._count.orders,
-      totalSpend: c.orders.reduce((s, o) => s + Number(o.totalAmountThb), 0),
-    }))
-    .sort((a, b) => b.totalSpend - a.totalSpend);
-  const customerTotals = fullCustomerOrders.slice(0, 5);
 
   // Stock
   const [stockAgg, lowStock] = await Promise.all([
     prisma.productVariant.aggregate({ _sum: { stock: true }, _count: { _all: true } }),
     prisma.productVariant.findMany({
-      where: { stock: { lte: 5 }, isActive: true },
+      where: { stock: { lte: LOW_STOCK_THRESHOLD }, isActive: true },
       orderBy: { stock: 'asc' },
       take: 8,
       select: { id: true, label: true, stock: true, product: { select: { name: true } } },
     }),
   ]);
+
+  // Review [High]: full customer PII (email) is only for holders of
+  // customers:read:full. Everyone else with dashboard:read gets masked emails
+  // (maskEmail from lib/rbac — the same helper the order/topup routes use).
+  const canSeeFullPii = check.payload?.perms.includes('customers:read:full') ?? false;
 
   // Recent orders (live)
   const recentOrders = await prisma.order.findMany({
@@ -211,9 +204,26 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const grossRevenue = Number(allAgg._sum.totalAmountThb ?? 0);
   const discounts = Number(allAgg._sum.discountThb ?? 0);
   const refundAmount = Number(refundsAgg._sum.amountThb ?? 0);
-  const profit = grossRevenue - discounts - totalCost;
   const completedOrders = allAgg._count._all;
   const averageOrderValue = completedOrders > 0 ? grossRevenue / completedOrders : 0;
+
+  // PromptPay share (review 2026-10-24): the page read
+  // revenueByPaymentMethod[0] — groupBy returns groups in arbitrary order, so
+  // a wallet-first store showed the WALLET figure labelled "PromptPay" (28%
+  // when the truth was 66%) and an empty store rendered NaN%. Look the method
+  // up by name and guard the division.
+  const promptpayRevenue =
+    revenueByPaymentMethod.find((p) => p.method === 'promptpay')?.total ?? 0;
+  const promptpaySharePct =
+    grossRevenue > 0 ? Math.round((promptpayRevenue / grossRevenue) * 100) : 0;
+
+  // Month panel figures — scoped to THIS month (the panel previously showed
+  // the all-time block under a hardcoded "กรกฎาคม 2026" header: ฿972 lifetime
+  // presented as October's ฿312).
+  const monthGross = Number(monthAgg._sum.totalAmountThb ?? 0);
+  const monthDiscount = Number(monthAgg._sum.discountThb ?? 0);
+  const monthVat = Math.round(Number(monthVatAgg._sum.vatAmountThb ?? 0) * 100) / 100;
+  const monthRefund = Number(monthRefundsAgg._sum.amountThb ?? 0);
   // VAT is historical order data: use each order's saved VAT amount instead
   // of applying today's rate to revenue from orders placed under old settings.
   const vatGroups = await prisma.order.groupBy({
@@ -225,69 +235,28 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     vatGroups.reduce((sum, group) => sum + Number(group._sum.vatAmountThb ?? 0), 0) * 100,
   ) / 100;
 
-  // Returning-customer rate (review): computed from the FULL 500-customer
-  // analytical set BEFORE the top-5 slice, so the denominator is the active
-  // base and the numerator is every repeat customer — not the top 5.
-  const repeatCustomers = fullCustomerOrders.filter((c) => c.totalOrders >= 2).length;
+  // Returning-customer rate (review): numerator is every repeat customer in the
+  // 500-customer analytical set, denominator is the active base.
+  const repeatCustomers = repeatBase.filter((c) => (c._count?.orders ?? 0) >= 2).length;
   const activeBase = Math.max(activeCustomers, 1);
   const averageOrdersPerCustomer = Math.round((completedOrders / activeBase) * 10) / 10;
   const averageCustomerLifetimeValue = Math.round((grossRevenue / activeBase) * 100) / 100;
   const returningCustomerRate = Math.round((repeatCustomers / activeBase) * 1000) / 10;
-
-  // Category performance (completed order items → variant → product → category)
-  const categoryGroups = await prisma.product.groupBy({
-    by: ['categoryId'],
-    _count: { _all: true },
-  });
-  const categories = await prisma.category.findMany({
-    select: { id: true, name: true },
-  });
-  const catName = new Map(categories.map((c) => [c.id, c.name]));
-  const categoryRevenue = await prisma.orderItem.groupBy({
-    by: ['variantId'],
-    where: { order: { status: 'completed' } },
-    _sum: { lineTotalThb: true, quantity: true },
-  });
-  // resolve variant → product → category once
-  const variantIds = categoryRevenue.map((c) => c.variantId);
-  const variantProducts = await prisma.productVariant.findMany({
-    where: { id: { in: variantIds } },
-    select: { id: true, productId: true },
-  });
-  const v2p = new Map(variantProducts.map((v) => [v.id, v.productId]));
-  const catPerf = new Map<string, { name: string; orderCount: number; revenue: number }>();
-  for (const row of categoryRevenue) {
-    const pid = v2p.get(row.variantId);
-    if (!pid) continue;
-    const prod = await prisma.product.findUnique({
-      where: { id: pid },
-      select: { categoryId: true },
-    });
-    if (!prod) continue;
-    const entry = catPerf.get(prod.categoryId) ?? {
-      name: catName.get(prod.categoryId) ?? prod.categoryId,
-      orderCount: 0,
-      revenue: 0,
-    };
-    entry.revenue += Number(row._sum.lineTotalThb ?? 0);
-    entry.orderCount += row._sum.quantity ?? 0;
-    catPerf.set(prod.categoryId, entry);
-  }
 
   return NextResponse.json({
     sales: {
       todayOrders: todayAgg._count._all,
       todayRevenue: Number(todayAgg._sum.totalAmountThb ?? 0),
       todayCompleted: todayStatusCount('completed'),
-      todayFailed: todayStatusCount('failed') + todayStatusCount('expired'),
+      // No writer ever sets Order.status='failed' (the failed writers are
+      // emailOutbox/paymentAttempt) — 'expired' is the real dead-order term.
+      todayFailed: todayStatusCount('expired'),
       pendingManualFulfilment: statusCount('pending_manual_fulfilment'),
       lowStockAlerts: lowStock.length,
       weekOrders: weekAgg._count._all,
       weekRevenue: Number(weekAgg._sum.totalAmountThb ?? 0),
       monthOrders: monthAgg._count._all,
-      monthRevenue: Number(monthAgg._sum.totalAmountThb ?? 0),
-      completedOrders,
-      itemsSold: itemsSoldAgg._sum.quantity ?? 0,
+      monthRevenue: monthGross,
     },
     revenue: {
       grossRevenue,
@@ -298,13 +267,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       averageOrderValue,
       revenueByDay,
       revenueByPaymentMethod,
-    },
-    profitReport: {
-      revenueThb: grossRevenue,
-      discountsThb: discounts,
-      costThb: totalCost,
-      grossProfitThb: Math.round(profit * 100) / 100,
-      codNote: 'ร้านรับชำระผ่านพร้อมเพย์/บัตร — ไม่มียอดเก็บปลายทางในระบบ',
+      promptpaySharePct,
+      revenueThisMonth: {
+        grossRevenue: monthGross,
+        netRevenue: monthGross - monthDiscount,
+        vatCollected: monthVat,
+        discountAmount: monthDiscount,
+        refundAmount: monthRefund,
+      },
     },
     products: {
       topProducts: topItemGroups.map((t) => ({
@@ -313,15 +283,6 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         totalSold: t._sum.quantity ?? 0,
         totalRevenue: Number(t._sum.lineTotalThb ?? 0),
       })),
-      categoryPerformance: [...catPerf.entries()]
-        .map(([categoryId, v]) => ({
-          categoryId,
-          name: v.name,
-          orderCount: v.orderCount,
-          revenue: v.revenue,
-        }))
-        .sort((a, b) => b.revenue - a.revenue)
-        .slice(0, 5),
     },
     customers: {
       totalCustomers,
@@ -330,7 +291,6 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       averageOrdersPerCustomer,
       averageCustomerLifetimeValue,
       returningCustomerRate,
-      topCustomers: customerTotals,
     },
     stock: {
       totalUnits: stockAgg._sum.stock ?? 0,
@@ -340,14 +300,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         sku: v.label,
         name: v.product.name,
         stock: v.stock,
-        threshold: 5,
+        threshold: LOW_STOCK_THRESHOLD,
       })),
     },
     recentOrders: recentOrders.map((o) => ({
       id: o.orderNumber,
-      // PII: recentOrders rides the same customers:read:full branch as
-      // topCustomers above — a reports:read role without read:full gets the
-      // masked email here too (regression-asserted in admin-pii-masking).
+      // PII: a dashboard:read role without customers:read:full gets the
+      // masked email (regression-asserted in admin-pii-masking).
       customer: canSeeFullPii ? o.customerEmail : maskEmail(o.customerEmail),
       product: o.items[0]?.productNameTh ?? '—',
       amount: Number(o.totalAmountThb),

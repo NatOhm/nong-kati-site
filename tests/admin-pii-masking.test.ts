@@ -20,7 +20,7 @@
  *  - GET /api/v1/admin/orders               (list)      orders:read
  *  - GET /api/v1/admin/orders/[id]          (detail)    orders:read
  *  - GET /api/v1/admin/topups               (queue)     topups:read
- *  - GET /api/v1/admin/dashboard            topCustomers + recentOrders emails
+ *  - GET /api/v1/admin/dashboard            recentOrders emails
  *  - GET /api/v1/admin/reports/customer-sales           (JSON, masked)
  *  - GET /api/v1/admin/reports/customer-sales/export    (CSV — masked IN THE
  *    FILE, served by the server behind reports:export; a limited role can
@@ -117,12 +117,11 @@ const { prismaMock } = vi.hoisted(() => {
     order: { findMany: vi.fn(), findUnique: vi.fn(), groupBy: vi.fn(), aggregate: vi.fn() },
     topUpLog: { findMany: vi.fn(), aggregate: vi.fn(), count: vi.fn() },
     auditLog: { create: vi.fn().mockResolvedValue({}) },
-    // dashboard route models (topCustomers + recentOrders + aggregates)
+    // dashboard route models (recentOrders + aggregates)
     refund: { aggregate: vi.fn() },
     orderItem: { groupBy: vi.fn(), findMany: vi.fn(), aggregate: vi.fn() },
     productVariant: { aggregate: vi.fn(), findMany: vi.fn() },
     product: { groupBy: vi.fn(), findUnique: vi.fn() },
-    category: { findMany: vi.fn() },
   };
   return { prismaMock };
 });
@@ -154,8 +153,8 @@ beforeEach(() => {
   prismaMock.topUpLog.count.mockResolvedValue(0);
 
   // Dashboard defaults: every aggregate/groupBy is empty/zero — individual
-  // tests only override the branches that carry PII (customer.findMany for
-  // topCustomers, order.findMany for recentOrders, both already shaped above).
+  // tests only override the branches that carry PII (order.findMany for
+  // recentOrders, already shaped above).
   prismaMock.refund.aggregate.mockResolvedValue({ _sum: { amountThb: null } });
   prismaMock.order.aggregate.mockResolvedValue({
     _count: { _all: 0 },
@@ -172,7 +171,6 @@ beforeEach(() => {
   prismaMock.productVariant.findMany.mockResolvedValue([]);
   prismaMock.product.groupBy.mockResolvedValue([]);
   prismaMock.product.findUnique.mockResolvedValue(null);
-  prismaMock.category.findMany.mockResolvedValue([]);
 });
 
 import { issueAdminJwt } from '@/lib/jwt';
@@ -310,7 +308,7 @@ describe('masking sanity (shared fixture)', () => {
   });
 });
 
-// ─── Dashboard: topCustomers + recentOrders ──────────────────────────────
+// ─── Dashboard: recentOrders ────────────────────────────────────
 // The dashboard is gated on its own narrow dashboard:read. PII on the response
 // is scoped SEPARATELY, by customers:read:full. Reaching the dashboard and
 // being allowed to read customer identities are two different questions, so
@@ -331,11 +329,9 @@ describe('PII masking — dashboard', () => {
     const mod = await importRoute('/dashboard/route.ts');
     const { status, body } = await callGet(mod, '/dashboard', await tokenFor(role));
     expect(status, role).toBe(200);
-    const customers = body['customers'] as { topCustomers: Array<{ email: string }> };
-    expect(customers.topCustomers[0]?.email, role).toBe(MASKED_EMAIL);
     const recent = body['recentOrders'] as Array<{ customer: string }>;
     expect(recent[0]?.customer, role).toBe(MASKED_EMAIL);
-    // Whole payload, not just the two known fields — a raw address anywhere in
+    // Whole payload, not just the known field — a raw address anywhere in
     // here is a masking regression.
     expect(JSON.stringify(body), role).not.toContain(FULL_EMAIL);
   });
@@ -344,8 +340,6 @@ describe('PII masking — dashboard', () => {
     const mod = await importRoute('/dashboard/route.ts');
     const { status, body } = await callGet(mod, '/dashboard', await tokenFor(role));
     expect(status, role).toBe(200);
-    const customers = body['customers'] as { topCustomers: Array<{ email: string }> };
-    expect(customers.topCustomers[0]?.email, role).toBe(FULL_EMAIL);
     const recent = body['recentOrders'] as Array<{ customer: string }>;
     expect(recent[0]?.customer, role).toBe(FULL_EMAIL);
   });
