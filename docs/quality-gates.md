@@ -76,6 +76,7 @@
 | VS    | Inventory shelf panel (21 ต.ค. 2569) — `POST /stock/bulk` รับ `variantId` pin ได้ (unknown variant = 400 ห้าม fallback เงียบ ๆ) + round-robin เดิมไม่เปลี่ยน · `GET /admin/inventory` คืน `variants[]` ครบทุกตัว (additive — field เดิมครบ) | `tests/inventory-variants-shelf.test.ts` | `npm test` (vitest) | Unit Tests |
 | BV    | Bulk-void + batchId correlation (22 ต.ค. 2569) — paste ทุก plan สร้าง batch + stamp ลง codes/StockMove/audit · `POST /stock/bulk-void` CAS เฉพาะ available, stock ไม่ติดลบ, idempotent, tx เดียว · `GET /admin/inventory` คืน `refId` (additive) ให้ chip ในตารางประวัติ | `tests/inventory-bulk-void.test.ts` | `npm test` (vitest) | Unit Tests |
 | DM    | Dashboard money scope — panel "รายได้เดือนนี้" ต้องเป็นยอดเดือนนี้ไม่ใช่ all-time · PromptPay share หาจาก method name (ไม่ใช่ `[0]` ที่ DB คืน wallet ก่อน) · store ว่าง = 0% ไม่ใช่ NaN% | `tests/dashboard-month-scope.test.ts` | `npm test` (vitest) | Unit Tests |
+| OS    | Order-status labels — คำสถานะออเดอร์ภาษาไทยมีที่เดียว `src/lib/orderStatus.ts` ( reconciliation เคยพิมพ์ "ยืนยันการชำระ/รอส่งมอบมือ" ขณะที่หน้าอื่นพิมพ์ "ชำระแล้ว/รอส่งโค้ด" ) · หน้า management ห้ามประกาศ label ไทยของ status ที่รู้จักเอง (allowlist เฉพาะแผนกที่เป็นคนละ domain: audit actions / gift-code / PDPA / top-ups) · ทุกหน้า badge ต้อง import lib ตัวเดียวกัน | `tests/order-status-labels.test.ts` | `npm test` (vitest) | Unit Tests |
 
 **วิธีรัน:**
 
@@ -796,3 +797,23 @@ Phase 2 ของแผงจัดการบัญชี: ยกเลิก�
 - คืน `revenueThisMonth` จาก allAgg → DM1 แดง
 - เรียง payment groups โดย wallet อยู่ `[0]` แล้วอ่าน `[0]` เป็น promptpay → DM2 แดง
 - ตัด guard `grossRevenue > 0` → DM3 แดง (NaN% ขึ้นหน้าจอ)
+
+---
+
+## Order-status labels (2026-10-24) — `tests/order-status-labels.test.ts`
+
+หน้า admin แต่ละหน้าเคยเก็บสำเนา label สถานะออเดอร์ภาษาไทยของตัวเอง แล้วสำเนาเหล่านั้นเริ่มขัดกัน: reconciliation พิมพ์ "ยืนยันการชำระ" / "รอส่งมอบมือ" / "คืนเงินแล้ว" ขณะที่ orders/customers/dashboard พิมพ์ "ชำระแล้ว" / "รอส่งโค้ด" / "คืนเงิน" สำหรับสถานะเดียวกัน — ออเดอร์หนึ่งอ่านไม่เหมือนกันเลยข้ามหน้าจอ คำทั้งหมดอยู่ที่ `src/lib/orderStatus.ts` ที่เดียว, หน้า badge เก็บเฉพาะสี/คลาสผ่าน `withStatusColors()`
+
+| ตัว | บังคับว่า |
+|---|---|
+| OS1 | หน้าใน `src/app/management/**` ห้ามประกาศ label ไทยของ status key ที่ lib รู้จัก — sentinel คือบรรทัดนิยาม key ที่มีตัวอักษรไทย (ทั้งแบบ `key: '…ไทย…'` บรรทัดเดียว และแบบ `key: {` แล้ว `label: '…ไทย…'` ใน 6 บรรทัดถัดไป) · คลาสสีล้วน ASCII ผ่านเฉย ๆ · ไฟล์ที่ map เป็นคนละ domain (audit actions / gift-code statuses / PDPA requests / top-up statuses) อยู่ allowlist พร้อมเหตุผล — ชื่อ key ซ้อนกันได้ แต่ entity ไม่ใช่อันเดียวกัน |
+| OS2 | ใน lib ต้องไม่มีคำที่ reconciliation เคยใช้ (`ยืนยันการชำระ`/`รอส่งมอบมือ`/`คืนเงินแล้ว`) — `payment_confirmed` = "ชำระแล้ว", `pending_manual_fulfilment` = "รอส่งโค้ด", `refunded` = "คืนเงิน" ทุกหน้า |
+| OS3 | หน้า badge ทั้ง 4 (orders/customers/reconciliation/dashboard) ต้อง import `@/lib/orderStatus` — reconciliation ต้อง spread `...ORDER_STATUS_LABELS` ไม่ใช่ประกาศใหม่เอง |
+
+ขอบเขตที่**ตั้งใจไม่แตะ**: badge ฝั่งลูกค้า `src/components/order/OrderStatusBadge.tsx` (คนละ audience/น้ำเสียง) และ label ของ audit action ในหน้า audit (คนละ domain กับ order status)
+
+**พังได้จริง — ทดสอบด้วยการใส่มั๊กกลับ**
+
+- เพิ่ม `pending_payment: { label: 'รอจ่ายเงิน' }` ในหน้า management ใดก็ได้ → OS1 แดง
+- เปลี่ยน lib ให้ `payment_confirmed: 'ยืนยันการชำระ'` → OS2 แดง
+- ลบ import `@/lib/orderStatus` จากหน้า customers แล้วประกาศ label เอง → OS1 + OS3 แดง

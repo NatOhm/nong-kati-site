@@ -6,6 +6,7 @@ import { AlertTriangle, MailWarning, RefreshCw, Send } from 'lucide-react';
 import { AdminShell } from '@/components/layout/AdminShell';
 import { adminJson } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
+import { ORDER_STATUS_LABELS } from '@/lib/orderStatus';
 
 /** Serialized payment row from GET /api/v1/admin/reconciliation. */
 interface PaymentRow {
@@ -49,12 +50,11 @@ interface QueueResponse {
   counts: { paymentsOpen: number; deadLetters: number; webhookGaps: number };
 }
 
+// Canonical order-status wording comes from src/lib/orderStatus.ts (one
+// status = one name across every admin surface); `unknown` is this page's
+// own reconciliation fallback for a status the queue can't classify.
 const STATUS_LABELS: Record<string, string> = {
-  pending_payment: 'รอชำระเงิน',
-  payment_confirmed: 'ยืนยันการชำระ',
-  completed: 'สำเร็จ',
-  pending_manual_fulfilment: 'รอส่งมอบมือ',
-  refunded: 'คืนเงินแล้ว',
+  ...ORDER_STATUS_LABELS,
   unknown: 'ไม่ทราบสถานะ',
 };
 

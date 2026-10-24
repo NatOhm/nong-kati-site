@@ -8,6 +8,7 @@ import { adminJson, adminFetch } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
 import { formatThb } from '@/lib/pricing';
 import { paymentMethodLabel } from '@/lib/paymentMethods';
+import { withStatusColors } from '@/lib/orderStatus';
 
 /**
  * Admin Orders — real data from /api/v1/admin/orders.
@@ -91,18 +92,20 @@ interface DeliveryReveal {
   revealedCodes: RevealedCode[];
 }
 
-const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  pending_payment: { label: 'รอชำระเงิน', color: 'text-amber-600' },
-  payment_confirmed: { label: 'ชำระแล้ว', color: 'text-sapphire-700' },
-  pending_manual_fulfilment: { label: 'รอส่งโค้ด', color: 'text-fg-brand' },
-  // Was missing (review 2026-10-24) — same wording as the audit log uses.
-  code_delivered: { label: 'ส่งโค้ดสำเร็จ', color: 'text-jade-600' },
-  completed: { label: 'สำเร็จ', color: 'text-jade-600' },
-  refunded: { label: 'คืนเงิน', color: 'text-fg-error' },
-  failed: { label: 'ล้มเหลว', color: 'text-fg-error' },
-  expired: { label: 'หมดอายุ', color: 'text-fg-muted' },
-  abandoned: { label: 'ถูกทิ้ง', color: 'text-fg-muted' },
-};
+// Labels come from the shared map (src/lib/orderStatus.ts); this page owns
+// only the per-status text color. The key set doubles as the status-filter
+// chip list below, so it stays explicit.
+const STATUS_LABELS = withStatusColors({
+  pending_payment: 'text-amber-600',
+  payment_confirmed: 'text-sapphire-700',
+  pending_manual_fulfilment: 'text-fg-brand',
+  code_delivered: 'text-jade-600',
+  completed: 'text-jade-600',
+  refunded: 'text-fg-error',
+  failed: 'text-fg-error',
+  expired: 'text-fg-muted',
+  abandoned: 'text-fg-muted',
+});
 
 export default function AdminOrdersPage(): React.JSX.Element {
   const [orders, setOrders] = useState<OrderRow[]>([]);

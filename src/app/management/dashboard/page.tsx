@@ -28,40 +28,26 @@ import { AdminShell } from '@/components/layout/AdminShell';
 import { formatThb } from '@/lib/pricing';
 import { paymentMethodLabel } from '@/lib/paymentMethods';
 import { adminJson } from '@/lib/adminSession';
+import { withStatusColors } from '@/lib/orderStatus';
 import { cn } from '@/utils/cn';
 
 // ─── Status Badge ─────────────────────────────────────────
-const STATUS_MAP: Record<string, { label: string; color: string }> = {
-  completed: { label: 'สำเร็จ', color: 'bg-jade-500/15 text-jade-700 border-jade-500/40' },
-  pending_manual_fulfilment: {
-    label: 'รอส่งโค้ด',
-    color: 'bg-topaz-400/20 text-peach-800 border-topaz-400',
-  },
-  pending_payment: {
-    label: 'รอชำระเงิน',
-    color: 'bg-sapphire-400/15 text-sapphire-200 border-sapphire-700/50',
-  },
-  // Both were MISSING (review 2026-10-24): payment_confirmed is the state an
-  // order sits in right after slip verification, so the recent-orders table
-  // rendered the raw enum `payment_confirmed` to staff.
-  payment_confirmed: {
-    label: 'ชำระแล้ว',
-    color: 'bg-jade-500/15 text-jade-700 border-jade-500/40',
-  },
-  code_delivered: {
-    label: 'ส่งโค้ดสำเร็จ',
-    color: 'bg-jade-500/15 text-jade-700 border-jade-500/40',
-  },
-  refunded: { label: 'คืนเงิน', color: 'bg-coral-500/15 text-fg-error border-coral-300' },
-  expired: { label: 'หมดอายุ', color: 'bg-surface text-fg-placeholder border-line-subtle' },
-  cancelled: { label: 'ยกเลิก', color: 'bg-surface text-clay-400 border-line-subtle' },
-  payment_failed: {
-    label: 'ชำระล้มเหลว',
-    color: 'bg-coral-500/15 text-fg-error border-coral-300',
-  },
-  paid: { label: 'ชำระแล้ว', color: 'bg-jade-500/15 text-jade-700 border-jade-500/40' },
-  delivering: { label: 'กำลังส่ง', color: 'bg-topaz-400/20 text-peach-800 border-topaz-400' },
-};
+// Labels come from the shared map (src/lib/orderStatus.ts); this page owns
+// only the badge color classes. `paid`/`delivering` cover the activity
+// feed's legacy status names.
+const STATUS_MAP = withStatusColors({
+  completed: 'bg-jade-500/15 text-jade-700 border-jade-500/40',
+  pending_manual_fulfilment: 'bg-topaz-400/20 text-peach-800 border-topaz-400',
+  pending_payment: 'bg-sapphire-400/15 text-sapphire-200 border-sapphire-700/50',
+  payment_confirmed: 'bg-jade-500/15 text-jade-700 border-jade-500/40',
+  code_delivered: 'bg-jade-500/15 text-jade-700 border-jade-500/40',
+  refunded: 'bg-coral-500/15 text-fg-error border-coral-300',
+  expired: 'bg-surface text-fg-placeholder border-line-subtle',
+  cancelled: 'bg-surface text-clay-400 border-line-subtle',
+  payment_failed: 'bg-coral-500/15 text-fg-error border-coral-300',
+  paid: 'bg-jade-500/15 text-jade-700 border-jade-500/40',
+  delivering: 'bg-topaz-400/20 text-peach-800 border-topaz-400',
+});
 
 const PAYMENT_ICONS: Record<string, typeof QrCode> = {
   promptpay: QrCode,

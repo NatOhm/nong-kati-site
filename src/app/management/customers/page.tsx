@@ -8,6 +8,7 @@ import { adminFetch } from '@/lib/adminSession';
 import { TIER_LABELS, type PriceTier } from '@/lib/pricing';
 import { cn } from '@/utils/cn';
 import { formatThb } from '@/lib/pricing';
+import { withStatusColors } from '@/lib/orderStatus';
 
 /**
  * Admin Customers — real DB-backed list + detail + price-tier management
@@ -90,16 +91,17 @@ type CustomerHistory = {
   orders: HistoryOrder[];
 };
 
-const HISTORY_STATUS: Record<string, { label: string; color: string }> = {
-  pending_payment: { label: 'รอชำระเงิน', color: 'text-amber-600' },
-  payment_confirmed: { label: 'ชำระแล้ว', color: 'text-sapphire-700' },
-  pending_manual_fulfilment: { label: 'รอส่งโค้ด', color: 'text-fg-brand' },
-  completed: { label: 'สำเร็จ', color: 'text-jade-600' },
-  refunded: { label: 'คืนเงิน', color: 'text-fg-error' },
-  failed: { label: 'ล้มเหลว', color: 'text-fg-error' },
-  expired: { label: 'หมดอายุ', color: 'text-fg-muted' },
-  abandoned: { label: 'ถูกทิ้ง', color: 'text-fg-muted' },
-};
+// Labels from the shared map (src/lib/orderStatus.ts); colors stay local.
+const HISTORY_STATUS = withStatusColors({
+  pending_payment: 'text-amber-600',
+  payment_confirmed: 'text-sapphire-700',
+  pending_manual_fulfilment: 'text-fg-brand',
+  completed: 'text-jade-600',
+  refunded: 'text-fg-error',
+  failed: 'text-fg-error',
+  expired: 'text-fg-muted',
+  abandoned: 'text-fg-muted',
+});
 
 const TIER_OPTIONS: PriceTier[] = ['retail', 'member', 'dealer'];
 
