@@ -749,7 +749,8 @@ function KPICard({
       </div>
       <p className="text-xs font-medium text-fg-placeholder">{label}</p>
       <div className="mt-1 flex items-baseline gap-2">
-        <p className="text-2xl font-bold text-fg">{value}</p>
+        {/* tabular-nums: KPI digits must not reflow as values change */}
+        <p className="text-2xl font-bold tabular-nums text-fg">{value}</p>
       </div>
       <p className="mt-1 text-[11px] text-clay-400">{subtitle}</p>
     </div>

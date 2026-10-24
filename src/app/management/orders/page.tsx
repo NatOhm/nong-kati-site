@@ -507,7 +507,7 @@ export default function AdminOrdersPage(): React.JSX.Element {
                         <span className="text-fg-placeholder">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-right text-fg-secondary">
+                    <td className="tabular-nums px-4 py-3 text-right text-fg-secondary">
                       {formatThb(order.totalThb)}
                     </td>
                     <td className="px-4 py-3 text-center text-xs text-fg-muted">
