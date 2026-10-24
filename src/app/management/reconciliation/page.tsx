@@ -148,7 +148,6 @@ export default function AdminReconciliationPage(): React.JSX.Element {
 
   return (
     <AdminShell
-      staffName="Founder"
       staffRole="super_admin"
       breadcrumbs={[{ label: 'Reconciliation' }]}
     >

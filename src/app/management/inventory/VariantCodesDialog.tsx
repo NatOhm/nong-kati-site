@@ -342,10 +342,13 @@ export function VariantCodesDialog({
         return;
       }
       const body = (await res.json()) as { orderComplete?: boolean; productName?: string };
+      // `${id}` here used to be the GIFT-CODE cuid — staff were shown
+      // "ส่งบัญชีให้ออเดอร์ cm… แล้ว" instead of the order number they typed
+      // (review 2026-10-24).
       setMessage(
         body.orderComplete
-          ? `ส่งบัญชีให้ออเดอร์ ${id} แล้ว — ออเดอร์เสร็จสมบูรณ์`
-          : `ส่งบัญชีให้ออเดอร์ ${id} แล้ว`,
+          ? `ส่งบัญชีให้ออเดอร์ ${orderId} แล้ว — ออเดอร์เสร็จสมบูรณ์`
+          : `ส่งบัญชีให้ออเดอร์ ${orderId} แล้ว`,
       );
       onChanged();
       await load(offset);

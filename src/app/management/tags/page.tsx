@@ -94,7 +94,6 @@ export default function TagsPage(): React.JSX.Element {
 
   return (
     <AdminShell
-      staffName="Founder"
       staffRole="super_admin"
       breadcrumbs={[{ label: 'แดชบอร์ด', href: '/management/dashboard' }, { label: 'แท็ก' }]}
     >

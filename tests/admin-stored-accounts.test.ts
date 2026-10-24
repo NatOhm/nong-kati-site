@@ -598,6 +598,24 @@ describe('manual assignment — send a chosen account to a chosen customer', () 
     expect((await post({})).status).toBe(400);
   });
 
+  it('resolves the typed ORDER NUMBER — the dialog sends NK-…, not the cuid', async () => {
+    // Regression (review 2026-10-24): the route only looked up `where.id`,
+    // so every order number typed into the "ส่งบัญชีนี้ให้ลูกค้าออเดอร์เลขที่"
+    // prompt returned 404 ORDER_NOT_FOUND — the manual-assign flow never
+    // worked end to end. cuid lookup first, orderNumber fallback second.
+    prismaMock.order.findUnique = vi.fn(
+      async (args?: { where?: Record<string, unknown> }) => {
+        const where = args?.where ?? {};
+        // A typed order number is not a cuid — first lookup finds nothing.
+        return where['orderNumber'] === 'NK-2026-000123' ? orderRow() : null;
+      },
+    ) as never;
+    const res = await post({ codeId: 'gc_1' }, 'NK-2026-000123');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { orderNumber: string };
+    expect(body.orderNumber).toBe('NK-2026-000123');
+  });
+
   it('audits the assignment, and never with the plaintext', async () => {
     await post({ codeId: 'gc_1' });
     const audit = argOf(auditMock.writeAuditLog);

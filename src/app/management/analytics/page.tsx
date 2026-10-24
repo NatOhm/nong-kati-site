@@ -14,6 +14,7 @@ import { TrendingUp, Users, ShoppingBag, DollarSign, RefreshCw } from 'lucide-re
 import { AdminShell } from '@/components/layout/AdminShell';
 import { adminJson } from '@/lib/adminSession';
 import { formatThb } from '@/lib/pricing';
+import { paymentMethodLabel } from '@/lib/paymentMethods';
 
 type DashboardResponse = {
   sales: {
@@ -45,14 +46,6 @@ type DashboardResponse = {
   };
 };
 
-const METHOD_LABELS: Record<string, string> = {
-  promptpay: 'PromptPay',
-  card: 'บัตรเครดิต',
-  wallet: 'เงินในกระเป๋า',
-  manual_transfer: 'โอนเงิน',
-  credit_card: 'บัตรเครดิต',
-};
-
 export default function AdminAnalyticsPage(): React.JSX.Element {
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -78,7 +71,7 @@ export default function AdminAnalyticsPage(): React.JSX.Element {
   }, [load]);
 
   return (
-    <AdminShell staffName="Founder" staffRole="super_admin" breadcrumbs={[{ label: 'Analytics' }]}>
+    <AdminShell staffRole="super_admin" breadcrumbs={[{ label: 'Analytics' }]}>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-fg">Analytics</h1>
@@ -205,7 +198,7 @@ export default function AdminAnalyticsPage(): React.JSX.Element {
                     data.revenue.revenueByPaymentMethod.map((method) => (
                       <div key={method.method} className="flex justify-between text-sm">
                         <span className="text-fg-placeholder">
-                          {METHOD_LABELS[method.method] ?? method.method}
+                          {paymentMethodLabel(method.method)}
                         </span>
                         <span className="text-fg">
                           {method.count} รายการ · {formatThb(method.total)}

@@ -62,7 +62,6 @@ export default function AdminTopupsPage(): React.JSX.Element {
 
   return (
     <AdminShell
-      staffName="Founder"
       staffRole="super_admin"
       breadcrumbs={[{ label: 'ประวัติเติมเงิน' }]}
     >

@@ -308,7 +308,6 @@ export default function AdminTrustBadgesPage(): React.JSX.Element {
 
   return (
     <AdminShell
-      staffName="Founder"
       staffRole="super_admin"
       breadcrumbs={[
         { label: 'ตั้งค่า', href: '/management/settings' },

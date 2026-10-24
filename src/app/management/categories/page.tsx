@@ -204,7 +204,7 @@ export default function AdminCategoriesPage(): React.JSX.Element {
   }, [modal, flat]);
 
   return (
-    <AdminShell staffName="Founder" staffRole="super_admin" breadcrumbs={[{ label: 'หมวดหมู่' }]}>
+    <AdminShell staffRole="super_admin" breadcrumbs={[{ label: 'หมวดหมู่' }]}>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>

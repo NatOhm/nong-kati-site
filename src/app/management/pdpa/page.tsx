@@ -101,7 +101,6 @@ export default function AdminPdpaPage(): React.JSX.Element {
 
   return (
     <AdminShell
-      staffName="Founder"
       staffRole="super_admin"
       breadcrumbs={[{ label: 'PDPA Requests' }]}
     >

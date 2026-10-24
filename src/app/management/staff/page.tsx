@@ -192,7 +192,7 @@ export default function AdminStaffPage(): React.JSX.Element {
   };
 
   return (
-    <AdminShell staffName="Founder" staffRole="super_admin" breadcrumbs={[{ label: 'พนักงาน' }]}>
+    <AdminShell staffRole="super_admin" breadcrumbs={[{ label: 'พนักงาน' }]}>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-fg">พนักงาน</h1>

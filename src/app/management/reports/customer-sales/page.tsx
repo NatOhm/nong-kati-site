@@ -131,7 +131,6 @@ export default function CustomerSalesReportPage(): React.JSX.Element {
 
   return (
     <AdminShell
-      staffName="Founder"
       staffRole="super_admin"
       breadcrumbs={[{ label: 'รายงาน' }, { label: 'ยอดซื้อรายคน' }]}
     >

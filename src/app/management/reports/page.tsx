@@ -107,7 +107,7 @@ export default function AdminReportsPage(): React.JSX.Element {
   };
 
   return (
-    <AdminShell staffName="Founder" staffRole="super_admin" breadcrumbs={[{ label: 'รายงาน' }]}>
+    <AdminShell staffRole="super_admin" breadcrumbs={[{ label: 'รายงาน' }]}>
       <div className="space-y-6">
         <h1 className="text-2xl font-bold text-fg">รายงาน</h1>
 

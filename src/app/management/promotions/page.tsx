@@ -212,7 +212,6 @@ export default function AdminPromotionsPage(): React.JSX.Element {
 
   return (
     <AdminShell
-      staffName="Founder"
       staffRole="super_admin"
       breadcrumbs={[{ label: 'โปรโมชัน' }]}
     >

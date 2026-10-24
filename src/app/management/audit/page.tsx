@@ -112,7 +112,7 @@ export default function AdminAuditPage(): React.JSX.Element {
   const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <AdminShell staffName="Founder" staffRole="super_admin" breadcrumbs={[{ label: 'Audit Log' }]}>
+    <AdminShell staffRole="super_admin" breadcrumbs={[{ label: 'Audit Log' }]}>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-fg">Audit Log</h1>

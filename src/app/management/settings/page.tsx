@@ -97,7 +97,7 @@ export default function AdminSettingsPage(): React.JSX.Element {
   }
 
   return (
-    <AdminShell staffName="Founder" staffRole="super_admin" breadcrumbs={[{ label: 'ตั้งค่า' }]}>
+    <AdminShell staffRole="super_admin" breadcrumbs={[{ label: 'ตั้งค่า' }]}>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>

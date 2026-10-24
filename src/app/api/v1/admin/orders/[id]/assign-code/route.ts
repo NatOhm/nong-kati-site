@@ -73,10 +73,25 @@ export async function POST(
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-      const order = await tx.order.findUnique({
+      const orderInclude = {
+        items: { include: { variant: { include: { product: true } } } },
+      } as const;
+      // Staff type the ORDER NUMBER (the dialog prompt literally says
+      // "เช่น NK-2026-000123" and its doc comment promises the endpoint
+      // resolves it) — the cuid path below returned ORDER_NOT_FOUND 404 for
+      // every number typed, so the manual-assign flow never worked (live
+      // review 2026-10-24). Try the cuid first for callers that hold one,
+      // then resolve the orderNumber.
+      let order = await tx.order.findUnique({
         where: { id: orderId },
-        include: { items: { include: { variant: { include: { product: true } } } } },
+        include: orderInclude,
       });
+      if (!order) {
+        order = await tx.order.findUnique({
+          where: { orderNumber: orderId },
+          include: orderInclude,
+        });
+      }
       if (!order) return { status: 404 as const, error: 'ORDER_NOT_FOUND' };
       if (!ASSIGNABLE_ORDER_STATES.has(order.status)) {
         return { status: 409 as const, error: 'ORDER_NOT_ASSIGNABLE', orderStatus: order.status };

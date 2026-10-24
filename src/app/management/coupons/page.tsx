@@ -138,7 +138,6 @@ export default function AdminCouponsPage(): React.JSX.Element {
 
   return (
     <AdminShell
-      staffName="Founder"
       staffRole="super_admin"
       breadcrumbs={[{ label: 'คูปองส่วนลด' }]}
     >

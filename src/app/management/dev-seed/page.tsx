@@ -46,7 +46,7 @@ export default function DevSeedPage(): React.JSX.Element {
   };
 
   return (
-    <AdminShell staffName="Founder" staffRole="super_admin" breadcrumbs={[{ label: 'Dev Seed' }]}>
+    <AdminShell staffRole="super_admin" breadcrumbs={[{ label: 'Dev Seed' }]}>
       <div className="mx-auto max-w-xl space-y-4">
         <h1 className="text-2xl font-bold text-fg">สร้างข้อมูลทดสอบ (Dev only)</h1>
         <p className="text-sm text-fg-muted">

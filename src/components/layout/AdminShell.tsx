@@ -23,7 +23,13 @@ const SIDEBAR_COLLAPSED_KEY = 'nk_admin_sidebar_collapsed';
 
 export interface AdminShellProps {
   children: React.ReactNode;
-  staffName: string;
+  /**
+   * Pre-/me placeholder ONLY. Pages used to hardcode "Founder" here — a fake
+   * identity that flashed on every load and stuck permanently if /me failed
+   * (review 2026-10-24). Omit it: the signed-in admin's real name from /me
+   * wins, and until then the neutral "แอดมิน" shows instead of a lie.
+   */
+  staffName?: string;
   staffRole: AdminRole;
   notificationCount?: number;
   breadcrumbs?: { label: string; href?: string }[];
@@ -78,7 +84,7 @@ export function AdminShell({
     };
   }, []);
 
-  const staffName = profile?.fullName ?? staffNameProp;
+  const staffName = profile?.fullName ?? staffNameProp ?? 'แอดมิน';
   const staffRole = profile?.role ?? staffRoleProp;
 
   const toggleSidebar = useCallback(() => {

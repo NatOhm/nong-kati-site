@@ -152,7 +152,6 @@ export default function AdminTicketsPage(): React.JSX.Element {
 
   return (
     <AdminShell
-      staffName="Founder"
       staffRole="super_admin"
       breadcrumbs={[{ label: 'ตั๋วสนับสนุน' }]}
     >

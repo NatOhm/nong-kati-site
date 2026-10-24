@@ -18,6 +18,7 @@ import {
 import { AdminShell } from '@/components/layout/AdminShell';
 import { useAdminIdentity } from '@/components/layout/useAdminIdentity';
 import { adminFetch, adminJson } from '@/lib/adminSession';
+import { LOW_STOCK_THRESHOLD } from '@/lib/lowStock';
 import { ROLE_PERMISSIONS } from '@/types/auth';
 import { cn } from '@/utils/cn';
 import { BulkStockDialog } from '../products/BulkStockDialog';
@@ -76,8 +77,6 @@ const REASON_LABELS: Record<string, string> = {
   import: 'นำเข้า',
   void: 'ยกเลิกบัญชี',
 };
-
-const LOW_STOCK_THRESHOLD = 5;
 
 /** ฟอร์มแก้ไขสินค้า (draft state แยกจาก list เพื่อกดยกเลิกได้ไม่เสียข้อมูล) */
 interface EditDraft {
@@ -298,7 +297,7 @@ export default function AdminInventoryPage(): React.JSX.Element {
   };
 
   return (
-    <AdminShell staffName="Founder" staffRole="super_admin" breadcrumbs={[{ label: 'คลังสินค้า' }]}>
+    <AdminShell staffRole="super_admin" breadcrumbs={[{ label: 'คลังสินค้า' }]}>
       <div className="space-y-6">
         {/* ── Header ── */}
         <div className="flex flex-wrap items-center justify-between gap-3">

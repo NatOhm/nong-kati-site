@@ -276,7 +276,7 @@ export default function AdminCustomersPage(): React.JSX.Element {
   };
 
   return (
-    <AdminShell staffName="Founder" staffRole="super_admin" breadcrumbs={[{ label: 'ลูกค้า' }]}>
+    <AdminShell staffRole="super_admin" breadcrumbs={[{ label: 'ลูกค้า' }]}>
       <div className="space-y-6">
         <h1 className="text-2xl font-bold text-fg">ลูกค้า</h1>
 

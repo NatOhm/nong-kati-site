@@ -7,6 +7,7 @@ import { AdminShell } from '@/components/layout/AdminShell';
 import { adminJson, adminFetch } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
 import { formatThb } from '@/lib/pricing';
+import { paymentMethodLabel } from '@/lib/paymentMethods';
 
 /**
  * Admin Orders — real data from /api/v1/admin/orders.
@@ -94,16 +95,13 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   pending_payment: { label: 'รอชำระเงิน', color: 'text-amber-600' },
   payment_confirmed: { label: 'ชำระแล้ว', color: 'text-sapphire-700' },
   pending_manual_fulfilment: { label: 'รอส่งโค้ด', color: 'text-fg-brand' },
+  // Was missing (review 2026-10-24) — same wording as the audit log uses.
+  code_delivered: { label: 'ส่งโค้ดสำเร็จ', color: 'text-jade-600' },
   completed: { label: 'สำเร็จ', color: 'text-jade-600' },
   refunded: { label: 'คืนเงิน', color: 'text-fg-error' },
   failed: { label: 'ล้มเหลว', color: 'text-fg-error' },
   expired: { label: 'หมดอายุ', color: 'text-fg-muted' },
   abandoned: { label: 'ถูกทิ้ง', color: 'text-fg-muted' },
-};
-
-const PAYMENT_METHODS: Record<string, string> = {
-  promptpay: 'พร้อมเพย์',
-  credit_card: 'บัตรเครดิต',
 };
 
 export default function AdminOrdersPage(): React.JSX.Element {
@@ -334,7 +332,7 @@ export default function AdminOrdersPage(): React.JSX.Element {
   };
 
   return (
-    <AdminShell staffName="Founder" staffRole="super_admin" breadcrumbs={[{ label: 'คำสั่งซื้อ' }]}>
+    <AdminShell staffRole="super_admin" breadcrumbs={[{ label: 'คำสั่งซื้อ' }]}>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-fg">คำสั่งซื้อ</h1>
@@ -488,7 +486,7 @@ export default function AdminOrdersPage(): React.JSX.Element {
                       )}
                     </td>
                     <td className="px-4 py-3 text-center text-xs text-fg-muted">
-                      {PAYMENT_METHODS[order.paymentMethod ?? ''] ?? '—'}
+                      {order.paymentMethod ? paymentMethodLabel(order.paymentMethod) : '—'}
                     </td>
                     <td className="px-4 py-3 text-left text-xs">
                       {order.slip ? (

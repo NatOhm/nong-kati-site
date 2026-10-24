@@ -152,7 +152,6 @@ export default function SlowStockReportPage(): React.JSX.Element {
 
   return (
     <AdminShell
-      staffName="Founder"
       staffRole="super_admin"
       breadcrumbs={[{ label: 'รายงาน' }, { label: 'สินค้าค้างสต๊อก' }]}
     >
