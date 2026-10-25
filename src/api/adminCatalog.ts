@@ -194,10 +194,49 @@ export async function adminUpdateProduct(
   };
 }
 
-export async function adminDeleteProduct(slug: string): Promise<{ success: boolean }> {
-  const existing = await adminGetProduct(slug);
-  if (!existing) return { success: false };
-  return { success: true };
+/**
+ * PERMANENTLY delete a product (hard delete, not archive). Returns the row
+ * counts the server destroyed so the caller can show what happened, or a
+ * Thai reason when a guard refuses (in-flight order / orphaned paid code).
+ */
+export async function adminDeleteProductPermanent(id: string): Promise<{
+  success: boolean;
+  reason?: string;
+  counts?: Record<string, number>;
+  orderNumbers?: string[];
+}> {
+  const res = await adminFetch(`/api/v1/admin/products/${id}`, { method: 'DELETE' });
+  if (res.ok) {
+    const data = (await res.json().catch(() => ({}))) as { counts?: Record<string, number> };
+    return data.counts ? { success: true, counts: data.counts } : { success: true };
+  }
+  const err = (await res.json().catch(() => ({}))) as {
+    error?: string;
+    orderNumbers?: string[];
+    detail?: string;
+  };
+  if (err.error === 'IN_FLIGHT_ORDER') {
+    // The numbers come back structured so the UI can deep-link them into
+    // /management/orders?orderNumber=… instead of dead plain text.
+    return {
+      success: false,
+      reason: 'มีออเดอร์ที่ยังไม่เสร็จ ต้องส่งของหรือยกเลิกออเดอร์ก่อน',
+      orderNumbers: err.orderNumbers ?? [],
+    };
+  }
+  if (err.error === 'ORPHANED_RESERVED_CODE') {
+    return {
+      success: false,
+      reason: 'มีรหัสที่ถูกจอง/ส่งให้ลูกค้าโดยไม่มีออเดอร์อ้างอิง ตรวจสอบหน้าจัดการรหัสก่อนลบ',
+    };
+  }
+  if (err.error === 'NOT_FOUND') {
+    return { success: false, reason: 'ไม่พบสินค้านี้ (อาจถูกลบไปแล้ว)' };
+  }
+  if (err.error === 'PURGE_FAILED') {
+    return { success: false, reason: `ลบไม่สำเร็จ: ${err.detail ?? 'ข้อผิดพลาดภายในเซิร์ฟเวอร์'}` };
+  }
+  return { success: false, reason: err.error ?? `HTTP_${res.status}` };
 }
 
 // ─── Category CRUD ──────────────────────────────────────
@@ -272,12 +311,27 @@ export async function adminUpdateCategory(
   return { success: false, error: err.error ?? `HTTP_${res.status}` };
 }
 
+/**
+ * PERMANENTLY delete a category. With `cascade`, the whole subtree (child
+ * categories + every product under them) is hard-deleted in one transaction.
+ * Without it, the server refuses when the category still has children or
+ * products, and the Thai reason names what blocked it.
+ */
 export async function adminDeleteCategory(
   id: string,
-): Promise<{ success: boolean; reason?: string }> {
-  const res = await adminFetch(`/api/v1/admin/categories/${id}`, { method: 'DELETE' });
+  opts: { cascade?: boolean } = {},
+): Promise<{ success: boolean; reason?: string; orderNumbers?: string[] }> {
+  const url = opts.cascade
+    ? `/api/v1/admin/categories/${id}?cascade=true`
+    : `/api/v1/admin/categories/${id}`;
+  const res = await adminFetch(url, { method: 'DELETE' });
   if (res.ok) return { success: true };
-  const err = (await res.json().catch(() => ({}))) as { error?: string; products?: number };
+  const err = (await res.json().catch(() => ({}))) as {
+    error?: string;
+    products?: number;
+    orderNumbers?: string[];
+    detail?: string;
+  };
   if (err.error === 'HAS_PRODUCTS') {
     return {
       success: false,
@@ -286,6 +340,27 @@ export async function adminDeleteCategory(
   }
   if (err.error === 'HAS_CHILDREN') {
     return { success: false, reason: 'มีหมวดหมู่ย่อยอยู่ ย้ายหรือลบหมวดย่อยก่อน' };
+  }
+  if (err.error === 'IN_FLIGHT_ORDER') {
+    // The numbers come back structured so the UI can deep-link them into
+    // /management/orders?orderNumber=… instead of dead plain text.
+    return {
+      success: false,
+      reason: 'มีออเดอร์ที่ยังไม่เสร็จ ต้องส่งของหรือยกเลิกออเดอร์ก่อน',
+      orderNumbers: err.orderNumbers ?? [],
+    };
+  }
+  if (err.error === 'ORPHANED_RESERVED_CODE') {
+    return {
+      success: false,
+      reason: 'มีรหัสที่ถูกจอง/ส่งให้ลูกค้าโดยไม่มีออเดอร์อ้างอิง ตรวจสอบหน้าจัดการรหัสก่อนลบ',
+    };
+  }
+  if (err.error === 'NOT_FOUND') {
+    return { success: false, reason: 'ไม่พบหมวดหมู่นี้ (อาจถูกลบไปแล้ว)' };
+  }
+  if (err.error === 'PURGE_FAILED') {
+    return { success: false, reason: `ลบไม่สำเร็จ: ${err.detail ?? 'ข้อผิดพลาดภายในเซิร์ฟเวอร์'}` };
   }
   return { success: false, reason: err.error ?? `HTTP_${res.status}` };
 }

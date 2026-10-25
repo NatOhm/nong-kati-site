@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic';
 import { PageShell } from '@/components/layout/PageShell';
 import { Breadcrumb } from '@/components/data-display/Breadcrumb';
 import { OrderDetailCard } from '@/components/order/OrderDetailCard';
+import { PendingOrderAutoRefresh } from '@/components/order/PendingOrderAutoRefresh';
 import { TrustBadgeRow } from '@/components/checkout/TrustBadgeRow';
 import { getOrderByConfirmationUuid } from '@/api/orders';
 import { getDeliveredCodes } from '@/lib/delivery/customerCodes';
@@ -43,6 +44,13 @@ export default async function OrderDetailPage({
     | 'failed'
     | 'refunded'
     | 'expired';
+
+  // Still-moving orders (slip verification / staff fulfilment) re-render
+  // themselves every 10s; terminal ones ship no client JS for it.
+  const isPending =
+    orderStatus === 'pending_payment' ||
+    orderStatus === 'payment_confirmed' ||
+    orderStatus === 'pending_manual_fulfilment';
 
   return (
     <>
@@ -82,6 +90,9 @@ export default async function OrderDetailPage({
                 customerEmail: order.customerEmail,
               }}
             />
+
+            {/* Silent auto-refresh while the order is still pending */}
+            {isPending && <PendingOrderAutoRefresh status={orderStatus} />}
 
             {/* Actions */}
             <div className="mt-6 space-y-3">

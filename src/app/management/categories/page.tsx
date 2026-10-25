@@ -11,9 +11,11 @@ import {
   FolderOpen,
   ArrowUp,
   ArrowDown,
+  Loader2,
 } from 'lucide-react';
 
 import { AdminShell } from '@/components/layout/AdminShell';
+import { DeleteConfirmDialog, useDeleteFlow } from '@/components/feedback/DeleteConfirmDialog';
 import {
   adminCreateCategory,
   adminUpdateCategory,
@@ -42,6 +44,29 @@ function flatten(cats: AdminCategory[], depth = 0): FlatRow[] {
   return out;
 }
 
+/** What a cascade delete takes with it — spelled out in the confirm dialog. */
+function cascadeSummary(cat: AdminCategory): string {
+  if (cat.children.length === 0 && cat.productCount === 0) return '';
+  return [
+    cat.productCount > 0 ? `สินค้า ${cat.productCount} ชิ้น` : null,
+    cat.children.length > 0 ? `หมวดย่อย ${cat.children.length} หมวด` : null,
+  ]
+    .filter(Boolean)
+    .join(' และ');
+}
+
+function deleteTitle(cat: AdminCategory): string {
+  const list = cascadeSummary(cat);
+  return list ? `ลบ "${cat.name}" ถาวรพร้อม ${list}?` : `ลบหมวดหมู่ "${cat.name}"?`;
+}
+
+function deleteDescription(cat: AdminCategory): string {
+  const list = cascadeSummary(cat);
+  return list
+    ? `${list} และรหัสที่ยังไม่ได้ขายจะถูกลบอย่างถาวร ไม่สามารถกู้คืนได้ — แต่ประวัติออเดอร์และยอดขายจะถูกเก็บไว้ครบ`
+    : 'การลบนี้เป็นการลบถาวร ไม่สามารถกู้คืนได้';
+}
+
 export default function AdminCategoriesPage(): React.JSX.Element {
   const [tree, setTree] = useState<AdminCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,6 +80,15 @@ export default function AdminCategoriesPage(): React.JSX.Element {
   const [slugTouched, setSlugTouched] = useState(false);
   const [saving, setSaving] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
+  /**
+   * Permanent delete: one shared flow (single-flight guard, cascade counts,
+   * refusal with blocking order links) — see DeleteConfirmDialog.
+   */
+  const categoryDelete = useDeleteFlow<AdminCategory>(
+    (cat) => adminDeleteCategory(cat.id, { cascade: cat.children.length > 0 || cat.productCount > 0 }),
+    () => reload(),
+  );
+  const deletingCat = categoryDelete.busy ? categoryDelete.target : null;
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -155,20 +189,6 @@ export default function AdminCategoriesPage(): React.JSX.Element {
   async function handleToggleActive(cat: AdminCategory) {
     const result = await adminUpdateCategory(cat.id, { isActive: !cat.isActive });
     if (result.success) await reload();
-  }
-
-  async function handleDelete(cat: AdminCategory) {
-    const warn =
-      cat.children.length > 0 || cat.productCount > 0
-        ? ' (ระบบจะปฏิเสธถ้ายังมีสินค้าหรือหมวดย่อย)'
-        : '';
-    if (!window.confirm(`ลบหมวดหมู่ "${cat.name}"?${warn}`)) return;
-    const result = await adminDeleteCategory(cat.id);
-    if (result.success) {
-      await reload();
-    } else {
-      window.alert(result.reason ?? 'ลบไม่สำเร็จ');
-    }
   }
 
   async function handleMove(cat: AdminCategory, dir: -1 | 1) {
@@ -362,11 +382,17 @@ export default function AdminCategoriesPage(): React.JSX.Element {
                             <Edit2 size={14} />
                           </button>
                           <button
-                            onClick={() => void handleDelete(cat)}
-                            className="rounded p-1.5 text-fg-placeholder hover:bg-surface hover:text-fg-error"
-                            aria-label="ลบ"
+                            onClick={() => categoryDelete.open(cat)}
+                            disabled={deletingCat === cat}
+                            className="rounded p-1.5 text-fg-placeholder hover:bg-surface hover:text-fg-error disabled:opacity-50"
+                            aria-label={`ลบ ${cat.name}`}
+                            title="ลบหมวดหมู่"
                           >
-                            <Trash2 size={14} />
+                            {deletingCat === cat ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              <Trash2 size={14} />
+                            )}
                           </button>
                         </div>
                       </td>
@@ -510,6 +536,12 @@ export default function AdminCategoriesPage(): React.JSX.Element {
           </div>
         </div>
       )}
+
+      <DeleteConfirmDialog
+        flow={categoryDelete}
+        title={deleteTitle}
+        description={deleteDescription}
+      />
     </AdminShell>
   );
 }

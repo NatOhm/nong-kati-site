@@ -13,6 +13,8 @@ export interface DialogProps {
   onConfirm: () => void;
   onCancel: () => void;
   loading?: boolean;
+  /** Extra body slot — refusal reasons, counts, linked order numbers. */
+  children?: React.ReactNode;
 }
 
 /** 05-components.md §8.4 — confirmation dialog, built on Modal. Use for irreversible actions. */
@@ -26,6 +28,7 @@ export function Dialog({
   onConfirm,
   onCancel,
   loading = false,
+  children,
 }: DialogProps): React.JSX.Element {
   return (
     <Modal
@@ -50,6 +53,7 @@ export function Dialog({
       }
     >
       <span className="sr-only">{description}</span>
+      {children}
     </Modal>
   );
 }

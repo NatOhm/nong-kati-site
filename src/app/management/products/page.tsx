@@ -5,9 +5,9 @@ import {
   Plus,
   Search,
   Edit2,
-  Archive,
   X,
   Loader2,
+  Trash2,
   ImagePlus,
   Star,
   CheckCircle2,
@@ -19,7 +19,9 @@ import {
 } from 'lucide-react';
 
 import { AdminShell } from '@/components/layout/AdminShell';
+import { DeleteConfirmDialog, useDeleteFlow } from '@/components/feedback/DeleteConfirmDialog';
 import { adminFetch } from '@/lib/adminSession';
+import { adminDeleteProductPermanent } from '@/api/adminCatalog';
 import { PRODUCT_SHORT_DESCRIPTION_MAX } from '@/lib/ogShareSettings';
 import { cn } from '@/utils/cn';
 import { ImportDialog } from './ImportDialog';
@@ -82,6 +84,19 @@ interface DraftVariant {
 }
 
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+
+/** Exact counts for the permanent-delete dialog body: variants + unsold codes. */
+function deleteDialogDescription(product: AdminProduct): string {
+  const codes = product.variants.reduce((sum, v) => sum + v.stock, 0);
+  const counts = [
+    product.variants.length > 0 ? `ตัวเลือก ${product.variants.length} รายการ` : null,
+    codes > 0 ? `รหัสที่ยังไม่ได้ขาย ${codes} รหัส` : null,
+  ]
+    .filter(Boolean)
+    .join(' และ');
+  const scope = counts ? `${counts} ` : 'สินค้าและรหัสที่ยังไม่ได้ขาย ';
+  return `${scope}จะถูกลบอย่างถาวร ไม่สามารถกู้คืนได้ — แต่ประวัติออเดอร์และยอดขายจะถูกเก็บไว้ครบ`;
+}
 
 let draftKey = 1;
 function newDraftVariant(): DraftVariant {
@@ -220,6 +235,17 @@ export default function AdminProductsPage(): React.JSX.Element {
   };
   const [bulkBusy, setBulkBusy] = useState(false);
   const [inlineBusy, setInlineBusy] = useState<string | null>(null);
+  /**
+   * Permanent delete: one shared flow (single-flight guard, refusal with the
+   * blocking order numbers as links) — see DeleteConfirmDialog.
+   */
+  const productDelete = useDeleteFlow<AdminProduct>(
+    (product) => adminDeleteProductPermanent(product.id),
+    () => {
+      void load();
+    },
+  );
+  const deletingProduct = productDelete.busy ? productDelete.target : null;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -616,26 +642,19 @@ export default function AdminProductsPage(): React.JSX.Element {
                         >
                           <Edit2 size={14} />
                         </button>
-                        {product.isActive && (
-                          <button
-                            onClick={async () => {
-                              if (
-                                !confirm(
-                                  `เก็บ "${product.name}" ไว้ในถาวร? ลูกค้าจะไม่เห็นสินค้านี้`,
-                                )
-                              )
-                                return;
-                              await adminFetch(`/api/v1/admin/products/${product.id}`, {
-                                method: 'DELETE',
-                              });
-                              void load();
-                            }}
-                            className="rounded p-1.5 text-fg-placeholder hover:bg-surface hover:text-fg-error"
-                            aria-label={`เก็บถาวร ${product.name}`}
-                          >
-                            <Archive size={14} />
-                          </button>
-                        )}
+                        <button
+                          onClick={() => productDelete.open(product)}
+                          disabled={deletingProduct === product}
+                          className="rounded p-1.5 text-fg-placeholder hover:bg-surface hover:text-fg-error disabled:opacity-50"
+                          aria-label={`ลบ ${product.name} ถาวร`}
+                          title="ลบทั้งหมด (ถาวร)"
+                        >
+                          {deletingProduct === product ? (
+                            <Loader2 size={14} className="animate-spin" />
+                          ) : (
+                            <Trash2 size={14} />
+                          )}
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -736,6 +755,12 @@ export default function AdminProductsPage(): React.JSX.Element {
           onSaved={handleSaved}
         />
       )}
+
+      <DeleteConfirmDialog
+        flow={productDelete}
+        title={(p) => `ลบ "${p.name}" ถาวร?`}
+        description={deleteDialogDescription}
+      />
     </AdminShell>
   );
 }

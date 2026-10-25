@@ -168,6 +168,17 @@ export default function AdminOrdersPage(): React.JSX.Element {
     }
   }, [statusFilter, emailFilter, orderNumberFilter]);
 
+  // Deep-link from a refused delete (…/management/orders?orderNumber=NK-…):
+  // prefill and apply the filter on mount so the blocking order is the list
+  // that loads. Draft inputs are client state only (no useSearchParams/Suspense).
+  useEffect(() => {
+    const initial = new URLSearchParams(window.location.search).get('orderNumber');
+    if (initial) {
+      setOrderNumberInput(initial);
+      setOrderNumberFilter(initial);
+    }
+  }, []);
+
   useEffect(() => {
     void load();
   }, [load]);
