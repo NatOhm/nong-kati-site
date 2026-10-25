@@ -39,6 +39,7 @@ export function Modal({
   closeOnBackdrop = true,
 }: ModalProps): React.JSX.Element | null {
   const titleId = useId();
+  const descriptionId = useId();
   const containerRef = useFocusTrap(isOpen);
 
   useEffect(() => {
@@ -70,6 +71,7 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        aria-describedby={description ? descriptionId : undefined}
         className={cn(
           'relative w-full animate-modal-enter rounded-t-3xl border border-line-subtle bg-surface p-8 shadow-clay-lg md:rounded-2xl',
           sizeClasses[size],
@@ -80,7 +82,11 @@ export function Modal({
             <h2 id={titleId} className="font-display text-xl font-semibold text-fg">
               {title}
             </h2>
-            {description && <p className="mt-1 text-sm text-fg-muted">{description}</p>}
+            {description && (
+              <p id={descriptionId} className="mt-1 text-sm text-fg-muted">
+                {description}
+              </p>
+            )}
           </div>
           <button
             type="button"

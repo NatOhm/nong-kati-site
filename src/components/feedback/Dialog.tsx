@@ -52,7 +52,6 @@ export function Dialog({
         </>
       }
     >
-      <span className="sr-only">{description}</span>
       {children}
     </Modal>
   );
