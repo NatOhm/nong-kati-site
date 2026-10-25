@@ -160,8 +160,11 @@ export async function PATCH(
         ipAddress: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
         metadata: {
           variantId: code.variantId,
-          variantLabel: code.variant.label,
-          productName: code.variant.product.name,
+          // Only `available` codes are editable and those always keep their
+          // variant (the purge deletes unsold codes), but variantId is
+          // nullable since migration 20261025150000 — fall back honestly.
+          variantLabel: code.variant?.label ?? '—',
+          productName: code.variant?.product.name ?? '—',
           codeStatus: code.status,
           length: next.length,
         },

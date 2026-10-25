@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { checkPermission } from '@/lib/rbac';
 import { getAdminToken } from '@/lib/adminRequest';
+import { purgeProductInTx, emptyPurgeCounts, type PurgeOutcome } from '@/lib/catalogPurge';
+import { writeAuditLog } from '@/lib/auditLog';
 
 export const dynamic = 'force-dynamic';
 
@@ -116,10 +118,30 @@ export async function PUT(
 }
 
 /**
- * DELETE /api/v1/admin/categories/[id] - delete an empty leaf category
- * (categories:write). Refuses when the category has child categories or
+ * DELETE /api/v1/admin/categories/[id] - delete a category (categories:write).
+ * Default (no query): refuses when the category has child categories or
  * products, so admins re-home those explicitly instead of losing them.
+ * ?cascade=true: deletes the whole subtree in ONE transaction - every product
+ * under the category (recursively, via the guarded product purge so in-flight
+ * orders still block it) and every child category, then the category itself.
+ * Order history and money totals survive (OrderItem snapshots the catalog).
  */
+/**
+ * A guard refusal inside the cascade. THROWN, never returned: Prisma COMMITS
+ * an interactive-tx callback that returns normally, so `return`-ing here would
+ * keep every product purged before this one while the client is told
+ * "refused" — silent, un-undoable partial deletion. Throwing rolls the whole
+ * cascade back as one unit, which is what the doc comment above promises.
+ */
+class CascadeBlocked extends Error {
+  readonly detail: Extract<PurgeOutcome, { ok: false }>;
+  constructor(detail: Extract<PurgeOutcome, { ok: false }>) {
+    super(detail.error);
+    this.name = 'CascadeBlocked';
+    this.detail = detail;
+  }
+}
+
 export async function DELETE(
   req: NextRequest,
   ctx: { params: Promise<{ id: string }> },
@@ -130,7 +152,10 @@ export async function DELETE(
   if (!check.allowed) {
     return NextResponse.json({ error: check.error ?? 'FORBIDDEN' }, { status: 403 });
   }
+  const actor = check.payload!;
   const { id } = await ctx.params;
+  const cascade = new URL(req.url).searchParams.get('cascade') === 'true';
+  const ipAddress = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
 
   const existing = await prisma.category.findUnique({
     where: { id },
@@ -138,17 +163,103 @@ export async function DELETE(
   });
   if (!existing) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
 
-  const children = await prisma.category.count({ where: { parentId: id } });
-  if (children > 0) {
-    return NextResponse.json({ error: 'HAS_CHILDREN', children }, { status: 400 });
-  }
-  if (existing._count.products > 0) {
-    return NextResponse.json(
-      { error: 'HAS_PRODUCTS', products: existing._count.products },
-      { status: 400 },
-    );
+  if (!cascade) {
+    const children = await prisma.category.count({ where: { parentId: id } });
+    if (children > 0) {
+      return NextResponse.json({ error: 'HAS_CHILDREN', children }, { status: 400 });
+    }
+    if (existing._count.products > 0) {
+      return NextResponse.json(
+        { error: 'HAS_PRODUCTS', products: existing._count.products },
+        { status: 400 },
+      );
+    }
+    await prisma.category.delete({ where: { id } });
+    return NextResponse.json({ deleted: true });
   }
 
-  await prisma.category.delete({ where: { id } });
-  return NextResponse.json({ deleted: true });
+  // Cascade: collect the subtree of category ids (this category + descendants).
+  const categoryIds: string[] = [];
+  const collect = async (catId: string): Promise<void> => {
+    categoryIds.push(catId);
+    const kids = await prisma.category.findMany({
+      where: { parentId: catId },
+      select: { id: true },
+    });
+    for (const k of kids) await collect(k.id);
+  };
+  await collect(id);
+
+  const products = await prisma.product.findMany({
+    where: { categoryId: { in: categoryIds } },
+    select: { id: true, name: true },
+  });
+
+  try {
+    const result = await prisma.$transaction(
+      async (tx) => {
+        const counts = emptyPurgeCounts();
+        for (const p of products) {
+          const r = await purgeProductInTx(
+            tx,
+            p.id,
+            { sub: actor.sub, email: actor.email },
+            ipAddress,
+            counts,
+          );
+          if (!r.ok) throw new CascadeBlocked(r);
+        }
+        await tx.category.deleteMany({ where: { id: { in: categoryIds } } });
+
+        await writeAuditLog({
+          actorType: 'admin',
+          actorId: actor.sub,
+          actorEmail: actor.email,
+          action: 'catalog.category_cascade_purge',
+          tableName: 'Category',
+          recordId: id,
+          diff: { before: { name: existing.name, slug: existing.slug }, after: null },
+          ipAddress,
+          metadata: {
+            categoryId: id,
+            categoryName: existing.name,
+            categorySlug: existing.slug,
+            categories: categoryIds.length,
+            purgedProducts: products.length,
+            ...counts,
+          },
+          tx,
+        });
+
+        return {
+          deleted: true,
+          categories: categoryIds.length,
+          products: products.length,
+          counts,
+        };
+      },
+      { timeout: 60000 },
+    );
+
+    return NextResponse.json(result);
+  } catch (err) {
+    if (err instanceof CascadeBlocked) {
+      const d = err.detail;
+      if (d.error === 'IN_FLIGHT_ORDER') {
+        return NextResponse.json(
+          { error: 'IN_FLIGHT_ORDER', orderNumbers: d.orderNumbers },
+          { status: 409 },
+        );
+      }
+      if (d.error === 'ORPHANED_RESERVED_CODE') {
+        return NextResponse.json({ error: 'ORPHANED_RESERVED_CODE', count: d.count }, { status: 409 });
+      }
+      return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
+    }
+    console.error('[categories] cascade purge failed', err);
+    return NextResponse.json(
+      { error: 'PURGE_FAILED', detail: err instanceof Error ? err.message : 'unknown error' },
+      { status: 500 },
+    );
+  }
 }

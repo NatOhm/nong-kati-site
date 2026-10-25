@@ -147,6 +147,16 @@ export async function fulfilOrder(
       for (const item of order.items) {
         const needed = item.quantity;
 
+        // A detached line (variantId nulled by the catalog purge, migration
+        // 20261025150000) has no variant to draw stock from. Unreachable
+        // while the purge guards hold (they refuse live orders), but never
+        // mislabel it as a stock hole: callers route an unknown error to
+        // their honest failure path (reconciliation evidence / rollback),
+        // not to manual restock and a wrong diagnosis.
+        if (!item.variantId) {
+          throw new Error('CATALOG_LINE_DETACHED');
+        }
+
         // FIFO pick of available codes, guarded per-row.
         const candidates = await tx.giftCode.findMany({
           where: { variantId: item.variantId, status: 'available' },

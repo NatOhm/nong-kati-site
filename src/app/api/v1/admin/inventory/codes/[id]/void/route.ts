@@ -72,6 +72,14 @@ export async function PATCH(
       if (!VOIDABLE.has(code.status)) {
         return { status: 409 as const, error: 'CODE_NOT_VOIDABLE', codeStatus: code.status };
       }
+      // A detached code (its product was hard-deleted; variantId nulled by
+      // migration 20261025150000) has no variant stock left to decrement —
+      // it is not inventory anymore. Unreachable for `available` codes today
+      // (the purge deletes unsold codes and only detaches reserved/delivered
+      // ones), but the FK is nullable now, so state it instead of assuming.
+      if (!code.variantId || !code.variant) {
+        return { status: 409 as const, error: 'CODE_DETACHED' };
+      }
 
       // CAS: the status predicate is what stops two concurrent voids from
       // both decrementing stock for one code.

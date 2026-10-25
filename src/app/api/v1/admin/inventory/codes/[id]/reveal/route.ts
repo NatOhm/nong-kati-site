@@ -57,6 +57,10 @@ export async function GET(
       variant: {
         select: { label: true, product: { select: { name: true } } },
       },
+      // A code delivered before its product was hard-detached (variantId
+      // nulled, migration 20261025150000) still reveals — its labels come
+      // from the order line's snapshot instead of the catalog.
+      orderItem: { select: { productNameTh: true } },
     },
   });
   if (!code) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
@@ -88,8 +92,8 @@ export async function GET(
     ipAddress: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
     metadata: {
       variantId: code.variantId,
-      variantLabel: code.variant.label,
-      productName: code.variant.product.name,
+      variantLabel: code.variant?.label ?? '—',
+      productName: code.variant?.product.name ?? code.orderItem?.productNameTh ?? '—',
       codeStatus: code.status,
     },
   });
@@ -98,8 +102,8 @@ export async function GET(
     id: code.id,
     code: plaintext,
     status: code.status,
-    variantLabel: code.variant.label,
-    productName: code.variant.product.name,
+    variantLabel: code.variant?.label ?? '—',
+    productName: code.variant?.product.name ?? code.orderItem?.productNameTh ?? '—',
     createdAt: code.createdAt.toISOString(),
     deliveredAt: code.deliveredAt?.toISOString() ?? null,
   });

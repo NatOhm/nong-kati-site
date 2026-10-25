@@ -1,9 +1,27 @@
+/**
+ * DELETE /api/v1/admin/products/[id] — PERMANENT hard delete (products:write).
+ *
+ * This used to be a soft-archive (isActive: false), which is why the client
+ * could never actually remove a test product — it just got hidden. It is now
+ * a real delete: the product, its variants and its unused gift codes are
+ * destroyed in one transaction, guarded so we never pull a variant out from
+ * under an in-flight order.
+ *
+ * Order history and every money total survive: the purge DETACHES each
+ * historical `OrderItem` (variantId → null, migration
+ * 20261025150000_nullable_catalog_variant_links) instead of deleting it, and
+ * every rendered field is an FK-free snapshot — so a past order still renders
+ * and totals correctly after the product row is gone. Delivered gift codes
+ * survive the same way.
+ * See src/lib/catalogPurge.ts for the full guard + delete order.
+ */
 import { NextRequest, NextResponse } from 'next/server';
 
 import { prisma } from '@/lib/db';
 import { checkPermission } from '@/lib/rbac';
 import { getAdminToken } from '@/lib/adminRequest';
 import { normalizeProductShortDescription } from '@/lib/ogShareSettings';
+import { purgeProduct } from '@/lib/catalogPurge';
 
 export const dynamic = 'force-dynamic';
 
@@ -260,8 +278,21 @@ export async function PUT(
 }
 
 /**
- * DELETE /api/v1/admin/products/[id] — archive (soft-delete) a product
- * (products:write). Hard delete would orphan order history.
+ * DELETE /api/v1/admin/products/[id] — PERMANENT hard delete (products:write).
+ *
+ * This used to be a soft-archive (isActive: false), which is why the client
+ * could never actually remove a test product — it just got hidden. It is now
+ * a real delete: the product, its variants and its unused gift codes are
+ * destroyed in one transaction, guarded so we never pull a variant out from
+ * under an in-flight order.
+ *
+ * Order history and every money total survive: the purge DETACHES each
+ * historical `OrderItem` (variantId → null, migration
+ * 20261025150000_nullable_catalog_variant_links) instead of deleting it, and
+ * every rendered field is an FK-free snapshot — so a past order still renders
+ * and totals correctly after the product row is gone. Delivered gift codes
+ * survive the same way.
+ * See src/lib/catalogPurge.ts for the full guard + delete order.
  */
 export async function DELETE(
   req: NextRequest,
@@ -273,11 +304,34 @@ export async function DELETE(
   if (!check.allowed) {
     return NextResponse.json({ error: check.error ?? 'FORBIDDEN' }, { status: 403 });
   }
+  const actor = check.payload!;
   const { id } = await ctx.params;
-  try {
-    await prisma.product.update({ where: { id }, data: { isActive: false } });
-  } catch {
-    return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
+  const ipAddress = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
+
+  const result = await purgeProduct({ productId: id, actor: { sub: actor.sub, email: actor.email }, ipAddress });
+
+  if (result.ok) {
+    return NextResponse.json({ ok: true, name: result.name, counts: result.counts });
   }
-  return NextResponse.json({ ok: true });
+  switch (result.error) {
+    case 'NOT_FOUND':
+      return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
+    case 'IN_FLIGHT_ORDER':
+      return NextResponse.json(
+        { error: 'IN_FLIGHT_ORDER', orderNumbers: result.orderNumbers },
+        { status: 409 },
+      );
+    case 'ORPHANED_RESERVED_CODE':
+      return NextResponse.json(
+        { error: 'ORPHANED_RESERVED_CODE', count: result.count },
+        { status: 409 },
+      );
+    default:
+      // PURGE_FAILED carries the caught server message so the admin sees the
+      // real cause in the toast instead of digging in server logs.
+      return NextResponse.json(
+        { error: 'PURGE_FAILED', detail: result.detail ?? 'unknown error' },
+        { status: 500 },
+      );
+  }
 }

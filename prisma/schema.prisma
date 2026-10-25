@@ -414,7 +414,11 @@ model Order {
 model OrderItem {
   id              String    @id @default(cuid())
   orderId         String
-  variantId       String
+  // Nullable since 2026-10-25 (nullable_catalog_variant_links): a hard
+  // product delete detaches historical lines here instead of destroying the
+  // order's itemised history. All rendered fields below are snapshots with
+  // no catalog FK, so a null variantId still renders and totals correctly.
+  variantId       String?
   productNameTh   String
   productNameEn   String
   skuCode         String
@@ -447,7 +451,7 @@ model OrderItem {
   finalLineVatAmount     Decimal  @default(0) @db.Decimal(10, 2)
 
   order     Order          @relation(fields: [orderId], references: [id], onDelete: Restrict)
-  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Restrict)
   giftCodes GiftCode[]
 
   @@index([orderId])
@@ -458,7 +462,10 @@ model OrderItem {
 
 model GiftCode {
   id            String    @id @default(cuid())
-  variantId     String
+  // Nullable since 2026-10-25 (nullable_catalog_variant_links): a code that
+  // was already delivered to a customer survives a product purge with
+  // variantId nulled — it stays reachable via orderId/orderItemId only.
+  variantId     String?
   codeEncrypted Bytes
   codeHash      Bytes     @unique
   nonce         Bytes
@@ -478,7 +485,7 @@ model GiftCode {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  variant     ProductVariant   @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  variant     ProductVariant?  @relation(fields: [variantId], references: [id], onDelete: Restrict)
   order       Order?           @relation(fields: [orderId], references: [id], onDelete: Restrict)
   orderItem   OrderItem?       @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
   uploadBatch CodeUploadBatch? @relation(fields: [uploadBatchId], references: [id], onDelete: Restrict)

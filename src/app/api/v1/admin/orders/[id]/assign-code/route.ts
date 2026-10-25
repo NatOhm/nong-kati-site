@@ -105,6 +105,12 @@ export async function POST(
       if (code.status !== 'available') {
         return { status: 409 as const, error: 'CODE_NOT_AVAILABLE', codeStatus: code.status };
       }
+      // An `available` code always keeps its variant (the purge deletes
+      // unsold codes), but variantId is nullable since migration
+      // 20261025150000 — stating the invariant beats dereferencing null.
+      if (!code.variantId || !code.variant) {
+        return { status: 409 as const, error: 'CODE_DETACHED' };
+      }
 
       // The code must be something this order actually bought.
       const item = order.items.find((i) => i.variantId === code.variantId);
@@ -120,6 +126,12 @@ export async function POST(
         }
         if (old.status !== 'delivered') {
           return { status: 409 as const, error: 'REPLACED_CODE_NOT_DELIVERED' };
+        }
+        // The old code's product was hard-detached after delivery (variantId
+        // nulled): there is no variant stock pool left to credit, so the
+        // swap refuses instead of corrupting a stock number we no longer own.
+        if (!old.variantId) {
+          return { status: 409 as const, error: 'REPLACED_CODE_DETACHED' };
         }
         await tx.giftCode.update({
           where: { id: old.id },
