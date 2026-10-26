@@ -67,9 +67,10 @@ foreach ($k in 'server.js', 'package.json', 'package-lock.json', 'next.config.js
     Write-Output ('PRESENT ' + $k + ' = ' + $ok)
 }
 
-# 6. Layout: the archive must contain exactly the seven staged top-level entries.
+# 6. Layout: the archive must contain exactly the eight staged top-level entries.
 $expectedTop = @('.next', 'next.config.js', 'package-lock.json', 'package.json',
-                 'prisma', 'public', 'server.js')
+               'prisma', 'public', 'server.js', 'server-bootstrap.js')
+
 $top = @($names | ForEach-Object { ($_ -split '/')[0] } | Sort-Object -Unique)
 $topMissing = @($expectedTop | Where-Object { $top -notcontains $_ })
 $topExtra   = @($top | Where-Object { $expectedTop -notcontains $_ })

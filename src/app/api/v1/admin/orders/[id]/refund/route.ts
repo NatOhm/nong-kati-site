@@ -32,7 +32,7 @@ async function runRefund<T>(fn: (tx: RefundTx) => Promise<T>): Promise<T> {
   throw new Error('unreachable'); // loop always returns or throws
 }
 
-/** The only source state a refund may move from (VALID_TRANSITIONS in api/orders.ts). */
+/** The only source state a refund may move from (completed → refunded). */
 const REFUNDABLE_FROM = 'completed';
 
 const fail = (code: string, status: number): NextResponse =>

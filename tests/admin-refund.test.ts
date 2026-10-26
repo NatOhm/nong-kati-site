@@ -12,8 +12,8 @@
  *  - authorization: no token → 401, missing orders:refund → 403;
  *  - validation: gateway reference required, amount finite and positive,
  *    amount may not exceed the order total;
- *  - the state machine: only `completed` may be refunded (VALID_TRANSITIONS
- *    in api/orders.ts allows completed → refunded and nothing else);
+ *  - the state machine: only `completed` may be refunded (the route's
+ *    REFUNDABLE_FROM guard allows completed → refunded and nothing else);
  *  - atomicity: codes voided, Refund row inserted, order flipped and the
  *    audit row written inside ONE serializable transaction, with the audit
  *    write passed `tx` so it rolls back with the mutation;

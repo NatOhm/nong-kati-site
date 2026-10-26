@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import { constantTimeEquals } from '@/lib/crypto';
 import { prisma } from '@/lib/db';
 import { notifyPromotionExpired } from '@/lib/notify';
 
@@ -17,13 +18,6 @@ import { notifyPromotionExpired } from '@/lib/notify';
  */
 export const dynamic = 'force-dynamic';
 
-function timingSafeEqualShim(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
-
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const secret = process.env['NK_CRON_SECRET'];
   if (!secret) {
@@ -40,7 +34,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const bearerToken = bearer?.startsWith('Bearer ') ? bearer.slice(7) : '';
   const token = headerToken || bearerToken;
 
-  let authenticated = Boolean(token) && timingSafeEqualShim(token, secret);
+  let authenticated = Boolean(token) && constantTimeEquals(token, secret);
 
   if (!authenticated && bearerToken) {
     // Fall back to an admin JWT (panel-triggered sweep).

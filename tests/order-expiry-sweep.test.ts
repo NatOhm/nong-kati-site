@@ -3,10 +3,11 @@
  *
  * The claim under test: checkout creates a real `pending_payment` order
  * before the customer commits to a payment action, and NOTHING in the
- * repository ever expired them. `updateOrderStatus` permitted
- * `pending_payment → expired` but had no caller, and the inventory queue
- * documented in `src/lib/jobs/mockQueue.ts` ("Reservation sweep (5min),
- * expiry sweep (15min)") had zero registered handlers.
+ * repository ever expired them. `updateOrderStatus` (since deleted) once
+ * permitted `pending_payment → expired` but had no caller, and the
+ * inventory queue in the since-deleted `src/lib/jobs/mockQueue.ts`
+ * ("Reservation sweep (5min), expiry sweep (15min)") had zero registered
+ * handlers.
  *
  * The contracts this file pins:
  *  1. The sweep moves ONLY `pending_payment`, and only rows older than the
@@ -18,14 +19,12 @@
  *     up" that predicate into a bare `id: { in }`, a paid order can be
  *     flipped to expired after the money arrived. That is the single most
  *     dangerous line in this feature, so it gets its own assertion.
- *  3. `expired` is a legal target in the real `VALID_TRANSITIONS` table
- *     (drift guard against `src/api/orders.ts`).
- *  4. NO stock or code side effects: `createOrder` only *validates* stock;
+ *  3. NO stock or code side effects: `createOrder` only *validates* stock;
  *     the debit happens in the fulfilment transaction at payment
  *     confirmation. `releaseExpiredReservations` walks an in-memory mock
  *     store that is empty on a serverless cold start, so wiring it into a
  *     cron route would be theatre — this suite asserts it is not wired.
- *  5. The route is gated exactly like its sibling email-outbox drain:
+ *  4. The route is gated exactly like its sibling email-outbox drain:
  *     503 when NK_CRON_SECRET is unset, 401 on a bad token.
  */
 import { readFileSync } from 'node:fs';
@@ -254,18 +253,8 @@ describe('expireUnpaidOrders — no inventory side effects', () => {
   });
 });
 
-describe('drift guard — expired is a legal transition', () => {
-  it('pending_payment → expired is still allowed by VALID_TRANSITIONS', () => {
-    const src = read('api/orders.ts');
-    const block = src.slice(src.indexOf('const VALID_TRANSITIONS'));
-    const pending = block.slice(
-      block.indexOf('pending_payment:'),
-      block.indexOf('payment_confirmed: ['),
-    );
-    expect(pending).toMatch(/'expired'/);
-  });
-
-  it('the sweep targets exactly that status', async () => {
+describe('sweep target status', () => {
+  it('the sweep targets exactly pending_payment', async () => {
     const { expireUnpaidOrders } = await import('@/lib/orderExpiry');
     await expireUnpaidOrders({ now: NOW, timeoutMinutes: 30 });
     expect(findArgs().where.status).toBe('pending_payment');

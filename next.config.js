@@ -10,9 +10,9 @@ const nextConfig = {
   async headers() {
     return [
       {
-        // 13-security.md §8 — baseline security headers.
-        // Full CSP is wired in M8 (13-security.md §8 rollout); M1 ships the
-        // headers that carry zero third-party-script risk today.
+        // 13-security.md §8 — baseline security headers (the static set).
+        // The full CSP is built per-request in src/middleware.ts instead of
+        // here, because its directives depend on the page being served.
         source: '/:path*',
         headers: [
           { key: 'X-Frame-Options', value: 'DENY' },

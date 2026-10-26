@@ -29,6 +29,9 @@ on:
     # Every 10 minutes, 24/7. GitHub disables scheduled workflows on repos
     # with 60 days of inactivity — the watchdog is only as alive as the repo.
     - cron: '*/10 * * * *'
+    # Daily housekeeping tick: the 30-day slip-evidence retention sweep runs
+    # once a day (03:17 UTC ≈ 10:17 ICT) instead of on every health tick.
+    - cron: '17 3 * * *'
   # Manual trigger: run it before/after a deploy, or when the alert email
   # itself is the thing you are suspicious of.
   workflow_dispatch:
@@ -118,6 +121,40 @@ jobs:
         with:
           path: .prod-health
           key: prod-health-state-${{ github.run_id }}
+
+      # ─── Housekeeping crons ───────────────────────────────
+      # The internal sweep endpoints (orders/promotions expiry, email-outbox
+      # drain, slip retention) are fail-closed and had NO caller anywhere —
+      # audit finding 2 (2026-10-26). Shared hosting runs no daemon, so this
+      # always-on job is their scheduler. The 10-minute tick runs the sweeps,
+      # the daily tick adds retention, workflow_dispatch runs everything; a
+      # red health step above skips this one (no point sweeping a dead site).
+      #
+      # NK_CRON_SECRET must match the server .env; until it is added as a
+      # repo secret this step fails LOUDLY (silent disablement was the bug).
+      - name: Housekeeping crons (expiry, drain, daily slip retention)
+        env:
+          NK_CRON_SECRET: ${{ secrets.NK_CRON_SECRET }}
+        run: |
+          if [ -z "$NK_CRON_SECRET" ]; then
+            echo "::error title=NK_CRON_SECRET missing::add it as a repo secret (same value as the server .env). The internal endpoints fail closed with 503 until then, so no sweep can run."
+            exit 1
+          fi
+          endpoints="internal/orders/expire internal/promotions/expire internal/email-outbox/drain"
+          if [ "${{ github.event.schedule }}" != "*/10 * * * *" ]; then
+            endpoints="$endpoints internal/settings/slip-retention"
+          fi
+          fail=0
+          for ep in $endpoints; do
+            if curl -fsS --max-time 30 -X POST -H "x-cron-token: $NK_CRON_SECRET" \
+              "https://nongkatistore.com/api/v1/$ep" >/dev/null; then
+              echo "ok: $ep"
+            else
+              echo "::error title=housekeeping cron failed::$ep returned non-2xx (site down, or NK_CRON_SECRET mismatch between repo secret and server .env)"
+              fail=1
+            fi
+          done
+          exit $fail
 
       # Dead-man's switch. The job can be perfectly GREEN while the SCHEDULE
       # is dead — cron disabled, repo inactive, Actions quota spent. Only an

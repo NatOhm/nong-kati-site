@@ -50,6 +50,7 @@ export type Slip2GoResult =
         | 'NOT_CONFIGURED'
         | 'UPSTREAM_ERROR'
         | 'QUOTA_EXCEEDED'
+        | 'RATE_LIMITED'
         | 'INVALID_SLIP'
         | 'AMOUNT_MISMATCH'
         | 'RECEIVER_MISMATCH';
@@ -78,6 +79,7 @@ interface Slip2GoBody {
 
 /** Condition/auth/infra response codes → our result variants. */
 function mapSlip2GoError(code: string, message: string): Slip2GoResult {
+  const detail = `${code}: ${message}`;
   switch (code) {
     case '200402':
       return { ok: false, code: 'AMOUNT_MISMATCH', detail: message };
@@ -89,6 +91,9 @@ function mapSlip2GoError(code: string, message: string): Slip2GoResult {
       return { ok: false, code: 'INVALID_SLIP', detail: 'fraud: ' + message };
     case '200404':
       return { ok: false, code: 'INVALID_SLIP', detail: message };
+    case '200502':
+      // Bank-side error — transient upstream trouble, not a bad slip.
+      return { ok: false, code: 'UPSTREAM_ERROR', detail };
     case '401005':
     case '401006':
       return { ok: false, code: 'QUOTA_EXCEEDED', detail: message };
@@ -100,8 +105,23 @@ function mapSlip2GoError(code: string, message: string): Slip2GoResult {
       // Config/IP problems — behave like "feature not usable" so the
       // checkout falls back to the manual admin path with an honest message.
       return { ok: false, code: 'NOT_CONFIGURED', detail: message };
+    case '429000':
+      return { ok: false, code: 'RATE_LIMITED', detail };
+    case '500500':
+    case '500503':
+      return { ok: false, code: 'UPSTREAM_ERROR', detail };
     default:
-      return { ok: false, code: 'INVALID_SLIP', detail: message };
+      // Never accuse the customer's slip for provider/infra problems
+      // (client feedback 19 Oct: rate limits, 5xx and body-validation
+      // errors all surfaced as "สลิปไม่ถูกต้อง/อ่านไม่ได้/ถูกใช้ไปแล้ว").
+      // Only the documented slip-condition codes (2xxxxx) may call the
+      // slip itself invalid; anything else is ours or the provider's fault.
+      if (code.startsWith('200')) return { ok: false, code: 'INVALID_SLIP', detail };
+      if (code.startsWith('401')) return { ok: false, code: 'NOT_CONFIGURED', detail };
+      if (code.startsWith('429') || code === 'HTTP_429') {
+        return { ok: false, code: 'RATE_LIMITED', detail };
+      }
+      return { ok: false, code: 'UPSTREAM_ERROR', detail };
   }
 }
 

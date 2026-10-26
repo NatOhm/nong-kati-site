@@ -169,22 +169,60 @@ async function sharedIncrement(
   }
 }
 
+/**
+ * Read-only variant of sharedIncrement for `{ increment: false }` checks:
+ * GET the current bucket count without touching it. Missing key = 0.
+ */
+async function sharedPeek(
+  key: string,
+  windowMs: number,
+): Promise<{ count: number; resetAt: number } | null> {
+  if (!SHARED_ENABLED) return null;
+  const bucket = Math.floor(Date.now() / windowMs);
+  const redisKey = `ratelimit:${key}:${bucket}`;
+  try {
+    const res = await fetch(`${UPSTASH_URL}/pipeline`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${UPSTASH_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify([['GET', redisKey]]),
+      signal: AbortSignal.timeout(1_500),
+    });
+    if (!res.ok) return null;
+    const results = (await res.json()) as { result?: unknown }[];
+    const count = Number(results[0]?.result ?? 0); // null → 0
+    if (!Number.isFinite(count) || count < 0) return null;
+    return { count, resetAt: (bucket + 1) * windowMs };
+  } catch {
+    return null;
+  }
+}
+
 // ─── Core Functions ──────────────────────────────────────
 
 /**
  * Check if a request should be rate-limited.
- * Returns { allowed, remaining, resetAt }.
+ * Returns { allowed, remaining, resetAt, degraded }.
  *
  * Uses the shared Upstash counter when configured (serverless-safe: the
  * limit is global across instances), otherwise falls back to the
  * per-instance memory store (dev / self-hosted single process).
+ *
+ * `opts.increment: false` makes the call a READ — the count is returned
+ * without being bumped, for buckets keyed by request-body data (the
+ * order-velocity email bucket): a pre-check must not itself consume the
+ * victim's quota. The caller increments with a normal call only once the
+ * protected action has succeeded.
  */
 export async function checkRateLimit(
   route: string,
   identifier: string,
-
   rule?: RateLimitRule,
+  opts?: { increment?: boolean },
 ): Promise<{ allowed: boolean; remaining: number; resetAt: number; degraded: boolean }> {
+  const increment = opts?.increment !== false;
   const matchedRule = rule ?? findMatchingRule(route);
   if (!matchedRule) {
     // No rule = unlimited
@@ -194,9 +232,11 @@ export async function checkRateLimit(
   const key = `${matchedRule.route}:${identifier}`;
 
   if (SHARED_ENABLED) {
-    const shared = await sharedIncrement(key, matchedRule.windowMs);
+    const shared = increment ? await sharedIncrement(key, matchedRule.windowMs) : await sharedPeek(key, matchedRule.windowMs);
     if (shared) {
-      const allowed = shared.count <= matchedRule.maxRequests;
+      const allowed = increment
+        ? shared.count <= matchedRule.maxRequests
+        : shared.count < matchedRule.maxRequests;
       return {
         allowed,
         remaining: Math.max(0, matchedRule.maxRequests - shared.count),
@@ -217,8 +257,16 @@ export async function checkRateLimit(
   const entry = store.get(key);
 
   if (!entry || entry.resetAt <= now) {
-    // New window
+    // New window. A peek never creates one — reading must have no side effect.
     const resetAt = now + matchedRule.windowMs;
+    if (!increment) {
+      return {
+        allowed: true,
+        remaining: matchedRule.maxRequests,
+        resetAt,
+        degraded: SHARED_ENABLED,
+      };
+    }
     evictIfNeeded();
     store.set(key, { count: 1, resetAt });
     return {
@@ -232,6 +280,15 @@ export async function checkRateLimit(
   // Existing window
   if (entry.count >= matchedRule.maxRequests) {
     return { allowed: false, remaining: 0, resetAt: entry.resetAt, degraded: SHARED_ENABLED };
+  }
+
+  if (!increment) {
+    return {
+      allowed: true,
+      remaining: matchedRule.maxRequests - entry.count,
+      resetAt: entry.resetAt,
+      degraded: SHARED_ENABLED,
+    };
   }
 
   entry.count++;
@@ -323,10 +380,13 @@ export async function applyRateLimit(
 // ─── Helpers ─────────────────────────────────────────────
 
 function findMatchingRule(route: string): RateLimitRule | undefined {
-  // Exact match first, then prefix match
+  // Exact match first, then prefix match. Underscore routes
+  // (`_order_velocity_*`) are named buckets invoked directly from handlers —
+  // they must never win a pathname prefix match (audit #8: the old guard
+  // `!== '_'` compared against the literal underscore and filtered nothing).
   return (
     RATE_LIMIT_RULES.find((r) => r.route === route) ??
-    RATE_LIMIT_RULES.find((r) => r.route !== '_' && route.startsWith(r.route))
+    RATE_LIMIT_RULES.find((r) => !r.route.startsWith('_') && route.startsWith(r.route))
   );
 }
 

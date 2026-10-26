@@ -31,6 +31,14 @@ function bearer(req: NextRequest): string | null {
   return token;
 }
 
+/** Thrown inside the variant-reconcile transaction for stale row ids. */
+class VariantOwnershipError extends Error {
+  constructor() {
+    super('VARIANT_NOT_FOUND');
+    this.name = 'VariantOwnershipError';
+  }
+}
+
 /**
  * PUT /api/v1/admin/products/[id] — update product info, image and variants
  * (products:write). Only fields present in the body are changed.
@@ -128,12 +136,23 @@ export async function PUT(
     data.tags = { deleteMany: [{ productId: id }], create: ids.map((tagId) => ({ tagId })) };
   }
 
-  // Variants: replace-all semantics when present.
+  // Variants: id-based reconcile (update in place / create new / remove
+  // dropped). The old replace-all logic had two failure modes the client hit
+  // on 19 Oct: (1) deleteMany violated onDelete: Restrict FKs (GiftCode,
+  // CodeUploadBatch, InventorySnapshot) → HTTP 500, so any product with
+  // uploaded codes could not be edited or moved to another category; (2) the
+  // order-referenced path deactivated + re-created every variant on each
+  // save, multiplying options and orphaning gift codes away from the
+  // sellable variants. Rows are now reconciled by id; a dropped row is
+  // deleted only when nothing references it, otherwise deactivated.
   if (b['variants'] !== undefined) {
     if (!Array.isArray(b['variants']) || b['variants'].length === 0) {
       return NextResponse.json({ error: 'VARIANTS_REQUIRED' }, { status: 400 });
     }
     const parsed = (b['variants'] as Record<string, unknown>[]).map((v) => {
+      // Existing rows send their id; new rows omit it (or send '').
+      const variantId =
+        typeof v['id'] === 'string' && v['id'].trim() !== '' ? v['id'].trim() : null;
       const label = typeof v['label'] === 'string' ? v['label'].trim() : '';
       const price = typeof v['price'] === 'number' ? v['price'] : NaN;
       const stock = typeof v['stock'] === 'number' ? v['stock'] : NaN;
@@ -155,77 +174,93 @@ export async function PUT(
       };
       const memberPrice = tier(v['memberPrice']);
       const dealerPrice = tier(v['dealerPrice']);
-      return { label, price, stock, isActive, cost, memberPrice, dealerPrice };
+      return { variantId, label, price, stock, isActive, cost, memberPrice, dealerPrice };
     });
     if (parsed.some((v) => v === null)) {
       return NextResponse.json({ error: 'INVALID_VARIANT' }, { status: 400 });
     }
-    // Snapshot existing stock so editor-driven changes land in the
+    // Snapshot existing stock per id so editor-driven changes land in the
     // ประวัติการจัดสต๊อก (StockMove) audit trail.
     const beforeVariants = await prisma.productVariant.findMany({
       where: { productId: id },
-      select: { id: true, label: true, stock: true },
+      select: { id: true, stock: true },
     });
-    const beforeByLabel = new Map(beforeVariants.map((v) => [v.label, v.stock]));
-
-    // OrderItem.variant has onDelete: Restrict, so variants referenced by past
-    // orders cannot be replaced wholesale — deactivate them instead, which
-    // preserves order history while hiding the old denominations from sale.
-    const referenced = await prisma.orderItem.findFirst({
-      where: { variant: { productId: id } },
-      select: { id: true },
-    });
-    if (referenced) {
-      await prisma.productVariant.updateMany({
-        where: { productId: id },
-        data: { isActive: false },
-      });
-      await prisma.productVariant.createMany({
-        data: parsed.map((v, i) => ({
-          productId: id,
-          label: v!.label,
-          price: v!.price,
-          memberPrice: v!.memberPrice,
-          dealerPrice: v!.dealerPrice,
-          stock: v!.stock,
-          costThb: v!.cost,
-          isActive: v!.isActive,
-          sortOrder: i,
-        })),
-      });
-      await prisma.product.update({ where: { id }, data });
-    } else {
-      await prisma.$transaction([
-        prisma.productVariant.deleteMany({ where: { productId: id } }),
-        prisma.product.update({
-          where: { id },
-          data: {
-            ...data,
-            variants: {
-              create: parsed.map((v, i) => ({
-                label: v!.label,
-                price: v!.price,
-                memberPrice: v!.memberPrice,
-                dealerPrice: v!.dealerPrice,
-                stock: v!.stock,
-                costThb: v!.cost,
-                isActive: v!.isActive,
-                sortOrder: i,
-              })),
-            },
-          },
-        }),
-      ]);
+    const beforeStockById = new Map(beforeVariants.map((v) => [v.id, v.stock]));
+    const existingIds = new Set(beforeVariants.map((v) => v.id));
+    for (const v of parsed) {
+      // A row id that does not belong to this product is a stale editor
+      // state — never let it write into another product's variants.
+      if (v!.variantId && !existingIds.has(v!.variantId)) {
+        return NextResponse.json({ error: 'VARIANT_NOT_FOUND' }, { status: 409 });
+      }
     }
-    // Record stock deltas for labels whose stock changed (new labels count
-    // as a restock from zero).
+
+    try {
+      await prisma.$transaction(
+        async (tx) => {
+          const keepIds = new Set<string>();
+          for (let i = 0; i < parsed.length; i++) {
+            const v = parsed[i]!;
+            const fields = {
+              label: v.label,
+              price: v.price,
+              memberPrice: v.memberPrice,
+              dealerPrice: v.dealerPrice,
+              stock: v.stock,
+              costThb: v.cost,
+              isActive: v.isActive,
+              sortOrder: i,
+            };
+            if (v.variantId) {
+              await tx.productVariant.update({ where: { id: v.variantId }, data: fields });
+              keepIds.add(v.variantId);
+            } else {
+              const created = await tx.productVariant.create({
+                data: { productId: id, ...fields },
+              });
+              keepIds.add(created.id);
+            }
+          }
+          // Rows the payload dropped: delete only when nothing references
+          // them (order items, gift codes, upload batches, stock snapshots
+          // all Restrict); otherwise deactivate so history survives.
+          const removedIds = beforeVariants.filter((v) => !keepIds.has(v.id)).map((v) => v.id);
+          if (removedIds.length > 0) {
+            const [orders, codes, batches, snaps] = await Promise.all([
+              tx.orderItem.count({ where: { variantId: { in: removedIds } } }),
+              tx.giftCode.count({ where: { variantId: { in: removedIds } } }),
+              tx.codeUploadBatch.count({ where: { variantId: { in: removedIds } } }),
+              tx.inventorySnapshot.count({ where: { productVariantId: { in: removedIds } } }),
+            ]);
+            if (orders + codes + batches + snaps > 0) {
+              await tx.productVariant.updateMany({
+                where: { id: { in: removedIds } },
+                data: { isActive: false },
+              });
+            } else {
+              await tx.productVariant.deleteMany({ where: { id: { in: removedIds } } });
+            }
+          }
+          await tx.product.update({ where: { id }, data });
+        },
+        { timeout: 15000 },
+      );
+    } catch (e) {
+      if (e instanceof VariantOwnershipError) {
+        return NextResponse.json({ error: 'VARIANT_NOT_FOUND' }, { status: 409 });
+      }
+      console.error('[admin products] variant reconcile failed', id, e);
+      return NextResponse.json({ error: 'VARIANT_UPDATE_FAILED' }, { status: 500 });
+    }
+    // Record stock deltas per variant id (new rows count as a restock from
+    // zero); rows kept untouched have delta 0 and are skipped.
     const afterVariants = await prisma.productVariant.findMany({
-      where: { productId: id, isActive: true },
-      select: { id: true, label: true, stock: true },
+      where: { productId: id },
+      select: { id: true, stock: true },
     });
     const moves = afterVariants
       .map((v) => {
-        const beforeStock = beforeByLabel.get(v.label) ?? 0;
+        const beforeStock = beforeStockById.get(v.id) ?? 0;
         return { variantId: v.id, delta: v.stock - beforeStock, stockAfter: v.stock };
       })
       .filter((m) => m.delta !== 0);
@@ -308,7 +343,11 @@ export async function DELETE(
   const { id } = await ctx.params;
   const ipAddress = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
 
-  const result = await purgeProduct({ productId: id, actor: { sub: actor.sub, email: actor.email }, ipAddress });
+  const result = await purgeProduct({
+    productId: id,
+    actor: { sub: actor.sub, email: actor.email },
+    ipAddress,
+  });
 
   if (result.ok) {
     return NextResponse.json({ ok: true, name: result.name, counts: result.counts });

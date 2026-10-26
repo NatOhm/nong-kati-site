@@ -10,7 +10,6 @@
 import { OmiseAdapter } from '@/lib/payment/omise';
 import { gatewayCircuitBreaker, GatewayUnavailableError } from '@/lib/payment/circuitBreaker';
 import { reserveCodes } from '@/lib/delivery/reservation';
-import { enqueueJob } from '@/lib/jobs/mockQueue';
 import type { Order } from './orders';
 
 // Lazy gateway adapter — never construct at module scope (build-time route

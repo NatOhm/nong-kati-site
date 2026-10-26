@@ -557,54 +557,6 @@ export async function getOrderByNumber(orderNumber: string): Promise<Order | nul
   return o ? mapOrder(o as unknown as DbOrder) : null;
 }
 
-// ─── Status transitions (09-payment.md §10) ──────────────
-
-const VALID_TRANSITIONS: Record<string, string[]> = {
-  pending_payment: [
-    'payment_confirmed',
-    'pending_manual_fulfilment',
-    'failed',
-    'expired',
-    'abandoned',
-  ],
-  payment_confirmed: ['completed', 'pending_manual_fulfilment'],
-  code_delivered: ['completed'],
-  pending_manual_fulfilment: ['completed'],
-  completed: ['refunded'],
-};
-
-/**
- * Update order status with transition guard. Returns false on invalid moves.
- */
-export async function updateOrderStatus(
-  orderId: string,
-  newStatus: string,
-  reason?: string,
-): Promise<boolean> {
-  const current = await prisma.order.findUnique({
-    where: { id: orderId },
-    select: { status: true },
-  });
-  if (!current) return false;
-
-  const allowed = VALID_TRANSITIONS[current.status];
-  if (!allowed || !allowed.includes(newStatus)) {
-    console.error(
-      `[Orders] Invalid transition: ${current.status} → ${newStatus} for order ${orderId}`,
-    );
-    return false;
-  }
-
-  await prisma.order.update({
-    where: { id: orderId },
-    data: {
-      status: newStatus,
-      ...(reason ? { manualFulfilmentReason: reason } : {}),
-    },
-  });
-  return true;
-}
-
 /**
  * Atomically claim a pending_payment order for confirmation (webhook /
  * admin slip-verify both use this so double-confirmation is impossible).

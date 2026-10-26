@@ -6,6 +6,7 @@ import { getManualTransferInfo } from '@/lib/data';
 import { hasUsableChannel, resolvePaymentChannels } from '@/lib/paymentChannels';
 import { isOpnConfigured } from '@/lib/payment/omise';
 import { prisma } from '@/lib/db';
+import { applyRateLimit, checkRateLimit, getClientIp } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,6 +64,29 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: { code: 'INVALID_JSON' } }, { status: 400 });
   }
   const b = (body ?? {}) as Record<string, unknown>;
+
+  // Order velocity caps (01-prd.md FR-144/FR-145): 20 orders/email/24h,
+  // 30/IP/24h. Middleware can only match pathnames, so these underscore
+  // buckets were never enforced anywhere (audit finding 1) — checked here.
+  //
+  // The EMAIL key comes from the body, so the pre-check is a read
+  // (`increment: false`) and the bucket is consumed only after an order
+  // exists: counting attempts would let anyone lock a victim's email for
+  // 24h with 21 malformed POSTs ("failed attempts never burn the email
+  // cap" in tests/order-velocity.test.ts). Trim + lowercase closes the
+  // case-variant bypass; an empty email skips the bucket entirely.
+  // The IP key is the requester itself — self-scoped, nothing to poison —
+  // so it counts every attempt.
+  const emailKey = String(b['customerEmail'] ?? b['email'] ?? '').trim().toLowerCase();
+  if (emailKey) {
+    const emailVelocity = await checkRateLimit('_order_velocity_email', emailKey, undefined, {
+      increment: false,
+    });
+    if (!emailVelocity.allowed) return applyRateLimit('_order_velocity_email', emailKey);
+  }
+  const ip = getClientIp(req);
+  const ipVelocity = await checkRateLimit('_order_velocity_ip', ip);
+  if (!ipVelocity.allowed) return applyRateLimit('_order_velocity_ip', ip);
 
   // Release capability check (security review 2026-09-26 [High]; updated by
   // the production review HIGH-3): never accept an order the storefront
@@ -128,6 +152,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       ...(typeof b['couponCode'] === 'string' ? { couponCode: b['couponCode'] as string } : {}),
       customerId,
     });
+
+    // FR-144 counts ORDERS, so the quota is consumed only now that one
+    // exists (see the pre-check above).
+    if (emailKey) await checkRateLimit('_order_velocity_email', emailKey);
 
     return NextResponse.json(result, { status: 201 });
   } catch (err) {

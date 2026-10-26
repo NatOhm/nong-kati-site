@@ -42,7 +42,7 @@ Copy-Item -Recurse -Force -LiteralPath (Join-Path $root '.next') -Destination (J
 Remove-Item -Recurse -Force -LiteralPath (Join-Path $stage '.next\cache')   # build cache: huge, unused at runtime
 Copy-Item -Recurse -Force -LiteralPath (Join-Path $root 'public')  -Destination (Join-Path $stage 'public')
 Copy-Item -Recurse -Force -LiteralPath (Join-Path $root 'prisma')  -Destination (Join-Path $stage 'prisma')
-foreach ($f in 'package.json', 'package-lock.json', 'next.config.js', 'server.js') {
+foreach ($f in 'package.json', 'package-lock.json', 'next.config.js', 'server.js', 'server-bootstrap.js') {
     Copy-Item -Force -LiteralPath (Join-Path $root $f) -Destination (Join-Path $stage $f)
 }
 

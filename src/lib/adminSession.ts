@@ -65,11 +65,6 @@ export async function ensureFreshAdminSession(): Promise<boolean> {
   }
 }
 
-export async function getAdminSession(jti: string) {
-  // Client helper surface only; server handlers use @/lib/adminRequest + @/lib/rbac.
-  return undefined;
-}
-
 export interface AdminFetchInit extends RequestInit {
   token?: string | null;
 }

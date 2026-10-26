@@ -7,7 +7,11 @@ import { cache } from 'react';
 
 import { prisma } from '@/lib/db';
 import { parseFaqSettings, type FaqSettings } from '@/lib/faqSettings';
-import { DEFAULT_TRUST_BADGES, parseTrustBadges, type TrustBadgesSettings } from '@/lib/trustBadges';
+import {
+  DEFAULT_TRUST_BADGES,
+  parseTrustBadges,
+  type TrustBadgesSettings,
+} from '@/lib/trustBadges';
 import { DEFAULT_OG_SHARE, parseOgShare, type OgShareSettings } from '@/lib/ogShareSettings';
 import { normalizeTier, tierPrice, type PriceTier } from '@/lib/pricing';
 import { getEligiblePromotions } from '@/lib/promotions';
@@ -176,7 +180,9 @@ export async function getCategoriesWithProductCounts(): Promise<
 > {
   const cats = await prisma.category.findMany({
     orderBy: { sortOrder: 'asc' },
-    include: { _count: { select: { products: true } } },
+    // Count only sellable products: a chip counting hidden products can show
+    // (2) above a listing that correctly returns none.
+    include: { _count: { select: { products: { where: { isActive: true } } } } },
   });
   const ownCount = new Map(cats.map((c) => [c.id, c._count.products]));
   const countMap = new Map(cats.map((c) => [c.id, c._count.products]));
@@ -624,7 +630,12 @@ export async function getCatalogProducts(
   if (categorySlug) {
     const cat = await prisma.category.findUnique({ where: { slug: categorySlug } });
     if (!cat) return { products: [], total: 0 };
-    where.categoryId = cat.id;
+    // Match the chip counts and /category/[...slug]: a category listing shows
+    // the whole subtree, not only direct children (client feedback 19 Oct —
+    // "work space (2)" rendered an empty /search result list because both
+    // products sat in child categories).
+    const descendantIds = await getDescendantIds(cat.id);
+    where.categoryId = { in: [cat.id, ...descendantIds] };
   }
   if (availableOnly) where.variants = AVAILABILITY_FILTER;
 

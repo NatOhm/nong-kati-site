@@ -27,23 +27,20 @@ const { createServer } = require('http');
 const { parse } = require('url');
 const next = require('next');
 
+const { resolveInfisicalConfig, planInjection } = require('./server-bootstrap');
+
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
 const port = parseInt(process.env.PORT || '3000', 10);
 
 // ── Infisical bootstrap (Universal Auth machine identity) ────────────────
 async function loadSecretsFromInfisical() {
-  const clientId = process.env.INFISICAL_CLIENT_ID;
-  const clientSecret = process.env.INFISICAL_CLIENT_SECRET;
-
-  if (!clientId || !clientSecret) {
+  const config = resolveInfisicalConfig(process.env);
+  if (!config.wired) {
     console.log('[infisical] not wired (INFISICAL_CLIENT_ID / INFISICAL_CLIENT_SECRET absent) — using environment as-is');
     return;
   }
-
-  const base = (process.env.INFISICAL_SITE_URL || 'https://app.infisical.com').replace(/\/+$/, '');
-  const envSlug = process.env.INFISICAL_ENV || 'prod';
-  const projectId = process.env.INFISICAL_PROJECT_ID; // workspaceId
+  const { clientId, clientSecret, base, envSlug, projectId } = config;
 
   const timeout = (ms) => AbortSignal.timeout(ms);
 
@@ -74,19 +71,10 @@ async function loadSecretsFromInfisical() {
   if (!Array.isArray(secrets)) throw new Error('secrets response had no secrets array');
 
   // 3. Inject WITHOUT clobbering: panel-provided vars are per-instance
-  //    overrides and win. Values are never logged.
-  let injected = 0;
-  let overridden = 0;
-  for (const s of secrets) {
-    if (!s || !s.secretKey) continue;
-    if (process.env[s.secretKey] === undefined) {
-      process.env[s.secretKey] = s.secretValue;
-      injected++;
-    } else {
-      overridden++;
-    }
-  }
-  console.log(`[infisical] loaded ${injected} secret(s) from ${envSlug}${overridden ? ` (${overridden} kept from panel override)` : ''}`);
+  //    overrides and win (decided by planInjection). Values are never logged.
+  const plan = planInjection(secrets, process.env);
+  for (const [key, value] of plan.entries) process.env[key] = value;
+  console.log(`[infisical] loaded ${plan.entries.length} secret(s) from ${envSlug}${plan.kept ? ` (${plan.kept} kept from panel override)` : ''}`);
 }
 
 // ── Boot: secrets first, then the app ────────────────────────────────────

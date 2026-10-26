@@ -33,7 +33,9 @@ afterEach(() => {
 });
 
 /** Narrow a Slip2Go result to the failure fields these assertions inspect. */
-function failed(r: Awaited<ReturnType<typeof import('@/lib/payment/slip2go')['verifySlip2Go']>>): {
+function failed(
+  r: Awaited<ReturnType<(typeof import('@/lib/payment/slip2go'))['verifySlip2Go']>>,
+): {
   code?: string | undefined;
   detail?: string | undefined;
 } {
@@ -269,9 +271,7 @@ describe('CSP img-src allows blob:', () => {
     try {
       const { middleware } = await import('@/middleware');
       const { NextRequest } = await import('next/server');
-      const res = await middleware(
-        new NextRequest('https://x.test/', { method: 'GET' }),
-      );
+      const res = await middleware(new NextRequest('https://x.test/', { method: 'GET' }));
       const csp = res.headers.get('Content-Security-Policy') ?? '';
       const imgDirective = /img-src[^;]*/.exec(csp)?.[0] ?? '';
       expect(imgDirective).toContain('blob:');
@@ -306,9 +306,7 @@ function slip2goOk(): Response {
 describe('Slip2Go adapter', () => {
   it('is disabled without NK_SLIP2GO_SECRET', async () => {
     delete process.env['NK_SLIP2GO_SECRET'];
-    const { isSlip2GoEnabled, verifySlip2Go } = await import(
-      '@/lib/payment/slip2go'
-    );
+    const { isSlip2GoEnabled, verifySlip2Go } = await import('@/lib/payment/slip2go');
     expect(isSlip2GoEnabled()).toBe(false);
     const r = await verifySlip2Go({
       imageBase64: 'aGk=',
@@ -343,9 +341,7 @@ describe('Slip2Go adapter', () => {
       amount: '25',
     });
     expect(body.payload.checkCondition.checkDuplicate).toBe(true);
-    expect(
-      String(body.payload.imageBase64).startsWith('data:image/png;base64,'),
-    ).toBe(true);
+    expect(String(body.payload.imageBase64).startsWith('data:image/png;base64,')).toBe(true);
   });
 });
 
@@ -480,6 +476,28 @@ describe('Slip2Go adapter — error mapping', () => {
     ).toBe('UPSTREAM_ERROR');
   });
 
+  it('never labels provider/infra failures as a bad slip (client feedback 19 Oct)', async () => {
+    process.env['NK_SLIP2GO_SECRET'] = 'test-secret';
+    const { verifySlip2Go } = await import('@/lib/payment/slip2go');
+    const check = async (body: unknown, status = 200): Promise<string | undefined> => {
+      fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(body), { status }));
+      return failed(await verifySlip2Go({ imageBase64: 'aGk=', expectedAmountThb: 25 })).code;
+    };
+
+    // Rate limit → retryable RATE_LIMITED (was: INVALID_SLIP).
+    expect(await check({ code: '429000', message: 'คำขอเกินจำนวนที่กำหนด' })).toBe('RATE_LIMITED');
+    // Provider outage → UPSTREAM_ERROR (was: INVALID_SLIP).
+    expect(await check({ code: '500503', message: 'ระบบขัดข้อง' })).toBe('UPSTREAM_ERROR');
+    // Bank-side error is transient, not a bad slip.
+    expect(await check({ code: '200502', message: 'ธนาคารขัดข้อง' })).toBe('UPSTREAM_ERROR');
+    // Undocumented 2xxxxx condition code stays slip-side.
+    expect(await check({ code: '200403', message: 'วันที่ไม่ตรง' })).toBe('INVALID_SLIP');
+    // HTTP 429 without a code field → RATE_LIMITED, not INVALID_SLIP.
+    expect(await check({ message: 'Too many requests' }, 429)).toBe('RATE_LIMITED');
+    // Truly unknown code → upstream; the customer's slip is never accused.
+    expect(await check({ code: '999999', message: 'wat' })).toBe('UPSTREAM_ERROR');
+  });
+
   it('re-checks the amount locally even on a 200000 success', async () => {
     process.env['NK_SLIP2GO_SECRET'] = 'test-secret';
     fetchMock.mockResolvedValueOnce(slip2goOk());
@@ -508,9 +526,7 @@ describe('storefront main-category groups', () => {
 
   it('keeps a configured main group instead of flattening it away', async () => {
     const { splitAppGroups } = await import('@/lib/appGroups');
-    const roots = [
-      group('movie-series', 'แอปดูหนัง/ซีรีส์', [child('wetv', 'WeTV')]),
-    ];
+    const roots = [group('movie-series', 'แอปดูหนัง/ซีรีส์', [child('wetv', 'WeTV')])];
     const result = splitAppGroups(roots);
     expect(result.groups).toHaveLength(1);
     expect(result.groups[0]?.id).toBe('movie-series');
@@ -538,9 +554,7 @@ describe('storefront main-category groups', () => {
     const roots = [
       group('movie-series', 'แอปดูหนัง/ซีรีส์', [child('wetv', 'WeTV')]),
       child('spotify', 'Spotify'),
-      group('music', 'แอปดนตรี', [
-        child('spotify-premium', 'Spotify Premium'),
-      ]),
+      group('music', 'แอปดนตรี', [child('spotify-premium', 'Spotify Premium')]),
     ];
     const result = splitAppGroups(roots);
     expect([...result.groups, ...result.looseApps].map((c) => c.id).sort()).toEqual([
@@ -565,10 +579,7 @@ describe('storefront main-category groups', () => {
 
   it('the homepage consumes the helper rather than re-flattening the tree', async () => {
     const { splitAppGroups } = await import('@/lib/appGroups');
-    const roots = [
-      group('g1', 'กลุ่ม 1', [child('c1', 'c1')]),
-      child('a1', 'a1'),
-    ];
+    const roots = [group('g1', 'กลุ่ม 1', [child('c1', 'c1')]), child('a1', 'a1')];
     const result = splitAppGroups(roots);
     expect(result.groups.map((c) => c.id)).toEqual(['g1']);
     expect(result.looseApps.map((c) => c.id)).toEqual(['a1']);
@@ -576,12 +587,19 @@ describe('storefront main-category groups', () => {
 
   it('still handles a root whose children field reads as undefined at runtime', async () => {
     const { splitAppGroups } = await import('@/lib/appGroups');
-    const brokenRoot: { id: string; name: string; type: 'category'; children?: readonly ReturnType<typeof child>[] } = {
+    const brokenRoot: {
+      id: string;
+      name: string;
+      type: 'category';
+      children?: readonly ReturnType<typeof child>[];
+    } = {
       id: 'orphan',
       name: 'เดียว',
       type: 'category',
     };
-    const result = splitAppGroups([brokenRoot as unknown as Parameters<typeof splitAppGroups>[0][number]]);
+    const result = splitAppGroups([
+      brokenRoot as unknown as Parameters<typeof splitAppGroups>[0][number],
+    ]);
     expect(result.groups).toHaveLength(0);
     expect(result.looseApps.map((c) => c.id)).toEqual(['orphan']);
   });

@@ -4,9 +4,10 @@
  * Checkout creates a `pending_payment` order before the customer commits to
  * a payment action, so abandoned checkouts leave real rows behind. Before
  * this endpoint nothing in the repository ever expired them (review
- * finding #2, 2026-10-05): `updateOrderStatus` permitted
+ * finding #2, 2026-10-05): `updateOrderStatus` (since deleted) permitted
  * `pending_payment → expired` but had no caller, and the inventory queue
- * documented in `src/lib/jobs/mockQueue.ts` had no registered handlers.
+ * in the since-deleted `src/lib/jobs/mockQueue.ts` had no registered
+ * handlers.
  *
  * Auth + shape mirror the sibling email-outbox drain route exactly: the
  * shared secret header must equal NK_CRON_SECRET, admin JWTs are accepted
@@ -19,16 +20,10 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 
+import { constantTimeEquals } from '@/lib/crypto';
 import { expireUnpaidOrders } from '@/lib/orderExpiry';
 
 export const dynamic = 'force-dynamic';
-
-function timingSafeEqualShim(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const secret = process.env['NK_CRON_SECRET'];
@@ -46,7 +41,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const bearerToken = bearer?.startsWith('Bearer ') ? bearer.slice(7) : '';
   const token = headerToken || bearerToken;
 
-  let authenticated = Boolean(token) && timingSafeEqualShim(token, secret);
+  let authenticated = Boolean(token) && constantTimeEquals(token, secret);
 
   if (!authenticated && bearerToken) {
     // Fall back to an admin JWT (panel-triggered sweep).

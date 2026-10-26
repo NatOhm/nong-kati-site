@@ -65,6 +65,7 @@
 | OG    | Weblink card + รายละเอียดตอนแชร์ — ข้อความการ์ด OG / `og:title` / `og:description` ใน `SiteSetting['ogShare']` (row เดิม/JSON พัง/field ว่าง = ใช้ชุดที่เคย hardcode, cap ตามลิมิต meta, ทุก consumer ต่อผ่าน lib ตัวเดียว) + `Product.shortDescription` ที่ admin แก้ได้ (create/update/list API ครบ, sanitize + cap 160) | `tests/og-share-settings.test.ts` | `npm test` (vitest) | Unit Tests |
 | ON    | Order-number allocation — numbering จากเลขสูงสุดของปีปัจจุบัน (ไม่ใช่ `COUNT(*)`) เพราะ row ถูกลบไป 1 อัน = count ตามจริงไม่ทัน → insert ซ้ำ → Postgres abort tx → เดิม retry ใน tx เดิมได้ 25P02 ทุกครั้ง = checkout 500 ทุกลูกค้า | `tests/order-numbering.test.ts` | `npm test` (vitest) | Unit Tests |
 | BK    | Bulk account-paste — counter นับเท่ากับที่ route แยกจริง (CRLF / NBSP blank-run / บล็อกในบัญชีเดียว) และ raw error code ห้ามหลุดถึงจอ (NO_VARIANTS → ข้อความไทย) | `tests/bulk-stock-records.test.ts` | `npm test` (vitest) | Unit Tests |
+| VR    | Variant reconcile by id ใน PUT admin/products — สินค้าที่มี gift codes บันทึกได้ไม่ชน FK (ไม่มี deleteMany), ตัวเลือกไม่ถูกสร้างซ้ำทุกครั้งที่เซฟ, StockMove นับตาม variant id + `/search?category=` ค้นทั้ง subtree และ chip นับเฉพาะสินค้า active | `tests/product-variant-reconcile.test.ts` | `npm test` (vitest) | Unit Tests |
 | E1    | Disabled-state affordance (WCAG 1.4.1)                | `e2e/disabled-state.spec.ts`       | `npm run test:e2e`   | (local/preview)        |
 | E2    | No hardcoded white in dark mode                       | `e2e/no-hardcoded-white.spec.ts`   | `npm run test:e2e`   | (local/preview)        |
 | E3    | Duplicate DOM ids (ทั้งไซต์ผ่าน sitemap)              | `e2e/duplicate-ids.spec.ts`        | `npm run test:e2e`   | (local/preview)        |
@@ -78,6 +79,11 @@
 | DM    | Dashboard money scope — panel "รายได้เดือนนี้" ต้องเป็นยอดเดือนนี้ไม่ใช่ all-time · PromptPay share หาจาก method name (ไม่ใช่ `[0]` ที่ DB คืน wallet ก่อน) · store ว่าง = 0% ไม่ใช่ NaN% | `tests/dashboard-month-scope.test.ts` | `npm test` (vitest) | Unit Tests |
 | OS    | Order-status labels — คำสถานะออเดอร์ภาษาไทยมีที่เดียว `src/lib/orderStatus.ts` ( reconciliation เคยพิมพ์ "ยืนยันการชำระ/รอส่งมอบมือ" ขณะที่หน้าอื่นพิมพ์ "ชำระแล้ว/รอส่งโค้ด" ) · หน้า management ห้ามประกาศ label ไทยของ status ที่รู้จักเอง (allowlist เฉพาะแผนกที่เป็นคนละ domain: audit actions / gift-code / PDPA / top-ups) · ทุกหน้า badge ต้อง import lib ตัวเดียวกัน | `tests/order-status-labels.test.ts` | `npm test` (vitest) | Unit Tests |
 | CP    | Catalog purge (สินค้า/หมวด hard delete) — guard สองตัวกันของมีค่า: in-flight order (`pending_payment`/`paid`/`fulfilling`) ต้องบล็อก ไม่งั้นดึง variant ออกจากใต้ออเดอร์ที่กำลังส่ง + reserved/delivered code ที่ไม่มี `orderId` อ้างอิงต้องบล็อก · เมื่อผ่าน guard ต้องลบ catalog ทั้งก้อน โดย **DETACH ประวัติแทนการลบ** (migration `20261025150000_nullable_catalog_variant_links` ทำให้ `OrderItem.variantId`/`GiftCode.variantId` nullable): order items + delivered codes โดน set variantId=null ไม่ใช่ลบ — เทสต์จับ regression ที่ playtest 25 ต.ค. เจอว่าโค้ดเดิมลบ order line ทิ้งจนออเดอร์ว่าง (หน้าคำสั่งซื้อโชว์ 0 รายการ) · unsold codes/upload batches ลบก่อน `product.delete` ไม่ชน FK · **Order แม่ไม่ถูกลบ** — ประวัติออเดอร์/ยอดขายรอดเพราะ snapshot อยู่ที่ OrderItem + dashboard group by `productNameTh` · audit row (`catalog.product_purge`) เดินใน tx เดียวกัน | `tests/catalog-purge.test.ts` | `npm test` (vitest) | Unit Tests |
+| OV    | Order velocity caps (audit #1, 26 ต.ค.) — `POST /api/v1/orders` บังคับ `_order_velocity_email` 20/24h + `_order_velocity_ip` 30/24h ที่เคยมีในตาราง rule แต่ไม่มีใครเรียก (checkout ไม่มีเพดานต่อวัน มีแค่ burst 10/min) · email บีบ lowercase กัน case-variant bypass · empty email ไม่เข้า bucket ร่วม · **SECURITY 26 ต.ค.: email bucket นับเฉพาะ order ที่สร้างสำเร็จ** (pre-check แบบ read-only ไม่ increment) — ถ้านับ attempts คนร้ายล็อกอีเมลเหยื่อ 24 ชม. ด้วย POST เสีย ๆ 21 ครั้งโดยไม่ต้องสร้างออเดอร์เลย · IP bucket ยังนับทุก attempt (key = ตัวเอง ไม่มีคนที่สามให้ poison) | `tests/order-velocity.test.ts` | `npm test` (vitest) | Unit Tests |
+| SR    | Slip evidence retention (audit #3, 26 ต.ค.) — `internal/settings/slip-retention` ลบเฉพาะ `slip:*` ที่ `updatedAt` เกิน 30 วัน (รูป base64 หลาย MB โตไม่รู้จบใน `SiteSetting` + เลขบัญชีธนาคารใน scope PDPA) · auth fail-closed: ไม่ตั้ง `NK_CRON_SECRET` = 503, token ผิด = 401 · เรียกผ่าน GitHub cron วันละครั้ง | `tests/slip-retention.test.ts` | `npm test` (vitest) | Unit Tests |
+| CT    | Constant-time compare ตัวเดียว (audit #5, 26 ต.ค.) — `constantTimeEquals` แทน shim 4 จุด (orders/expire, promotions/expire, email-outbox/drain, jwt signature) · length mismatch = false ก่อน, UTF-8 semantics ตรง `===` ทั้ง ASCII/ไทย | `tests/constant-time-equals.test.ts` | `npm test` (vitest) | Unit Tests |
+| SB    | server.js Infisical boot decisions (audit #7, 26 ต.ค.) — wired/skip เมื่อไม่มี credential, base URL ตัด trailing slash + default `prod`, panel override ชนะเสมอ (`=== undefined` ไม่ใช่ falsy — ค่า `""` นับว่าตั้งแล้ว), row ไม่มี `secretKey` ถูกข้ามไม่ใช่ crash · แยกเป็น `server-bootstrap.js` ให้ test ได้โดยไม่แตะ network/exit | `tests/server-bootstrap.test.ts` | `npm test` (vitest) | Unit Tests |
+| HC    | Housekeeping cron wiring (audit #2, 26 ต.ค.) — `prod-health-monitor.yml` ต้องมีทั้ง cron ทุก 10 นาที (expire ×2 + drain) และ cron รายวัน `17 3 * * *` (slip retention) · ครบทั้ง 4 endpoint พร้อม header `x-cron-token` · retention ต้องอยู่ ใน branch ของ `github.event.schedule` (ไม่งั้นสแกน settings table ทุก 10 นาที) · ไม่ตั้ง `NK_CRON_SECRET` = ต้อง `exit 1` + `::error` ดัง ๆ (บั๊กต้นเรื่องคือปิดเงียบ) | `tests/housekeeping-cron.test.ts` | `npm test` (vitest) | Unit Tests |
 
 **วิธีรัน:**
 
@@ -526,7 +532,7 @@ ffmpeg -hide_banner -loglevel error -y -ss 5.0 -i admin-walkthrough-th.mp4 -fram
 
 ## กวาดออเดอร์ที่ยังไม่จ่าย (5 ต.ค. 2569) — `tests/order-expiry-sweep.test.ts`
 
-รีวิวหน้าร้านข้อ 2: checkout สร้างออเดอร์ `pending_payment` **จริง** ตั้งแต่กด "Continue" ก่อนลูกค้าจะยืนยันการจ่ายเงิน (`src/app/checkout/page.tsx` `handleContactSubmit` → `createOrder`) แต่ **ไม่มีโค้ดสักบรรทัดใน repo ที่หมดอายุมันได้** — `updateOrderStatus` อนุญาต `pending_payment → expired` แต่ไม่มีผู้เรียกเลย และคิว inventory ที่ `mockQueue.ts` เขียนไว้ว่า *"Reservation sweep (5min), expiry sweep (15min)"* มี `registerJobHandler` ที่ **ไม่เคยถูกเรียกที่ไหนเลย**
+รีวิวหน้าร้านข้อ 2: checkout สร้างออเดอร์ `pending_payment` **จริง** ตั้งแต่กด "Continue" ก่อนลูกค้าจะยืนยันการจ่ายเงิน (`src/app/checkout/page.tsx` `handleContactSubmit` → `createOrder`) แต่ **ไม่มีโค้ดสักบรรทัดใน repo ที่หมดอายุมันได้** — `updateOrderStatus` (ปัจจุบันถูกลบแล้ว) เคยอนุญาต `pending_payment → expired` แต่ไม่มีผู้เรียกเลย และคิว inventory ที่ `mockQueue.ts` (ลบไปแล้ว) เคยเขียนไว้ว่า *"Reservation sweep (5min), expiry sweep (15min)"* มี `registerJobHandler` ที่ **ไม่เคยถูกเรียกที่ไหนเลย**
 
 หมายเหตุสำคัญที่ตรวจเจอระหว่างลงมือ: รีวิวเดิมเสนอให้ "คืน stock reservation" ด้วย — **ทำไม่ได้และไม่จำเป็น**: `createOrder` แค่ *ตรวจ* สต๊อก (โยน `OUT_OF_STOCK`) ส่วนการหักสต๊อกจริงเกิดใน transaction ตอนยืนยันการจ่ายเงิน (`src/lib/fulfilment.ts`) ออเดอร์ที่หมดอายุจึง**ไม่ถือของไว้** ส่วน `releaseExpiredReservations` เดินบน `mockCodeStore` ในหน่วยความจำซึ่งว่างเปล่าตอน cold start บน serverless — เอามาเรียกจาก cron คือทำลายเพื่อไม่ได้อะไร เกตนี้จึงยืนยันว่า**ไม่** import มัน
 
@@ -538,7 +544,6 @@ ffmpeg -hide_banner -loglevel error -y -ss 5.0 -i admin-walkthrough-th.mp4 -fram
 | EX4 | ทำงานเป็น batch ไม่ใช่ประโยคเดียวจบ (หนี้สต๊อกค้างครั้งแรกต้องไม่ล้ม) · รันซ้ำแล้วเป็น no-op |
 | EX5 | **ไม่แตะสต๊อกและไม่แตะ gift code เลย** — ยืนยันด้วยการเรียกจริง ไม่ใช่อ่านซอร์สอย่างเดียว พร้อมดริฟต์การ์์ว่า `reservation.ts` ยังเป็น mock อยู่จริง |
 | EX6 | route `/api/v1/internal/orders/expire` เหมือน drain ของอีเมลทุกประการ: 503 เมื่อไม่ตั้ง `NK_CRON_SECRET` (fail-closed) · 401 เมื่อ token ผิด · รับ admin JWT เพื่อกดจากแผง · clamp `?batch` |
-| EX7 | drift guard — `expired` ยังเป็น transition ที่ถูกต้องใน `VALID_TRANSITIONS` ของ `src/api/orders.ts` |
 
 **พังได้จริง — ทดสอบด้วยการใส่มั๊กกลับ**
 
@@ -818,3 +823,25 @@ Phase 2 ของแผงจัดการบัญชี: ยกเลิก�
 - เพิ่ม `pending_payment: { label: 'รอจ่ายเงิน' }` ในหน้า management ใดก็ได้ → OS1 แดง
 - เปลี่ยน lib ให้ `payment_confirmed: 'ยืนยันการชำระ'` → OS2 แดง
 - ลบ import `@/lib/orderStatus` จากหน้า customers แล้วประกาศ label เอง → OS1 + OS3 แดง
+
+---
+
+## Variant reconcile by id + category search subtree (2026-10-26) — `tests/product-variant-reconcile.test.ts`
+
+feedback 19 ต.ค.: (1) สินค้าที่มีรหัสเติมไว้แก้ไข/ย้ายหมวดไม่ได้เลย (บันทึกแล้ว HTTP 500), (2) "อยู่ ๆ ตัวเลือกก็เพิ่มขึ้น" — PUT แบบ replace-all สำหรับสินค้าที่มีประวัติออเดอร์จะ deactivate ทุก row แล้ว createMany ใหม่ทุกครั้งที่เซฟ (ของจริง: HBO Max มี 6 variants, 5 ชื่อ "default"), (3) `/search?category=workspace` ว่างทั้งที่ chip บอก (2) เพราะ listing ค้นเฉพาะ categoryId ตรง ๆ แต่ chip นับทั้ง subtree, (4) chip ยังนับสินค้าที่ซ่อนอยู่ด้วย
+
+| ตัว | บังคับว่า |
+|---|---|
+| VR1 | PUT variants ต้อง reconcile ตาม id — row ที่มากับ id อัปเดตที่เดิม, row ใหม่ไม่มี id ค่อย create, row ที่หายจาก payload ลบเฉพาะเมื่อไม่มีอะไรอ้าง (orderItem/giftCode/codeUploadBatch/inventorySnapshot) ไม่งั้น deactivate — ห้าม `deleteMany({ productId })` และห้าม deactivate-all+createMany |
+| VR2 | id ที่ไม่ได้เป็นของสินค้านั้น → 409 `VARIANT_NOT_FOUND` โดยไม่แตะ tx; ภายใน tx พัง → 500 `VARIANT_UPDATE_FAILED` (ไม่ใช่ raw error) |
+| VR3 | StockMove นับ delta ตาม variant id (row ที่ stock ไม่เปลี่ยนไม่สร้าง move, row ใหม่นับ restock จาก 0) |
+| VR4 | `getCatalogProducts` กับ categorySlug ต้อง filter `categoryId in [cat, ...descendants]` — ตรงกับที่ chip นับ และ chip counts ต้อง `products where isActive: true` |
+
+ขอบเขตที่**ตั้งใจไม่แตะ**: การ merge stock/รหัสของ duplicate ที่มีอยู่ใน production แล้ว — ใช้ `scripts/dedupe-variants.mjs` (dry-run ก่อน) แยกต่างหาก
+
+**พังได้จริง — ทดสอบด้วยการใส่มั๊กกลับ**
+
+- ให้ `productVariant.deleteMany` ถูกเรียกตอน PUT → VR1 แดง
+- คืน id ปลอมใน payload → VR2 แดง (ต้องได้ 409 ไม่ใช่ 200)
+- คืน category filter เป็น `cat.id` ตรง ๆ (ไม่เอา descendants) → VR4 แดง
+- เอา `where: { isActive: true }` ออกจาก `_count` ของ chip → VR4 แดง

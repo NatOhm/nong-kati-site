@@ -4,12 +4,12 @@
  * Checkout creates a real `pending_payment` order before the customer
  * commits to any payment action (`src/app/checkout/page.tsx`
  * handleContactSubmit → `createOrder`, `src/api/orders.ts`), so every
- * abandoned checkout leaves a row behind. The state machine has always
- * permitted `pending_payment → expired` (`VALID_TRANSITIONS` in
- * `src/api/orders.ts`) but nothing ever performed the transition:
- * `updateOrderStatus` had no caller anywhere in `src/`, and the inventory
- * queue documented in `src/lib/jobs/mockQueue.ts` ("Reservation sweep
- * (5min), expiry sweep (15min)") had zero registered handlers. Unpaid
+ * abandoned checkout leaves a row behind, and nothing ever performed the
+ * `pending_payment → expired` move: `updateOrderStatus` (since deleted) had
+ * no caller anywhere in `src/`,
+ * and the inventory queue in the since-deleted `src/lib/jobs/mockQueue.ts`
+ * ("Reservation sweep (5min), expiry sweep (15min)") had zero registered
+ * handlers. Unpaid
  * orders therefore accumulated indefinitely and the admin order list grew
  * a permanent tail of rows that will never be paid.
  *
@@ -24,12 +24,13 @@
  * deliberately NOT wired in here. Its real replacement is the GiftCode
  * guard inside the fulfilment transaction.
  *
- * WHY `updateMany` AND NOT `updateOrderStatus`: the transition guard in
- * `updateOrderStatus` is a findUnique-then-update pair, so two concurrent
- * callers can both pass the guard. A single `updateMany` whose `where`
- * re-asserts `status: 'pending_payment'` is one atomic CAS — that is what
- * makes it safe to run on a cron tick racing a payment webhook. A webhook
- * that confirms first flips the row and the sweep then matches nothing.
+ * WHY `updateMany` AND NOT a find-then-update guard: the old
+ * `updateOrderStatus` helper (since deleted) was a findUnique-then-update
+ * pair, so two concurrent callers can both pass the guard. A single
+ * `updateMany` whose `where` re-asserts `status: 'pending_payment'` is one
+ * atomic CAS — that is what makes it safe to run on a cron tick racing a
+ * payment webhook. A webhook that confirms first flips the row and the
+ * sweep then matches nothing.
  */
 
 import { prisma } from '@/lib/db';

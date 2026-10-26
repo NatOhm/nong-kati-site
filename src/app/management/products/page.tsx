@@ -75,6 +75,9 @@ interface TagOption {
 
 interface DraftVariant {
   key: number;
+  /** Row id for variants that already exist — PUT reconciles by id, so
+   *  saving never re-creates (and multiplies) existing options. */
+  id?: string;
   label: string;
   price: string;
   memberPrice: string;
@@ -82,6 +85,22 @@ interface DraftVariant {
   stock: string;
   isActive: boolean;
 }
+
+/** Server save-error codes → Thai (client feedback 19 Oct: raw "HTTP 500"). */
+const SAVE_ERR_TH: Record<string, string> = {
+  UNAUTHENTICATED: 'เซสชันหมดอายุ — กรุณาล็อกอินใหม่อีกครั้ง',
+  FORBIDDEN: 'บัญชีนี้ไม่มีสิทธิ์แก้ไขสินค้า',
+  NAME_REQUIRED: 'กรุณากรอกชื่อสินค้า',
+  CATEGORY_REQUIRED: 'กรุณาเลือกหมวดหมู่',
+  CATEGORY_NOT_FOUND: 'หมวดหมู่ที่เลือกไม่มีอยู่แล้ว — รีเฟรชหน้าแล้วลองใหม่',
+  VARIANTS_REQUIRED: 'ต้องมีตัวเลือกอย่างน้อย 1 รายการ',
+  INVALID_VARIANT: 'ข้อมูลตัวเลือกไม่ถูกต้อง — ตรวจชื่อ ราคา และสต๊อก',
+  VARIANT_NOT_FOUND:
+    'ตัวเลือกบางรายการถูกเปลี่ยนไปแล้ว — ปิดหน้านี้แล้วเปิดใหม่เพื่อดึงข้อมูลล่าสุด',
+  VARIANT_UPDATE_FAILED: 'บันทึกตัวเลือกไม่สำเร็จ — ลองอีกครั้ง หรือติดต่อฝ่ายสนับสนุน',
+  TAG_NOT_FOUND: 'แท็กที่เลือกถูกลบไปแล้ว — ลองใหม่อีกครั้ง',
+  SKU_TAKEN: 'รหัส SKU นี้ถูกใช้ไปแล้ว',
+};
 
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
@@ -176,7 +195,7 @@ export default function AdminProductsPage(): React.JSX.Element {
     const last = shown[shown.length - 1];
     const remaining = v.length - shown.length;
     return (
-      <div className="mt-1 flex flex-wrap gap-1 items-baseline">
+      <div className="mt-1 flex flex-wrap items-baseline gap-1">
         {shown.map((x, i) => (
           <button
             key={x.id}
@@ -207,8 +226,7 @@ export default function AdminProductsPage(): React.JSX.Element {
           title={`ดูบัญชีที่เก็บไว้ทั้งหมด — เหลือ ${remaining} ตัวเลือก`}
           className="inline-flex items-center gap-1 rounded-md border border-line bg-surface px-1.5 py-0.5 text-[11px] text-fg-brand transition-colors hover:bg-surface-elevated"
         >
-          <Eye size={12} />
-          +{remaining}
+          <Eye size={12} />+{remaining}
         </button>
       </div>
     );
@@ -715,9 +733,7 @@ export default function AdminProductsPage(): React.JSX.Element {
                     className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-fg hover:bg-surface-sunken"
                   >
                     <Eye size={14} />
-                    <span className="min-w-0 flex-1 truncate">
-                      {v.label || 'ตัวเลือกหลัก'}
-                    </span>
+                    <span className="min-w-0 flex-1 truncate">{v.label || 'ตัวเลือกหลัก'}</span>
                     <span className="font-mono text-xs text-fg-muted">เหลือ {v.stock}</span>
                   </button>
                 </li>
@@ -797,6 +813,7 @@ function ProductEditor({
     product && product.variants.length > 0
       ? product.variants.map((v) => ({
           key: draftKey++,
+          id: v.id,
           label: v.label,
           price: String(v.price),
           memberPrice: v.memberPrice === null ? '' : String(v.memberPrice),
@@ -888,6 +905,9 @@ function ProductEditor({
         isFeatured,
         tagIds: selectedTagIds,
         variants: variants.map((v) => ({
+          // Existing rows carry their id so the server updates in place
+          // instead of delete-and-recreate (variant-multiplication bug).
+          ...(v.id ? { id: v.id } : {}),
           label: v.label.trim(),
           price: Number(v.price),
           memberPrice: v.memberPrice === '' ? null : Number(v.memberPrice),
@@ -906,7 +926,7 @@ function ProductEditor({
       );
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(data.error ?? `HTTP ${res.status}`);
+        throw new Error(SAVE_ERR_TH[data.error ?? ''] ?? data.error ?? `HTTP ${res.status}`);
       }
       onSaved();
     } catch (e) {
@@ -1016,8 +1036,9 @@ function ProductEditor({
               className="w-full resize-none rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-fg-placeholder focus:ring-2 focus:ring-peach-500"
             />
             <p className="mt-1 text-xs text-fg-placeholder">
-              ใช้เป็นคำอธิบายตอนแปะลิงก์ (og:description) · เว้นว่าง = ขึ้น &quot;ซื้อ {'{ชื่อสินค้า}'} ออนไลน์&quot;
-              · {shortDescription.length}/{PRODUCT_SHORT_DESCRIPTION_MAX}
+              ใช้เป็นคำอธิบายตอนแปะลิงก์ (og:description) · เว้นว่าง = ขึ้น &quot;ซื้อ{' '}
+              {'{ชื่อสินค้า}'} ออนไลน์&quot; · {shortDescription.length}/
+              {PRODUCT_SHORT_DESCRIPTION_MAX}
             </p>
           </div>
 
@@ -1125,6 +1146,14 @@ function ProductEditor({
                     placeholder="ชื่อ เช่น 7 วัน 4K"
                     className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-placeholder focus:ring-2 focus:ring-peach-500"
                   />
+                  {!v.isActive && (
+                    <span
+                      className="shrink-0 rounded-full bg-surface-sunken px-2 py-1 text-[10px] font-semibold text-fg-muted"
+                      title="ตัวเลือกนี้ปิดจำหน่ายแล้ว — ไม่แสดงบนหน้าเว็บ"
+                    >
+                      ปิด
+                    </span>
+                  )}
                   <input
                     value={v.price}
                     onChange={(e) =>

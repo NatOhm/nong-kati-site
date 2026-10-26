@@ -25,11 +25,12 @@ import { describe, expect, it } from 'vitest';
 
 import { getClientIp, RATE_LIMIT_RULES, type RateLimitRule } from '@/lib/rateLimit';
 
-/** Same lookup middleware/lib use: exact route, then first prefix hit. */
+/** Same lookup middleware/lib use: exact route, then first prefix hit
+ * (underscore-prefixed rows are named buckets — exact only, never prefix). */
 function matchingRule(route: string): RateLimitRule | undefined {
   return (
     RATE_LIMIT_RULES.find((r) => r.route === route) ??
-    RATE_LIMIT_RULES.find((r) => r.route !== '_' && route.startsWith(r.route))
+    RATE_LIMIT_RULES.find((r) => !r.route.startsWith('_') && route.startsWith(r.route))
   );
 }
 

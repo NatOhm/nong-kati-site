@@ -32,7 +32,12 @@ type ProviderResult =
   | Awaited<ReturnType<typeof verifySlip2Go>>;
 
 /** Transient/config failures worth retrying on the other provider. */
-const RETRYABLE_ON_FALLBACK = new Set(['UPSTREAM_ERROR', 'QUOTA_EXCEEDED', 'NOT_CONFIGURED']);
+const RETRYABLE_ON_FALLBACK = new Set([
+  'UPSTREAM_ERROR',
+  'QUOTA_EXCEEDED',
+  'RATE_LIMITED',
+  'NOT_CONFIGURED',
+]);
 
 /** Best-effort MIME from the image bytes — used only for the stored data URL. */
 function sniffImageMime(imageBase64: string): string {
@@ -155,6 +160,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   // ── Ask the configured providers (Slip2Go preferred, SlipOK fallback) ──
+  let usedProvider = isSlip2GoEnabled() ? 'slip2go' : 'slipok';
   let result: ProviderResult = isSlip2GoEnabled()
     ? await verifySlip2Go({ imageBase64, expectedAmountThb: expected })
     : await verifySlip({ imageBase64, expectedAmountThb: expected });
@@ -167,16 +173,27 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       result = isSlip2GoEnabled()
         ? await verifySlip({ imageBase64, expectedAmountThb: expected })
         : await verifySlip2Go({ imageBase64, expectedAmountThb: expected });
+      usedProvider = isSlip2GoEnabled() ? 'slipok' : 'slip2go';
     }
   }
 
   if (!result.ok) {
+    // Provider diagnostics (client feedback 19 Oct: auto-verify failures
+    // were undiagnosable). Ids and codes only — never the slip bytes.
+    console.warn('[slip-verify] auto-verify failed', {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      provider: usedProvider,
+      error: result.code,
+      detail: result.detail ?? null,
+    });
     // Mapped, honest errors — the customer can fix and retry. Every branch
     // leaves the order untouched (still payable, admin fallback intact).
     const statusByCode: Record<string, number> = {
       NOT_CONFIGURED: 503,
       UPSTREAM_ERROR: 502,
       QUOTA_EXCEEDED: 502,
+      RATE_LIMITED: 502,
       SLIP_DELAYED: 502,
       INVALID_SLIP: 422,
       AMOUNT_MISMATCH: 422,
@@ -186,6 +203,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       NOT_CONFIGURED: 'ระบบตรวจสลิปยังไม่พร้อมใช้งาน — ส่งสลิปให้แอดมินยืนยันได้ปกติ',
       UPSTREAM_ERROR: 'ระบบตรวจสลิปขัดข้องชั่วคราว — ลองอีกครั้ง หรือรอแอดมินยืนยัน',
       QUOTA_EXCEEDED: 'ระบบตรวจสลิปเกินโควตาวันนี้ — แอดมินจะยืนยันให้เอง',
+      RATE_LIMITED: 'ระบบตรวจสลิปยุ่งชั่วคราว — รอสักครู่แล้วลองใหม่ หรือรอแอดมินยืนยันให้เอง',
       INVALID_SLIP: 'ตรวจสลิปไม่ผ่าน — สลิปไม่ถูกต้อง/อ่านไม่ได้/ถูกใช้ไปแล้ว',
       AMOUNT_MISMATCH: 'ยอดโอนในสลิปไม่ตรงกับยอดสั่งซื้อ',
       RECEIVER_MISMATCH: 'บัญชีผู้รับในสลิปไม่ตรงกับร้าน',
