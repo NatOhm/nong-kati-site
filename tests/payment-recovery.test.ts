@@ -63,10 +63,9 @@ vi.mock('@/api/orders', () => ordersMock);
 vi.mock('@/lib/fulfilment', () => fulfilmentMock);
 vi.doMock('@/lib/rbac', () => rbacMock);
 vi.mock('@/lib/notify', () => ({
-  getNotificationSettings: vi.fn(async () => ({})),
   notifyPaymentConfirmed: vi.fn(async () => undefined),
-  notifyStockLow: vi.fn(async () => undefined),
-  notifyStockOutOf: vi.fn(async () => undefined),
+  notifyPaymentPending: vi.fn(async () => undefined),
+  notifyStockAlertsForVariants: vi.fn(async () => undefined),
 }));
 
 // SlipOK + upload-token mocks for the slip-verify route (top level —
@@ -90,6 +89,7 @@ beforeEach(() => {
 
 import { recordPaymentReconciliation } from '@/lib/paymentReconciliation';
 import { writeAuditLog } from '@/lib/auditLog';
+import { notifyStockAlertsForVariants } from '@/lib/notify';
 
 const auditSpy = writeAuditLog as unknown as ReturnType<typeof vi.fn>;
 const auditArgs = (): Record<string, unknown>[] =>
@@ -433,5 +433,87 @@ describe('POST /api/v1/admin/orders/[id]/verify-payment — audit evidence', () 
       const dumped = JSON.stringify(row);
       expect(dumped).not.toContain('PLAINTEXT-CODE');
     }
+  });
+});
+
+/**
+ * Post-commit stock policy delegation (approved plan). The three confirmation
+ * routes must hand their variant ids to notifyStockAlertsForVariants and must
+ * NOT run their own threshold → productVariant.findMany → out/low block: that
+ * inline block sat after the transaction with nothing guarding it, so one
+ * transient read answered 5xx for an already-committed payment (and, for the
+ * omise webhook, broke LD-10's always-200).
+ */
+describe('post-commit stock policy delegation', () => {
+  it('slip-verify success → helper once with the order\u2019s variant ids (nulls filtered)', async () => {
+    const routePath = '../src/app/api/v1/payments/slip-verify/route.ts';
+    const route = (await import(routePath)) as Record<string, unknown>;
+    const req = new NextRequest('http://localhost/api/v1/payments/slip-verify', {
+      method: 'POST',
+      body: JSON.stringify({ orderId: 'ord-sv', token: 'tok', imageBase64: 'aGk=' }),
+      headers: { 'content-type': 'application/json' },
+    });
+
+    ordersMock.getOrderById.mockResolvedValue({
+      id: 'ord-sv',
+      orderNumber: 'NK-3001',
+      customerEmail: 'c@test.local',
+      status: 'pending_payment',
+      totalAmountThb: 107,
+      confirmationUuid: 'cu-1',
+      items: [{ variantId: 'v1' }, { variantId: 'v1' }, { variantId: null }],
+    });
+    prismaMock.paymentAttempt.findFirst.mockResolvedValue({ id: 'att-sv' });
+    verifySlipMock.verifySlip.mockResolvedValue({
+      ok: true,
+      ref: 'ref-ok',
+      amountThb: 107,
+      receiverAccount: 'x',
+      raw: {},
+    });
+    ordersMock.claimOrderForConfirmation.mockResolvedValue({ id: 'ord-sv' });
+    fulfilmentMock.fulfilOrder.mockResolvedValue({ success: true, codes: ['c1'] });
+
+    const res = await (route['POST'] as (r: NextRequest) => Promise<Response>)(req);
+
+    expect(res.status).toBe(200);
+    expect(vi.mocked(notifyStockAlertsForVariants)).toHaveBeenCalledTimes(1);
+    // Deduped and null-filtered — one detached line must not abort the batch.
+    expect(vi.mocked(notifyStockAlertsForVariants)).toHaveBeenCalledWith(['v1']);
+    // The inline policy is gone: the route no longer queries variants itself.
+    expect(prismaMock.productVariant.findMany).not.toHaveBeenCalled();
+  });
+
+  it('verify-payment success → helper once with deduped variant ids, inline query gone', async () => {
+    const routePath = '../src/app/api/v1/admin/orders/[id]/verify-payment/route.ts';
+    const route = (await import(routePath)) as Record<string, unknown>;
+    const req = new NextRequest('http://localhost/api/v1/admin/orders/ord-adm/verify-payment', {
+      method: 'POST',
+      headers: { authorization: 'Bearer admin-token' },
+    });
+
+    ordersMock.getOrderById.mockResolvedValue({
+      id: 'ord-adm',
+      orderNumber: 'NK-4001',
+      status: 'pending_payment',
+      totalAmountThb: 107,
+      items: [],
+    });
+    ordersMock.claimOrderForConfirmation.mockResolvedValue({
+      id: 'ord-adm',
+      orderNumber: 'NK-4001',
+      totalAmountThb: 107,
+      items: [{ variantId: 'vA' }, { variantId: 'vA' }, { variantId: 'vB' }, { variantId: null }],
+    });
+    fulfilmentMock.fulfilOrder.mockResolvedValue({ success: true, codes: ['c1'] });
+
+    const res = await (route['POST'] as (r: NextRequest, c: unknown) => Promise<Response>)(req, {
+      params: Promise.resolve({ id: 'ord-adm' }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(vi.mocked(notifyStockAlertsForVariants)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(notifyStockAlertsForVariants)).toHaveBeenCalledWith(['vA', 'vB']);
+    expect(prismaMock.productVariant.findMany).not.toHaveBeenCalled();
   });
 });

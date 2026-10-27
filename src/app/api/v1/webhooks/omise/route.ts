@@ -19,12 +19,7 @@ import { prisma } from '@/lib/db';
 import { getOrderById, claimOrderForConfirmation } from '@/api/orders';
 import { fulfilOrder, scheduleOutboxDrain } from '@/lib/fulfilment';
 import { recordPaymentReconciliation } from '@/lib/paymentReconciliation';
-import {
-  getNotificationSettings,
-  notifyPaymentConfirmed,
-  notifyStockLow,
-  notifyStockOutOf,
-} from '@/lib/notify';
+import { notifyPaymentConfirmed, notifyStockAlertsForVariants } from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
 
@@ -193,30 +188,22 @@ async function handleChargeSucceeded(chargeId: string, gatewayAmount: number): P
     await scheduleOutboxDrain();
 
     // Notifications (fire-and-forget), only after a real commit.
-    const cfg = await getNotificationSettings();
     void notifyPaymentConfirmed({
       orderNumber: claimed.orderNumber,
       totalThb: Number(claimed.totalAmountThb),
     });
-    const threshold = cfg.lowStockThreshold ?? 5;
     const variantIds = [...new Set(claimed.items.map((i: { variantId: string }) => i.variantId))];
-    const low = await prisma.productVariant.findMany({
-      where: { id: { in: variantIds }, stock: { lte: threshold } },
-      include: { product: { select: { name: true } } },
+    // Post-fulfilment stock policy lives in notifyStockAlertsForVariants
+    // (threshold → query → out/low; its internals swallow the stock query).
+    // LD-10: the gateway ALWAYS gets 200, and that answer must not depend on
+    // the helper's no-throw contract holding forever — so this one await
+    // carries its own guard. The catch below must only ever see the
+    // control-flow markers thrown by the transaction above.
+    await notifyStockAlertsForVariants(
+      variantIds.filter((v): v is string => v !== null),
+    ).catch(() => {
+      // Alert lost at worst — never a gateway-facing failure.
     });
-    for (const v of low) {
-      // stock <= threshold includes 0 — a sold-out variant deserves the
-      // urgent card, not the routine low-stock one.
-      if (v.stock <= 0) {
-        void notifyStockOutOf({ productName: v.product.name, variantLabel: v.label });
-      } else {
-        void notifyStockLow({
-          productName: v.product.name,
-          variantLabel: v.label,
-          stock: v.stock,
-        });
-      }
-    }
   } catch (e) {
     if (e instanceof WebhookAlreadyConfirmedError) {
       console.info('[Webhook] Order already confirmed:', e.message);

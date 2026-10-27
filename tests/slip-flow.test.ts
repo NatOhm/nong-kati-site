@@ -51,6 +51,7 @@ const h = vi.hoisted(() => {
     getNotificationSettings: vi.fn(async () => ({})),
     notifyPaymentConfirmed: vi.fn(async () => undefined),
     notifyPaymentPending: vi.fn(async () => undefined),
+    notifyStockAlertsForVariants: vi.fn(async () => undefined),
     notifyStockLow: vi.fn(async () => undefined),
     notifyStockOutOf: vi.fn(async () => undefined),
   };

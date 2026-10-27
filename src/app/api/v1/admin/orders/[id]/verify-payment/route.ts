@@ -7,12 +7,7 @@ import { writeAuditLog } from '@/lib/auditLog';
 import { claimOrderForConfirmation, getOrderById } from '@/api/orders';
 import { fulfilOrder, scheduleOutboxDrain } from '@/lib/fulfilment';
 import { recordPaymentReconciliation } from '@/lib/paymentReconciliation';
-import {
-  getNotificationSettings,
-  notifyPaymentConfirmed,
-  notifyStockLow,
-  notifyStockOutOf,
-} from '@/lib/notify';
+import { notifyPaymentConfirmed, notifyStockAlertsForVariants } from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
 
@@ -365,28 +360,19 @@ export async function POST(
   await scheduleOutboxDrain();
 
   // Notifications (fire-and-forget).
-  const cfg = await getNotificationSettings();
   void notifyPaymentConfirmed({
     orderNumber: claimed.orderNumber,
     totalThb: Number(claimed.totalAmountThb),
   });
 
-  // Low-stock check on affected variants.
-  const threshold = cfg.lowStockThreshold ?? 5;
   const variantIds = [...new Set(claimed.items.map((i: { variantId: string }) => i.variantId))];
-  const lowVariants = await prisma.productVariant.findMany({
-    where: { id: { in: variantIds }, stock: { lte: threshold } },
-    include: { product: { select: { name: true } } },
-  });
-  for (const v of lowVariants) {
-    // stock <= threshold includes 0 — a sold-out variant deserves the urgent
-    // card, not the routine low-stock one.
-    if (v.stock <= 0) {
-      void notifyStockOutOf({ productName: v.product.name, variantLabel: v.label });
-    } else {
-      void notifyStockLow({ productName: v.product.name, variantLabel: v.label, stock: v.stock });
-    }
-  }
+  // Post-fulfilment stock policy lives in notifyStockAlertsForVariants
+  // (threshold → query → out/low, never throws) — one owner, and a Discord
+  // concern can never turn a committed payment into a 5xx: after commit the
+  // only awaits left are scheduleOutboxDrain (never throws) and this helper.
+  await notifyStockAlertsForVariants(
+    variantIds.filter((v): v is string => v !== null),
+  );
 
   return NextResponse.json({
     status: 'completed',
