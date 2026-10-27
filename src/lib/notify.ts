@@ -157,6 +157,39 @@ export async function notifyNewOrder(params: {
   ]);
 }
 
+/**
+ * A deposit into a customer's wallet (admin top-up). Money arriving is the
+ * one balance change an operator should not have to discover by opening the
+ * customers list — same reasoning as notifyRefundIssued, opposite direction.
+ * Fire-and-forget: a Discord outage must never fail the credit transaction.
+ */
+export async function notifyTopUp(params: {
+  customerEmail: string;
+  amountThb: number;
+  balanceAfterThb: number;
+}): Promise<void> {
+  await sendDiscordEmbed([
+    {
+      title: `💰 พบการเติมเงินเข้าระบบ`,
+      description: `ลูกค้า **${params.customerEmail}** เติมเงินเข้าระบบ`,
+      color: COLORS.SUCCESS,
+      fields: [
+        {
+          name: 'ยอดเติม',
+          value: `฿${params.amountThb.toLocaleString('th-TH')}`,
+          inline: true,
+        },
+        {
+          name: 'ยอดคงเหลือ',
+          value: `฿${params.balanceAfterThb.toLocaleString('th-TH')}`,
+          inline: true,
+        },
+      ],
+      footer: { text: 'Nong-Kati — ระบบอัตโนมัติ' },
+    },
+  ]);
+}
+
 export async function notifyStockLow(params: {
   productName: string;
   variantLabel: string;

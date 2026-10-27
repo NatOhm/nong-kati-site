@@ -240,7 +240,8 @@ export async function adminAdjustCustomerCredit(
   adminId: string,
   adminEmail: string,
 ): Promise<
-  { success: true; balanceThb: number; amountThb: number } | { success: false; error: string }
+  | { success: true; balanceThb: number; amountThb: number; customerEmail: string }
+  | { success: false; error: string }
 > {
   const amount = Number(amountThb);
   if (!Number.isFinite(amount) || amount === 0) {
@@ -313,6 +314,7 @@ export async function adminAdjustCustomerCredit(
       success: true as const,
       balanceThb: Number(updated1.walletBalanceThb),
       amountThb: amount2,
+      customerEmail: customer.email,
     };
   });
 }

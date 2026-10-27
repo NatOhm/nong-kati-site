@@ -8,6 +8,7 @@ import {
 import { maskEmail } from '@/lib/rbac';
 import { checkPermission } from '@/lib/rbac';
 import { getAdminToken } from '@/lib/adminRequest';
+import { notifyTopUp } from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
 
@@ -83,6 +84,16 @@ export async function PATCH(
         { error: result.error },
         { status: result.error === 'CUSTOMER_NOT_FOUND' ? 404 : 400 },
       );
+    }
+    // Money arriving — ping the ops channel AFTER the transaction commits,
+    // fire-and-forget (a hung webhook must not hold up the credit). A debit
+    // adjustment shares this branch, so only a positive amount pings.
+    if (result.amountThb > 0) {
+      void notifyTopUp({
+        customerEmail: result.customerEmail,
+        amountThb: result.amountThb,
+        balanceAfterThb: result.balanceThb,
+      });
     }
     return NextResponse.json({
       success: true,

@@ -53,6 +53,7 @@
 | IU    | Admin image upload 5 MB byte limit, dimensions, and pixel-area limits | `tests/image-upload-validation.test.ts` | `npm test` (vitest) | Unit Tests |
 | SK    | Slip2Go account-info probe (no-purchase connectivity check) — raw-secret scheme first, Bearer fallback only on auth rejection, no fetch when unconfigured, secret never in any result | `tests/slip-account-info.test.ts` | `npm test` (vitest) | Unit Tests |
 | DS    | Discord webhook is environment-only; legacy DB value is ignored; one-click test probe (`sendTestDiscordMessage`) reports the truth — ไม่ config → ไม่ fetch, Discord ปฏิเสธ → คืน status จริง, เน็ตตาย → UNREACHABLE, ไม่ leak URL | `tests/discord-secret-config.test.ts` | `npm test` (vitest) | Unit Tests |
+| TU    | Top-up Discord ping (พบการเติมเงินเข้าระบบ, 27 ต.ค.) — เติมเครดิตบวก → `notifyTopUp` ยิง 1 ครั้งหลัง commit พร้อม email/ยอด/คงเหลือจริง · หักเครดิต (ลบ) เงียบ · credit ถูกปฏิเสธ เงียบ — ปิดการเติมเงินที่หายไปจาก Discord โดยไม่มีใครสังเกต | `tests/topup-notify.test.ts` | `npm test` (vitest) | Unit Tests |
 | SI    | Store contact settings persist a configurable HTTPS LINE URL | `tests/store-info-settings.test.ts` | `npm test` (vitest) | Unit Tests |
 | PN    | Customer promotion alerts include discount, conditions, expiry, description, and item links | `tests/promotion-notifications.test.ts` | `npm test` (vitest) | Unit Tests |
 | RP    | Recommended catalog includes only active, admin-featured products | `tests/recommended-products.test.ts` | `npm test` (vitest) | Unit Tests |
