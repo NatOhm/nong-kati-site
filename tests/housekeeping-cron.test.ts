@@ -86,4 +86,17 @@ describe('housekeeping cron wiring (prod-health-monitor.yml)', () => {
       ).toBe(true);
     }
   });
+
+  it('H6: a failed sweep run also pings the alert webhook (once per run)', () => {
+    // Annotations only reach humans who open CI. A sweep dead for weeks with
+    // nobody looking is exactly the failure mode this whole monitor exists to
+    // prevent — so the run must also POST to PRODUCTION_ALERT_WEBHOOK.
+    expect(workflow).toContain('PRODUCTION_ALERT_WEBHOOK');
+    expect(workflow).toContain('housekeeping failed:$failed');
+    // Dual shape: Discord ignores `text` and Slack ignores `content`.
+    expect(workflow).toContain('\\"text\\":');
+    expect(workflow).toContain('\\"content\\":');
+    // Must be gated on an actually-failed run, or every 10-minute tick pings.
+    expect(workflow).toContain('if [ "$fail" = "1" ] && [ -n "$PRODUCTION_ALERT_WEBHOOK" ]');
+  });
 });

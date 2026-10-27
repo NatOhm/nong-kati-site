@@ -19,7 +19,12 @@ import { prisma } from '@/lib/db';
 import { getOrderById, claimOrderForConfirmation } from '@/api/orders';
 import { fulfilOrder, scheduleOutboxDrain } from '@/lib/fulfilment';
 import { recordPaymentReconciliation } from '@/lib/paymentReconciliation';
-import { getNotificationSettings, notifyPaymentConfirmed, notifyStockLow } from '@/lib/notify';
+import {
+  getNotificationSettings,
+  notifyPaymentConfirmed,
+  notifyStockLow,
+  notifyStockOutOf,
+} from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
 
@@ -200,11 +205,17 @@ async function handleChargeSucceeded(chargeId: string, gatewayAmount: number): P
       include: { product: { select: { name: true } } },
     });
     for (const v of low) {
-      void notifyStockLow({
-        productName: v.product.name,
-        variantLabel: v.label,
-        stock: v.stock,
-      });
+      // stock <= threshold includes 0 — a sold-out variant deserves the
+      // urgent card, not the routine low-stock one.
+      if (v.stock <= 0) {
+        void notifyStockOutOf({ productName: v.product.name, variantLabel: v.label });
+      } else {
+        void notifyStockLow({
+          productName: v.product.name,
+          variantLabel: v.label,
+          stock: v.stock,
+        });
+      }
     }
   } catch (e) {
     if (e instanceof WebhookAlreadyConfirmedError) {

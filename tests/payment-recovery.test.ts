@@ -66,6 +66,7 @@ vi.mock('@/lib/notify', () => ({
   getNotificationSettings: vi.fn(async () => ({})),
   notifyPaymentConfirmed: vi.fn(async () => undefined),
   notifyStockLow: vi.fn(async () => undefined),
+  notifyStockOutOf: vi.fn(async () => undefined),
 }));
 
 // SlipOK + upload-token mocks for the slip-verify route (top level —

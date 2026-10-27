@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { checkPermission } from '@/lib/rbac';
 import { getAdminToken } from '@/lib/adminRequest';
 import { writeAuditLog } from '@/lib/auditLog';
+import { notifyRefundIssued } from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
 
@@ -170,6 +171,16 @@ export async function POST(
       });
 
       return { refundId: refund.id, codesVoided, orderNumber: order.orderNumber };
+    });
+
+    // AFTER commit, never inside the transaction: a hung webhook must not
+    // hold a serializable transaction open, and a failed refund must never
+    // notify. Fire-and-forget — sendDiscordEmbed swallows its own errors.
+    void notifyRefundIssued({
+      orderNumber: result.orderNumber,
+      amountThb: rawAmount,
+      codesVoided: result.codesVoided,
+      reasonCategory,
     });
 
     return NextResponse.json({

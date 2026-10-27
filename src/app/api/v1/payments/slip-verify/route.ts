@@ -7,6 +7,7 @@ import {
   notifyPaymentConfirmed,
   notifyPaymentPending,
   notifyStockLow,
+  notifyStockOutOf,
 } from '@/lib/notify';
 import { fulfilOrder, scheduleOutboxDrain } from '@/lib/fulfilment';
 import { recordPaymentReconciliation } from '@/lib/paymentReconciliation';
@@ -396,7 +397,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     include: { product: { select: { name: true } } },
   });
   for (const v of low) {
-    void notifyStockLow({ productName: v.product.name, variantLabel: v.label, stock: v.stock });
+    // stock <= threshold includes 0 — a sold-out variant deserves the urgent
+    // card, not the routine low-stock one.
+    if (v.stock <= 0) {
+      void notifyStockOutOf({ productName: v.product.name, variantLabel: v.label });
+    } else {
+      void notifyStockLow({ productName: v.product.name, variantLabel: v.label, stock: v.stock });
+    }
   }
 
   return NextResponse.json({

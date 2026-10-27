@@ -111,6 +111,54 @@ What it does: fresh-download bundle → wipe old `.next` → extract → drop ta
 `tmp/restart.txt` (Passenger restart signal) → write the on-disk BUILD_ID into
 `httpdocs/extract-check.txt` for verification.
 
+### The nightly task — guarded compare-before-extract (2026-10-27)
+
+A pre-existing task at **00:51** used to run `npm ci; npx prisma generate; npm run build`
+inside `httpdocs`. That tree carries the COMPLETE OLD SOURCE (`src/`, `tsconfig.json`,
+`node_modules/next`; no `.git`), so on the nights it succeeded it rebuilt `.next` from stale
+source and **reverted whatever had just been deployed**. It is the revert vector this whole
+provenance work exists to kill.
+
+Its command is now a guarded re-extract of the artifact branch instead — automated runs may
+only confirm they match, never pick a different commit:
+
+```
+cd httpdocs && curl -fsSLk -o deploy-bundle.tar.gz https://raw.githubusercontent.com/NatOhm/nong-kati-site/deploy-artifact/deploy-bundle.tar.gz && tar -xzf deploy-bundle.tar.gz -O .next/GIT_SHA > incoming-sha.txt; if test -f .next/GIT_SHA && cmp -s .next/GIT_SHA incoming-sha.txt; then echo UP-TO-DATE > nightly-check.txt && cat .next/GIT_SHA >> nightly-check.txt && rm -f deploy-bundle.tar.gz incoming-sha.txt; else echo MISMATCH > nightly-check.txt && cat .next/GIT_SHA >> nightly-check.txt 2>/dev/null; echo ARTIFACT-SAYS: >> nightly-check.txt && cat incoming-sha.txt >> nightly-check.txt && rm -f deploy-bundle.tar.gz incoming-sha.txt && exit 1; fi
+```
+
+Design notes — do not "simplify" these away:
+
+- **Two one-liners on purpose.** The Step-2 command above stays UNGUARDED: a human deploy
+  intentionally changes what is live. The guard belongs only on the AUTOMATED task, where
+  "the artifact differs from production" always means something is wrong (a deploy landed
+  without updating the artifact branch, or the branch was force-pushed with something else).
+- **No `"` and no `$(...)` in the command.** The Plesk runner wraps it in a double-quoted
+  string: an inner `"` truncates it (see the warning above), and a `$(...)` would be expanded
+  by the wrapper's shell against the wrong working directory BEFORE the chroot shell runs.
+  The comparison is therefore `cmp -s` on the two GIT_SHA files (exit code, no substitution).
+  `cmp` missing from the chroot fails CLOSED — the extract half never runs.
+- **Equal → `UP-TO-DATE`, exit 0, `.next` untouched.** Mismatch → `MISMATCH` + both SHAs in
+  `httpdocs/nightly-check.txt`, exit 1 so the failure is visible in the task log. A human
+  resolves it by running the normal Step-2 deploy, after which the nightly goes green again.
+- **Never let this task run `npm run build` again.** The bundle is built locally from a
+  committed tree and shipped whole; the server's source copy is a stale snapshot that has no
+  business producing builds.
+
+Panel state as of 2026-10-27 `[V]`: the 00:51 nightly task (id 236) was **deactivated and its
+command rewritten to an inert `echo` banner** — it can no longer rebuild or revert anything.
+If a nightly build is ever wanted again, restore a command here, never the old
+`npm ci; npx prisma generate; npm run build` line.
+
+**Two dead tasks seen only in toasts, NOT deletable from this panel `[V]` (2026-10-27):**
+`ext-git-task\deployment` (fails: `could not read Username for 'https://github.com'`) and
+`export NEXT_PUBLIC_SITE_URL=... && bash deploy-hostatom.sh` (fails in 0 s). They do not appear
+in this subscription's Scheduled Tasks list (5 entries: watchdog ping, bundle pull, PROBE3,
+RESTORE, and the now-disabled nightly), so they are not crontab rows here and the panel's
+Remove control cannot reach them. They surface only as stale run-result toasts. **Do not burn
+session time hunting them** — they cannot fire from this scheduler and pose no deploy risk.
+(If they are ever confirmed harmful, remove them from whatever module owns that scope — Plesk
+> Tools & Settings, not the domain scheduler.)
+
 ## Step 3 — Verify the extract
 
 File Manager → `httpdocs/extract-check.txt` → content must equal the Step-0 BUILD_ID exactly

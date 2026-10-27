@@ -42,6 +42,12 @@ backups/
 .deploy-stage/
 deploy-bundle.tar.gz
 
+# .verify-bundle.ps1 scratch tree. Ignored because a leftover copy would make
+# `git status --porcelain` non-empty, and stamp-git-sha.mjs now treats ANY
+# dirty path as "this build is not the commit it claims to be" — an ignored
+# scratch dir would otherwise stamp every build as `-dirty`.
+.bundle-check/
+
 # Production health monitor runtime state (scripts/monitor-health.mjs).
 # Local scratch state — the scheduled workflow keeps its own copy in the
 # Actions cache, and nothing here belongs in git.

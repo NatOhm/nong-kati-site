@@ -171,6 +171,24 @@ describe('§5 public version endpoint', () => {
     expect(body['gitSha']).not.toBe('2ee2ae7');
   });
 
+  it('reports a -dirty stamp verbatim instead of falling back to the stale env echo', async () => {
+    // stamp-git-sha.mjs appends `-dirty` when the tree had uncommitted changes
+    // (next build compiled the working tree, not HEAD). A bare-SHA regex used
+    // to reject exactly this value, dropping the route back to the stale env
+    // GIT_SHA — reintroducing the lie the endpoint was built to remove.
+    // The dashboard reads the suffix to warn, so it must survive the round trip.
+    process.env['GIT_SHA'] = '2ee2ae7'; // stale panel value
+    const GET = await loadRoute('gUxcV6SEGUgIp6nFJf8hR', 'd05c48ec4756a2d0c9fff4c1a456d3da2ab165ba-dirty\n');
+    const body = (await (await GET()).json()) as Record<string, string>;
+
+    const sha = body['gitSha'];
+    expect(sha).toBe('d05c48ec4756a2d0c9fff4c1a456d3da2ab165ba-dirty');
+    expect(sha).not.toBe('2ee2ae7');
+    expect(sha?.endsWith('-dirty')).toBe(true);
+    // Response shape is a pinned contract (three keys, no extra field).
+    expect(Object.keys(body).sort()).toEqual(['buildId', 'gitRef', 'gitSha']);
+  });
+
   it('a junk GIT_SHA stamp degrades to the env value instead of shipping nonsense', async () => {
     // A truncated extraction can leave an HTML error page where GIT_SHA
     // should be; the same shape-check that guards BUILD_ID guards this.

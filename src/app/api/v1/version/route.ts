@@ -47,8 +47,16 @@ async function readBuildId(): Promise<string | null> {
  * Same shape-check philosophy as BUILD_ID: the stamp is written by our own
  * bundle scripts, but a junk value (empty file, an error page from a broken
  * extraction) must degrade to "not stamped" rather than become a fake sha.
+ *
+ * `-dirty` IS a valid stamp (2026-10-27). stamp-git-sha.mjs appends it when
+ * the working tree had uncommitted changes, because `next build` compiled the
+ * working tree rather than HEAD. Accepting only bare SHAs here would make the
+ * route REJECT the honest stamp and fall back to the stale env echo — which is
+ * precisely the lie this endpoint exists to remove, reintroduced one line
+ * below. `.verify-bundle.ps1` refuses `-dirty`, so a dirty build should never
+ * reach production; if it does, this endpoint must SAY so.
  */
-const GIT_SHA_RE = /^[0-9a-f]{7,40}$/i;
+const GIT_SHA_RE = /^[0-9a-f]{7,40}(-dirty)?$/i;
 
 async function readStampedGitSha(): Promise<string | null> {
   try {

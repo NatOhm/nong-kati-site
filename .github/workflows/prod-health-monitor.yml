@@ -11,7 +11,8 @@
 #
 # ALERTING: a non-zero exit fails the job, which notifies the repo owner by
 # email and leaves a red run on the repo. Set the PRODUCTION_ALERT_WEBHOOK
-# secret to also POST to Slack/Discord/Line (body: {"text": "..."}).
+# secret to also POST to Slack/Discord/Line (body carries both "text" and
+# "content" — Discord ignores "text").
 # Adding a paid third party is deliberately NOT required — see
 # docs/production-health-monitoring.md for the UptimeRobot/Healthchecks
 # options and why the built-in uptime checker cannot see restarts at all.
@@ -145,15 +146,27 @@ jobs:
             endpoints="$endpoints internal/settings/slip-retention"
           fi
           fail=0
+          failed=""
           for ep in $endpoints; do
             if curl -fsS --max-time 30 -X POST -H "x-cron-token: $NK_CRON_SECRET" \
               "https://nongkatistore.com/api/v1/$ep" >/dev/null; then
               echo "ok: $ep"
             else
               echo "::error title=housekeeping cron failed::$ep returned non-2xx (site down, or NK_CRON_SECRET mismatch between repo secret and server .env)"
+              failed="$failed $ep"
               fail=1
             fi
           done
+          # One webhook message per RUN, never one per endpoint: a dead site
+          # fails every sweep at once, and four near-identical pings teach an
+          # operator to mute the channel — which then hides the health alerts
+          # sharing it. Unset webhook → skip; the red run and its ::error
+          # annotations still report either way.
+          if [ "$fail" = "1" ] && [ -n "$PRODUCTION_ALERT_WEBHOOK" ]; then
+            curl -fsS --max-time 10 -X POST -H 'content-type: application/json' \
+              -d "{\"text\":\"🚨 nongkatistore.com housekeeping failed:$failed\",\"content\":\"🚨 nongkatistore.com housekeeping failed:$failed\"}" \
+              "$PRODUCTION_ALERT_WEBHOOK" || echo "webhook delivery failed (non-fatal)"
+          fi
           exit $fail
 
       # Dead-man's switch. The job can be perfectly GREEN while the SCHEDULE

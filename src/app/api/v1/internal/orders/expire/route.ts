@@ -22,6 +22,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { constantTimeEquals } from '@/lib/crypto';
 import { expireUnpaidOrders } from '@/lib/orderExpiry';
+import { notifyOrderExpired } from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,6 +65,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     : 100;
 
   const result = await expireUnpaidOrders({ batchSize });
+
+  // Zero expired → zero messages: the sweep ticks every 10 minutes and most
+  // runs clear nothing, so announcing every run would bury the channel.
+  if (result.expired > 0) void notifyOrderExpired({ count: result.expired });
 
   return NextResponse.json({ ok: true, ...result });
 }

@@ -5,7 +5,15 @@
 #   - stage absent   -> self-contained structural checks instead, because the
 #                       maker deletes the stage on success
 # Always asserted: entry-name separators, secret-shaped entries, extraction
-# layout, critical files at their real paths.
+# layout, critical files at their real paths, and a PROVENANCE STAMP that
+# names a real commit (audit finding 1, 2026-10-27).
+#
+# Why the stamp is asserted: production reported gitSha `dbe8acd` while
+# serving `b057e55`'s routes, because stamp-git-sha.mjs used to write HEAD
+# onto a build made from an uncommitted tree. A bundle whose .next/GIT_SHA
+# ends in `-dirty` therefore describes code that exists in NO commit — packing
+# it would ship a build nobody can name, roll back, or diff. Refusing here (at
+# pack time, on your machine) is the cheapest possible place to catch it.
 #
 # Usage (from the repo root):
 #   powershell -NoProfile -ExecutionPolicy Bypass -File .verify-bundle.ps1
@@ -60,15 +68,39 @@ Write-Output ('FLAT_MANGLED_FILES=' + $flat.Count)
 # 5. Critical files must exist at their real paths after extraction.
 $presenceOk = $true
 foreach ($k in 'server.js', 'package.json', 'package-lock.json', 'next.config.js',
-               'prisma/schema.prisma', '.next/BUILD_ID') {
+               'prisma/schema.prisma', '.next/BUILD_ID', '.next/GIT_SHA', '.htaccess') {
     $p = Join-Path $tmp ($k -replace '/', [string][char]92)
     $ok = Test-Path -LiteralPath $p
     if (-not $ok) { $presenceOk = $false }
     Write-Output ('PRESENT ' + $k + ' = ' + $ok)
 }
+if (-not $presenceOk -and -not (Test-Path -LiteralPath (Join-Path $tmp '.htaccess'))) {
+    Write-Output 'REJECTED: no .htaccess in the bundle — the source-tree files in httpdocs become downloadable again (see the file header for the 200-vs-403 evidence).'
+}
 
-# 6. Layout: the archive must contain exactly the eight staged top-level entries.
-$expectedTop = @('.next', 'next.config.js', 'package-lock.json', 'package.json',
+# 6. Provenance: the stamp must name a real commit, not a dirty working tree.
+$stampOk = $true
+$stampPath = Join-Path $tmp ('.next/GIT_SHA' -replace '/', [string][char]92)
+if (Test-Path -LiteralPath $stampPath) {
+    $stamp = (Get-Content -LiteralPath $stampPath -Raw).Trim()
+    $isDirty = $stamp.EndsWith('-dirty')
+    $looksLikeSha = $stamp -match '^[0-9a-f]{7,40}(-dirty)?$'
+    Write-Output ('GIT_SHA=' + $stamp)
+    Write-Output ('GIT_SHA_DIRTY=' + $isDirty)
+    if ($isDirty) {
+        $stampOk = $false
+        Write-Output 'REJECTED: this bundle was built from an uncommitted working tree, so it does not match ANY commit. Commit, then rebuild.'
+    } elseif (-not $looksLikeSha) {
+        $stampOk = $false
+        Write-Output ('REJECTED: GIT_SHA is not a commit id: ' + $stamp)
+    }
+} else {
+    $stampOk = $false
+    Write-Output 'REJECTED: no .next/GIT_SHA in the bundle — run a build through `npm run build` (stamp-git-sha.mjs), not a bare `next build`.'
+}
+
+# 7. Layout: the archive must contain exactly the staged top-level entries.
+$expectedTop = @('.next', '.htaccess', 'next.config.js', 'package-lock.json', 'package.json',
                'prisma', 'public', 'server.js', 'server-bootstrap.js')
 
 $top = @($names | ForEach-Object { ($_ -split '/')[0] } | Sort-Object -Unique)
@@ -77,7 +109,7 @@ $topExtra   = @($top | Where-Object { $expectedTop -notcontains $_ })
 Write-Output ('TOP_MISSING=' + $topMissing.Count)
 Write-Output ('TOP_EXTRA=' + $topExtra.Count)
 
-# 7. Round-trip diff — only meaningful while the maker's stage still exists.
+# 8. Round-trip diff — only meaningful while the maker's stage still exists.
 $diffOk = $true
 $mode = 'STRUCTURAL'
 if ($stageExists) {
@@ -100,6 +132,6 @@ Remove-Item -LiteralPath $tmp -Recurse -Force
 
 $ok = ($bad -eq 0) -and ($secretHits.Count -eq 0) -and ($flat.Count -eq 0) -and
       $presenceOk -and ($topMissing.Count -eq 0) -and ($topExtra.Count -eq 0) -and
-      $diffOk -and ($got.Count -gt 0)
+      $diffOk -and ($got.Count -gt 0) -and $stampOk
 Write-Output ('RESULT=' + $(if ($ok) { 'PASS' } else { 'FAIL' }))
 if ($ok) { exit 0 } else { exit 1 }

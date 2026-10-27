@@ -71,7 +71,11 @@ mkdir -p "$STAGE"
 cp -r .next "$STAGE/.next"
 rm -rf "$STAGE/.next/cache"            # build cache: huge, unused at runtime
 cp -r public prisma "$STAGE/"
-cp package.json package-lock.json next.config.js server.js "$STAGE/"
+# .htaccess (source-file 403s) and server-bootstrap.js (required by server.js)
+# ship on THIS route too — it is the route that actually deploys; without them
+# the tar bundle is less complete than the zip one (.make-bundle.ps1 stages
+# both) and the web-exposed source tree stays readable.
+cp package.json package-lock.json next.config.js server.js server-bootstrap.js .htaccess "$STAGE/"
 tar -czf "$BUNDLE" -C "$STAGE" .
 SIZE="$(du -h "$BUNDLE" | cut -f1)"
 
@@ -140,8 +144,10 @@ cd httpdocs && curl -fsSLk -o deploy-bundle.tar.gz $RAW_URL && rm -rf .next && t
  5. Verification curls:
 
 curl -s https://nongkatistore.com/api/v1/version
-#   expect buildId == $BUILD_ID above (read from .next/BUILD_ID on the server).
-#   gitSha is an Infisical echo and may legitimately differ — do NOT verify on it.
+#   expect buildId == $BUILD_ID above AND gitSha == $START_SHA: stamp-git-sha.mjs
+#   writes the commit INTO .next/GIT_SHA at build time, and the route prefers
+#   that stamp over the env var — the SHA is now the verification signal
+#   (before 2026-10-27 it was a stale Infisical echo and could not be trusted).
 curl -s https://nongkatistore.com/api/v1/health
 curl -s -o /dev/null -w "%{http_code}\n" https://nongkatistore.com/api/v1/products
 #   expect: 200

@@ -229,6 +229,34 @@ export default function AdminDashboardPage(): React.JSX.Element {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'today' | 'week' | 'month'>('today');
 
+  // Release identity (GET /api/v1/version) — public and unauthenticated, so it
+  // is fetched separately from adminJson. Its whole point is answering "what
+  // code is actually serving requests?": the stamp used to name a commit that
+  // did not contain the deployed routes (reported dbe8acd while serving
+  // b057e55), and the dashboard is where an operator should SEE that.
+  const [release, setRelease] = useState<{ buildId: string | null; gitSha: string } | null>(
+    null,
+  );
+  const [releaseFailed, setReleaseFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch('/api/v1/version', { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const body = (await res.json()) as { buildId: string | null; gitSha: string };
+        if (!cancelled) setRelease(body);
+      } catch {
+        // Degrade to an explicit "unavailable" line — never a broken layout.
+        if (!cancelled) setReleaseFailed(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const load = useCallback(async () => {
     try {
       const d = await adminJson<DashboardData>('/api/v1/admin/dashboard');
@@ -275,6 +303,7 @@ export default function AdminDashboardPage(): React.JSX.Element {
             <p className="mt-1 text-sm text-fg-placeholder">
               ภาพรวมระบบ Nong-Kati · อัปเดตล่าสุด เมื่อสักครู่
             </p>
+            <ReleaseStatus release={release} failed={releaseFailed} />
           </div>
           <div className="flex items-center gap-1 rounded-lg border border-line-subtle bg-surface p-1">
             {(['today', 'week', 'month'] as const).map((tab) => (
@@ -719,6 +748,52 @@ export default function AdminDashboardPage(): React.JSX.Element {
 }
 
 // ─── Sub Components ───────────────────────────────────────
+
+/**
+ * Which build is actually serving requests (audit finding 1, 2026-10-27).
+ *
+ * `gitSha` carries `-dirty` when the bundle was made from an uncommitted tree:
+ * `next build` compiles the working copy, so that build exists in NO commit
+ * and cannot be rolled back or diffed by anyone. The verifier refuses to pack
+ * such a bundle, so seeing the warning here means a deploy skipped that gate.
+ */
+function ReleaseStatus({
+  release,
+  failed,
+}: {
+  release: { buildId: string | null; gitSha: string } | null;
+  failed: boolean;
+}): React.JSX.Element | null {
+  if (failed) {
+    return (
+      <p className="mt-1 text-xs text-fg-placeholder">ดึงข้อมูลเวอร์ชันไม่สำเร็จ</p>
+    );
+  }
+  // Silent while loading: an empty line is better than a flicker under the title.
+  if (!release) return null;
+
+  const dirty = release.gitSha.endsWith('-dirty');
+  const shortSha = release.gitSha.replace(/-dirty$/, '').slice(0, 7);
+  const shaKnown = /^[0-9a-f]{7}$/i.test(shortSha);
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-fg-placeholder">
+      {release.buildId && <span className="font-mono">build {release.buildId}</span>}
+      {shaKnown && (
+        <span className="font-mono">
+          commit {shortSha}
+          {dirty ? '-dirty' : ''}
+        </span>
+      )}
+      {dirty && (
+        <span className="border-error bg-error rounded-md border px-2 py-0.5 font-medium text-fg-error">
+          เวอร์ชันนี้สร้างจากไฟล์ที่ยังไม่ได้ commit — แก้ไขไม่ได้จาก commit นี้
+        </span>
+      )}
+      {!shaKnown && !release.buildId && <span>ไม่มีข้อมูลเวอร์ชัน</span>}
+    </div>
+  );
+}
 
 function KPICard({
   icon: Icon,

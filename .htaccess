@@ -1,0 +1,35 @@
+# nongkatistore.com — deny public HTTP access to source/build/tooling files.
+#
+# Files stay on disk: the nightly deploy, `npm install` and `prisma generate`
+# all read them from the filesystem, so DELETING them would break the deploy
+# chain. Only the web is denied. Apache .htaccess on Plesk/Hostatom.
+#
+# WHY THIS FILE MATTERS (2026-10-27): Plesk's panel for this subscription has
+# no "Additional nginx directives" field, so .htaccess is the only lever that
+# exists. Without it, anyone can download the whole source tree — /src/lib/
+# data.ts, /docs/*, /prisma/schema.prisma, /package.json and every package
+# under /node_modules/ all returned 200 with the file contents.
+#
+# Verified live after deploy: /src/lib/data.ts, /docs/*, /prisma/*,
+# /package.json, /server.js and /node_modules/* return 403, while /,
+# /checkout, /search, /api/v1/*, /robots.txt, /_next/static/* and
+# /.well-known/ keep returning 200.
+#
+# ONLY core mod_authz_core directives are used here on purpose: no RewriteRule
+# (needs AllowOverride FileInfo + mod_rewrite) and no regex literals (ap_expr
+# delimits them with "/", which collides with paths). `-strmatch` globs are
+# delimiter-free, so this cannot break the site if an override class is
+# narrower than expected — it would be ignored, not 500.
+#
+# Keep this file staged into deploy-bundle.zip (.make-bundle.ps1) and asserted
+# by .verify-bundle.ps1: an unshipped copy is the same as no protection, since
+# a full-directory restore would silently re-expose everything.
+
+# 1) Path-based blocks (source, docs, tests, deps, prisma schema, build output)
+Require expr "!(%{REQUEST_URI} -strmatch '/src/*' || %{REQUEST_URI} -strmatch '/docs/*' || %{REQUEST_URI} -strmatch '/tests/*' || %{REQUEST_URI} -strmatch '/scripts/*' || %{REQUEST_URI} -strmatch '/e2e/*' || %{REQUEST_URI} -strmatch '/prisma/*' || %{REQUEST_URI} -strmatch '/node_modules/*' || %{REQUEST_URI} -strmatch '/tmp/*' || %{REQUEST_URI} -strmatch '/.github/*' || %{REQUEST_URI} -strmatch '/.next/*' || %{REQUEST_URI} -strmatch '/.next-prev-bundle/*')"
+
+# 2) Specific root-level config/runtime files (matched by filename, so this
+#    also covers node_modules/**/package.json — never fetched over HTTP anyway)
+<FilesMatch "^(package\.json|package-lock\.json|server\.js|server-bootstrap\.js|next\.config\.js|tsconfig\.json|tailwind\.config\.ts|vitest\.config\.ts|playwright\.config\.ts|postcss\.config\.js|ecosystem\.config\.js|docker-compose\.yml|Dockerfile|vercel\.json|next-env\.d\.ts|deploy-hostatom\.sh|extract-check\.txt|nightly-check\.txt|incoming-sha\.txt|deploy-bundle\.tar\.gz|deploy-bundle\.zip)$">
+Require all denied
+</FilesMatch>

@@ -178,10 +178,62 @@ export async function notifyStockOutOf(params: {
 }): Promise<void> {
   await sendDiscordEmbed([
     {
-      title: `🚫 สต๊อกหมดอายุ`,
+      // "หมดอายุ" means *expired* — wrong for a zero-balance alert. The
+      // function had zero call sites, so nobody ever saw it. Fixed as the
+      // first caller was added (2026-10-27).
+      title: `🚫 สต๊อกหมด`,
       description: `**${params.productName}** (${params.variantLabel})\nสต๊อกไม่เหลือแล้ว — ไม่สามารถขายได้`,
       color: COLORS.ERROR,
       footer: { text: 'พิจารณาจัดสต๊อกหรือระงับสินค้า' },
+    },
+  ]);
+}
+
+/**
+ * Refunds are money leaving the business — the one event an operator must not
+ * learn about by opening the orders list. Fired after the refund transaction
+ * COMMITS (never inside it): this is fire-and-forget, and a hung webhook must
+ * not extend a serializable transaction that voids gift codes.
+ */
+export async function notifyRefundIssued(params: {
+  orderNumber: string;
+  amountThb: number;
+  codesVoided: number;
+  reasonCategory?: string;
+}): Promise<void> {
+  await sendDiscordEmbed([
+    {
+      title: `↩️ คืนเงินออเดอร์`,
+      description: `ออเดอร์ **${params.orderNumber}** ถูกคืนเงินแล้ว\nยกเลิกโค้ดไป **${params.codesVoided}** รหัส`,
+      color: COLORS.ERROR,
+      fields: [
+        {
+          name: 'ยอดเงิน',
+          value: `฿${params.amountThb.toLocaleString('th-TH')}`,
+          inline: true,
+        },
+        ...(params.reasonCategory
+          ? [{ name: 'เหตุผล', value: params.reasonCategory, inline: true }]
+          : []),
+      ],
+      footer: { text: 'Nong-Kati — ระบบอัตโนมัติ' },
+    },
+  ]);
+}
+
+/**
+ * ONE message per sweep, never one per order: this tick runs every 10 minutes
+ * and abandoned checkouts are common, so per-row messages would bury the
+ * channel in noise — and an operator who mutes a noisy channel stops reading
+ * the payment alerts in it too.
+ */
+export async function notifyOrderExpired(params: { count: number }): Promise<void> {
+  await sendDiscordEmbed([
+    {
+      title: `⏳ ออเดอร์หมดเวลาชำระ`,
+      description: `ครั้งนี้ระบบยกเลิกออเดอร์ที่ไม่ชำระเงิน **${params.count}** รายการ`,
+      color: COLORS.WARNING,
+      footer: { text: 'ไม่มีสต๊อกถูกกักไว้ — ตัดรอบทุก 10 นาที' },
     },
   ]);
 }

@@ -267,16 +267,21 @@ export async function fetchHealth({ baseUrl, healthPath, timeoutMs }) {
 
 // ── Alert delivery ──────────────────────────────────────────────────────
 /**
- * Optional webhook (Slack/Discord/Line shape: `{ text }`). Failure to deliver
- * is reported but does not change the exit code — the check verdict is the
- * signal, and a broken webhook must not mask it.
+ * Optional webhook (Slack/Discord/Line). Failure to deliver is reported but
+ * does not change the exit code — the check verdict is the signal, and a
+ * broken webhook must not mask it.
+ *
+ * The body carries BOTH `text` (Slack/Line) and `content` (Discord): Discord
+ * silently ignores `text`, so a `{text}`-only body posts an EMPTY message to
+ * a Discord channel — the alert system would appear configured while
+ * delivering nothing. Each side ignores the key it does not use.
  */
 async function sendWebhook(url, message) {
   try {
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ text: message }),
+      body: JSON.stringify({ text: message, content: message }),
       signal: AbortSignal.timeout(10000),
     });
     if (!res.ok) console.warn(`⚠ webhook returned HTTP ${res.status}`);
@@ -340,7 +345,7 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
         `  --timeout-ms <n>        default ${DEFAULTS.timeoutMs}`,
         `  --idle-reap-seconds <n> default ${DEFAULTS.idleReapSeconds}`,
         `  --failure-threshold <n> default ${DEFAULTS.failureThreshold}`,
-        '  --webhook <url>         POST {"text":...} on alert (or WEBHOOK_URL env)',
+        '  --webhook <url>         POST {"text","content"} on alert (or WEBHOOK_URL env)',
         '',
         'Exit: 0 ok / 1 alert / 2 monitor error',
       ].join('\n'),

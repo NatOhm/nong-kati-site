@@ -4,7 +4,8 @@
 #
 #   1. runs `next build` unless -NoBuild is given
 #   2. stages ONLY Linux-portable artifacts (.next minus cache, public, prisma,
-#      package.json, package-lock.json, next.config.js, server.js)
+#      package.json, package-lock.json, next.config.js, server.js,
+#      server-bootstrap.js, .htaccess)
 #   3. zips them with FORWARD-SLASH entry names
 #   4. verifies the zip by extracting it and diffing against the stage
 #
@@ -42,7 +43,7 @@ Copy-Item -Recurse -Force -LiteralPath (Join-Path $root '.next') -Destination (J
 Remove-Item -Recurse -Force -LiteralPath (Join-Path $stage '.next\cache')   # build cache: huge, unused at runtime
 Copy-Item -Recurse -Force -LiteralPath (Join-Path $root 'public')  -Destination (Join-Path $stage 'public')
 Copy-Item -Recurse -Force -LiteralPath (Join-Path $root 'prisma')  -Destination (Join-Path $stage 'prisma')
-foreach ($f in 'package.json', 'package-lock.json', 'next.config.js', 'server.js', 'server-bootstrap.js') {
+foreach ($f in 'package.json', 'package-lock.json', 'next.config.js', 'server.js', 'server-bootstrap.js', '.htaccess') {
     Copy-Item -Force -LiteralPath (Join-Path $root $f) -Destination (Join-Path $stage $f)
 }
 

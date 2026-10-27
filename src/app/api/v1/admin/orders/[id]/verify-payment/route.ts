@@ -7,7 +7,12 @@ import { writeAuditLog } from '@/lib/auditLog';
 import { claimOrderForConfirmation, getOrderById } from '@/api/orders';
 import { fulfilOrder, scheduleOutboxDrain } from '@/lib/fulfilment';
 import { recordPaymentReconciliation } from '@/lib/paymentReconciliation';
-import { getNotificationSettings, notifyPaymentConfirmed, notifyStockLow } from '@/lib/notify';
+import {
+  getNotificationSettings,
+  notifyPaymentConfirmed,
+  notifyStockLow,
+  notifyStockOutOf,
+} from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
 
@@ -374,7 +379,13 @@ export async function POST(
     include: { product: { select: { name: true } } },
   });
   for (const v of lowVariants) {
-    void notifyStockLow({ productName: v.product.name, variantLabel: v.label, stock: v.stock });
+    // stock <= threshold includes 0 — a sold-out variant deserves the urgent
+    // card, not the routine low-stock one.
+    if (v.stock <= 0) {
+      void notifyStockOutOf({ productName: v.product.name, variantLabel: v.label });
+    } else {
+      void notifyStockLow({ productName: v.product.name, variantLabel: v.label, stock: v.stock });
+    }
   }
 
   return NextResponse.json({

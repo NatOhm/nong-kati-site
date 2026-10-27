@@ -52,6 +52,7 @@ const h = vi.hoisted(() => {
     notifyPaymentConfirmed: vi.fn(async () => undefined),
     notifyPaymentPending: vi.fn(async () => undefined),
     notifyStockLow: vi.fn(async () => undefined),
+    notifyStockOutOf: vi.fn(async () => undefined),
   };
   const slipSec = {
     isValidSlipUploadToken: vi.fn(() => true),
