@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { getCustomerFromToken } from '@/api/customerAuth';
 import { claimOrderForConfirmation } from '@/api/orders';
 import { fulfilOrder, scheduleOutboxDrain } from '@/lib/fulfilment';
+import { notifyPaymentConfirmed, notifyStockAlertsForVariants } from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
 
@@ -154,6 +155,25 @@ export async function POST(
     // response; a failure to send never undoes the payment (the row stays
     // pending for the retry paths).
     await scheduleOutboxDrain();
+
+    // Discord (review 2026-10-27): a wallet-paid order IS a purchase — this
+    // path commits a full fulfilment (codes + stock + completed) yet was the
+    // ONE confirmation path with zero ops-channel visibility. Same post-commit,
+    // fire-and-forget pattern as verify-payment / slip-verify / omise.
+    void notifyPaymentConfirmed({
+      orderNumber: result.orderNumber,
+      totalThb: result.total,
+    });
+    const soldVariantRows = await prisma.orderItem.findMany({
+      where: { orderId: id },
+      select: { variantId: true },
+    });
+    await notifyStockAlertsForVariants(
+      soldVariantRows
+        .map((i) => i.variantId)
+        .filter((v): v is string => v !== null),
+    );
+
     return NextResponse.json({ success: true, ...result });
   } catch (err) {
     // Transaction rolled back — balance, ledger, claim, codes all intact.

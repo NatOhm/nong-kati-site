@@ -54,6 +54,8 @@ const { prismaMock, ordersMock, fulfilmentMock, authMock } = vi.hoisted(() => {
     },
     customer: { updateMany: vi.fn(async () => ({ count: 1 })) },
     topUpLog: { create: vi.fn(async () => ({ id: 'tl-1' })) },
+    // pay-wallet post-commit notification wiring reads the order's variant ids.
+    orderItem: { findMany: vi.fn(async () => []) },
     // Interactive-tx shape: the mock passes ITSELF as the tx client and
     // ignores the options (recorded below by the test through mock.calls).
     $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(prismaMock)),

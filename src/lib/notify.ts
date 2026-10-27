@@ -144,7 +144,9 @@ export async function notifyNewOrder(params: {
 }): Promise<void> {
   await sendDiscordEmbed([
     {
-      title: `🛒 ออเดอร์ใหม่: ${params.orderNumber}`,
+      // "พบการซื้อสินค้า" — the exact status name the old Torishop bot used
+      // in #เว็บ (client alignment, 2026-10-27); was "ออเดอร์ใหม่".
+      title: `🛒 พบการซื้อสินค้า: ${params.orderNumber}`,
       color: COLORS.INFO,
       fields: [
         { name: 'ยอดรวม', value: `฿${params.totalThb.toLocaleString('th-TH')}`, inline: true },
@@ -213,13 +215,48 @@ export async function notifyStockOutOf(params: {
     {
       // "หมดอายุ" means *expired* — wrong for a zero-balance alert. The
       // function had zero call sites, so nobody ever saw it. Fixed as the
-      // first caller was added (2026-10-27).
-      title: `🚫 สต๊อกหมด`,
+      // first caller was added (2026-10-27). Title now matches the old
+      // Torishop bot's status name (client alignment, 2026-10-27).
+      title: `🚫 สินค้าหมดแล้ว`,
       description: `**${params.productName}** (${params.variantLabel})\nสต๊อกไม่เหลือแล้ว — ไม่สามารถขายได้`,
       color: COLORS.ERROR,
       footer: { text: 'พิจารณาจัดสต๊อกหรือระงับสินค้า' },
     },
   ]);
+}
+
+/**
+ * Post-fulfilment stock alerts for one order — the threshold → query →
+ * out/low policy in ONE place. pay-wallet fires this after its transaction
+ * commits (review 2026-10-27: a wallet-paid sale was the only confirmation
+ * path with zero ops-channel visibility — a variant drained to 0 by wallet
+ * spend never raised สินค้าหมดแล้ว).
+ *
+ * Fire-and-forget contract: lookup failures resolve, never throw — a Discord
+ * concern must not surface in a payment path.
+ */
+export async function notifyStockAlertsForVariants(variantIds: string[]): Promise<void> {
+  try {
+    const ids = [...new Set(variantIds)].filter((id) => id.length > 0);
+    if (ids.length === 0) return;
+    const cfg = await getNotificationSettings();
+    const threshold = cfg.lowStockThreshold ?? 5;
+    const low = await prisma.productVariant.findMany({
+      where: { id: { in: ids }, stock: { lte: threshold } },
+      include: { product: { select: { name: true } } },
+    });
+    for (const v of low) {
+      // stock <= threshold includes 0 — a sold-out variant deserves the
+      // urgent card, not the routine low-stock one.
+      if (v.stock <= 0) {
+        void notifyStockOutOf({ productName: v.product.name, variantLabel: v.label });
+      } else {
+        void notifyStockLow({ productName: v.product.name, variantLabel: v.label, stock: v.stock });
+      }
+    }
+  } catch {
+    // Same swallow as every notifier here: alerts never break the caller.
+  }
 }
 
 /**
