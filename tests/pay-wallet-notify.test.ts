@@ -144,6 +144,37 @@ describe('A. pay-wallet notification wiring', () => {
     expect(notifyMock.notifyStockAlertsForVariants).not.toHaveBeenCalled();
   });
 
+  it('post-commit stock lookup blowing up still answers 200 (payment is committed)', async () => {
+    // The variant query runs AFTER the transaction commits but used to sit
+    // inside the route's try — one transient DB error returned 500
+    // WALLET_PAY_FAILED for a payment that DID succeed, and the checkout UI
+    // reacts to that by offering PromptPay again (customer pays twice).
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    prismaMock.orderItem.findMany.mockRejectedValue(new Error('Connection terminated unexpectedly'));
+
+    const res = await call(post('nk_session=tok'));
+
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { success?: boolean }).success).toBe(true);
+    expect(notifyMock.notifyPaymentConfirmed).toHaveBeenCalledTimes(1);
+    expect(errSpy).toHaveBeenCalledWith(
+      '[pay-wallet] post-commit notification failed:',
+      'Connection terminated unexpectedly',
+    );
+    errSpy.mockRestore();
+  });
+
+  it('a rejecting stock-alert helper still answers 200', async () => {
+    notifyMock.notifyStockAlertsForVariants.mockRejectedValue(new Error('boom'));
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const res = await call(post('nk_session=tok'));
+
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { success?: boolean }).success).toBe(true);
+    errSpy.mockRestore();
+  });
+
   it('stock hole (strict rollback) → 409, silent', async () => {
     fulfilMock.fulfilOrder.mockRejectedValue(new Error('INSUFFICIENT_STOCK'));
 

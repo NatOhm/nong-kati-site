@@ -150,29 +150,43 @@ export async function POST(
     if (result.code === 'ORDER_NOT_PAYABLE' || result.code === 'INSUFFICIENT_BALANCE') {
       return NextResponse.json({ error: { code: result.code } }, { status: 409 });
     }
-    // Audit #2: the unit committed — codes delivered, wallet debited, and the
-    // code-delivery outbox row promised. Kick the delivery worker after the
-    // response; a failure to send never undoes the payment (the row stays
-    // pending for the retry paths).
-    await scheduleOutboxDrain();
+    // Everything below runs AFTER the commit and must never reach the outer
+    // catch — that catch answers 500 WALLET_PAY_FAILED, and the checkout UI
+    // reacts to it by falling back to PromptPay on an order that is already
+    // paid and completed (customer pays twice). scheduleOutboxDrain is
+    // contractually never-throwing, but the stock lookup below is a plain
+    // query: one transient DB error used to turn a successful payment into a
+    // reported failure. One guard for the whole post-commit block.
+    try {
+      // Audit #2: the unit committed — codes delivered, wallet debited, and the
+      // code-delivery outbox row promised. Kick the delivery worker after the
+      // response; a failure to send never undoes the payment (the row stays
+      // pending for the retry paths).
+      await scheduleOutboxDrain();
 
-    // Discord (review 2026-10-27): a wallet-paid order IS a purchase — this
-    // path commits a full fulfilment (codes + stock + completed) yet was the
-    // ONE confirmation path with zero ops-channel visibility. Same post-commit,
-    // fire-and-forget pattern as verify-payment / slip-verify / omise.
-    void notifyPaymentConfirmed({
-      orderNumber: result.orderNumber,
-      totalThb: result.total,
-    });
-    const soldVariantRows = await prisma.orderItem.findMany({
-      where: { orderId: id },
-      select: { variantId: true },
-    });
-    await notifyStockAlertsForVariants(
-      soldVariantRows
-        .map((i) => i.variantId)
-        .filter((v): v is string => v !== null),
-    );
+      // Discord (review 2026-10-27): a wallet-paid order IS a purchase — this
+      // path commits a full fulfilment (codes + stock + completed) yet was the
+      // ONE confirmation path with zero ops-channel visibility. Same post-commit,
+      // fire-and-forget pattern as verify-payment / slip-verify / omise.
+      void notifyPaymentConfirmed({
+        orderNumber: result.orderNumber,
+        totalThb: result.total,
+      });
+      const soldVariantRows = await prisma.orderItem.findMany({
+        where: { orderId: id },
+        select: { variantId: true },
+      });
+      await notifyStockAlertsForVariants(
+        soldVariantRows
+          .map((i) => i.variantId)
+          .filter((v): v is string => v !== null),
+      );
+    } catch (err) {
+      console.error(
+        '[pay-wallet] post-commit notification failed:',
+        err instanceof Error ? err.message : err,
+      );
+    }
 
     return NextResponse.json({ success: true, ...result });
   } catch (err) {
