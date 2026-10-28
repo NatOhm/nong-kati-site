@@ -10,7 +10,9 @@
      every bill, desktop + mobile).
   3. Slip2Go adapter (provider #2, the client's merchant account): wire
      format per slip2go.com/guide — POST /api/verify-slip/qr-base64/info,
-     Authorization header = the secret directly, checkCondition carries
+     Authorization: Bearer {secret} first (this merchant account requires
+     Bearer empirically), one raw-secret retry after an auth rejection
+     (HTTP 401/403 or provider 401xxx), checkCondition carries
      checkAmount eq + checkDuplicate; response codes mapped to our types.
 */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -334,7 +336,7 @@ describe('Slip2Go adapter', () => {
       { headers: Record<string, string>; body: string },
     ];
     expect(url).toContain('/api/verify-slip/qr-base64/info');
-    expect(init.headers['Authorization']).toBe('test-secret');
+    expect(init.headers['Authorization']).toBe('Bearer test-secret');
     const body = JSON.parse(init.body);
     expect(body.payload.checkCondition.checkAmount).toEqual({
       type: 'eq',
@@ -342,6 +344,42 @@ describe('Slip2Go adapter', () => {
     });
     expect(body.payload.checkCondition.checkDuplicate).toBe(true);
     expect(String(body.payload.imageBase64).startsWith('data:image/png;base64,')).toBe(true);
+  });
+
+  it('retries once with the raw secret when Bearer is rejected, then succeeds', async () => {
+    process.env['NK_SLIP2GO_SECRET'] = 'test-secret';
+    // 1st attempt: HTTP 401 (scheme rejected). 2nd: the same endpoint under
+    // the raw scheme answers with the real success payload.
+    fetchMock
+      .mockResolvedValueOnce(new Response('{}', { status: 401 }))
+      .mockResolvedValueOnce(slip2goOk());
+    const { verifySlip2Go } = await import('@/lib/payment/slip2go');
+    const r = await verifySlip2Go({ imageBase64: 'aGk=', expectedAmountThb: 25 });
+    expect(r).toMatchObject({ ok: true, ref: 'TR1234567890' });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const first = fetchMock.mock.calls[0] as unknown as [
+      string,
+      { headers: Record<string, string> },
+    ];
+    const second = fetchMock.mock.calls[1] as unknown as [
+      string,
+      { headers: Record<string, string> },
+    ];
+    expect(first[1].headers['Authorization']).toBe('Bearer test-secret');
+    expect(second[1].headers['Authorization']).toBe('test-secret');
+  });
+
+  it('maps a provider 401xxx code on the Bearer attempt to the raw retry too', async () => {
+    process.env['NK_SLIP2GO_SECRET'] = 'test-secret';
+    const authFail = () =>
+      new Response(JSON.stringify({ code: '401001', message: 'token ไม่ถูกต้อง' }), {
+        status: 200,
+      });
+    fetchMock.mockResolvedValueOnce(authFail()).mockResolvedValueOnce(authFail());
+    const { verifySlip2Go } = await import('@/lib/payment/slip2go');
+    const r = await verifySlip2Go({ imageBase64: 'aGk=', expectedAmountThb: 25 });
+    expect(failed(r).code).toBe('NOT_CONFIGURED');
+    expect(fetchMock).toHaveBeenCalledTimes(2); // bearer then raw — both mapped
   });
 });
 
@@ -406,16 +444,19 @@ describe('Slip2Go adapter — error mapping', () => {
 
   it('maps 401005/401006 to QUOTA_EXCEEDED and 401007 (IP) to NOT_CONFIGURED', async () => {
     process.env['NK_SLIP2GO_SECRET'] = 'test-secret';
-    fetchMock.mockResolvedValueOnce(
+    // 401xxx codes are auth-family: each attempt (Bearer then raw) is queued
+    // its own response, and BOTH must map to the same outcome.
+    const code401 = (code: string): Response =>
       new Response(
         JSON.stringify({
-          code: '401005',
-          message: 'เกินจำนวนที่อนุญาต',
+          code,
+          message: code === '401007' ? 'IP ไม่อยู่ใน allowlist' : 'เกินจำนวนที่อนุญาต',
         }),
         { status: 200 },
-      ),
-    );
+      );
     const { verifySlip2Go } = await import('@/lib/payment/slip2go');
+
+    fetchMock.mockResolvedValueOnce(code401('401005')).mockResolvedValueOnce(code401('401005'));
     expect(
       failed(
         await verifySlip2Go({
@@ -425,15 +466,7 @@ describe('Slip2Go adapter — error mapping', () => {
       ).code,
     ).toBe('QUOTA_EXCEEDED');
 
-    fetchMock.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          code: '401006',
-          message: 'เกินจำนวนที่อนุญาต',
-        }),
-        { status: 200 },
-      ),
-    );
+    fetchMock.mockResolvedValueOnce(code401('401006')).mockResolvedValueOnce(code401('401006'));
     expect(
       failed(
         await verifySlip2Go({
@@ -443,15 +476,7 @@ describe('Slip2Go adapter — error mapping', () => {
       ).code,
     ).toBe('QUOTA_EXCEEDED');
 
-    fetchMock.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          code: '401007',
-          message: 'IP ไม่อยู่ใน allowlist',
-        }),
-        { status: 200 },
-      ),
-    );
+    fetchMock.mockResolvedValueOnce(code401('401007')).mockResolvedValueOnce(code401('401007'));
     expect(
       failed(
         await verifySlip2Go({

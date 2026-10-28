@@ -8,8 +8,13 @@
  *
  * Wire format per slip2go.com/guide (REST API):
  * - POST {base}/api/verify-slip/qr-base64/info
- * - Header: Authorization: {NK_SLIP2GO_SECRET} (the secret directly — no
- *   Bearer prefix, per the Authentication guide), Content-Type: application/json
+ * - Header: Authorization: Bearer {NK_SLIP2GO_SECRET}, Content-Type:
+ *   application/json. The public guide shows the raw secret while the
+ *   merchant dashboard's examples show `Bearer` — and this merchant account
+ *   EMPIRICALLY requires Bearer (the account-info probe accepts both, the
+ *   verify endpoint only Bearer), so verify sends Bearer first and retries
+ *   once with the raw secret after an auth rejection (401/403 or 401xxx),
+ *   mirroring the probe's fallback so either scheme works.
  * - Body: { payload: { imageBase64, checkCondition: { checkAmount: { type:
  *   'eq', amount }, checkDuplicate: true, checkReceiver?: [...] } } }
  *   — amount 'eq' with no commas and no trailing zeros ("100" not "100.00").
@@ -21,10 +26,12 @@
  *   429000 rate limit, 500500/500503 server, 4xx body validation.
  *
  * Config: NK_SLIP2GO_BASE overrides the API origin (default
- * https://api.slip2go.com) for staging/testing.
+ * https://connect.slip2go.com — the live host: api.slip2go.com 404s every
+ * merchant path, so dev/staging without the env var must not be dead on
+ * arrival). Production sets NK_SLIP2GO_BASE explicitly in the Plesk panel.
  */
 
-const SLIP2GO_BASE = process.env['NK_SLIP2GO_BASE'] ?? 'https://api.slip2go.com';
+const SLIP2GO_BASE = process.env['NK_SLIP2GO_BASE'] ?? 'https://connect.slip2go.com';
 
 export interface Slip2GoVerifyInput {
   imageBase64: string;
@@ -131,6 +138,11 @@ function amountString(amountThb: number): string {
   return String(Number(rounded.toFixed(2)));
 }
 
+/** True when the response is an auth rejection worth retrying with the other scheme. */
+function isAuthRejection(httpStatus: number, providerCode: string): boolean {
+  return httpStatus === 401 || httpStatus === 403 || /^401\d*$/.test(providerCode);
+}
+
 /** Verify one slip through Slip2Go. Never throws — every path returns a result. */
 export async function verifySlip2Go(input: Slip2GoVerifyInput): Promise<Slip2GoResult> {
   const secret = process.env['NK_SLIP2GO_SECRET'];
@@ -146,34 +158,51 @@ export async function verifySlip2Go(input: Slip2GoVerifyInput): Promise<Slip2GoR
     },
   };
 
-  let res: Response;
-  try {
-    res = await fetch(`${SLIP2GO_BASE}/api/verify-slip/qr-base64/info`, {
-      method: 'POST',
-      headers: {
-        Authorization: secret,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(15_000),
-    });
-  } catch {
-    return { ok: false, code: 'UPSTREAM_ERROR', detail: 'network' };
-  }
+  // Bearer first (what this merchant account requires empirically), raw
+  // fallback after an auth rejection only — one retry, same result mapping.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const authorization = attempt === 0 ? `Bearer ${secret}` : secret;
+    let res: Response;
+    try {
+      res = await fetch(`${SLIP2GO_BASE}/api/verify-slip/qr-base64/info`, {
+        method: 'POST',
+        headers: {
+          Authorization: authorization,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(15_000),
+      });
+    } catch {
+      return { ok: false, code: 'UPSTREAM_ERROR', detail: 'network' };
+    }
 
-  let parsed: Slip2GoBody | null;
-  try {
-    parsed = (await res.json()) as Slip2GoBody;
-  } catch {
-    return { ok: false, code: 'UPSTREAM_ERROR', detail: `HTTP ${res.status}` };
-  }
+    let parsed: Slip2GoBody | null;
+    try {
+      parsed = (await res.json()) as Slip2GoBody;
+    } catch {
+      return { ok: false, code: 'UPSTREAM_ERROR', detail: `HTTP ${res.status}` };
+    }
 
-  const code = typeof parsed?.code === 'string' ? parsed.code : `HTTP_${res.status}`;
-  const message = typeof parsed?.message === 'string' ? parsed.message : `HTTP ${res.status}`;
+    const code = typeof parsed?.code === 'string' ? parsed.code : `HTTP_${res.status}`;
+    const message = typeof parsed?.message === 'string' ? parsed.message : `HTTP ${res.status}`;
 
-  if (res.status !== 200 || !code.startsWith('200') || !parsed?.data) {
-    return mapSlip2GoError(code, message);
+    if (res.status !== 200 || !code.startsWith('200') || !parsed?.data) {
+      if (attempt === 0 && isAuthRejection(res.status, code)) continue;
+      return mapSlip2GoError(code, message);
+    }
+
+    return verifySuccess(parsed, input);
   }
+  // Unreachable: the loop returns on every path except an auth rejection on
+  // attempt 0, and the last attempt always returns.
+  return { ok: false, code: 'NOT_CONFIGURED' };
+}
+
+function verifySuccess(parsed: Slip2GoBody, input: Slip2GoVerifyInput): Slip2GoResult {
+  const code = typeof parsed.code === 'string' ? parsed.code : '';
+  const message = typeof parsed.message === 'string' ? parsed.message : '';
+  if (!parsed.data) return mapSlip2GoError(code || 'HTTP_200', message || 'HTTP 200');
 
   const d = parsed.data;
   const amount = Number(d.amount ?? NaN);
