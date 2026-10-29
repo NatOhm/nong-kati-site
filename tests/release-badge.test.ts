@@ -95,6 +95,9 @@ describe('release badge — placements', () => {
 
   it('renders the dashboard card on the shared hook, not a private fetch', () => {
     expect(dashboard).toContain('<ReleaseCard />');
+    // …and it is the page FOOTER (below Quick Actions), not a line under the
+    // title — the title carries the always-on chip instead.
+    expect(dashboard).toMatch(/<footer aria-label="เวอร์ชันระบบ">\s*<ReleaseCard \/>/);
     expect(dashboard).toContain('useRelease()');
     expect(dashboard).toContain('<ReleaseBadge variant="full" />');
     // The card still explains failure and "no identity" explicitly — those

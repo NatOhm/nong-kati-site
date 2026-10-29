@@ -281,7 +281,6 @@ export default function AdminDashboardPage(): React.JSX.Element {
             <p className="mt-1 text-sm text-fg-placeholder">
               ภาพรวมระบบ Nong-Kati · อัปเดตล่าสุด เมื่อสักครู่
             </p>
-            <ReleaseCard />
           </div>
           <div className="flex items-center gap-1 rounded-lg border border-line-subtle bg-surface p-1">
             {(['today', 'week', 'month'] as const).map((tab) => (
@@ -720,6 +719,14 @@ export default function AdminDashboardPage(): React.JSX.Element {
             <QuickAction href="/management/customers" icon={Users} label="จัดการลูกค้า" />
           </div>
         </div>
+
+        {/* ── Page footer: release identity ──
+            Deliberately at the END of the page (client ask 2026-10-29): the
+            number lives in the top-bar chip and the sidebar line on every
+            screen, so down here it only has to be the full, copyable record. */}
+        <footer aria-label="เวอร์ชันระบบ">
+          <ReleaseCard />
+        </footer>
       </div>
     </AdminShell>
   );
@@ -742,6 +749,10 @@ export default function AdminDashboardPage(): React.JSX.Element {
  * `next build` compiles the working copy, so that build exists in NO commit
  * and cannot be rolled back or diffed by anyone. The verifier refuses to pack
  * such a bundle, so seeing the warning here means a deploy skipped that gate.
+ *
+ * Placement: the page footer (below Quick Actions), not under the title — the
+ * title already carries the always-on chip, and the card is the full record:
+ * values worth reading and copying, not a headline.
  */
 function ReleaseCard(): React.JSX.Element | null {
   const { release, fetchedAt, failed } = useRelease();
@@ -788,7 +799,7 @@ function ReleaseCard(): React.JSX.Element | null {
   };
 
   return (
-    <div className="mt-3 flex w-full max-w-xl items-start justify-between gap-3 rounded-lg border border-line-subtle bg-surface px-4 py-3">
+    <div className="flex w-full items-start justify-between gap-3 rounded-lg border border-line-subtle bg-surface px-4 py-3">
       <div className="min-w-0">
         <p className="text-[11px] font-medium text-fg-placeholder">เวอร์ชันระบบ</p>
         <div className="mt-1.5">
