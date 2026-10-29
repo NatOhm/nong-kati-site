@@ -25,6 +25,12 @@ import {
   Activity,
 } from 'lucide-react';
 import { AdminShell } from '@/components/layout/AdminShell';
+import {
+  DIRTY_WARNING_TEXT,
+  ReleaseBadge,
+  deriveRelease,
+  useRelease,
+} from '@/components/layout/ReleaseBadge';
 import { formatThb } from '@/lib/pricing';
 import { paymentMethodLabel } from '@/lib/paymentMethods';
 import { adminJson } from '@/lib/adminSession';
@@ -229,34 +235,6 @@ export default function AdminDashboardPage(): React.JSX.Element {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'today' | 'week' | 'month'>('today');
 
-  // Release identity (GET /api/v1/version) — public and unauthenticated, so it
-  // is fetched separately from adminJson. Its whole point is answering "what
-  // code is actually serving requests?": the stamp used to name a commit that
-  // did not contain the deployed routes (reported dbe8acd while serving
-  // b057e55), and the dashboard is where an operator should SEE that.
-  const [release, setRelease] = useState<{ buildId: string | null; gitSha: string } | null>(
-    null,
-  );
-  const [releaseFailed, setReleaseFailed] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const res = await fetch('/api/v1/version', { cache: 'no-store' });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const body = (await res.json()) as { buildId: string | null; gitSha: string };
-        if (!cancelled) setRelease(body);
-      } catch {
-        // Degrade to an explicit "unavailable" line — never a broken layout.
-        if (!cancelled) setReleaseFailed(true);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   const load = useCallback(async () => {
     try {
       const d = await adminJson<DashboardData>('/api/v1/admin/dashboard');
@@ -297,13 +275,13 @@ export default function AdminDashboardPage(): React.JSX.Element {
     >
       <div className="space-y-6">
         {/* ── Time Filter Tabs ── */}
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+          <div className="min-w-0">
             <h1 className="text-2xl font-bold text-fg">แดชบอร์ด</h1>
             <p className="mt-1 text-sm text-fg-placeholder">
               ภาพรวมระบบ Nong-Kati · อัปเดตล่าสุด เมื่อสักครู่
             </p>
-            <ReleaseStatus release={release} failed={releaseFailed} />
+            <ReleaseCard />
           </div>
           <div className="flex items-center gap-1 rounded-lg border border-line-subtle bg-surface p-1">
             {(['today', 'week', 'month'] as const).map((tab) => (
@@ -752,45 +730,89 @@ export default function AdminDashboardPage(): React.JSX.Element {
 /**
  * Which build is actually serving requests (audit finding 1, 2026-10-27).
  *
+ * The endpoint is public and unauthenticated, so this reads it through the
+ * shared `useRelease` hook — one cached request per session that the top bar
+ * chip and the sidebar footer line share — instead of this page's old private
+ * fetch. Its whole point is answering "what code is actually serving
+ * requests?": the stamp used to name a commit that did not contain the
+ * deployed routes (reported dbe8acd while serving b057e55), and the dashboard
+ * is where an operator should SEE that.
+ *
  * `gitSha` carries `-dirty` when the bundle was made from an uncommitted tree:
  * `next build` compiles the working copy, so that build exists in NO commit
  * and cannot be rolled back or diffed by anyone. The verifier refuses to pack
  * such a bundle, so seeing the warning here means a deploy skipped that gate.
  */
-function ReleaseStatus({
-  release,
-  failed,
-}: {
-  release: { buildId: string | null; gitSha: string } | null;
-  failed: boolean;
-}): React.JSX.Element | null {
+function ReleaseCard(): React.JSX.Element | null {
+  const { release, fetchedAt, failed } = useRelease();
+  const [copied, setCopied] = useState(false);
+
+  // Transient "คัดลอกแล้ว": reverts itself, with the timeout cleared on
+  // unmount so a fast navigation cannot leak it.
+  useEffect(() => {
+    if (!copied) return;
+    const t = setTimeout(() => setCopied(false), 2000);
+    return () => clearTimeout(t);
+  }, [copied]);
+
   if (failed) {
     return (
-      <p className="mt-1 text-xs text-fg-placeholder">ดึงข้อมูลเวอร์ชันไม่สำเร็จ</p>
+      <p className="mt-2 text-xs text-fg-placeholder">ดึงข้อมูลเวอร์ชันไม่สำเร็จ</p>
     );
   }
   // Silent while loading: an empty line is better than a flicker under the title.
   if (!release) return null;
 
-  const dirty = release.gitSha.endsWith('-dirty');
-  const shortSha = release.gitSha.replace(/-dirty$/, '').slice(0, 7);
-  const shaKnown = /^[0-9a-f]{7}$/i.test(shortSha);
+  const d = deriveRelease(release);
+  // Nothing verifiable — say so rather than render an empty card.
+  if (!d.usable) {
+    return <p className="mt-2 text-xs text-fg-placeholder">ไม่มีข้อมูลเวอร์ชัน</p>;
+  }
+
+  const copyText = [
+    release.buildId ? `build ${release.buildId}` : 'ไม่มี build id',
+    d.shaKnown ? `commit ${release.gitSha}` : 'ไม่มี commit',
+    ...(d.refKnown ? [`ref ${release.gitRef}`] : []),
+    ...(d.dirty ? [DIRTY_WARNING_TEXT] : []),
+  ].join(' · ');
+
+  const handleCopy = (): void => {
+    const clip = navigator.clipboard;
+    // Clipboard API is absent on insecure origins — fail quietly, the values
+    // are still selectable on the card.
+    if (!clip) return;
+    void clip
+      .writeText(copyText)
+      .then(() => setCopied(true))
+      .catch(() => undefined);
+  };
 
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-fg-placeholder">
-      {release.buildId && <span className="font-mono">build {release.buildId}</span>}
-      {shaKnown && (
-        <span className="font-mono">
-          commit {shortSha}
-          {dirty ? '-dirty' : ''}
-        </span>
-      )}
-      {dirty && (
-        <span className="border-error bg-error rounded-md border px-2 py-0.5 font-medium text-fg-error">
-          เวอร์ชันนี้สร้างจากไฟล์ที่ยังไม่ได้ commit — แก้ไขไม่ได้จาก commit นี้
-        </span>
-      )}
-      {!shaKnown && !release.buildId && <span>ไม่มีข้อมูลเวอร์ชัน</span>}
+    <div className="mt-3 flex w-full max-w-xl items-start justify-between gap-3 rounded-lg border border-line-subtle bg-surface px-4 py-3">
+      <div className="min-w-0">
+        <p className="text-[11px] font-medium text-fg-placeholder">เวอร์ชันระบบ</p>
+        <div className="mt-1.5">
+          <ReleaseBadge variant="full" />
+        </div>
+        {fetchedAt !== null && (
+          <p className="mt-1.5 text-[11px] text-fg-placeholder">
+            อ่านค่าเมื่อ {new Date(fetchedAt).toLocaleTimeString('th-TH', { hour12: false })} น.
+          </p>
+        )}
+        {d.dirty && (
+          <span className="mt-2 inline-block rounded-md border border-error bg-error px-2 py-0.5 text-xs font-medium text-fg-error">
+            {DIRTY_WARNING_TEXT}
+          </span>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={handleCopy}
+        className="shrink-0 rounded-md border border-line px-2.5 py-1.5 text-xs text-fg-secondary transition-colors hover:border-line-brand hover:text-fg-brand"
+        aria-label="คัดลอกข้อมูลเวอร์ชันระบบ"
+      >
+        {copied ? 'คัดลอกแล้ว' : 'คัดลอก'}
+      </button>
     </div>
   );
 }

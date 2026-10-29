@@ -90,6 +90,7 @@
 | SB    | server.js Infisical boot decisions (audit #7, 26 ต.ค.) — wired/skip เมื่อไม่มี credential, base URL ตัด trailing slash + default `prod`, panel override ชนะเสมอ (`=== undefined` ไม่ใช่ falsy — ค่า `""` นับว่าตั้งแล้ว), row ไม่มี `secretKey` ถูกข้ามไม่ใช่ crash · แยกเป็น `server-bootstrap.js` ให้ test ได้โดยไม่แตะ network/exit | `tests/server-bootstrap.test.ts` | `npm test` (vitest) | Unit Tests |
 | HC    | Housekeeping cron wiring (audit #2, 26 ต.ค.) — `prod-health-monitor.yml` ต้องมีทั้ง cron ทุก 10 นาที (expire ×2 + drain) และ cron รายวัน `17 3 * * *` (slip retention) · ครบทั้ง 4 endpoint พร้อม header `x-cron-token` · retention ต้องอยู่ ใน branch ของ `github.event.schedule` (ไม่งั้นสแกน settings table ทุก 10 นาที) · ไม่ตั้ง `NK_CRON_SECRET` = ต้อง `exit 1` + `::error` ดัง ๆ (บั๊กต้นเรื่องคือปิดเงียบ) | `tests/housekeeping-cron.test.ts` | `npm test` (vitest) | Unit Tests |
 | BS    | Build stamp ต้องบอกของจริง (audit #1, 27 ต.ค.) — `.next/GIT_SHA` มาจา working tree ไม่ใช่ HEAD (ของจริง: `/api/v1/version` บอก `dbe8acd` แต่เสิร์ฟโค้ด `b057e55` เพราะ build ก่อน commit) · tree รก = stamp `<sha>-dirty` + เตือนดัง ๆ แต่ยัง exit 0 (คนยังแก้ของอยู่ ห้ามบล็อก build) · untracked file ก็นับ dirty (route ใหม่ที่ยังไม่ commit ก็เข้า build ได้) · ไม่มี `.next/BUILD_ID` = exit 1 | `tests/build-stamp.test.ts` | `npm test` (vitest) | Unit Tests |
+| RB    | Release badge — เวอร์ชันที่แอดมินเห็น ต้องเป็นของจริงทุกหน้า (29 ต.ค.) — `fetch('/api/v1/version')` มีที่เดียวใน `src/` หลัง module-level cache (ไม่งั้นทุก navigation ในแอดมินเรียกซ้ำ) · chip ต้องอยู่ใน top bar (ทุกหน้า) และ sidebar footer ทั้ง desktop rail กับ mobile drawer · dashboard card อ่านจาก hook เดียวกัน ไม่มี fetch ส่วนตัว · ข้อความ fail/ไม่มีข้อมูล + dirty warning + ปุ่มคัดลอก ต้องอยู่ครบ | `tests/release-badge.test.ts` | `npm test` (vitest) | Unit Tests |
 
 **วิธีรัน:**
 
@@ -851,3 +852,23 @@ feedback 19 ต.ค.: (1) สินค้าที่มีรหัสเติ
 - คืน id ปลอมใน payload → VR2 แดง (ต้องได้ 409 ไม่ใช่ 200)
 - คืน category filter เป็น `cat.id` ตรง ๆ (ไม่เอา descendants) → VR4 แดง
 - เอา `where: { isActive: true }` ออกจาก `_count` ของ chip → VR4 แดง
+
+---
+
+## Release badge — เวอร์ชันที่แอดมินเห็นได้ทุกหน้า (29 ต.ค. 2569) — `tests/release-badge.test.ts`
+
+เดิม build/commit เป็นตัวหนังสือ 12px ใต้ title ของหน้า dashboard หน้าเดียว ที่อ่านจาก `useEffect` เฉพาะของ page นั้น — แอดมินอยู่หน้าอื่น (orders, inventory, settings) บอกไม่ได้เลยว่าโค้ดตัวไหนกำลังเสิร์ฟ และทุก navigation ที่กลับเข้า dashboard ก็ยิง request ใหม่ ตอนนี้มีที่อ่าน 3 ที่ คือ chip ใน top bar (ทุกหน้าแอดมิน รวมมือถือ), บรรทัดที่ footer ของ sidebar (ทั้ง rail และ drawer), และการ์ด `เวอร์ชันระบบ` ใน dashboard — ทั้งหมดแช่ request เดียว
+
+| ตัว | บังคับว่า |
+|---|---|
+| RB1 | `fetch('/api/v1/version', { cache: 'no-store' })` มีที่เดียวใน `src/` — อยู่ใน `ReleaseBadge.tsx` หลัง module-level cache (`pending`/`settled`) และ `catch` ต้อง `pending = null` เพื่อให้ mount ถัดไป retry ได้ (ค้าง fail ตลอด session = badge หายเงียบจนรีเฟรช) |
+| RB2 | top bar ต้อง mount `<ReleaseBadge variant="chip" commit="responsive" />` — ครึ่ง `commit` หายไปต่ำกว่า `sm` ไม่ให้เบียด bell/logout บนจอ 390px |
+| RB3 | sidebar ต้องผ่าน `SidebarRelease` สองจุด (rail + drawer) และตอน collapsed ต้อง `commit='none'` + `minimal` — คอลัมน์ 4rem ใส่ prefix/commit ไม่ได้ ปล่อยให้ truncate ตัด ไม่ใช่ overflow |
+| RB4 | dashboard ต้อง render `<ReleaseCard />` ที่อ่าน `useRelease()` (ไม่มี fetch ของตัวเอง) และยังมี `ดึงข้อมูลเวอร์ชันไม่สำเร็จ`, `ไม่มีข้อมูลเวอร์ชัน`, `DIRTY_WARNING_TEXT` และปุ่ม `คัดลอกแล้ว` |
+
+**พังได้จริง — ทดสอบด้วยการใส่มั๊กกลับ**
+
+- ย้าย `fetch('/api/v1/version')` กลับเข้า dashboard page → RB1 แดง (มี 2 ไฟล์ที่ fetch)
+- ลบ `<ReleaseBadge/>` จาก top bar → RB2 แดง
+- เอา `<SidebarRelease collapsed={false}/>` ออกจาก drawer → RB3 แดง
+- ให้ dashboard กลับไป declare `release` state เอง → RB4 แดง

@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, X, Store } from 'lucide-react';
 import { cn } from '@/utils/cn';
+import { ReleaseBadge } from './ReleaseBadge';
 import { type AdminRole } from '@/types/auth';
 import {
   type AdminNavNode,
@@ -307,6 +308,29 @@ function StorefrontLink({
   );
 }
 
+/**
+ * Release identity pinned to the bottom of BOTH presentation modes — the
+ * same number the top bar chip carries, so an operator sees it on every
+ * admin screen without hunting for the dashboard line it used to hide in.
+ *
+ * The wrapper owns the shared `border-t p-2` so the rail and the drawer keep
+ * matching bottom edges; the collapsed 4rem rail has no width for the prefix
+ * or the commit, so `minimal` shows the bare short build id and lets truncate
+ * handle the remainder instead of overflowing the column.
+ */
+function SidebarRelease({ collapsed }: { collapsed: boolean }) {
+  return (
+    <div className="shrink-0 border-t border-line-subtle px-2 py-2">
+      <ReleaseBadge
+        variant="chip"
+        commit={collapsed ? 'none' : 'always'}
+        minimal={collapsed}
+        className={cn('w-full', collapsed && 'justify-center px-0 text-center')}
+      />
+    </div>
+  );
+}
+
 /** Collapse toggle — desktop rail only (the drawer has its own close button). */
 function CollapseToggle({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   return (
@@ -408,6 +432,7 @@ export function AdminSidebar({
         <SidebarBrand collapsed={collapsed} />
         <StorefrontLink collapsed={collapsed} />
         <SidebarNav role={role} collapsed={collapsed} />
+        <SidebarRelease collapsed={collapsed} />
         <CollapseToggle collapsed={collapsed} onToggle={onToggle} />
       </aside>
 
@@ -452,9 +477,9 @@ export function AdminSidebar({
             </div>
             <StorefrontLink collapsed={false} onNavigate={onCloseMobile} />
             <SidebarNav role={role} collapsed={false} onNavigate={onCloseMobile} />
-            {/* Footer keeps the rail's bottom border height so both modes
-                look identical; the collapse control is desktop-only. */}
-            <div className="shrink-0 border-t border-line-subtle p-2" />
+            {/* Same release line as the rail, so both modes keep the same
+                bottom edge; the collapse control is desktop-only. */}
+            <SidebarRelease collapsed={false} />
           </div>
         </>
       )}

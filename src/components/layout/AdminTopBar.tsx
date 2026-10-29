@@ -8,6 +8,7 @@ import { clearAdminSession } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
 import { type AdminRole } from '@/types/auth';
 import { ThemeToggle } from './ThemeToggle';
+import { ReleaseBadge } from './ReleaseBadge';
 
 export interface AdminTopBarProps {
   staffName: string;
@@ -99,6 +100,11 @@ export function AdminTopBar({
       </div>
 
       <div className="flex items-center gap-4">
+        {/* Release identity — visible on EVERY admin page (this header sits
+            inside AdminShell). `responsive` drops the commit half below sm so
+            the 390px header can still hold the bell and logout. */}
+        <ReleaseBadge variant="chip" commit="responsive" />
+
         {/* Client ask: quick jump back to the storefront. */}
         <Link
           href="/"
@@ -125,8 +131,12 @@ export function AdminTopBar({
           )}
         </button>
 
-        {/* User info */}
-        <div className="hidden items-center gap-2 md:flex">
+        {/* User info — md→lg on 2026-10-29: the release chip adds 144px to
+            this row, and between 768–1023px the name wrapped to two lines and
+            spilled past the 56px bar. Below lg the role still reads in the
+            sidebar's gated nav and the chip stays, which is the worse of the
+            two to lose. */}
+        <div className="hidden items-center gap-2 lg:flex">
           <div className="text-right">
             <p className="text-sm font-medium text-fg">{staffName}</p>
             <p className="text-xs text-fg-placeholder">{ROLE_LABELS[staffRole]}</p>
