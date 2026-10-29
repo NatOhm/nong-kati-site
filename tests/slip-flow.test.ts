@@ -90,7 +90,20 @@ const h = vi.hoisted(() => {
     getClientIp: vi.fn(() => '203.0.113.9'),
     checkRateLimit: vi.fn(async () => ({ allowed: true })),
   };
-  return { prisma, orders, fulfil, notify, slipSec, slipok, slip2go, rate };
+  // Route reads the store receiving account via getManualTransferInfo —
+  // mocked here because the real module pulls React.cache at import time,
+  // which does not exist in the vitest environment.
+  const manualTransfer = {
+    getManualTransferInfo: vi.fn(async (): Promise<Row> => ({
+      enabled: true,
+      accountName: 'ร้านนกกะทา',
+      accountNumber: null,
+      accountType: 'bank',
+      bankName: null,
+      qrImageUrl: null,
+    })),
+  };
+  return { prisma, orders, fulfil, notify, slipSec, slipok, slip2go, rate, manualTransfer };
 });
 
 vi.mock('@/lib/db', () => ({ prisma: h.prisma }));
@@ -101,6 +114,10 @@ vi.mock('@/lib/slipSecurity', () => h.slipSec);
 vi.mock('@/lib/payment/slipok', () => h.slipok);
 vi.mock('@/lib/payment/slip2go', () => h.slip2go);
 vi.mock('@/lib/rateLimit', () => h.rate);
+vi.mock('@/lib/data', () => ({
+  getManualTransferInfo: (...args: unknown[]) =>
+    (h.manualTransfer.getManualTransferInfo as (...a: unknown[]) => unknown)(...args),
+}));
 vi.mock('@/lib/paymentReconciliation', () => ({
   recordPaymentReconciliation: vi.fn(async () => 'rec-1'),
 }));
@@ -162,6 +179,14 @@ beforeEach(() => {
   h.prisma.paymentAttempt.update.mockResolvedValue({});
   h.prisma.order.update.mockResolvedValue({});
   h.prisma.siteSetting.create.mockResolvedValue({});
+  h.manualTransfer.getManualTransferInfo.mockResolvedValue({
+    enabled: true,
+    accountName: 'ร้านนกกะทา',
+    accountNumber: null,
+    accountType: 'bank',
+    bankName: null,
+    qrImageUrl: null,
+  });
   h.fulfil.fulfilOrder.mockResolvedValue({ success: true });
 });
 
@@ -183,6 +208,31 @@ describe('provider dispatch in POST /api/v1/payments/slip-verify', () => {
     expect(((await res.json()) as { status: string }).status).toBe('confirmed');
     expect(h.slip2go.verifySlip2Go).toHaveBeenCalledTimes(1);
     expect(h.slipok.verifySlip).not.toHaveBeenCalled();
+    // Fix C: the audit label records the real provider, not a hardcoded one.
+    expect(h.prisma.paymentAttempt.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ slipVerifiedBy: 'slip2go:auto' }),
+      }),
+    );
+  });
+
+  it('passes the store receiving account to Slip2Go for the receiver check', async () => {
+    h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
+    h.slip2go.verifySlip2Go.mockResolvedValueOnce(slipOkSuccess);
+    h.manualTransfer.getManualTransferInfo.mockResolvedValueOnce({
+      enabled: true,
+      accountName: 'ร้านนกกะทา',
+      accountNumber: '123-456-5786',
+      accountType: 'bank',
+      bankName: null,
+      qrImageUrl: null,
+    });
+
+    const res = await callVerify();
+    expect(res.status).toBe(200);
+    expect(h.slip2go.verifySlip2Go).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedReceiverDigits: '1234565786' }),
+    );
   });
 
   it('skips the upstream call when Slip2Go is not configured', async () => {
@@ -193,6 +243,11 @@ describe('provider dispatch in POST /api/v1/payments/slip-verify', () => {
     expect(res.status).toBe(200);
     expect(h.slip2go.verifySlip2Go).not.toHaveBeenCalled();
     expect(h.slipok.verifySlip).toHaveBeenCalledTimes(1);
+    expect(h.prisma.paymentAttempt.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ slipVerifiedBy: 'slipok:auto' }),
+      }),
+    );
   });
 
   it('retries on SlipOK when Slip2Go fails transiently (outage)', async () => {
@@ -224,6 +279,25 @@ describe('provider dispatch in POST /api/v1/payments/slip-verify', () => {
     const res = await callVerify();
     expect(res.status).toBe(422);
     expect(h.slipok.verifySlip).not.toHaveBeenCalled();
+  });
+
+  it('does NOT retry or confirm on a wrong-account slip (receiver mismatch)', async () => {
+    h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
+    h.slipok.isSlipVerificationEnabled.mockReturnValue(true);
+    h.slip2go.verifySlip2Go.mockResolvedValueOnce({
+      ok: false,
+      code: 'RECEIVER_MISMATCH',
+      detail: 'receiver …9999 vs store …5786',
+    });
+
+    const res = await callVerify();
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { error: string }).error).toBe('RECEIVER_MISMATCH');
+    // A wrong-account slip must never be retried on the other provider
+    // hoping for a pass, and must never reach fulfilment.
+    expect(h.slipok.verifySlip).not.toHaveBeenCalled();
+    expect(h.fulfil.fulfilOrder).not.toHaveBeenCalled();
+    expect(h.prisma.paymentAttempt.update).not.toHaveBeenCalled();
   });
 });
 

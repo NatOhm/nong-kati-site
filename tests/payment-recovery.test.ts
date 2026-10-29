@@ -80,6 +80,20 @@ const { verifySlipMock, tokenMock } = vi.hoisted(() => {
 });
 vi.doMock('@/lib/payment/slipok', () => verifySlipMock);
 vi.doMock('@/lib/slipSecurity', () => tokenMock);
+// The slip-verify route reads the store receiving account via
+// getManualTransferInfo — the real module pulls React.cache at import
+// time, which does not exist in the vitest environment. Null account
+// keeps receiver enforcement off, matching pre-checkReceiver behavior.
+vi.doMock('@/lib/data', () => ({
+  getManualTransferInfo: vi.fn(async () => ({
+    enabled: true,
+    accountName: 'ร้านนกกะทา',
+    accountNumber: null,
+    accountType: 'bank',
+    bankName: null,
+    qrImageUrl: null,
+  })),
+}));
 
 beforeEach(() => {
   vi.clearAllMocks();

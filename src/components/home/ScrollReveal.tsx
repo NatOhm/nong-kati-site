@@ -72,8 +72,12 @@ export function ScrollReveal({ children, className, delay = 0 }: ScrollRevealPro
     <div
       ref={ref}
       className={cn(
-        'transition-smart duration-interactive ease-out-quart will-change-transform',
-        isVisible ? 'translate-y-0 opacity-100' : 'translate-y-6 scale-[0.99] opacity-0',
+        'transition-smart duration-interactive ease-out-quart',
+        // Revealed state keeps NO transform/will-change: either one makes
+        // this section a containing block for `fixed` descendants (e.g.
+        // the quick-view modal), mis-anchoring them to the section box.
+        // Pre-reveal keeps will-change so the entrance stays smooth.
+        isVisible ? 'opacity-100' : 'translate-y-6 scale-[0.99] opacity-0 will-change-transform',
         className,
       )}
     >

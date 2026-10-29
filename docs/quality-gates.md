@@ -79,6 +79,7 @@
 | E6    | Admin refund + resend controls on the order detail modal | `e2e/order-refund-resend.spec.ts` | `npm run test:e2e`   | **Browser Smoke** (run ใน CI ด้วย) |
 | E7    | Admin order search / customer history / delivery reveal — masked vs full PII, cancel-path, allowed + denied roles | `e2e/admin-search-history-reveal.spec.ts` | `npm run test:e2e` | **Browser Smoke** (run ใน CI ด้วย) |
 | SF    | Slip flow — auto-verify dispatch (Slip2Go→SlipOK fallback), เก็บหลักฐานสลิป before check, ping แอดมินเมื่อต้องตรวจเอง | `tests/slip-flow.test.ts` | `npm test` (vitest) | Unit Tests             |
+| RV    | Slip receiver enforcement (28 ต.ค.) — ยอดตรงแต่บัญชีผู้รับไม่ใช่ร้าน ห้าม auto-confirm/ปล่อยโค้ด: `checkReceiver` bank-side (`200401`→`RECEIVER_MISMATCH`) + local trailing-4 guard, ออเดอร์ค้างจ่าย+สลิปอยู่คิวมือ · `slipVerifiedBy` บันทึก provider จริง (`slip2go:auto`/`slipok:auto`) ทั้ง confirm และ recovery path | `tests/slip2go-receiver.test.ts` | `npm test` (vitest) | Unit Tests             |
 | VS    | Inventory shelf panel (21 ต.ค. 2569) — `POST /stock/bulk` รับ `variantId` pin ได้ (unknown variant = 400 ห้าม fallback เงียบ ๆ) + round-robin เดิมไม่เปลี่ยน · `GET /admin/inventory` คืน `variants[]` ครบทุกตัว (additive — field เดิมครบ) | `tests/inventory-variants-shelf.test.ts` | `npm test` (vitest) | Unit Tests |
 | BV    | Bulk-void + batchId correlation (22 ต.ค. 2569) — paste ทุก plan สร้าง batch + stamp ลง codes/StockMove/audit · `POST /stock/bulk-void` CAS เฉพาะ available, stock ไม่ติดลบ, idempotent, tx เดียว · `GET /admin/inventory` คืน `refId` (additive) ให้ chip ในตารางประวัติ | `tests/inventory-bulk-void.test.ts` | `npm test` (vitest) | Unit Tests |
 | DM    | Dashboard money scope — panel "รายได้เดือนนี้" ต้องเป็นยอดเดือนนี้ไม่ใช่ all-time · PromptPay share หาจาก method name (ไม่ใช่ `[0]` ที่ DB คืน wallet ก่อน) · store ว่าง = 0% ไม่ใช่ NaN% | `tests/dashboard-month-scope.test.ts` | `npm test` (vitest) | Unit Tests |
@@ -717,6 +718,15 @@ job นี้แดงมาตั้งแต่รอบที่ 88 และ
 - **Admin fallback ping:** ทุกเคสที่ระบบยืนยันเองไม่ได้ (`slip-verify` fail) และทุกการอัปโหลด slip-upload (manual path เต็ม) → `notifyPaymentPending` ยิง Discord ให้แอดมินมาตรวจทันที (เดิมไม่มีใครถูกแจ้งเลย — คิวเปลี่ยนเฉพาะตอนมีคนเปิดหน้าเว็บ)
 - **UX ฝั่งลูกค้า:** panel เก็บเหตุผลจากระบบตรวจไว้ในข้อความตอนส่งให้แอดมิน (เดิมถูกแทนด้วยข้อความ generic), verify สำเร็จ → `onConfirmed` ให้ checkout flip เป็นสถานะชำระเงินแล้ว และ network fail ระหว่าง verify → ยัง upload ให้แอดมินต่อได้
 - **assert (node env):** dispatch 2 provider + fallback + ไม่ retry เมื่อ verdict ชัด · evidence row เขียนก่อน provider call ทั้งตอนผ่าน/ไม่ผ่าน · `notifyPaymentPending` ถูกเรียกตอน fail ทั้ง 2 route · token ผิด = 403 ไม่เก็บรูป · panel component (jsdom): เหตุผล+ข้อความแอดมินอยู่ครบ, เรียก slip-verify ครั้งเดียวเมื่อ `slipStored`, `onConfirmed('confirmed')` เมื่อผ่าน
+
+## Slip receiver enforcement (28 ต.ค.) — `tests/slip2go-receiver.test.ts`
+
+ช่องโหว่: สลิปยอดตรงแต่โอนเข้าบัญชีคนอื่น เคย auto-confirm แล้วปล่อยโค้ดได้ (เงินไม่เคยเข้าร้าน) — โค้ดอยู่ `src/lib/payment/slip2go.ts` (`checkReceiver` + local trailing-4 guard), `src/app/api/v1/payments/slip-verify/route.ts` (`verifiedBy` + fail-closed mapping):
+
+- **Bank-side check:** ส่ง `checkReceiver: [{ accountNumber }]` (digits only ผ่าน `normalizeAccountDigits` ตัวเดียว) เฉพาะเมื่อตั้งค่าบัญชีร้านไว้ — provider ตอบ `200401` → map เป็น `RECEIVER_MISMATCH` (ไม่ retry, ไม่ fulfil)
+- **Local guard:** provider รายงานบัญชีแบบ masked (`xxx-x-x5366-x`) จึงเทียบ trailing-4 หลัก และเทียบเฉพาะเมื่อทั้งสองฝั่งมี ≥4 หลัก — mismatch ที่ชัวร์ fail-closed (ออเดอร์ยังจ่ายได้ สลิปค้างคิวมือ), masked จนเทียบไม่ได้ = ปล่อยผ่านให้ bank-side verdict ตัดสิน
+- **Provider label จริง:** `slipVerifiedBy` = `slip2go:auto`/`slipok:auto` ตาม provider ที่ใช้จริง (เดิม hardcode `slipok:auto` ทุกเคส) — เขียนที่เดียวผ่าน `verifiedBy` const ทั้ง confirm และ insufficient-stock recovery path
+- **วิธีแก้เมื่อแดง:** แก้ mapping/guard ใน `slip2go.ts` หรือ `verifiedBy` ใน route อย่าแก้เทสต์ให้ตามโค้ดที่ผิด; บัญชีร้านไม่ตั้ง = ข้าม receiver check เหมือนเดิม (fail-open เฉพาะเมื่อไม่มีอะไรให้เทียบ)
 
 ## CI pipeline (`.github/workflows/ci.yml`)
 

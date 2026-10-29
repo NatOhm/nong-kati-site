@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { claimOrderForConfirmation, getOrderById } from '@/api/orders';
 import { prisma } from '@/lib/db';
+import { getManualTransferInfo } from '@/lib/data';
 import { notifyPaymentConfirmed, notifyPaymentPending, notifyStockAlertsForVariants } from '@/lib/notify';
 import { fulfilOrder, scheduleOutboxDrain } from '@/lib/fulfilment';
 import { recordPaymentReconciliation } from '@/lib/paymentReconciliation';
@@ -133,6 +134,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
   const expected = Number(order.totalAmountThb);
 
+  // Strict receiver: the store's own receiving account (digits only) is
+  // enforced bank-side via checkReceiver plus a local trailing-4 guard in
+  // verifySlip2Go. Unconfigured store account → receiver check skipped,
+  // exactly as before (fail-closed only where we have something to check
+  // against; a misconfigured account fails verifications into the manual
+  // queue instead of releasing codes).
+  const manualInfo = await getManualTransferInfo();
+  const storeDigits = (manualInfo.accountNumber ?? '').replace(/\D/g, '');
+  const receiverOpt = storeDigits === '' ? {} : { expectedReceiverDigits: storeDigits };
+
   // ── Keep the evidence FIRST ──────────────────────────────────────────────
   // Whatever the provider answers (pass, amount mismatch, outage), the
   // customer's slip must land in หน้าจัดการคำสั่งซื้อ so the admin fallback
@@ -157,7 +168,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // ── Ask the configured providers (Slip2Go preferred, SlipOK fallback) ──
   let usedProvider = isSlip2GoEnabled() ? 'slip2go' : 'slipok';
   let result: ProviderResult = isSlip2GoEnabled()
-    ? await verifySlip2Go({ imageBase64, expectedAmountThb: expected })
+    ? await verifySlip2Go({ imageBase64, expectedAmountThb: expected, ...receiverOpt })
     : await verifySlip({ imageBase64, expectedAmountThb: expected });
   if (!result.ok && RETRYABLE_ON_FALLBACK.has(result.code)) {
     // Slip2Go down / quota spent / config broken — retry on the OTHER
@@ -167,10 +178,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     if (canRetry) {
       result = isSlip2GoEnabled()
         ? await verifySlip({ imageBase64, expectedAmountThb: expected })
-        : await verifySlip2Go({ imageBase64, expectedAmountThb: expected });
+        : await verifySlip2Go({ imageBase64, expectedAmountThb: expected, ...receiverOpt });
       usedProvider = isSlip2GoEnabled() ? 'slipok' : 'slip2go';
     }
   }
+  const verifiedBy = usedProvider === 'slip2go' ? 'slip2go:auto' : 'slipok:auto';
 
   if (!result.ok) {
     // Provider diagnostics (client feedback 19 Oct: auto-verify failures
@@ -245,11 +257,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             slipVerifiedRef: result.ref,
             slipVerifiedAt: new Date(),
             slipReceiverAccount: result.receiverAccount,
-            slipVerifiedBy: 'slipok:auto',
+            slipVerifiedBy: verifiedBy,
             gatewayResponse: result.raw as object,
           },
         });
-        // Production review HIGH-2: the bank verified this transfer (SlipOK);
+        // Production review HIGH-2: the bank verified this transfer (Slip2Go/SlipOK);
         // coupon state changes after QR issuance cannot strand the money.
         const claimed = await claimOrderForConfirmation(order.id, tx, { paidExternally: true });
         if (!claimed) throw new Error('ALREADY_CLAIMED');
@@ -297,7 +309,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
               slipVerifiedRef: result.ref,
               slipVerifiedAt: new Date(),
               slipReceiverAccount: result.receiverAccount,
-              slipVerifiedBy: 'slipok:auto',
+              slipVerifiedBy: verifiedBy,
             },
           });
           const claimed = await claimOrderForConfirmation(order.id, tx, { paidExternally: true });

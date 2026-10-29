@@ -37,6 +37,14 @@ export interface Slip2GoVerifyInput {
   imageBase64: string;
   /** Exact order total in THB — enforced bank-side via checkAmount eq. */
   expectedAmountThb: number;
+  /**
+   * Store receiving account, digits only (no spaces/dashes) — enforced
+   * bank-side via checkReceiver when present, plus a local trailing-4
+   * guard in verifySuccess. Omit when the store account is not
+   * configured: amount/duplicate checks still apply, receiver
+   * enforcement is skipped (same as before this field existed).
+   */
+  expectedReceiverDigits?: string;
 }
 
 export interface Slip2GoSuccess {
@@ -132,6 +140,11 @@ function mapSlip2GoError(code: string, message: string): Slip2GoResult {
   }
 }
 
+/** Digits only — strips spaces/dashes/mask chars from account numbers. */
+function normalizeAccountDigits(v: string | null | undefined): string {
+  return (v ?? '').replace(/\D/g, '');
+}
+
 /** Slip2Go wants a plain decimal string: no commas, no trailing zeros. */
 function amountString(amountThb: number): string {
   const rounded = Math.round(amountThb * 100) / 100;
@@ -148,12 +161,18 @@ export async function verifySlip2Go(input: Slip2GoVerifyInput): Promise<Slip2GoR
   const secret = process.env['NK_SLIP2GO_SECRET'];
   if (!secret) return { ok: false, code: 'NOT_CONFIGURED' };
 
+  const receiverDigits = normalizeAccountDigits(input.expectedReceiverDigits);
   const body = {
     payload: {
       imageBase64: `data:image/png;base64,${input.imageBase64}`,
       checkCondition: {
         checkAmount: { type: 'eq', amount: amountString(input.expectedAmountThb) },
         checkDuplicate: true,
+        // Provider-side receiver enforcement (200401 on mismatch, mapped
+        // to RECEIVER_MISMATCH). Sent only when the store account is
+        // configured — Slip2Go checks only the keys present, so omitting
+        // this changes nothing else.
+        ...(receiverDigits !== '' ? { checkReceiver: [{ accountNumber: receiverDigits }] } : {}),
       },
     },
   };
@@ -218,12 +237,31 @@ function verifySuccess(parsed: Slip2GoBody, input: Slip2GoVerifyInput): Slip2GoR
       detail: `slip ${amount} vs order ${input.expectedAmountThb}`,
     };
   }
+  const gotAccount =
+    d.receiver?.account?.bank?.account ?? d.receiver?.account?.proxy?.account ?? null;
+  const gotDigits = normalizeAccountDigits(typeof gotAccount === 'string' ? gotAccount : '');
+  const wantDigits = normalizeAccountDigits(input.expectedReceiverDigits);
+  // Local receiver guard: the provider reports masked accounts
+  // ("xxx-x-x5366-x"), so compare trailing 4 digits only, and only when
+  // both sides yield at least 4 digits. A definite mismatch fails closed —
+  // the order stays payable and the slip waits for manual review.
+  // Last-4 only in the detail: the full numbers never enter logs.
+  if (
+    wantDigits.length >= 4 &&
+    gotDigits.length >= 4 &&
+    wantDigits.slice(-4) !== gotDigits.slice(-4)
+  ) {
+    return {
+      ok: false,
+      code: 'RECEIVER_MISMATCH',
+      detail: `receiver …${gotDigits.slice(-4)} vs store …${wantDigits.slice(-4)}`,
+    };
+  }
   return {
     ok: true,
     ref: d.transRef,
     amountThb: amount,
-    receiverAccount:
-      d.receiver?.account?.bank?.account ?? d.receiver?.account?.proxy?.account ?? null,
+    receiverAccount: gotAccount,
     receiverName: d.receiver?.account?.name ?? null,
     transferAt: d.dateTime ?? null,
     raw: d as unknown as Record<string, unknown>,

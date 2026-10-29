@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { Check, Minus, Plus, X } from 'lucide-react';
 import { cn } from '@/utils/cn';
@@ -145,7 +146,11 @@ export function QuickViewModal({
 
   if (!isOpen) return <></>;
 
-  return (
+  // Portal out of the card grid: ancestors like ScrollReveal keep a
+  // transform/will-change that would otherwise trap these `fixed` layers
+  // inside the section box instead of the viewport. isOpen is only ever
+  // true after client interaction, so document.body always exists here.
+  return createPortal(
     <>
       {/* Backdrop */}
       <div
@@ -314,6 +319,7 @@ export function QuickViewModal({
           </Link>
         </div>
       </div>
-    </>
+    </>,
+    document.body,
   );
 }

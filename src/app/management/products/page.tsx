@@ -1135,7 +1135,7 @@ function ProductEditor({
             </div>
             <div className="space-y-2">
               {variants.map((v, i) => (
-                <div key={v.key} className="flex items-center gap-2">
+                <div key={v.key} className="flex flex-wrap items-center gap-2">
                   <input
                     value={v.label}
                     onChange={(e) =>
@@ -1146,14 +1146,28 @@ function ProductEditor({
                     placeholder="ชื่อ เช่น 7 วัน 4K"
                     className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-placeholder focus:ring-2 focus:ring-peach-500"
                   />
-                  {!v.isActive && (
-                    <span
-                      className="shrink-0 rounded-full bg-surface-sunken px-2 py-1 text-[10px] font-semibold text-fg-muted"
-                      title="ตัวเลือกนี้ปิดจำหน่ายแล้ว — ไม่แสดงบนหน้าเว็บ"
-                    >
-                      ปิด
-                    </span>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setVariants((arr) =>
+                        arr.map((x) => (x.key === v.key ? { ...x, isActive: !x.isActive } : x)),
+                      )
+                    }
+                    aria-pressed={v.isActive}
+                    title={
+                      v.isActive
+                        ? 'กำลังขายอยู่ — กดเพื่อปิดจำหน่าย (ซ่อนจากหน้าเว็บ)'
+                        : 'ปิดจำหน่ายอยู่ — กดเพื่อเปิดขายอีกครั้ง'
+                    }
+                    className={cn(
+                      'shrink-0 rounded-full border px-2 py-1 text-[10px] font-semibold',
+                      v.isActive
+                        ? 'border-peach-500 bg-peach-100 text-peach-800'
+                        : 'border-line bg-surface-sunken text-fg-muted',
+                    )}
+                  >
+                    {v.isActive ? 'เปิด' : 'ปิด'}
+                  </button>
                   <input
                     value={v.price}
                     onChange={(e) =>
@@ -1234,6 +1248,9 @@ function ProductEditor({
             </div>
             <p className="mt-1 text-[10px] text-fg-placeholder">
               ชื่อตัวเลือก · ราคาปกติ · ราคาสมาชิก · ราคาตัวแทน (เว้นว่าง = ใช้ราคาปกติ) · สต็อก
+              <br />
+              ตัวเลือกที่เคยมีออเดอร์/โค้ดอ้างอิงอยู่จะลบถาวรไม่ได้ — กด × แล้วบันทึกจะเปลี่ยนเป็น
+              “ปิด” แทน กดปุ่ม เปิด/ปิด เพื่อขายอีกครั้งได้
             </p>
           </div>
 
