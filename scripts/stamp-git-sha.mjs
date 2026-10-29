@@ -35,13 +35,23 @@ try {
   const stamped = dirty ? `${sha}-dirty` : sha;
 
   writeFileSync('.next/GIT_SHA', stamped);
+
+  // HUMAN-FACING RELEASE NUMBER (2026-10-29, client ask): the commit count.
+  // The Next build id is a random 21-char string nobody can read aloud, so
+  // the admin UI shows this instead — monotonic, never resets, and identical
+  // for two builds of the same commit (which is the truth: same code).
+  // -dirty rides on GIT_SHA, so the number stays a plain integer here.
+  const count = execSync('git rev-list --count HEAD', { encoding: 'utf8' }).trim();
+  if (!/^\d+$/.test(count)) throw new Error(`unrecognised commit count: ${count}`);
+  writeFileSync('.next/BUILD_NUMBER', `${count}\n`);
+
   if (dirty) {
     console.warn(`stamp-git-sha: WORKING TREE DIRTY — .next/GIT_SHA = ${stamped}`);
     console.warn(
       'stamp-git-sha: this build contains changes that are not in that commit. Commit, then rebuild. .verify-bundle.ps1 will refuse to pack it.',
     );
   } else {
-    console.log(`stamp-git-sha: .next/GIT_SHA = ${stamped}`);
+    console.log(`stamp-git-sha: .next/GIT_SHA = ${stamped} · .next/BUILD_NUMBER = ${count}`);
   }
 } catch (err) {
   console.warn(`stamp-git-sha: skipped (${err.message.trim()}) — /api/v1/version falls back to env GIT_SHA`);

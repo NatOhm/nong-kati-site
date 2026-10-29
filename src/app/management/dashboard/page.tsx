@@ -781,7 +781,9 @@ function ReleaseCard(): React.JSX.Element | null {
   }
 
   const copyText = [
-    release.buildId ? `build ${release.buildId}` : 'ไม่มี build id',
+    // Same token the chip renders: the release number when stamped, the raw
+    // build id otherwise — the copy payload never disagrees with what is on screen.
+    d.displayBuild ? `build ${d.displayBuild}` : 'ไม่มี build id',
     d.shaKnown ? `commit ${release.gitSha}` : 'ไม่มี commit',
     ...(d.refKnown ? [`ref ${release.gitRef}`] : []),
     ...(d.dirty ? [DIRTY_WARNING_TEXT] : []),

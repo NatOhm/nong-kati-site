@@ -14,7 +14,11 @@
  *      .verify-bundle.ps1, so a build you are still editing can carry on);
  *   3. an untracked file also counts as dirty, because `next build` can compile
  *      a new route that is not in any commit yet;
- *   4. no `.next/BUILD_ID` still exits 1 (must run `next build` first).
+ *   4. no `.next/BUILD_ID` still exits 1 (must run `next build` first);
+ *   5. `.next/BUILD_NUMBER` carries `git rev-list --count HEAD` — the number
+ *      the admin UI shows instead of the random 21-char build id (client ask,
+ *      2026-10-29) — as a bare integer on BOTH the clean and the dirty path,
+ *      because `-dirty` already rides on GIT_SHA.
  *
  * The sandbox writes its own `.gitignore` with `.next/` in it, mirroring the
  * real repo — otherwise BUILD_ID itself would be untracked and every build
@@ -129,6 +133,37 @@ describe('stamp-git-sha', () => {
     expect(r.code).toBe(0);
     expect(readStamp(dir)).toBe(`${head}-dirty`);
   });
+
+  // Budget, not slack: this is the only case that runs the script TWICE on
+  // top of a repo init/commit (≈9 git+node spawns), and under a full-suite
+  // run it lands past vitest's 5 s default on a loaded machine. The asserts
+  // below are unchanged — only the clock is.
+  it(
+    'stamps the commit count into .next/BUILD_NUMBER as a plain integer',
+    { timeout: 30_000 },
+    () => {
+      const dir = makeRepo(true);
+      const count = git(dir, 'rev-list', '--count', 'HEAD').trim();
+      const readNumber = (): string =>
+        readFileSync(join(dir, '.next', 'BUILD_NUMBER'), 'utf8').trim();
+
+      const clean = stamp(dir);
+
+      expect(clean.code).toBe(0);
+      expect(count).toMatch(/^\d+$/);
+      expect(readNumber()).toBe(count);
+
+      // A dirty tree changes GIT_SHA, never the number: an operator reading
+      // `#1` aloud must not also have to remember whether the tree was dirty.
+      writeFileSync(join(dir, 'index.ts'), 'export const changed = 1;\n');
+      const dirty = stamp(dir);
+
+      expect(dirty.code).toBe(0);
+      expect(readStamp(dir)).toContain('-dirty');
+      expect(readNumber()).toBe(count);
+      expect(readNumber()).not.toContain('dirty');
+    },
+  );
 
   it('refuses to stamp without .next/BUILD_ID (exit 1)', () => {
     const dir = makeRepo(false);

@@ -25,6 +25,8 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { deriveRelease } from '../src/components/layout/ReleaseBadge';
+
 const read = (rel: string): string =>
   readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
 
@@ -72,6 +74,56 @@ describe('release badge — single shared request', () => {
   it('carries the dirty-build warning once, in Thai, with error tokens', () => {
     expect(badge).toContain('เวอร์ชันนี้สร้างจากไฟล์ที่ยังไม่ได้ commit — แก้ไขไม่ได้จาก commit นี้');
     expect(badge).toMatch(/d\.dirty \? 'border-error bg-error text-fg-error'/);
+  });
+});
+
+describe('release badge — the build number, not the build id', () => {
+  const SHA = 'd6335ad1f2da9dcee79cf19cb3670eebb41c7c75';
+
+  it('renders the stamped release number as #N', () => {
+    const d = deriveRelease({
+      buildId: 'b3VolF0huX9073f7NUdKN',
+      buildNumber: 337,
+      gitSha: SHA,
+      gitRef: 'master',
+    });
+
+    expect(d.displayBuild).toBe('#337');
+    expect(d.usable).toBe(true);
+    // The raw id stays on the payload for support, but is not what we show.
+    expect(d.displayBuild).not.toContain('b3VolF0');
+  });
+
+  it('falls back to the short build id while nothing is stamped', () => {
+    const d = deriveRelease({
+      buildId: 'b3VolF0huX9073f7NUdKN',
+      buildNumber: null,
+      gitSha: SHA,
+      gitRef: 'master',
+    });
+
+    expect(d.displayBuild).toBe('b3VolF0h');
+    expect(d.usable).toBe(true);
+  });
+
+  it('stays unusable rather than rendering a junk number', () => {
+    const d = deriveRelease({
+      buildId: null,
+      buildNumber: null,
+      gitSha: 'unknown',
+      gitRef: 'unknown',
+    });
+
+    expect(d.displayBuild).toBeNull();
+    expect(d.usable).toBe(false);
+  });
+
+  it('every placement reads the one display token', () => {
+    // Chip (top bar / sidebar), collapsed rail and full card all render
+    // `displayBuild` — no placement may keep the raw id behind the change.
+    expect(badge.match(/d\.displayBuild/g)!.length).toBeGreaterThanOrEqual(5);
+    expect(badge).not.toContain('release.buildId && <span>');
+    expect(dashboard).toContain('d.displayBuild');
   });
 });
 

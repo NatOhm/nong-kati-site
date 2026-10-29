@@ -14,6 +14,16 @@ import { cn } from '@/utils/cn';
  */
 export interface ReleaseInfo {
   buildId: string | null;
+  /**
+   * The human-facing release number (client ask, 2026-10-29): the commit
+   * count stamped into `.next/BUILD_NUMBER` at build time. Shown in place of
+   * the raw build id because an operator can read "337" aloud; `buildId`
+   * stays on the payload (and as the fallback below) because it is still the
+   * source of truth for WHICH bundle is serving requests.
+   * null until a stamped build ships the file — the UI then degrades to the
+   * raw id rather than to nothing.
+   */
+  buildNumber: number | null;
   gitSha: string;
   gitRef: string;
 }
@@ -58,6 +68,14 @@ function loadRelease(): Promise<ReleaseInfo> {
         // and is handled below as "nothing verifiable" — never as a failure.
         const value: ReleaseInfo = {
           buildId: body.buildId ?? null,
+          // Shape-checked like the server side: anything that is not a
+          // positive integer is treated as "not stamped".
+          buildNumber:
+            typeof body.buildNumber === 'number' &&
+            Number.isInteger(body.buildNumber) &&
+            body.buildNumber > 0
+              ? body.buildNumber
+              : null,
           gitSha: body.gitSha ?? 'unknown',
           gitRef: body.gitRef ?? 'unknown',
         };
@@ -116,6 +134,12 @@ export interface DerivedRelease {
   shaKnown: boolean;
   /** First 8 chars of the build id, or null when not stamped. */
   shortBuild: string | null;
+  /**
+   * What the chip actually renders as the build token: `#337` when the
+   * number is stamped, otherwise the short raw build id. One field so no
+   * placement can show the number while another still shows the id.
+   */
+  displayBuild: string | null;
   refKnown: boolean;
   /** Nothing verifiable to show — the badge then stays out of the way. */
   usable: boolean;
@@ -126,21 +150,24 @@ export function deriveRelease(release: ReleaseInfo): DerivedRelease {
   const shortSha = release.gitSha.replace(/-dirty$/, '').slice(0, 7);
   const shaKnown = /^[0-9a-f]{7}$/i.test(shortSha);
   const shortBuild = release.buildId ? release.buildId.slice(0, 8) : null;
+  const displayBuild =
+    release.buildNumber !== null ? `#${release.buildNumber}` : shortBuild;
   const refKnown = Boolean(release.gitRef) && release.gitRef !== 'unknown';
   return {
     dirty,
     shortSha,
     shaKnown,
     shortBuild,
+    displayBuild,
     refKnown,
-    usable: Boolean(shortBuild) || shaKnown,
+    usable: Boolean(displayBuild) || shaKnown,
   };
 }
 
 /** Full identity string — the tooltip, the screen-reader name and the copy payload. */
 function fullLabel(release: ReleaseInfo, d: DerivedRelease): string {
   const parts = [
-    release.buildId ? `build ${release.buildId}` : 'ไม่มี build id',
+    d.displayBuild ? `build ${d.displayBuild}` : 'ไม่มี build id',
     d.shaKnown ? `commit ${release.gitSha}` : 'ไม่มี commit',
   ];
   if (d.refKnown) parts.push(`ref ${release.gitRef}`);
@@ -202,7 +229,7 @@ export function ReleaseBadge({
           className,
         )}
       >
-        {release.buildId && <span>build {release.buildId}</span>}
+        {d.displayBuild && <span>build {d.displayBuild}</span>}
         {d.shaKnown && <span>commit {release.gitSha}</span>}
         {d.refKnown && <span>ref {release.gitRef}</span>}
       </span>
@@ -226,21 +253,21 @@ export function ReleaseBadge({
         {minimal ? (
           // 4rem rail: six chars + this chip's own border still clear the
           // column (a full 8 does not), truncate covers an odd font metric.
-          <span className="min-w-0 truncate">{(d.shortBuild ?? d.shortSha).slice(0, 6)}</span>
+          <span className="min-w-0 truncate">{(d.displayBuild ?? d.shortSha).slice(0, 6)}</span>
         ) : (
           <>
-            {d.shortBuild && (
+            {d.displayBuild && (
               <>
-                <span className="hidden min-w-0 truncate sm:block">build {d.shortBuild}</span>
-                {/* Below sm the prefix is what has to go — 8 chars still fit. */}
-                <span className="min-w-0 truncate sm:hidden">{d.shortBuild}</span>
+                <span className="hidden min-w-0 truncate sm:block">build {d.displayBuild}</span>
+                {/* Below sm the prefix is what has to go — `#337` still fits. */}
+                <span className="min-w-0 truncate sm:hidden">{d.displayBuild}</span>
               </>
             )}
             {commit !== 'none' && d.shaKnown && (
               <span
                 className={cn('min-w-0 truncate', commit === 'responsive' && 'hidden sm:block')}
               >
-                {d.shortBuild ? '· ' : ''}commit {d.shortSha}
+                {d.displayBuild ? '· ' : ''}commit {d.shortSha}
               </span>
             )}
           </>

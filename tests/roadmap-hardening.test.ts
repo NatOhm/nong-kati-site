@@ -107,13 +107,15 @@ describe('§4 payment-channel union gate', () => {
 describe('§5 public version endpoint', () => {
   /**
    * Import the route with fs/promises stubbed. The route reads exactly two
-   * on-disk release-identity files (.next/BUILD_ID and .next/GIT_SHA); any
+   * on-disk release-identity files (.next/BUILD_ID, .next/GIT_SHA and
+   * .next/BUILD_NUMBER); any
    * other read is a bug worth failing on, so the stub asserts the caller only
    * asks for those. Pass `undefined` for the stamp to mean "file not there".
    */
   async function loadRoute(
     buildIdContents: string | Error,
     gitShaStamp?: string | Error,
+    buildNumberContents?: string | Error,
   ): Promise<() => Promise<Response>> {
     vi.resetModules();
     vi.doMock('fs/promises', () => ({
@@ -123,6 +125,11 @@ describe('§5 public version endpoint', () => {
           if (gitShaStamp === undefined) throw new Error('ENOENT');
           if (gitShaStamp instanceof Error) throw gitShaStamp;
           return gitShaStamp;
+        }
+        if (path.includes(join('next', 'BUILD_NUMBER'))) {
+          if (buildNumberContents === undefined) throw new Error('ENOENT');
+          if (buildNumberContents instanceof Error) throw buildNumberContents;
+          return buildNumberContents;
         }
         expect(path).toContain(join('next', 'BUILD_ID'));
         if (buildIdContents instanceof Error) throw buildIdContents;
@@ -152,7 +159,7 @@ describe('§5 public version endpoint', () => {
     expect(body['buildId']).toBe('gUxcV6SEGUgIp6nFJf8hR');
     expect(body['gitSha']).toBe('abc1234');
     expect(body['gitRef']).toBe('master');
-    expect(Object.keys(body).sort()).toEqual(['buildId', 'gitRef', 'gitSha']);
+    expect(Object.keys(body).sort()).toEqual(['buildId', 'buildNumber', 'gitRef', 'gitSha']);
     expect(res.headers.get('Cache-Control')).toContain('no-store');
   });
 
@@ -186,7 +193,7 @@ describe('§5 public version endpoint', () => {
     expect(sha).not.toBe('2ee2ae7');
     expect(sha?.endsWith('-dirty')).toBe(true);
     // Response shape is a pinned contract (three keys, no extra field).
-    expect(Object.keys(body).sort()).toEqual(['buildId', 'gitRef', 'gitSha']);
+    expect(Object.keys(body).sort()).toEqual(['buildId', 'buildNumber', 'gitRef', 'gitSha']);
   });
 
   it('a junk GIT_SHA stamp degrades to the env value instead of shipping nonsense', async () => {
@@ -196,6 +203,22 @@ describe('§5 public version endpoint', () => {
     const GET = await loadRoute('gUxcV6SEGUgIp6nFJf8hR', '<html>502 Bad Gateway</html>');
     const body = (await (await GET()).json()) as Record<string, string>;
     expect(body['gitSha']).toBe('2ee2ae7');
+  });
+
+  it('reports the stamped release number, degrading to null when it is junk', async () => {
+    // Client ask 2026-10-29: the admin UI shows this commit count instead of
+    // the random 21-char build id. Same shape check as the other two stamped
+    // files — an empty file or an HTML error page from a broken extraction
+    // becomes null (the badge then falls back to the raw build id), never a
+    // fake number.
+    const versionBody = async (numberStamp?: string | Error): Promise<Record<string, unknown>> => {
+      const GET = await loadRoute('gUxcV6SEGUgIp6nFJf8hR', undefined, numberStamp);
+      return (await (await GET()).json()) as Record<string, unknown>;
+    };
+
+    expect((await versionBody('337\n'))['buildNumber']).toBe(337);
+    expect((await versionBody('<html>502 Bad Gateway</html>'))['buildNumber']).toBeNull();
+    expect((await versionBody(undefined))['buildNumber']).toBeNull();
   });
 
   it('degrades to "unknown" instead of failing when no env identity is set', async () => {

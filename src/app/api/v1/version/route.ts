@@ -68,6 +68,27 @@ async function readStampedGitSha(): Promise<string | null> {
   }
 }
 
+/**
+ * The human-facing release number (client ask 2026-10-29): stamp-git-sha.mjs
+ * writes `git rev-list --count HEAD` into .next/BUILD_NUMBER so the admin UI
+ * can show a number an operator can read aloud instead of the random build id.
+ *
+ * Same shape-check philosophy as the other two files: a junk value (empty
+ * file, an HTML error page from a broken extraction) or no file at all
+ * degrades to null, and the UI then falls back to the raw build id.
+ */
+const BUILD_NUMBER_RE = /^\d{1,9}$/;
+
+async function readBuildNumber(): Promise<number | null> {
+  try {
+    const raw = await readFile(path.join(process.cwd(), '.next', 'BUILD_NUMBER'), 'utf8');
+    const trimmed = raw.trim();
+    return BUILD_NUMBER_RE.test(trimmed) ? Number(trimmed) : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(): Promise<NextResponse> {
   const buildId = await readBuildId();
 
@@ -80,6 +101,8 @@ export async function GET(): Promise<NextResponse> {
   return NextResponse.json(
     {
       buildId,
+      // Monotonic release number for display; null until a stamped build ships it.
+      buildNumber: await readBuildNumber(),
       // Retained fields: same names as before, but 'unknown' rather than a
       // value we cannot verify. Prefer `buildId` when checking what is live.
       gitSha: gitSha ?? 'unknown',
