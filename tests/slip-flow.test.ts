@@ -297,7 +297,15 @@ describe('provider dispatch in POST /api/v1/payments/slip-verify', () => {
     // hoping for a pass, and must never reach fulfilment.
     expect(h.slipok.verifySlip).not.toHaveBeenCalled();
     expect(h.fulfil.fulfilOrder).not.toHaveBeenCalled();
-    expect(h.prisma.paymentAttempt.update).not.toHaveBeenCalled();
+    // The failed check is stamped on the pending attempt for the admin UI
+    // (slipCheck) — the order itself stays payable for manual review.
+    expect(h.prisma.paymentAttempt.update).toHaveBeenCalledWith({
+      where: { id: 'att-flow' },
+      data: expect.objectContaining({
+        failureReason: 'RECEIVER_MISMATCH',
+        gatewayStatusCode: 'slip2go',
+      }),
+    });
   });
 
   it('applies the receiver policy after a Slip2Go SUCCESS (provider 200200 is not enough)', async () => {
@@ -325,7 +333,14 @@ describe('provider dispatch in POST /api/v1/payments/slip-verify', () => {
     expect(body.detail).toContain('9999'); // last-4 only, never the full number
     // Order stays payable for manual review; evidence was kept first.
     expect(h.fulfil.fulfilOrder).not.toHaveBeenCalled();
-    expect(h.prisma.paymentAttempt.update).not.toHaveBeenCalled();
+    // Local receiver guard verdict is stamped for the admin UI to show.
+    expect(h.prisma.paymentAttempt.update).toHaveBeenCalledWith({
+      where: { id: 'att-flow' },
+      data: expect.objectContaining({
+        failureReason: 'RECEIVER_MISMATCH',
+        gatewayStatusCode: 'slip2go',
+      }),
+    });
     expect(h.prisma.siteSetting.create).toHaveBeenCalledTimes(1);
   });
 
@@ -355,7 +370,14 @@ describe('provider dispatch in POST /api/v1/payments/slip-verify', () => {
     expect(((await res.json()) as { error: string }).error).toBe('RECEIVER_MISMATCH');
     expect(h.slipok.verifySlip).toHaveBeenCalledTimes(1);
     expect(h.fulfil.fulfilOrder).not.toHaveBeenCalled();
-    expect(h.prisma.paymentAttempt.update).not.toHaveBeenCalled();
+    // Fallback-path failure is stamped with the provider that produced it.
+    expect(h.prisma.paymentAttempt.update).toHaveBeenCalledWith({
+      where: { id: 'att-flow' },
+      data: expect.objectContaining({
+        failureReason: 'RECEIVER_MISMATCH',
+        gatewayStatusCode: 'slipok',
+      }),
+    });
   });
 });
 

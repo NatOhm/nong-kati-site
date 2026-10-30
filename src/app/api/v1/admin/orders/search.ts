@@ -73,9 +73,17 @@ export async function GET_search(req: NextRequest): Promise<NextResponse> {
       completedAt: true,
       _count: { select: { items: true } },
       paymentAttempts: {
-        where: { slipVerifiedRef: { not: null } },
-        select: { slipVerifiedRef: true, amountThb: true, slipVerifiedAt: true },
-        orderBy: { createdAt: 'desc' },
+        where: { paymentMethod: 'promptpay' },
+        select: {
+          slipVerifiedRef: true,
+          amountThb: true,
+          slipVerifiedAt: true,
+          slipVerifiedBy: true,
+          failureReason: true,
+          gatewayStatusCode: true,
+          updatedAt: true,
+        },
+        orderBy: { updatedAt: 'desc' },
         take: 1,
       },
     },
@@ -95,18 +103,37 @@ export async function GET_search(req: NextRequest): Promise<NextResponse> {
     slipImageUrl: o.slipImageUrl,
     slipUploadedAt: o.slipUploadedAt?.toISOString() ?? null,
     createdAt: o.createdAt.toISOString(),
-    completedAt: o.completedAt?.toISOString() ?? null,
-    slip:
-      o.paymentAttempts[0] !== undefined
+    completedAt: o.completedAt?.toISOString() ?? null,      slip:
+        o.paymentAttempts[0]?.slipVerifiedRef
+          ? {
+              ref: o.paymentAttempts[0].slipVerifiedRef ?? '',
+              amountThb: Number(o.paymentAttempts[0].amountThb ?? 0),
+              verifiedAt:
+                o.paymentAttempts[0].slipVerifiedAt instanceof Date
+                  ? o.paymentAttempts[0].slipVerifiedAt.toISOString()
+                  : null,
+              by: o.paymentAttempts[0].slipVerifiedBy ?? null,
+            }
+          : null,
+      slipCheck: o.paymentAttempts[0]?.slipVerifiedRef
         ? {
-            ref: o.paymentAttempts[0].slipVerifiedRef ?? '',
-            amountThb: Number(o.paymentAttempts[0].amountThb ?? 0),
-            verifiedAt:
+            provider: o.paymentAttempts[0].slipVerifiedBy ?? null,
+            error: null,
+            checkedAt:
               o.paymentAttempts[0].slipVerifiedAt instanceof Date
                 ? o.paymentAttempts[0].slipVerifiedAt.toISOString()
                 : null,
           }
-        : null,
+        : o.paymentAttempts[0]?.failureReason
+          ? {
+              provider: o.paymentAttempts[0].gatewayStatusCode ?? null,
+              error: o.paymentAttempts[0].failureReason ?? '',
+              checkedAt:
+                o.paymentAttempts[0].updatedAt instanceof Date
+                  ? o.paymentAttempts[0].updatedAt.toISOString()
+                  : null,
+            }
+          : null,
   }));
 
   const groupResult = await prisma.order.groupBy({ by: ['status'], _count: { _all: true } });
@@ -171,9 +198,17 @@ export async function GET_customerHistory(
       slipImageUrl: true,
       slipUploadedAt: true,
       paymentAttempts: {
-        where: { slipVerifiedRef: { not: null } },
-        select: { slipVerifiedRef: true, slipVerifiedAt: true, slipReceiverAccount: true },
-        orderBy: { createdAt: 'desc' },
+        where: { paymentMethod: 'promptpay' },
+        select: {
+          slipVerifiedRef: true,
+          slipVerifiedAt: true,
+          slipReceiverAccount: true,
+          slipVerifiedBy: true,
+          failureReason: true,
+          gatewayStatusCode: true,
+          updatedAt: true,
+        },
+        orderBy: { updatedAt: 'desc' },
         take: 1,
       },
       items: {
@@ -220,13 +255,31 @@ export async function GET_customerHistory(
       createdAt: o.createdAt.toISOString(),
       completedAt: o.completedAt?.toISOString() ?? null,
       slip:
-        o.paymentAttempts[0] !== undefined
+        o.paymentAttempts[0]?.slipVerifiedRef
           ? {
               ref: o.paymentAttempts[0].slipVerifiedRef ?? '',
               verifiedAt: o.paymentAttempts[0].slipVerifiedAt instanceof Date
                 ? o.paymentAttempts[0].slipVerifiedAt.toISOString()
                 : null,
               receiverAccount: o.paymentAttempts[0].slipReceiverAccount,
+              by: o.paymentAttempts[0].slipVerifiedBy ?? null,
+            }
+          : null,
+      slipCheck: o.paymentAttempts[0]?.slipVerifiedRef
+        ? {
+            provider: o.paymentAttempts[0].slipVerifiedBy ?? null,
+            error: null,
+            checkedAt: o.paymentAttempts[0].slipVerifiedAt instanceof Date
+              ? o.paymentAttempts[0].slipVerifiedAt.toISOString()
+              : null,
+          }
+        : o.paymentAttempts[0]?.failureReason
+          ? {
+              provider: o.paymentAttempts[0].gatewayStatusCode ?? null,
+              error: o.paymentAttempts[0].failureReason ?? '',
+              checkedAt: o.paymentAttempts[0].updatedAt instanceof Date
+                ? o.paymentAttempts[0].updatedAt.toISOString()
+                : null,
             }
           : null,
       slipImageUrl: o.slipImageUrl,

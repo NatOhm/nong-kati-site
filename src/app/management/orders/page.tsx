@@ -30,8 +30,10 @@ interface OrderRow {
   manualFulfilmentReason: string | null;
   /** Customer sent a slip for manual check (ส่งสลิปให้แอดมินตรวจ). */
   slipImageUrl: string | null;
-  /** SlipOK auto-verification (ref + verified amount) when the slip passed. */
-  slip: { ref: string; amountThb: number; verifiedAt: string | null } | null;
+  /** Auto-verification success (ref + verified amount + provider) when the slip passed. */
+  slip: { ref: string; amountThb: number; verifiedAt: string | null; by: string | null } | null;
+  /** Last auto-check (success or fail) — null when never checked. */
+  slipCheck: { provider: string | null; error: string | null; checkedAt: string | null } | null;
   createdAt: string;
   completedAt: string | null;
 }
@@ -45,12 +47,15 @@ interface OrderDetail {
   discountThb: number;
   totalAmountThb: number;
   manualFulfilmentReason: string | null;
-  /** Present when the customer's slip was auto-verified (SlipOK). */
+  /** Present when the customer's slip was auto-verified. */
   slipVerification: {
     ref: string;
     verifiedAt: string | null;
     receiverAccount: string | null;
+    by: string | null;
   } | null;
+  /** Last auto-check (success or fail) — null when never checked. */
+  slipCheck: { provider: string | null; error: string | null; checkedAt: string | null } | null;
   /** Customer-uploaded slip image (manual check). */
   slipImageUrl: string | null;
   slipUploadedAt: string | null;
@@ -506,13 +511,21 @@ export default function AdminOrdersPage(): React.JSX.Element {
                       {order.slip ? (
                         <span
                           className="text-jade-600 inline-flex max-w-[200px] items-center gap-1 dark:text-jade-400"
-                          title={`ตรวจสลิปอัตโนมัติ (SlipOK)${order.slip.verifiedAt ? ` เมื่อ ${new Date(order.slip.verifiedAt).toLocaleString('th-TH')}` : ''}`}
+                          title={`ตรวจสลิปอัตโนมัติ (${order.slip.by === 'slip2go:auto' ? 'Slip2Go' : order.slip.by === 'slipok:auto' ? 'SlipOK' : 'อัตโนมัติ'})${order.slip.verifiedAt ? ` เมื่อ ${new Date(order.slip.verifiedAt).toLocaleString('th-TH')}` : ''}`}
                         >
                           <ShieldCheck size={13} className="shrink-0" />
                           <span className="truncate font-mono">{order.slip.ref}</span>
                           <span className="whitespace-nowrap text-fg-muted">
                             · {formatThb(order.slip.amountThb)}
                           </span>
+                        </span>
+                      ) : order.slipCheck?.error ? (
+                        <span
+                          className="inline-flex max-w-[200px] items-center gap-1 text-amber-600 dark:text-amber-400"
+                          title={`ตรวจอัตโนมัติไม่ผ่าน: ${order.slipCheck.error}${order.slipCheck.provider ? ` · ${order.slipCheck.provider === 'slip2go' ? 'Slip2Go' : order.slipCheck.provider === 'slipok' ? 'SlipOK' : order.slipCheck.provider}` : ''}${order.slipCheck.checkedAt ? ` · ${new Date(order.slipCheck.checkedAt).toLocaleString('th-TH')}` : ''}`}
+                        >
+                          <XCircle size={13} className="shrink-0" />
+                          <span className="truncate font-mono">{order.slipCheck.error}</span>
                         </span>
                       ) : (
                         <span className="text-fg-placeholder">—</span>
@@ -695,7 +708,15 @@ export default function AdminOrdersPage(): React.JSX.Element {
                 <div className="mt-5 flex items-start gap-2 rounded-md border border-jade-500/40 bg-jade-900/5 px-3 py-2.5 text-sm text-jade-700">
                   <ShieldCheck size={16} className="mt-0.5 shrink-0" />
                   <div>
-                    <p className="font-medium">ยืนยันอัตโนมัติด้วยสลิป (SlipOK)</p>
+                    <p className="font-medium">
+                      ยืนยันอัตโนมัติด้วยสลิป (
+                      {selectedOrder.slipVerification.by === 'slip2go:auto'
+                        ? 'Slip2Go'
+                        : selectedOrder.slipVerification.by === 'slipok:auto'
+                          ? 'SlipOK'
+                          : 'อัตโนมัติ'}
+                      )
+                    </p>
                     <p className="mt-0.5 text-xs">
                       ref {selectedOrder.slipVerification.ref}
                       {selectedOrder.slipVerification.receiverAccount
@@ -703,6 +724,26 @@ export default function AdminOrdersPage(): React.JSX.Element {
                         : ''}
                       {selectedOrder.slipVerification.verifiedAt
                         ? ` · ${new Date(selectedOrder.slipVerification.verifiedAt).toLocaleString('th-TH')}`
+                        : ''}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {!selectedOrder.slipVerification && selectedOrder.slipCheck?.error && (
+                <div className="mt-5 flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2.5 text-sm text-amber-700 dark:text-amber-300">
+                  <XCircle size={16} className="mt-0.5 shrink-0" />
+                  <div>
+                    <p className="font-medium">
+                      ตรวจอัตโนมัติไม่ผ่าน — รอแอดมินยืนยัน
+                    </p>
+                    <p className="mt-0.5 font-mono text-xs">
+                      {selectedOrder.slipCheck.error}
+                      {selectedOrder.slipCheck.provider
+                        ? ` · ${selectedOrder.slipCheck.provider === 'slip2go' ? 'Slip2Go' : selectedOrder.slipCheck.provider === 'slipok' ? 'SlipOK' : selectedOrder.slipCheck.provider}`
+                        : ''}
+                      {selectedOrder.slipCheck.checkedAt
+                        ? ` · ${new Date(selectedOrder.slipCheck.checkedAt).toLocaleString('th-TH')}`
                         : ''}
                     </p>
                   </div>

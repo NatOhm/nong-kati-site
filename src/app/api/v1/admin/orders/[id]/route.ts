@@ -41,9 +41,17 @@ export async function GET(
         orderBy: { createdAt: 'asc' },
       },
       paymentAttempts: {
-        where: { slipVerifiedRef: { not: null } },
-        select: { slipVerifiedRef: true, slipVerifiedAt: true, slipReceiverAccount: true },
-        orderBy: { createdAt: 'desc' },
+        where: { paymentMethod: 'promptpay' },
+        select: {
+          slipVerifiedRef: true,
+          slipVerifiedAt: true,
+          slipReceiverAccount: true,
+          slipVerifiedBy: true,
+          failureReason: true,
+          gatewayStatusCode: true,
+          updatedAt: true,
+        },
+        orderBy: { updatedAt: 'desc' },
         take: 1,
       },
     },
@@ -64,13 +72,27 @@ export async function GET(
     discountThb: Number(order.discountThb),
     totalAmountThb: Number(order.totalAmountThb),
     manualFulfilmentReason: order.manualFulfilmentReason,
-    slipVerification: slipVerification
+    slipVerification: slipVerification?.slipVerifiedRef
       ? {
           ref: slipVerification.slipVerifiedRef,
           verifiedAt: slipVerification.slipVerifiedAt?.toISOString() ?? null,
           receiverAccount: slipVerification.slipReceiverAccount,
+          by: slipVerification.slipVerifiedBy ?? null,
         }
       : null,
+    slipCheck: slipVerification?.slipVerifiedRef
+      ? {
+          provider: slipVerification.slipVerifiedBy ?? null,
+          error: null,
+          checkedAt: slipVerification.slipVerifiedAt?.toISOString() ?? null,
+        }
+      : slipVerification?.failureReason
+        ? {
+            provider: slipVerification.gatewayStatusCode ?? null,
+            error: slipVerification.failureReason ?? '',
+            checkedAt: slipVerification.updatedAt?.toISOString() ?? null,
+          }
+        : null,
     // Customer-uploaded slip for manual check (ส่งสลิปให้แอดมินตรวจ).
     slipImageUrl: order.slipImageUrl,
     slipUploadedAt: order.slipUploadedAt?.toISOString() ?? null,

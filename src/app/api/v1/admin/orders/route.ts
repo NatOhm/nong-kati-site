@@ -53,12 +53,21 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         createdAt: true,
         completedAt: true,
         _count: { select: { items: true } },
-        // SlipOK auto-verification (latest verified attempt only) so the
-        // list can show ref/amount without a detail fetch.
+        // Latest promptpay attempt so the list can show the auto-check
+        // status (success ref/amount + provider, or last fail reason)
+        // without a detail fetch.
         paymentAttempts: {
-          where: { slipVerifiedRef: { not: null } },
-          select: { slipVerifiedRef: true, amountThb: true, slipVerifiedAt: true },
-          orderBy: { createdAt: 'desc' },
+          where: { paymentMethod: 'promptpay' },
+          select: {
+            slipVerifiedRef: true,
+            amountThb: true,
+            slipVerifiedAt: true,
+            slipVerifiedBy: true,
+            failureReason: true,
+            gatewayStatusCode: true,
+            updatedAt: true,
+          },
+          orderBy: { updatedAt: 'desc' },
           take: 1,
         },
       },
@@ -80,14 +89,29 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       manualFulfilmentReason: o.manualFulfilmentReason,
       /** Customer sent a slip for manual check (ส่งสลิปให้แอดมินตรวจ). */
       slipImageUrl: o.slipImageUrl,
-      /** SlipOK auto-verification, when the slip passed the bank check. */
-      slip: o.paymentAttempts[0]
+      /** Auto-verification success, when the slip passed the bank check. */
+      slip: o.paymentAttempts[0]?.slipVerifiedRef
         ? {
             ref: o.paymentAttempts[0].slipVerifiedRef ?? '',
             amountThb: Number(o.paymentAttempts[0].amountThb),
             verifiedAt: o.paymentAttempts[0].slipVerifiedAt?.toISOString() ?? null,
+            by: o.paymentAttempts[0].slipVerifiedBy ?? null,
           }
         : null,
+      /** Last auto-check (success or fail) — null when never checked. */
+      slipCheck: o.paymentAttempts[0]?.slipVerifiedRef
+        ? {
+            provider: o.paymentAttempts[0].slipVerifiedBy ?? null,
+            error: null,
+            checkedAt: o.paymentAttempts[0].slipVerifiedAt?.toISOString() ?? null,
+          }
+        : o.paymentAttempts[0]?.failureReason
+          ? {
+              provider: o.paymentAttempts[0].gatewayStatusCode ?? null,
+              error: o.paymentAttempts[0].failureReason ?? '',
+              checkedAt: o.paymentAttempts[0].updatedAt?.toISOString() ?? null,
+            }
+          : null,
       createdAt: o.createdAt.toISOString(),
       completedAt: o.completedAt?.toISOString() ?? null,
     })),

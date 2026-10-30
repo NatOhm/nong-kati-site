@@ -221,6 +221,33 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       error: result.code,
       detail: result.detail ?? null,
     });
+    // Stamp the last auto-check on the pending attempt (best-effort — never
+    // blocks the response). The admin list/detail reads this as slipCheck so
+    // a failed check is distinguishable from "never checked". Status stays
+    // pending: the order is still payable and manually confirmable.
+    try {
+      const failed = await prisma.paymentAttempt.findFirst({
+        where: { orderId: order.id, status: 'pending', paymentMethod: 'promptpay' },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (failed) {
+        await prisma.paymentAttempt.update({
+          where: { id: failed.id },
+          data: {
+            failureReason: result.code,
+            gatewayStatusCode: usedProvider,
+            gatewayResponse: {
+              provider: usedProvider,
+              error: result.code,
+              detail: result.detail ?? null,
+              checkedAt: new Date().toISOString(),
+            },
+          },
+        });
+      }
+    } catch {
+      // Diagnostics only — the customer response + admin ping below still run.
+    }
     // Mapped, honest errors — the customer can fix and retry. Every branch
     // leaves the order untouched (still payable, admin fallback intact).
     const statusByCode: Record<string, number> = {
