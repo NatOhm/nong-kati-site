@@ -25,7 +25,10 @@ probe was spent confirming this, further calls buy nothing.
 2. From the production host (or a prod shell), call the verify path once with
    the store account digits attached — same shape the route already sends:
    `checkReceiver: [{ accountNumber: <store digits> }]` + `checkAmount` eq.
-3. Expect `200000` on amount+receiver match. Log **provider code only**
+3. Expect **`200200`** — the observed live answer (2 calls on 30 ต.ค. 2026):
+   the bank-side `checkReceiver` condition we send does not fire, so the
+   provider reports the slip valid and the **local** `checkReceiverMatch`
+   decides. Log **provider code only**
    (`200000` / `200401` / …) plus trailing-4 comparison — no PII, no secret,
    no image bytes in any log.
 4. If a known wrong-account slip sample exists, repeat once and expect
