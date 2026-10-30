@@ -215,14 +215,24 @@ test.describe('checkout flow creates an order', () => {
 
 /** Security headers that must ship with every production response. */
 test.describe('API security headers', () => {
-  test('version endpoint exposes only release identity and carries the CSP policy', async ({ request }) => {
+  test('version endpoint exposes only release identity and carries the CSP policy', async ({
+    request,
+  }) => {
     const res = await request.get('/api/v1/version');
     expect(res.status()).toBe(200);
 
     const body = (await res.json()) as Record<string, unknown>;
     // `buildId` is read from .next/BUILD_ID on disk, so it is the only field
     // that cannot go stale the way the Infisical-fed gitSha can.
-    expect(Object.keys(body).sort()).toEqual(['buildId', 'gitRef', 'gitSha']);
+    // `buildNumber` is the human-readable release number stamped by
+    // stamp-git-sha.mjs (shown by ReleaseBadge); null until stamped.
+    // tests/roadmap-hardening.test.ts pins this same four-key shape.
+    expect(Object.keys(body).sort()).toEqual(['buildId', 'buildNumber', 'gitRef', 'gitSha']);
+    expect(
+      body['buildNumber'] === null ||
+        (typeof body['buildNumber'] === 'number' && Number.isInteger(body['buildNumber'])),
+      'buildNumber must be null or an integer release number',
+    ).toBe(true);
     expect(body['buildId'], 'buildId must look like a real Next build id').toMatch(
       /^[A-Za-z0-9_-]{8,64}$/,
     );
@@ -261,7 +271,8 @@ test.describe('API security headers', () => {
  * one Enter commits. A green unit test proves the arithmetic; only this proves
  * the wiring.
  */
-test.describe('search suggestions are keyboard operable', () => {/**
+test.describe('search suggestions are keyboard operable', () => {
+  /**
    * Type a query that reliably returns suggestions, then wait for the list.
    *
    * The term is DERIVED from whatever catalog this environment seeded rather
@@ -339,7 +350,9 @@ test.describe('search suggestions are keyboard operable', () => {/**
     );
   });
 
-  test('/search: Enter with no highlight still searches (fallthrough preserved)', async ({ page }) => {
+  test('/search: Enter with no highlight still searches (fallthrough preserved)', async ({
+    page,
+  }) => {
     await page.goto('/search');
     const term = await openSuggestions(page);
     test.skip(term === null, 'catalog yielded no suggestion-bearing query');
