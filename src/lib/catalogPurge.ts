@@ -209,6 +209,107 @@ export async function purgeProductInTx(
 }
 
 /**
+ * Hard-delete individual variants inside the caller's transaction — the
+ * variant-level counterpart of the product purge above, with the same guard
+ * philosophy but a non-fatal outcome: a variant that is still serving a
+ * live sale (or holds a reserved/delivered code with no order to fall back
+ * on) is reported back for deactivation instead of failing the whole save.
+ * Everything else (historical order lines, handed-out codes) is detached
+ * exactly like the product purge; never-sold codes (available/expired/
+ * voided) are destroyed with the variant, as are its upload batches,
+ * snapshots and stock moves.
+ *
+ * A batch shared beyond the variant (it also holds another variant's
+ * codes) can neither go down with it nor survive it, so the variant falls
+ * back to deactivation instead.
+ */
+export type VariantRemovalOutcome = {
+  deletedIds: string[];
+  deactivatedIds: string[];
+};
+
+export async function purgeVariantsInTx(
+  tx: AuditTx,
+  variantIds: string[],
+): Promise<VariantRemovalOutcome> {
+  const deletedIds: string[] = [];
+  const deactivatedIds: string[] = [];
+  if (variantIds.length === 0) return { deletedIds, deactivatedIds };
+
+  // ── Per-variant guards (batched reads, per-row decisions) ─────────────
+  const liveItems = await tx.orderItem.findMany({
+    where: { variantId: { in: variantIds }, order: { status: { in: LIVE_ORDER_STATUSES } } },
+    select: { variantId: true },
+  });
+  const liveByVariant = new Set(liveItems.map((i) => i.variantId));
+  const codes = await tx.giftCode.findMany({
+    where: { variantId: { in: variantIds } },
+    select: { variantId: true, status: true, orderId: true },
+  });
+  const codesByVariant = new Map<string, { status: string; orderId: string | null }[]>();
+  for (const c of codes) {
+    const list = codesByVariant.get(c.variantId!) ?? [];
+    list.push({ status: c.status, orderId: c.orderId });
+    codesByVariant.set(c.variantId!, list);
+  }
+  // A batch that also holds another variant's codes cannot go down with
+  // this variant — deleting it would strand those codes, and keeping it
+  // would trip Restrict on the variant delete. Deactivate instead.
+  const sharedBatches = await tx.codeUploadBatch.findMany({
+    where: {
+      variantId: { in: variantIds },
+      codes: { some: { variantId: { notIn: variantIds } } },
+    },
+    select: { variantId: true },
+  });
+  const sharedByVariant = new Set(sharedBatches.map((b) => b.variantId));
+
+  for (const variantId of variantIds) {
+    if (liveByVariant.has(variantId) || sharedByVariant.has(variantId)) {
+      deactivatedIds.push(variantId);
+      continue;
+    }
+    const rows = codesByVariant.get(variantId) ?? [];
+    const orphaned = rows.some(
+      (r) => (r.status === 'reserved' || r.status === 'delivered') && r.orderId === null,
+    );
+    if (orphaned) {
+      deactivatedIds.push(variantId);
+      continue;
+    }
+
+    // ── Removable: detach history, destroy never-sold inventory ──────────
+    await tx.orderItem.updateMany({
+      where: { variantId },
+      data: { variantId: null },
+    });
+    await tx.giftCode.updateMany({
+      where: { variantId, status: { in: ['reserved', 'delivered'] } },
+      data: { variantId: null, uploadBatchId: null },
+    });
+    await tx.giftCode.deleteMany({ where: { variantId } });
+    // The upfront shared-batch check proved no surviving code points at
+    // this variant's batches; the `none` guard below is belt-and-braces.
+    await tx.codeUploadBatch.deleteMany({
+      where: { variantId, codes: { none: {} } },
+    });
+    await tx.inventorySnapshot.deleteMany({ where: { productVariantId: variantId } });
+    await tx.stockMove.deleteMany({ where: { variantId } });
+    // Cart items cascade off the variant delete; nothing to do.
+    await tx.productVariant.delete({ where: { id: variantId } });
+    deletedIds.push(variantId);
+  }
+
+  if (deactivatedIds.length > 0) {
+    await tx.productVariant.updateMany({
+      where: { id: { in: deactivatedIds } },
+      data: { isActive: false },
+    });
+  }
+  return { deletedIds, deactivatedIds };
+}
+
+/**
  * Hard-delete a product and all its variants in one transaction, with the
  * in-flight / orphaned-code guards. The audit row commits atomically with the
  * mutation.

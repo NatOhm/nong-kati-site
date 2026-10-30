@@ -253,6 +253,8 @@ export default function AdminProductsPage(): React.JSX.Element {
   };
   const [bulkBusy, setBulkBusy] = useState(false);
   const [inlineBusy, setInlineBusy] = useState<string | null>(null);
+  /** One-shot notice from the last product save (e.g. variant cleanup). */
+  const [notice, setNotice] = useState<string | null>(null);
   /**
    * Permanent delete: one shared flow (single-flight guard, refusal with the
    * blocking order numbers as links) — see DeleteConfirmDialog.
@@ -313,8 +315,9 @@ export default function AdminProductsPage(): React.JSX.Element {
     });
   }, [products, searchQuery, statusFilter, categoryFilter]);
 
-  function handleSaved() {
+  function handleSaved(savedNotice?: string | null) {
     setEditing(null);
+    setNotice(savedNotice ?? null);
     void load();
   }
 
@@ -443,6 +446,20 @@ export default function AdminProductsPage(): React.JSX.Element {
             </button>
           </div>
         </div>
+
+        {notice !== null && (
+          <div className="flex items-start gap-2 rounded-lg border border-line bg-surface px-4 py-3 text-sm text-fg-secondary">
+            <AlertTriangle size={16} className="mt-0.5 shrink-0 text-peach-500" />
+            <p className="flex-1">{notice}</p>
+            <button
+              onClick={() => setNotice(null)}
+              className="rounded p-1 text-fg-placeholder hover:text-fg"
+              aria-label="ปิดข้อความ"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
 
         {/* Filters */}
         <div className="flex gap-3">
@@ -796,7 +813,7 @@ function ProductEditor({
   allTags: TagOption[];
   onTagsChanged: () => void;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (notice?: string | null) => void;
 }) {
   const [name, setName] = useState(product?.name ?? '');
   const [description, setDescription] = useState(product?.description ?? '');
@@ -928,7 +945,29 @@ function ProductEditor({
         const data = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(SAVE_ERR_TH[data.error ?? ''] ?? data.error ?? `HTTP ${res.status}`);
       }
-      onSaved();
+      // Variant cleanup the server applied to rows dropped in this save:
+      // deleted rows are gone, deactivated ones come back as ปิด because
+      // they still serve history — say so instead of silently resurrecting.
+      let notice: string | null = null;
+      if (product) {
+        const saved = (await res.json().catch(() => ({}))) as {
+          variantCleanup?: { deletedIds?: unknown; deactivatedIds?: unknown };
+        };
+        const deleted = Array.isArray(saved.variantCleanup?.deletedIds)
+          ? (saved.variantCleanup.deletedIds as unknown[]).length
+          : 0;
+        const kept = Array.isArray(saved.variantCleanup?.deactivatedIds)
+          ? (saved.variantCleanup.deactivatedIds as unknown[]).length
+          : 0;
+        const parts: string[] = [];
+        if (deleted > 0) parts.push(`ลบตัวเลือกถาวร ${deleted} รายการ`);
+        if (kept > 0)
+          parts.push(
+            `${kept} รายการที่ลบไม่ได้ (ยังมีออเดอร์หรือโค้ดที่ขายไปแล้วอ้างอิงอยู่) เปลี่ยนเป็น “ปิด” แทน`,
+          );
+        if (parts.length > 0) notice = `บันทึกแล้ว — ${parts.join(' · ')}`;
+      }
+      onSaved(notice);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
     } finally {
@@ -1249,8 +1288,9 @@ function ProductEditor({
             <p className="mt-1 text-[10px] text-fg-placeholder">
               ชื่อตัวเลือก · ราคาปกติ · ราคาสมาชิก · ราคาตัวแทน (เว้นว่าง = ใช้ราคาปกติ) · สต็อก
               <br />
-              ตัวเลือกที่เคยมีออเดอร์/โค้ดอ้างอิงอยู่จะลบถาวรไม่ได้ — กด × แล้วบันทึกจะเปลี่ยนเป็น
-              “ปิด” แทน กดปุ่ม เปิด/ปิด เพื่อขายอีกครั้งได้
+              กด × แล้วบันทึกคือลบถาวร: แถวที่ไม่เคยขายเลยจะหายไปพร้อมโค้ดที่ยังไม่เคยขาย
+              (ถ้ามี) · แถวที่กำลังขายอยู่หรือมีโค้ดที่ขายไปแล้วอ้างอิงอยู่จะลบไม่ได้ —
+              เปลี่ยนเป็น “ปิด” แทน กดปุ่ม เปิด/ปิด เพื่อขายอีกครั้งได้
             </p>
           </div>
 

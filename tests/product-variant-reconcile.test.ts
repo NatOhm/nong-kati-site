@@ -34,12 +34,13 @@ const { prismaMock } = vi.hoisted(() => {
       create: vi.fn(),
       updateMany: vi.fn(),
       deleteMany: vi.fn(),
+      delete: vi.fn(),
     },
-    orderItem: { count: vi.fn() },
-    giftCode: { count: vi.fn() },
-    codeUploadBatch: { count: vi.fn() },
-    inventorySnapshot: { count: vi.fn() },
-    stockMove: { createMany: vi.fn() },
+    orderItem: { findMany: vi.fn(), updateMany: vi.fn() },
+    giftCode: { findMany: vi.fn(), updateMany: vi.fn(), deleteMany: vi.fn() },
+    codeUploadBatch: { findMany: vi.fn(), deleteMany: vi.fn() },
+    inventorySnapshot: { deleteMany: vi.fn() },
+    stockMove: { createMany: vi.fn(), deleteMany: vi.fn() },
     tag: { findMany: vi.fn() },
     category: { findUnique: vi.fn(), findMany: vi.fn() },
     siteSetting: { findUnique: vi.fn() },
@@ -113,11 +114,17 @@ beforeEach(() => {
   prismaMock.productVariant.update.mockResolvedValue({});
   prismaMock.productVariant.create.mockResolvedValue({ id: 'vnew' });
   prismaMock.productVariant.updateMany.mockResolvedValue({ count: 1 });
-  prismaMock.productVariant.deleteMany.mockResolvedValue({ count: 1 });
-  prismaMock.orderItem.count.mockResolvedValue(0);
-  prismaMock.giftCode.count.mockResolvedValue(0);
-  prismaMock.codeUploadBatch.count.mockResolvedValue(0);
-  prismaMock.inventorySnapshot.count.mockResolvedValue(0);
+  prismaMock.productVariant.deleteMany.mockResolvedValue({ count: 0 });
+  prismaMock.productVariant.delete.mockResolvedValue({});
+  prismaMock.orderItem.findMany.mockResolvedValue([]);
+  prismaMock.orderItem.updateMany.mockResolvedValue({ count: 0 });
+  prismaMock.giftCode.findMany.mockResolvedValue([]);
+  prismaMock.giftCode.updateMany.mockResolvedValue({ count: 0 });
+  prismaMock.giftCode.deleteMany.mockResolvedValue({ count: 0 });
+  prismaMock.codeUploadBatch.findMany.mockResolvedValue([]);
+  prismaMock.codeUploadBatch.deleteMany.mockResolvedValue({ count: 0 });
+  prismaMock.inventorySnapshot.deleteMany.mockResolvedValue({ count: 0 });
+  prismaMock.stockMove.deleteMany.mockResolvedValue({ count: 0 });
   prismaMock.stockMove.createMany.mockResolvedValue({ count: 0 });
   prismaMock.tag.findMany.mockResolvedValue([]);
   prismaMock.category.findUnique.mockResolvedValue(null);
@@ -173,7 +180,7 @@ describe('PUT admin/products/[id] — variant reconcile', () => {
     // deactivate-all + createMany (variant multiplication). Neither may run.
     expect(prismaMock.productVariant.deleteMany).not.toHaveBeenCalled();
     expect(prismaMock.productVariant.updateMany).not.toHaveBeenCalled();
-    expect(prismaMock.giftCode.count).not.toHaveBeenCalled(); // nothing dropped
+    expect(prismaMock.giftCode.findMany).not.toHaveBeenCalled(); // nothing dropped
 
     expect(prismaMock.productVariant.update).toHaveBeenCalledTimes(2);
     expect(prismaMock.productVariant.update).toHaveBeenCalledWith(
@@ -205,14 +212,18 @@ describe('PUT admin/products/[id] — variant reconcile', () => {
     expect(moves.some((m) => m.variantId === 'v2')).toBe(false);
   });
 
-  it('deactivates a dropped variant that owns gift codes instead of deleting it', async () => {
+  it('deactivates a dropped variant holding an orphaned handover code instead of deleting it', async () => {
     prismaMock.productVariant.findMany
       .mockResolvedValueOnce([
         { id: 'v1', stock: 10 },
         { id: 'v2', stock: 3 },
       ])
       .mockResolvedValueOnce([{ id: 'v1', stock: 10 }]);
-    prismaMock.giftCode.count.mockResolvedValue(4);
+    // A delivered code with no order is a customer handover we cannot
+    // account for — the row must survive (as ปิด), never be deleted.
+    prismaMock.giftCode.findMany.mockResolvedValue([
+      { variantId: 'v2', status: 'delivered', orderId: null },
+    ]);
 
     const res = await putVariants({
       name: 'HBO Max 7 4K',
@@ -220,14 +231,14 @@ describe('PUT admin/products/[id] — variant reconcile', () => {
     });
 
     expect(res.status).toBe(200);
-    expect(prismaMock.giftCode.count).toHaveBeenCalledWith({
-      where: { variantId: { in: ['v2'] } },
-    });
     expect(prismaMock.productVariant.updateMany).toHaveBeenCalledWith({
       where: { id: { in: ['v2'] } },
       data: { isActive: false },
     });
-    expect(prismaMock.productVariant.deleteMany).not.toHaveBeenCalled();
+    expect(prismaMock.productVariant.delete).not.toHaveBeenCalled();
+    expect(await res.json()).toMatchObject({
+      variantCleanup: { deletedIds: [], deactivatedIds: ['v2'] },
+    });
   });
 
   it('deletes a dropped variant only when nothing references it', async () => {
@@ -244,10 +255,109 @@ describe('PUT admin/products/[id] — variant reconcile', () => {
     });
 
     expect(res.status).toBe(200);
-    expect(prismaMock.productVariant.deleteMany).toHaveBeenCalledWith({
-      where: { id: { in: ['v2'] } },
+    expect(prismaMock.productVariant.delete).toHaveBeenCalledWith({
+      where: { id: 'v2' },
     });
     expect(prismaMock.productVariant.updateMany).not.toHaveBeenCalled();
+    expect(await res.json()).toMatchObject({
+      variantCleanup: { deletedIds: ['v2'], deactivatedIds: [] },
+    });
+  });
+
+  it('deletes a dropped variant with only unsold codes, destroying those codes', async () => {
+    prismaMock.productVariant.findMany
+      .mockResolvedValueOnce([
+        { id: 'v1', stock: 10 },
+        { id: 'v2', stock: 0 },
+      ])
+      .mockResolvedValueOnce([{ id: 'v1', stock: 10 }]);
+    // Live case (hbo-max-7-4k-4, Oct 2026): dead rows each holding unsold
+    // codes could never be removed — the old batch check deactivated the
+    // row instead. Unsold inventory goes down with the row.
+    prismaMock.giftCode.findMany.mockResolvedValue([
+      { variantId: 'v2', status: 'available', orderId: null },
+      { variantId: 'v2', status: 'available', orderId: null },
+    ]);
+
+    const res = await putVariants({
+      name: 'HBO Max 7 4K',
+      variants: [{ id: 'v1', label: '7 วัน', price: 100, stock: 10, isActive: true }],
+    });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.giftCode.deleteMany).toHaveBeenCalledWith({
+      where: { variantId: 'v2' },
+    });
+    expect(prismaMock.productVariant.delete).toHaveBeenCalledWith({
+      where: { id: 'v2' },
+    });
+    expect(prismaMock.productVariant.updateMany).not.toHaveBeenCalled();
+    expect(await res.json()).toMatchObject({
+      variantCleanup: { deletedIds: ['v2'], deactivatedIds: [] },
+    });
+  });
+
+  it('decides per row: a live sale keeps its row while a clean sibling is deleted', async () => {
+    prismaMock.productVariant.findMany
+      .mockResolvedValueOnce([
+        { id: 'v1', stock: 10 },
+        { id: 'v2', stock: 3 },
+        { id: 'v3', stock: 0 },
+      ])
+      .mockResolvedValueOnce([{ id: 'v1', stock: 10 }]);
+    // The old batch check let one referenced row save all dropped siblings
+    // from deletion. v2 serves a live order → ปิด; v3 is clean → gone.
+    prismaMock.orderItem.findMany.mockResolvedValue([{ variantId: 'v2' }]);
+
+    const res = await putVariants({
+      name: 'HBO Max 7 4K',
+      variants: [{ id: 'v1', label: '7 วัน', price: 100, stock: 10, isActive: true }],
+    });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.productVariant.delete).toHaveBeenCalledWith({
+      where: { id: 'v3' },
+    });
+    expect(prismaMock.productVariant.delete).not.toHaveBeenCalledWith({
+      where: { id: 'v2' },
+    });
+    expect(prismaMock.productVariant.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['v2'] } },
+      data: { isActive: false },
+    });
+    expect(await res.json()).toMatchObject({
+      variantCleanup: { deletedIds: ['v3'], deactivatedIds: ['v2'] },
+    });
+  });
+
+  it('deactivates a dropped variant whose batch is shared with another variant', async () => {
+    prismaMock.productVariant.findMany
+      .mockResolvedValueOnce([
+        { id: 'v1', stock: 10 },
+        { id: 'v2', stock: 0 },
+      ])
+      .mockResolvedValueOnce([{ id: 'v1', stock: 10 }]);
+    prismaMock.giftCode.findMany.mockResolvedValue([
+      { variantId: 'v2', status: 'available', orderId: null },
+    ]);
+    // The batch also holds a surviving variant's code: deleting the batch
+    // would strand it, keeping it would trip Restrict — deactivate instead.
+    prismaMock.codeUploadBatch.findMany.mockResolvedValue([{ variantId: 'v2' }]);
+
+    const res = await putVariants({
+      name: 'HBO Max 7 4K',
+      variants: [{ id: 'v1', label: '7 วัน', price: 100, stock: 10, isActive: true }],
+    });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.productVariant.delete).not.toHaveBeenCalled();
+    expect(prismaMock.productVariant.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['v2'] } },
+      data: { isActive: false },
+    });
+    expect(await res.json()).toMatchObject({
+      variantCleanup: { deletedIds: [], deactivatedIds: ['v2'] },
+    });
   });
 
   it('rejects a stale variant id with 409 and writes nothing', async () => {

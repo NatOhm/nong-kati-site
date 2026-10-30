@@ -21,7 +21,7 @@ import { prisma } from '@/lib/db';
 import { checkPermission } from '@/lib/rbac';
 import { getAdminToken } from '@/lib/adminRequest';
 import { normalizeProductShortDescription } from '@/lib/ogShareSettings';
-import { purgeProduct } from '@/lib/catalogPurge';
+import { purgeProduct, purgeVariantsInTx } from '@/lib/catalogPurge';
 
 export const dynamic = 'force-dynamic';
 
@@ -136,6 +136,8 @@ export async function PUT(
     data.tags = { deleteMany: [{ productId: id }], create: ids.map((tagId) => ({ tagId })) };
   }
 
+  // Which dropped variant rows the save deleted vs force-kept as ปิด.
+  let variantCleanup = { deletedIds: [] as string[], deactivatedIds: [] as string[] };
   // Variants: id-based reconcile (update in place / create new / remove
   // dropped). The old replace-all logic had two failure modes the client hit
   // on 19 Oct: (1) deleteMany violated onDelete: Restrict FKs (GiftCode,
@@ -143,8 +145,10 @@ export async function PUT(
   // uploaded codes could not be edited or moved to another category; (2) the
   // order-referenced path deactivated + re-created every variant on each
   // save, multiplying options and orphaning gift codes away from the
-  // sellable variants. Rows are now reconciled by id; a dropped row is
-  // deleted only when nothing references it, otherwise deactivated.
+  // sellable variants. Rows are now reconciled by id; a dropped row goes
+  // through purgeVariantsInTx — deleted with its never-sold codes when it
+  // serves no live sale and holds no orphaned handover codes, deactivated
+  // otherwise (the response's variantCleanup says which).
   if (b['variants'] !== undefined) {
     if (!Array.isArray(b['variants']) || b['variants'].length === 0) {
       return NextResponse.json({ error: 'VARIANTS_REQUIRED' }, { status: 400 });
@@ -221,26 +225,11 @@ export async function PUT(
               keepIds.add(created.id);
             }
           }
-          // Rows the payload dropped: delete only when nothing references
-          // them (order items, gift codes, upload batches, stock snapshots
-          // all Restrict); otherwise deactivate so history survives.
+          // Rows the payload dropped go through the variant purge: per-row
+          // guards (live sale or orphaned handover codes → deactivate),
+          // otherwise detach history and delete with never-sold codes.
           const removedIds = beforeVariants.filter((v) => !keepIds.has(v.id)).map((v) => v.id);
-          if (removedIds.length > 0) {
-            const [orders, codes, batches, snaps] = await Promise.all([
-              tx.orderItem.count({ where: { variantId: { in: removedIds } } }),
-              tx.giftCode.count({ where: { variantId: { in: removedIds } } }),
-              tx.codeUploadBatch.count({ where: { variantId: { in: removedIds } } }),
-              tx.inventorySnapshot.count({ where: { productVariantId: { in: removedIds } } }),
-            ]);
-            if (orders + codes + batches + snaps > 0) {
-              await tx.productVariant.updateMany({
-                where: { id: { in: removedIds } },
-                data: { isActive: false },
-              });
-            } else {
-              await tx.productVariant.deleteMany({ where: { id: { in: removedIds } } });
-            }
-          }
+          variantCleanup = await purgeVariantsInTx(tx, removedIds);
           await tx.product.update({ where: { id }, data });
         },
         { timeout: 15000 },
@@ -291,6 +280,7 @@ export async function PUT(
   });
   return NextResponse.json({
     id: updated!.id,
+    variantCleanup,
     name: updated!.name,
     slug: updated!.slug,
     description: updated!.description,
