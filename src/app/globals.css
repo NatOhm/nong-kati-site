@@ -28,9 +28,44 @@
   }
 
   body {
-    background: var(--bg-base);
+    background-color: var(--bg-base);
+    /* Warm site backdrop: soft peach/oat/blush glows + a faint dot grain
+       so large empty areas feel cozy, not flat. Static gradients only —
+       nothing to disable for reduced-motion. */
+    background-image: radial-gradient(
+        42rem 28rem at 8% -6%,
+        rgb(254 215 170 / 0.55),
+        transparent 60%
+      ),
+      radial-gradient(36rem 26rem at 95% 4%, rgb(253 230 138 / 0.35), transparent 60%),
+      radial-gradient(50rem 34rem at 50% 110%, rgb(254 205 211 / 0.3), transparent 60%),
+      radial-gradient(rgb(124 45 18 / 0.055) 1px, transparent 1.4px);
+    background-size:
+      auto,
+      auto,
+      auto,
+      22px 22px;
+    background-attachment: fixed;
     color: var(--fg-primary);
     font-family: var(--font-ui);
+  }
+
+  [data-theme='dark'] body {
+    background-color: var(--bg-base);
+    background-image: radial-gradient(
+        42rem 28rem at 8% -6%,
+        rgb(249 115 22 / 0.14),
+        transparent 60%
+      ),
+      radial-gradient(36rem 26rem at 95% 4%, rgb(232 160 32 / 0.1), transparent 60%),
+      radial-gradient(50rem 34rem at 50% 110%, rgb(235 115 123 / 0.1), transparent 60%),
+      radial-gradient(rgb(255 255 255 / 0.05) 1px, transparent 1.4px);
+    background-size:
+      auto,
+      auto,
+      auto,
+      22px 22px;
+    background-attachment: fixed;
   }
 
   /* 04-design-system.md §2.5 — Thai typography rules */

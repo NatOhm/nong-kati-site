@@ -7,6 +7,7 @@ import { CartProvider } from '@/providers/CartProvider';
 import { CustomerProfileProvider } from '@/components/layout/CustomerProfileProvider';
 import { CookieConsentBanner } from '@/components/pdpa/CookieConsentBanner';
 import { MobileBottomNav } from '@/components/home/MobileBottomNav';
+import { RouteProgress } from '@/components/layout/RouteProgress';
 import { ThemeVars } from '@/components/layout/ThemeVars';
 import { ClayIconDefs } from '@/components/ui/ClayIconDefs';
 import { getAppearance } from '@/lib/data';
@@ -105,6 +106,7 @@ export default async function RootLayout({
         />
       </head>
       <body className="text-thai font-ui">
+        <RouteProgress />
         {/* Shared SVG paint-server defs (one document-wide registry — the
             duplicate-ID gate's sanctioned source of literal gradient ids). */}
         <ClayIconDefs />
