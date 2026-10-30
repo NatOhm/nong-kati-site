@@ -22,6 +22,14 @@
  * (both sides at least 4 digits) rejects; a short/unreadable mask trusts the
  * provider. Details carry last-4 digits only — full account numbers never
  * reach a log.
+ *
+ * 2026-10-30 correction: the provider mask does NOT expose the trailing
+ * window. The genuine slip to `199-1-73578-6` reports `xxx-x-x3578-x`
+ * (digits `3578` — positions 6–9, tail masked), so trailing-4 equality
+ * false-rejected a real customer slip (probe order NK-2026-000175: amount
+ * 9 = 9, same account, yet `RECEIVER_MISMATCH`). The compare is therefore
+ * containment — the slip's exposed run must appear inside the store digits
+ * (or vice versa) — not tail equality.
  */
 
 /** Digits only — strips spaces/dashes/mask chars from account numbers. */
@@ -43,8 +51,9 @@ export type ReceiverVerdict = { ok: true } | { ok: false; detail: string };
 
 /**
  * Compare the slip's receiver against the store account. Providers report
- * masked accounts ("xxx-x-x5786-x"), so only the trailing 4 digits are
- * compared, and only when both sides yield at least 4.
+ * masked accounts ("xxx-x-x3578-x" for store `199-1-73578-6`), so the
+ * exposed digit run must appear inside the store digits (or vice versa),
+ * and only when both sides yield at least 4 digits.
  */
 export function checkReceiverMatch(
   storeAccount: string | null | undefined,
@@ -53,6 +62,6 @@ export function checkReceiverMatch(
   const want = normalizeAccountDigits(storeAccount);
   const got = normalizeAccountDigits(slipReceiver);
   if (want.length < 4 || got.length < 4) return { ok: true };
-  if (want.slice(-4) === got.slice(-4)) return { ok: true };
+  if (want.includes(got) || got.includes(want)) return { ok: true };
   return { ok: false, detail: `receiver …${got.slice(-4)} vs store …${want.slice(-4)}` };
 }

@@ -33,6 +33,13 @@ describe('checkReceiverMatch', () => {
     expect(checkReceiverMatch('199-1-73578-6', '5786')).toEqual({ ok: true });
   });
 
+  it('accepts the masked middle window of the real store account (live 2026-10-30)', () => {
+    // Genuine slip to 199-1-73578-6 reports xxx-x-x3578-x (digits 3578 =
+    // positions 6-9, tail masked). Trailing-4 equality false-rejected it
+    // (probe order NK-2026-000175); containment accepts it.
+    expect(checkReceiverMatch('199-1-73578-6', 'xxx-x-x3578-x')).toEqual({ ok: true });
+  });
+
   it('fails closed on a definite mismatch, reporting last-4 only', () => {
     const v = checkReceiverMatch('123-456-5786', 'xxx-x-x9999-x');
     expect(v).toEqual({ ok: false, detail: 'receiver …9999 vs store …5786' });

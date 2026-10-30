@@ -52,3 +52,30 @@ probe was spent confirming this, further calls buy nothing.
 - If the provider ever rejects digits-only account numbers (docs show dashed
   examples but mandate no-symbols), the fix is in `normalizeAccountDigits`
   (`src/lib/payment/receiverPolicy.ts`) — one place, both enforcement layers.
+
+## 2026-10-30 probe outcome (1 credit, user-approved) — genuine slip FAILED
+
+- Setup: real stored slip-171 (347,885 B JPEG) resubmitted through the live
+  `POST /api/v1/payments/slip-verify` against a fresh 9-THB probe order
+  `NK-2026-000175` (amount 9 = 9, same receiver). No order was created blind:
+  a price preview confirmed total 9 first; the order stays `pending_payment`
+  and auto-expires like any abandoned checkout.
+- Result: **HTTP 422 `RECEIVER_MISMATCH`, `slipStored: true`**, order payable.
+  NOT the expected `200501` duplicate — the receiver guard fires first.
+- Root cause (mask-window, not a wrong account): the genuine slip to
+  `199-1-73578-6` reports `xxx-x-x3578-x` — digits `3578` are positions 6–9,
+  the tail `5786` is never exposed. Trailing-4 equality (`5786` vs `3578`)
+  false-rejected a real customer slip. The OQ answers itself: `…5786` (tail)
+  and `…3578` (mask window) are the SAME account — settings were already
+  correct, no change made (verified no-op).
+- Fix: `checkReceiverMatch` is now containment — the slip's exposed digit run
+  must appear inside the store digits (or vice versa). Regression test uses
+  the real mask. Failing safe is preserved: mismatch still queues to manual
+  review, never fulfils.
+- Side note: this was the slip's 3rd provider submit and still no `200501`,
+  so provider-side duplicate is not a reliable second line — the DB unique
+  slip-ref index remains the real one-slip-one-order guard.
+- Re-probe after the fix ships: 1 more credit, expect `INVALID_SLIP`
+  (duplicate) or `confirmed`. Open side effects of this probe: 1 Discord
+  payment-pending ping for the test order; no secrets touched (the Slip2Go
+  secret never left the server — the app called the provider itself).
