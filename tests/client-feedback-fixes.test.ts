@@ -346,6 +346,67 @@ describe('Slip2Go adapter', () => {
     expect(String(body.payload.imageBase64).startsWith('data:image/png;base64,')).toBe(true);
   });
 
+  it('sends amount "9" for a ฿9 order and accepts a "9.00" echo back (no false mismatch)', async () => {
+    process.env['NK_SLIP2GO_SECRET'] = 'test-secret';
+    // Docs: no commas, no trailing zeros on the way out; the bank may still
+    // echo a decimal string back — Number() must absorb it.
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          code: '200000',
+          message: 'Slip found.',
+          data: {
+            transRef: 'TR-9',
+            amount: '9.00',
+            receiver: { account: { name: 'Shop', bank: { account: 'xxx-x-x5786-x' } } },
+          },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+    );
+    const { verifySlip2Go } = await import('@/lib/payment/slip2go');
+    const r = await verifySlip2Go({ imageBase64: 'aGk=', expectedAmountThb: 9 });
+    expect(r).toMatchObject({ ok: true, amountThb: 9 });
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, { body: string }];
+    const sent = JSON.parse(init.body) as {
+      payload: { checkCondition: { checkAmount: { type: string; amount: string } } };
+    };
+    expect(sent.payload.checkCondition.checkAmount).toEqual({ type: 'eq', amount: '9' });
+  });
+
+  it('surfaces a proxy-only receiver (PromptPay id) as the receiver account', async () => {
+    process.env['NK_SLIP2GO_SECRET'] = 'test-secret';
+    // Some slips carry the receiver only under receiver.account.proxy — the
+    // route's receiverPolicy compare must still have something to check.
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          code: '200000',
+          message: 'Slip found.',
+          data: {
+            transRef: 'TR-PROXY',
+            amount: 25,
+            receiver: {
+              account: {
+                name: 'Shop',
+                bank: null,
+                proxy: { type: 'NATID', account: 'xxx-x-x5786-x' },
+              },
+            },
+          },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+    );
+    const { verifySlip2Go } = await import('@/lib/payment/slip2go');
+    const r = await verifySlip2Go({
+      imageBase64: 'aGk=',
+      expectedAmountThb: 25,
+      expectedReceiverDigits: '1234565786',
+    });
+    expect(r).toMatchObject({ ok: true, receiverAccount: 'xxx-x-x5786-x' });
+  });
+
   it('retries once with the raw secret when Bearer is rejected, then succeeds', async () => {
     process.env['NK_SLIP2GO_SECRET'] = 'test-secret';
     // 1st attempt: HTTP 401 (scheme rejected). 2nd: the same endpoint under

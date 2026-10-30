@@ -31,6 +31,8 @@
  * arrival). Production sets NK_SLIP2GO_BASE explicitly in the Plesk panel.
  */
 
+import { normalizeAccountDigits } from './receiverPolicy';
+
 const SLIP2GO_BASE = process.env['NK_SLIP2GO_BASE'] ?? 'https://connect.slip2go.com';
 
 export interface Slip2GoVerifyInput {
@@ -38,11 +40,12 @@ export interface Slip2GoVerifyInput {
   /** Exact order total in THB — enforced bank-side via checkAmount eq. */
   expectedAmountThb: number;
   /**
-   * Store receiving account, digits only (no spaces/dashes) — enforced
-   * bank-side via checkReceiver when present, plus a local trailing-4
-   * guard in verifySuccess. Omit when the store account is not
-   * configured: amount/duplicate checks still apply, receiver
-   * enforcement is skipped (same as before this field existed).
+   * Store receiving account, digits only (no spaces/dashes) — forwarded
+   * bank-side as checkReceiver. This is a belt only: the provider did NOT
+   * enforce it in the 2026-10-30 live proof, so the authoritative compare
+   * is `checkReceiverMatch` in receiverPolicy.ts, applied by the route after
+   * any provider succeeds. Omit when the store account is not configured:
+   * amount/duplicate checks still apply, receiver enforcement is skipped.
    */
   expectedReceiverDigits?: string;
 }
@@ -140,11 +143,6 @@ function mapSlip2GoError(code: string, message: string): Slip2GoResult {
   }
 }
 
-/** Digits only — strips spaces/dashes/mask chars from account numbers. */
-function normalizeAccountDigits(v: string | null | undefined): string {
-  return (v ?? '').replace(/\D/g, '');
-}
-
 /** Slip2Go wants a plain decimal string: no commas, no trailing zeros. */
 function amountString(amountThb: number): string {
   const rounded = Math.round(amountThb * 100) / 100;
@@ -237,26 +235,12 @@ function verifySuccess(parsed: Slip2GoBody, input: Slip2GoVerifyInput): Slip2GoR
       detail: `slip ${amount} vs order ${input.expectedAmountThb}`,
     };
   }
+  // Receiver reporting only — no account comparison here. The masked
+  // receiver (bank account, else proxy id) is surfaced so the route can run
+  // the single receiverPolicy compare after ANY provider succeeds (SlipOK
+  // has no receiver condition either). See receiverPolicy.ts.
   const gotAccount =
     d.receiver?.account?.bank?.account ?? d.receiver?.account?.proxy?.account ?? null;
-  const gotDigits = normalizeAccountDigits(typeof gotAccount === 'string' ? gotAccount : '');
-  const wantDigits = normalizeAccountDigits(input.expectedReceiverDigits);
-  // Local receiver guard: the provider reports masked accounts
-  // ("xxx-x-x5366-x"), so compare trailing 4 digits only, and only when
-  // both sides yield at least 4 digits. A definite mismatch fails closed —
-  // the order stays payable and the slip waits for manual review.
-  // Last-4 only in the detail: the full numbers never enter logs.
-  if (
-    wantDigits.length >= 4 &&
-    gotDigits.length >= 4 &&
-    wantDigits.slice(-4) !== gotDigits.slice(-4)
-  ) {
-    return {
-      ok: false,
-      code: 'RECEIVER_MISMATCH',
-      detail: `receiver …${gotDigits.slice(-4)} vs store …${wantDigits.slice(-4)}`,
-    };
-  }
   return {
     ok: true,
     ref: d.transRef,

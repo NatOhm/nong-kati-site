@@ -39,6 +39,13 @@ probe was spent confirming this, further calls buy nothing.
 
 - Delete this file's claim from the stuck list; correctness for the money
   path can then be graded above 6.
-- If the provider rejects digits-only account numbers (docs show dashed
+- **Decision (30 ต.ค. 2026): the bank-side `checkReceiver` stays belt-only.**
+  Docs show `checkReceiver: [{ accountNumber: "…" }]` as a valid standalone
+  example (`accountType` is documented as optional), so our payload matches
+  published usage — yet the live proof answered `200200` for a wrong account.
+  No payload change without a credit-backed probe; enforcement is the local
+  `checkReceiverMatch` in `src/lib/payment/receiverPolicy.ts` (one owner,
+  applied by the route after ANY provider success).
+- If the provider ever rejects digits-only account numbers (docs show dashed
   examples but mandate no-symbols), the fix is in `normalizeAccountDigits`
-  (`src/lib/payment/slip2go.ts`) — one place, both enforcement layers.
+  (`src/lib/payment/receiverPolicy.ts`) — one place, both enforcement layers.

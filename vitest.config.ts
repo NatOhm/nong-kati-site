@@ -11,6 +11,16 @@ export default defineConfig({
     include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
     environment: 'node',
     globals: true,
+    // Cap workers: vitest otherwise spawns one per CPU (89 on this box) and
+    // the resulting contention trips the 5s per-test timeout at random files
+    // (build-stamp, font-vendoring, SlipUploadPanel…) — flaky failures that
+    // pass when re-run alone. Four workers keeps the suite deterministic.
+    maxWorkers: 4,
+    // Some gates spawn git / scan the whole tree (build-stamp,
+    // release-badge); on Windows that regularly needs >5s while 3 siblings
+    // run in parallel. 15s still bounds a real hang without producing
+    // machine-dependent red.
+    testTimeout: 15_000,
     // JWT/slip secrets fail closed in every environment now, so every worker
     // needs a value; per-file vi.stubEnv still overrides for fail-closed
     // assertions.

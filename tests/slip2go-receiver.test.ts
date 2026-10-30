@@ -1,6 +1,8 @@
-/** Slip2Go receiver enforcement (Fix C): the store's receiving account must
- * be checked bank-side via checkReceiver plus a local trailing-4 guard, so
- * a right-amount slip paid to someone else can never auto-confirm.
+/** Slip2Go receiver plumbing: the store's receiving account is sent
+ * bank-side via checkReceiver (digits only). The AUTHORITATIVE compare is
+ * receiverPolicy.checkReceiverMatch, applied by the slip-verify route after
+ * any provider succeeds — it lives here only so a change to the rule has one
+ * home (tests/receiver-policy.test.ts + tests/slip-flow.test.ts cover it).
  * Mocks fetch only — no network, no DB.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -87,7 +89,11 @@ describe('Slip2Go receiver enforcement', () => {
     expect(r).toMatchObject({ ok: false, code: 'RECEIVER_MISMATCH' });
   });
 
-  it('fails closed locally when the 200000 slip went to another account', async () => {
+  it('surfaces the provider receiver verbatim for the route to compare', async () => {
+    // The 2026-10-30 live proof: Slip2Go answered 200200 for a slip paid to
+    // another account, so this module reports what it saw and does NOT
+    // decide accept/reject — receiverPolicy (route) does that for every
+    // provider, SlipOK included.
     process.env['NK_SLIP2GO_SECRET'] = 'test-secret';
     fetchMock.mockResolvedValueOnce(okResponse('xxx-x-x9999-x'));
     const { verifySlip2Go } = await import('@/lib/payment/slip2go');
@@ -96,28 +102,6 @@ describe('Slip2Go receiver enforcement', () => {
       expectedAmountThb: 25,
       expectedReceiverDigits: '1234565786',
     });
-    expect(r).toMatchObject({ ok: false, code: 'RECEIVER_MISMATCH' });
-    if (!r.ok) expect(r.detail).toContain('9999');
-  });
-
-  it('passes when trailing-4 matches and skips the guard on short masks', async () => {
-    process.env['NK_SLIP2GO_SECRET'] = 'test-secret';
-    fetchMock
-      .mockResolvedValueOnce(okResponse('xxx-x-x5786-x'))
-      .mockResolvedValueOnce(okResponse('xx'));
-    const { verifySlip2Go } = await import('@/lib/payment/slip2go');
-    const match = await verifySlip2Go({
-      imageBase64: 'aGk=',
-      expectedAmountThb: 25,
-      expectedReceiverDigits: '1234565786',
-    });
-    expect(match.ok).toBe(true);
-    // Provider mask too short to compare (<4 digits) → guard skipped, trust provider.
-    const short = await verifySlip2Go({
-      imageBase64: 'aGk=',
-      expectedAmountThb: 25,
-      expectedReceiverDigits: '1234565786',
-    });
-    expect(short.ok).toBe(true);
+    expect(r).toMatchObject({ ok: true, receiverAccount: 'xxx-x-x9999-x' });
   });
 });

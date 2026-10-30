@@ -8,6 +8,7 @@ import { fulfilOrder, scheduleOutboxDrain } from '@/lib/fulfilment';
 import { recordPaymentReconciliation } from '@/lib/paymentReconciliation';
 import { getClientIp, checkRateLimit } from '@/lib/rateLimit';
 import { isSlip2GoEnabled, verifySlip2Go } from '@/lib/payment/slip2go';
+import { checkReceiverMatch, storeReceiverDigits } from '@/lib/payment/receiverPolicy';
 import { isSlipVerificationEnabled, verifySlip } from '@/lib/payment/slipok';
 import { isValidSlipUploadToken, mintSlipStorageKey, slipImageRoute } from '@/lib/slipSecurity';
 
@@ -109,6 +110,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       orderId = String(body.orderId ?? '');
       uploadToken = String(body.token ?? '');
       imageBase64 = String(body.imageBase64 ?? '').replace(/^data:[^,]+,/, '');
+      // Same ceiling as the multipart path (file.size above): the JSON
+      // branch had no size check at all, so a multi-hundred-MB base64 body
+      // could be buffered into the evidence row and forwarded upstream.
+      // Buffer.byteLength(.., 'base64') = the DECODED byte count.
+      if (Buffer.byteLength(imageBase64, 'base64') > MAX_IMAGE_BYTES) {
+        return NextResponse.json({ error: 'FILE_TOO_LARGE' }, { status: 413 });
+      }
     }
   } catch {
     return NextResponse.json({ error: 'INVALID_BODY' }, { status: 400 });
@@ -134,14 +142,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
   const expected = Number(order.totalAmountThb);
 
-  // Strict receiver: the store's own receiving account (digits only) is
-  // enforced bank-side via checkReceiver plus a local trailing-4 guard in
-  // verifySlip2Go. Unconfigured store account → receiver check skipped,
+  // Strict receiver: the store's own receiving account (digits only) is sent
+  // bank-side via checkReceiver AND compared here by receiverPolicy — the
+  // single owner of the rule. Unconfigured store account → check skipped,
   // exactly as before (fail-closed only where we have something to check
   // against; a misconfigured account fails verifications into the manual
   // queue instead of releasing codes).
   const manualInfo = await getManualTransferInfo();
-  const storeDigits = (manualInfo.accountNumber ?? '').replace(/\D/g, '');
+  const storeDigits = storeReceiverDigits(manualInfo.accountNumber);
+  if (storeDigits === '') {
+    // Fail-open is a deliberate decision, but it must never be silent: a
+    // store with no account configured is auto-confirming without the
+    // receiver guard and nobody would ever see it.
+    console.warn('[slip-verify] store receiving account not configured — receiver check skipped');
+  }
   const receiverOpt = storeDigits === '' ? {} : { expectedReceiverDigits: storeDigits };
 
   // ── Keep the evidence FIRST ──────────────────────────────────────────────
@@ -182,6 +196,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       usedProvider = isSlip2GoEnabled() ? 'slipok' : 'slip2go';
     }
   }
+  // ── Receiver policy (one owner: receiverPolicy.ts) ────────────────────
+  // Applied after ANY provider succeeds, because the bank-side condition is
+  // not trustworthy on its own (the 2026-10-30 live proof sent a wrong
+  // accountNumber and got 200200 instead of 200401) and the SlipOK fallback
+  // carries no receiver condition at all. Unconfigured store account → the
+  // verdict is ok → check skipped, as documented.
+  if (result.ok) {
+    const verdict = checkReceiverMatch(manualInfo.accountNumber, result.receiverAccount);
+    if (!verdict.ok) {
+      result = { ok: false, code: 'RECEIVER_MISMATCH', detail: verdict.detail };
+    }
+  }
+
   const verifiedBy = usedProvider === 'slip2go' ? 'slip2go:auto' : 'slipok:auto';
 
   if (!result.ok) {

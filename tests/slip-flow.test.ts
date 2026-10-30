@@ -218,7 +218,7 @@ describe('provider dispatch in POST /api/v1/payments/slip-verify', () => {
 
   it('passes the store receiving account to Slip2Go for the receiver check', async () => {
     h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
-    h.slip2go.verifySlip2Go.mockResolvedValueOnce(slipOkSuccess);
+    h.slip2go.verifySlip2Go.mockResolvedValueOnce({ ...slipOkSuccess, receiverAccount: 'x-5786' });
     h.manualTransfer.getManualTransferInfo.mockResolvedValueOnce({
       enabled: true,
       accountName: 'ร้านนกกะทา',
@@ -296,6 +296,64 @@ describe('provider dispatch in POST /api/v1/payments/slip-verify', () => {
     // A wrong-account slip must never be retried on the other provider
     // hoping for a pass, and must never reach fulfilment.
     expect(h.slipok.verifySlip).not.toHaveBeenCalled();
+    expect(h.fulfil.fulfilOrder).not.toHaveBeenCalled();
+    expect(h.prisma.paymentAttempt.update).not.toHaveBeenCalled();
+  });
+
+  it('applies the receiver policy after a Slip2Go SUCCESS (provider 200200 is not enough)', async () => {
+    // The provider said the slip is fine while reporting an account the
+    // store does not own — the route's receiverPolicy compare is the guard.
+    h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
+    h.slip2go.verifySlip2Go.mockResolvedValueOnce({
+      ...slipOkSuccess,
+      receiverAccount: 'xxx-x-x9999-x',
+    });
+    h.manualTransfer.getManualTransferInfo.mockResolvedValueOnce({
+      enabled: true,
+      accountName: 'ร้านนกกะทา',
+      accountNumber: '123-456-5786',
+      accountType: 'bank',
+      bankName: null,
+      qrImageUrl: null,
+    });
+
+    const res = await callVerify();
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { error?: string; slipStored?: boolean; detail?: string };
+    expect(body.error).toBe('RECEIVER_MISMATCH');
+    expect(body.slipStored).toBe(true);
+    expect(body.detail).toContain('9999'); // last-4 only, never the full number
+    // Order stays payable for manual review; evidence was kept first.
+    expect(h.fulfil.fulfilOrder).not.toHaveBeenCalled();
+    expect(h.prisma.paymentAttempt.update).not.toHaveBeenCalled();
+    expect(h.prisma.siteSetting.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes the SlipOK-fallback gap: wrong receiver on the fallback path 422s too', async () => {
+    h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
+    h.slipok.isSlipVerificationEnabled.mockReturnValue(true);
+    h.slip2go.verifySlip2Go.mockResolvedValueOnce({
+      ok: false,
+      code: 'UPSTREAM_ERROR',
+      detail: 'HTTP 502',
+    });
+    h.slipok.verifySlip.mockResolvedValueOnce({
+      ...slipOkSuccess,
+      receiverAccount: 'xxx-x-x9999-x',
+    });
+    h.manualTransfer.getManualTransferInfo.mockResolvedValueOnce({
+      enabled: true,
+      accountName: 'ร้านนกกะทา',
+      accountNumber: '123-456-5786',
+      accountType: 'bank',
+      bankName: null,
+      qrImageUrl: null,
+    });
+
+    const res = await callVerify();
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { error: string }).error).toBe('RECEIVER_MISMATCH');
+    expect(h.slipok.verifySlip).toHaveBeenCalledTimes(1);
     expect(h.fulfil.fulfilOrder).not.toHaveBeenCalled();
     expect(h.prisma.paymentAttempt.update).not.toHaveBeenCalled();
   });
@@ -377,5 +435,120 @@ describe('evidence + admin fallback', () => {
     expect(res.status).toBe(403);
     expect(h.prisma.siteSetting.create).not.toHaveBeenCalled();
     expect(h.notify.notifyPaymentPending).not.toHaveBeenCalled();
+  });
+});
+
+/** JSON entry point with a caller-chosen body (multipart covers the rest). */
+function postJson(body: unknown): NextRequest {
+  return new NextRequest('http://localhost/api/v1/payments/slip-verify', {
+    method: 'POST',
+    body: JSON.stringify(body),
+    headers: { 'content-type': 'application/json' },
+  });
+}
+
+describe('entry-point boundaries (adversarial pass, 30 ต.ค.)', () => {
+  it('rejects a bad capability token with 403 before any provider call or evidence write', async () => {
+    h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
+    h.slipSec.isValidSlipUploadToken.mockReturnValue(false);
+
+    const res = await callVerify();
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { error: string }).error).toBe('INVALID_UPLOAD_TOKEN');
+    // Ordering: an order ID alone must not be able to spend quota or make
+    // us store arbitrary images.
+    expect(h.slip2go.verifySlip2Go).not.toHaveBeenCalled();
+    expect(h.prisma.siteSetting.create).not.toHaveBeenCalled();
+    expect(h.prisma.order.update).not.toHaveBeenCalled();
+  });
+
+  it('answers 409 for an order that is no longer payable, before touching a provider', async () => {
+    h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
+    h.orders.getOrderById.mockResolvedValue({ ...ORDER, status: 'paid' });
+
+    const res = await callVerify();
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: string }).error).toBe('ORDER_NOT_PAYABLE');
+    expect(h.slip2go.verifySlip2Go).not.toHaveBeenCalled();
+    expect(h.prisma.siteSetting.create).not.toHaveBeenCalled();
+  });
+
+  it('maps a duplicate slip (provider 200501 → INVALID_SLIP) to 422 without fulfilling', async () => {
+    h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
+    h.slip2go.verifySlip2Go.mockResolvedValueOnce({
+      ok: false,
+      code: 'INVALID_SLIP',
+      detail: 'duplicate: รายการนี้ถูกบันทึกไปแล้ว',
+    });
+
+    const res = await callVerify();
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as {
+      error?: string;
+      message?: string;
+      slipStored?: boolean;
+    };
+    expect(body.error).toBe('INVALID_SLIP');
+    expect(body.message).toContain('ตรวจสลิปไม่ผ่าน');
+    // The slip stays in the admin queue, order still payable.
+    expect(body.slipStored).toBe(true);
+    expect(h.fulfil.fulfilOrder).not.toHaveBeenCalled();
+  });
+
+  it('caps the JSON path at MAX_IMAGE_BYTES (the multipart path already did)', async () => {
+    h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
+    // ~7 MB of base64 → decodes above the 5 MB ceiling.
+    const huge = 'A'.repeat(7 * 1024 * 1024);
+    const route = (await import('@/app/api/v1/payments/slip-verify/route')) as unknown as Record<
+      string,
+      (r: NextRequest) => Promise<Response>
+    >;
+
+    const res = await route['POST']!(postJson({ orderId: ORDER.id, token: 'tok', imageBase64: huge }));
+    expect(res.status).toBe(413);
+    expect(((await res.json()) as { error: string }).error).toBe('FILE_TOO_LARGE');
+    // Never buffered into the evidence row, never forwarded upstream.
+    expect(h.slip2go.verifySlip2Go).not.toHaveBeenCalled();
+    expect(h.prisma.siteSetting.create).not.toHaveBeenCalled();
+  });
+
+  it('keeps checking when the evidence write fails — slipStored:false, verdict still returned', async () => {
+    h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
+    h.slip2go.verifySlip2Go.mockResolvedValueOnce({
+      ok: false,
+      code: 'AMOUNT_MISMATCH',
+      detail: 'slip 250 vs order 300',
+    });
+    h.prisma.siteSetting.create.mockRejectedValueOnce(new Error('db down'));
+
+    const res = await callVerify();
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { error?: string; slipStored?: boolean };
+    expect(body.error).toBe('AMOUNT_MISMATCH');
+    expect(body.slipStored).toBe(false);
+    expect(h.slip2go.verifySlip2Go).toHaveBeenCalledTimes(1);
+  });
+
+  it('warns (not silently) when no store account is configured — the deliberate fail-open', async () => {
+    h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
+    h.slip2go.verifySlip2Go.mockResolvedValueOnce(slipOkSuccess);
+    h.manualTransfer.getManualTransferInfo.mockResolvedValueOnce({
+      enabled: true,
+      accountName: 'ร้านนกกะทา',
+      accountNumber: null, // unconfigured → receiver check skipped by design
+      accountType: 'bank',
+      bankName: null,
+      qrImageUrl: null,
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const res = await callVerify();
+      expect(res.status).toBe(200);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('receiver check skipped'),
+      );
+    } finally {
+      warn.mockRestore();
+    }
   });
 });
