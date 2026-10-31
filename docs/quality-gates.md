@@ -24,7 +24,6 @@
 | PR    | Password reset — single-use token claim, revocation    | `tests/password-reset.test.ts`     | `npm test` (vitest)  | Unit Tests             |
 | O1    | Phone OTP sign-in (pure logic, no DB/network)          | `tests/phone-otp.test.ts`          | `npm test` (vitest)  | Unit Tests             |
 | M1    | Manual-transfer settings validator (incl. bank-QR URL allowlist) | `tests/manual-transfer-settings.test.ts` | `npm test` (vitest) | Unit Tests             |
-| AE    | Admin email test — fake SMTP + SSRF guard             | `tests/admin-email-test.test.ts`    | `npm test` (vitest)  | Unit Tests             |
 | SA    | Staff audit hardening (crypto temp password, tx-scoped audit) | `tests/staff-audit-hardening.test.ts` | `npm test` (vitest) | Unit Tests             |
 | X1    | JSON-LD XSS escaping                                  | `tests/jsonld-xss.test.ts`         | `npm test` (vitest)  | Unit Tests             |
 | D1    | Client-doc drift — 20 gates over 4 docs               | `tests/client-docs-consistency.test.ts` | `npm test` (vitest) | doc-consistency        |
@@ -163,7 +162,7 @@ Playwright เลือก target ตาม `E2E_BASE_URL` > localhost:4200 (dev
   3. แต่ละ role ทั้ง 6 (จาก `ROLE_PERMISSIONS` ใน `src/types/auth.ts`): ไม่มี permission ของ endpoint → **403 เป๊ะ**; มี permission → **ห้าม 401/403** (หลัง gate ขอให้พังก็ได้ — prisma ถูก mock ให้ throw เพื่อพิสูจน์ว่าผ่าน gate มาแล้ว)
 - **หลักการสำคัญ:** expected result **derive** จาก `ROLE_PERMISSIONS` ไม่ใช่เขียนมือ — matrix จึงเลื่อนตาม RBAC ต้นทางเสมอ token เป็น JWT จริง (ผ่าน `verifyAdminJwt` รวม live role/status check) และ handler ถูกเรียก in-process ไม่มี HTTP server
 - **วิธีแก้เมื่อแดง:**
-  - `endpoints missing from the authz matrix` → เพิ่ม row `{ method, path, perm, body? }` (body ใส่ JSON ขั้นต่ำให้ handler ถึง guard ก่อน validation) เช่น route ที่กำลังจะเพิ่ม `POST /settings/email-test` → `{ method: 'POST', path: '/settings/email-test', perm: 'settings:write', body: {} }`
+  - `endpoints missing from the authz matrix` → เพิ่ม row `{ method, path, perm, body? }` (body ใส่ JSON ขั้นต่ำให้ handler ถึง guard ก่อน validation) เช่น route ที่กำลังจะเพิ่ม `POST /settings/discord-test` → `{ method: 'POST', path: '/settings/discord-test', perm: 'settings:write', body: {} }`
   - `→ 200/500, expected 403` → route นั้นเรียก `checkPermission` ด้วย permission ผิด หรือลืมเรียก
   - `→ 401, gate must pass` → token/role ถูกต้องแต่ guard ดีดกลับ — มักเป็นการเช็ค role ตรง ๆ แทนที่จะเช็ค permission
 
@@ -398,7 +397,7 @@ Test: 14 เคส + static guards (ไม่มี inline script ใน layout,
 Route เดิมตอบ provider outage ด้วย `result.error` ดิบในช่อง `error` แต่ค่านั้นเป็น **ข้อความระดับ transport** จาก `lib/email/resend.ts` (`EMAIL_NOT_CONFIGURED: …`, `EMAIL_PROVIDER_ERROR: Resend 422 …`) ไม่ใช่ code ของ API นี้ ส่วน modal ในหลังบ้านแตก error ด้วย `msg.includes('EMAIL_SEND_FAILED')` → **ไม่มีวัน match** ข้อความที่เขียนไว้เจาะจงว่า "ผู้ให้บริการอีเมลอาจมีปัญหา" จึงเป็น dead code และทุก outage ไปตกที่ข้อความกลาง ๆ "ลองใหม่"
 
 - **ทำไมถึงรอดมานาน:** ไม่มีอะไรแดง ก็จริง — route ยังตอบ 502 และยังไม่กล่าวอ้างว่าส่งสำเร็จ แค่**ความเจาะจงของข้อความที่ผู้ใช้เห็นหายไป** และหายเฉพาะในเคสที่เขียนข้อความนั้นไว้เพื่อ
-- **ทางแก้:** `error` ต้องเป็น code ของ route (`EMAIL_SEND_FAILED`) ส่วนข้อความจริงของ provider ย้ายไป `detail` + log ฝั่งเซิร์ฟเวอร์ (ตัด 300 ตัวอักษร) ตามแบบเดียวกับที่ `settings/email-test` ทำ (`SMTP_NOT_CONFIGURED` + `detail`)
+- **ทางแก้:** `error` ต้องเป็น code ของ route (`EMAIL_SEND_FAILED`) ส่วนข้อความจริงของ provider ย้ายไป `detail` + log ฝั่งเซิร์ฟเวอร์ (ตัด 300 ตัวอักษร) แยก code ของ route ออกจากข้อความจริงของ provider ไว้ใน `detail` เสมอ
 - **gate 8 เคส:** ไม่มี token → 401 · role ที่ไม่มี `orders:write` → 403 และไม่ส่งเมล · order ไม่มี → 404 · ส่งสำเร็จ → 200 และ `sentTo` เป็น **อีเมลของออเดอร์เอง** เสมอ (ไม่ใช่ที่ผู้เรียกกรอก) · provider outage → `EMAIL_SEND_FAILED` + `detail` · provider ไม่ได้ตั้งค่า → ยังเป็น `EMAIL_SEND_FAILED` ไม่ใช่ชื่อ env var · **ข้อความ provider ที่มีคำว่า `FORBIDDEN` ปนอยู่ก็ยังต้องตอบ `EMAIL_SEND_FAILED`** · ข้อความยาวเกินถูกตัด
 - **เคส `FORBIDDEN` ปนคือหัวใจของบั๊ก:** client แตก error ด้วย `includes(...)` ถ้าเอาข้อความ provider ไปใส่ `error` ตรง ๆ คำว่าใด ๆ ในนั้นจะพา UI ไปเข้าข้อความของ error อื่น — เคสนี้คือไปโทษว่าแอดมินไม่มีสิทธิ์ ทั้งที่จริงเป็นแค่ outage
 - **ไม่ mock ตัวตรวจสิทธิ์:** ใช้ JWT จริงผ่าน `checkPermission` จริง — `verifyAdminJwt` อ่านแถว `admin_users` สดทุกครั้ง (ถ้าโดนลดสิทธิ์ token เดิมตายทันที) การ mock ทิ้งไปก็คือการถอดส่วนที่ควรตรวจออก ปลอดแค่ prisma, การหาออเดอร์ และการส่งเมล
@@ -755,7 +754,7 @@ job นี้แดงมาตั้งแต่รอบที่ 88 และ
 - [ ] endpoint ใหม่คืนข้อมูลลูกค้า → ตรวจว่าอยู่ใต้ branch mask ของ PII ด้วย (เพิ่มเคสใน `admin-pii-masking.test.ts`) — รวมถึง **CSV/excel export ทุกรูปแบบ**: mask ต้องเกิดก่อนเขียนไฟล์ (อ้างแบบ `reports/customer-sales/export` + `lib/reports/customerSales`)
 - [ ] export ใหม่ที่โหลดไฟล์ออกจากระบบ → ผ่าน formula-injection guard (`isFormulaInjection`)
 
-**ปิดแล้วเดิม:** route `POST /api/v1/admin/settings/email-test` (ปุ่ม Test connection ของ Email settings) พร้อมครบตาม checklist — row ใน `ROUTE_COVERAGE` (perm `settings:write`), SSRF guard ที่ `probeSmtp` + แบน localhost ใน route, audit `settings.email_test` (เก็บแค่ผล per-step ไม่มี credential) — คลุมด้วย `tests/admin-email-test.test.ts` (fake SMTP server ต่อ TCP จริง + route guard/override/fallback)
+**ถอดออกแล้ว (2026-10-31):** route `POST /api/v1/admin/settings/email-test`, `lib/email/smtpProbe.ts` และเทสต์ที่คุมมันถูกลบทั้งชุด — แอปไม่เคยส่งเมลผ่าน SMTP เลย (ส่งผ่าน Resend HTTP) การ probe จึงพิสูจน์ได้แค่ "เซิร์ฟเวอร์ที่ไม่ได้ใช้ ติดต่อได้" และบอกไม่ได้ว่าเมลส่งออกได้จริงไหม; ผู้ส่งจริงอ่านจาก `NK_RESEND_FROM_EMAIL` ผ่าน `lib/email/config.ts` ตัวเดียว และหน้าตั้งค่าแสดงค่านั้นแบบอ่านอย่างเดียว
 
 ## Weblink (OG) card + share-preview copy admin-editable (2026-10-18) — `tests/og-share-settings.test.ts`
 

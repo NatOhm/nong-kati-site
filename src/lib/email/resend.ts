@@ -24,6 +24,13 @@
  * vitest module mocks — never via a magic API key.
  */
 
+import {
+  emailSender,
+  isEmailDeliveryConfigured,
+  missingEmailConfig,
+  resendApiKey,
+} from '@/lib/email/config';
+
 export interface EmailOptions {
   to: string;
   subject: string;
@@ -41,14 +48,10 @@ const RESEND_ENDPOINT = 'https://api.resend.com/emails';
 const REQUEST_TIMEOUT_MS = 10_000;
 
 /**
- * True when real delivery is configured. Routes that must not lie to users
- * (magic link, password reset, checkout success copy) consult this to fail
- * fast with an honest error instead of enqueueing into a void.
+ * Re-exported for callers that only talk to the mailer (and for the tests
+ * that inject it). The rule itself lives in '@/lib/email/config'.
  */
-export function isEmailDeliveryConfigured(): boolean {
-  const key = process.env['NK_RESEND_API_KEY'];
-  return Boolean(key) && key !== 're_mock_key' && Boolean(process.env['NK_RESEND_FROM_EMAIL']);
-}
+export { isEmailDeliveryConfigured };
 
 interface ResendSendResponse {
   id?: string;
@@ -58,14 +61,11 @@ interface ResendSendResponse {
 
 /** One POST to the Resend API. Throws on network failure / non-2xx. */
 async function resendSend(options: EmailOptions & { idempotencyKey?: string }): Promise<string> {
-  const apiKey = process.env['NK_RESEND_API_KEY'];
-  const from = process.env['NK_RESEND_FROM_EMAIL'];
-
-  if (!apiKey) {
-    throw new Error('EMAIL_NOT_CONFIGURED: NK_RESEND_API_KEY is not set');
-  }
-  if (!from) {
-    throw new Error('EMAIL_NOT_CONFIGURED: NK_RESEND_FROM_EMAIL is not set');
+  const apiKey = resendApiKey();
+  const from = emailSender();
+  const missing = missingEmailConfig();
+  if (missing || !apiKey || !from) {
+    throw new Error(`EMAIL_NOT_CONFIGURED: ${missing ?? 'email transport'} is not set`);
   }
 
   // Roadmap §2 — provider-side idempotency: same key = same email, Resend
@@ -122,7 +122,7 @@ export async function sendEmail(
   options: EmailOptions & { idempotencyKey?: string },
 ): Promise<EmailResult> {
   if (!isEmailDeliveryConfigured()) {
-    const missing = process.env['NK_RESEND_API_KEY'] ? 'NK_RESEND_FROM_EMAIL' : 'NK_RESEND_API_KEY';
+    const missing = missingEmailConfig() ?? 'NK_RESEND_API_KEY';
     console.error(`[Email] NOT CONFIGURED — set ${missing} (mock success is no longer returned)`);
     return {
       success: false,

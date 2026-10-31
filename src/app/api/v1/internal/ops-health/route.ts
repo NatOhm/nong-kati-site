@@ -78,13 +78,14 @@ export async function GET(req: Request): Promise<NextResponse> {
       deadLetterEmails: deadLetters,
       openReconciliations: reconciliations,
       stuckSendingEmails: stuckSending,
+      // Live catalog state only. There is deliberately NO `drift` field: it
+      // used to be hardcoded `false`, which is not a signal — a monitor that
+      // can never go red teaches the reader to trust it (audit finding 3,
+      // 2026-10-31). Real drift is caught by the CI verify-rls + migrate
+      // deploy gates, which compare the shipped directory against the DB.
       migration: {
         latestFinished: latestFinished[0]?.migration_name ?? null,
         finishedCount: Number(shippedMigrations[0]?.count ?? 0),
-        // Deeper drift detection (shipped-directory diff) lives in the CI
-        // concurrency job's verify-rls + migrate deploy gates; here we
-        // expose the live catalog state for uptime monitors.
-        drift: false,
       },
       limiter: {
         mode: sharedLimiter ? 'shared' : 'memory',

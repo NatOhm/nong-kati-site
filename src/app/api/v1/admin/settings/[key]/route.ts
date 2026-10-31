@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db';
 import { checkPermission } from '@/lib/rbac';
 import { getAdminToken } from '@/lib/adminRequest';
 import { writeAuditLog } from '@/lib/auditLog';
+import { emailSender, isEmailDeliveryConfigured } from '@/lib/email/config';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,6 +21,17 @@ const VALID_KEYS = new Set([
   'email',
   'security',
 ]);
+
+/**
+ * Read-only truth for the email screen: the sender the mailer ACTUALLY uses
+ * and whether delivery is wired at all. The transport config lives in the
+ * environment (Infisical → server.js), so this is displayed, never edited —
+ * the dashboard used to offer a `fromEmail` field that nothing read back
+ * (audit finding 2, 2026-10-31).
+ */
+function emailLiveFields(): Record<string, unknown> {
+  return { liveSender: emailSender(), emailConfigured: isEmailDeliveryConfigured() };
+}
 
 function bearer(req: NextRequest): string | null {
   const token = getAdminToken(req);
@@ -49,7 +61,9 @@ export async function GET(
     return NextResponse.json(
       key === 'notifications'
         ? { discordConfigured: Boolean(process.env['NK_DISCORD_WEBHOOK_URL']) }
-        : {},
+        : key === 'email'
+          ? emailLiveFields()
+          : {},
       { status: 200 },
     );
   }
@@ -62,9 +76,10 @@ export async function GET(
         discordConfigured: Boolean(process.env['NK_DISCORD_WEBHOOK_URL']),
       }, { status: 200 });
     }
+    if (key === 'email') return NextResponse.json({ ...value, ...emailLiveFields() }, { status: 200 });
     return NextResponse.json(value, { status: 200 });
   } catch {
-    return NextResponse.json({}, { status: 200 });
+    return NextResponse.json(key === 'email' ? emailLiveFields() : {}, { status: 200 });
   }
 }
 
@@ -227,48 +242,11 @@ export async function PUT(
       next['accountNumber'] = v === '' ? null : v;
     }
   } else if (key === 'email') {
-    // Outbound-mail configuration. The SMTP password is intentionally NOT
-    // stored here: like the Omise secret, only the ENV VAR NAME is persisted
-    // and the credential itself never reaches the database.
+    // Only the template toggles live here. The transport (sender + API key)
+    // comes from the environment via '@/lib/email/config', and SMTP config is
+    // gone with the dead probe (audit findings 2 + 4, 2026-10-31): nothing in
+    // this app ever sent over SMTP, so persisting it only made screens lie.
     next = {};
-    if (b['smtpHost'] === null) {
-      next['smtpHost'] = null;
-    } else if (typeof b['smtpHost'] === 'string') {
-      next['smtpHost'] = (b['smtpHost'] as string).trim().slice(0, 253) || null;
-    }
-    if (b['smtpPort'] !== undefined) {
-      const p = Number(b['smtpPort']);
-      if (!Number.isInteger(p) || p < 1 || p > 65535) {
-        return NextResponse.json({ error: 'INVALID_SMTP_PORT' }, { status: 400 });
-      }
-      next['smtpPort'] = p;
-    }
-    if (b['smtpUser'] === null) {
-      next['smtpUser'] = null;
-    } else if (typeof b['smtpUser'] === 'string') {
-      next['smtpUser'] = (b['smtpUser'] as string).trim().slice(0, 120) || null;
-    }
-    if (b['smtpPasswordEnv'] !== undefined) {
-      const v = String(b['smtpPasswordEnv']).trim();
-      if (v !== '' && !/^[A-Z][A-Z0-9_]{2,63}$/.test(v)) {
-        return NextResponse.json({ error: 'INVALID_ENV_VAR_NAME' }, { status: 400 });
-      }
-      next['smtpPasswordEnv'] = v === '' ? null : v;
-    }
-    if (b['fromName'] === null) {
-      next['fromName'] = null;
-    } else if (typeof b['fromName'] === 'string') {
-      next['fromName'] = (b['fromName'] as string).trim().slice(0, 120) || null;
-    }
-    if (b['fromEmail'] === null) {
-      next['fromEmail'] = null;
-    } else if (typeof b['fromEmail'] === 'string') {
-      const v = (b['fromEmail'] as string).trim();
-      if (v !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) {
-        return NextResponse.json({ error: 'INVALID_FROM_EMAIL' }, { status: 400 });
-      }
-      next['fromEmail'] = v === '' ? null : v;
-    }
     if (typeof b['emailTemplates'] === 'object' && b['emailTemplates'] !== null) {
       // Toggle map for the fixed template set — only known keys survive.
       const t = b['emailTemplates'] as Record<string, unknown>;

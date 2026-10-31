@@ -34,7 +34,6 @@ import {
 import { AdminShell } from '@/components/layout/AdminShell';
 import { adminFetch, clearAdminSession } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
-import type { SmtpProbeResult } from '@/lib/email/smtpProbe';
 
 /** A tab's save implementation, registered with the page so the header
  *  button can trigger the active tab's real save. */
@@ -1713,12 +1712,9 @@ function PaymentSettings({
 
 // ─── Email Settings — wired to SiteSetting('email') ──────
 interface EmailSettingsData {
-  smtpHost?: string | null;
-  smtpPort?: number;
-  smtpUser?: string | null;
-  smtpPasswordEnv?: string | null;
-  fromName?: string | null;
-  fromEmail?: string | null;
+  /** Read-only: the From header the mailer actually sends with. */
+  liveSender?: string | null;
+  emailConfigured?: boolean;
   emailTemplates?: Partial<
     Record<'order_confirm' | 'code_delivery' | 'low_stock' | 'invoice', boolean>
   >;
@@ -1740,12 +1736,8 @@ function EmailSettings({
 }: {
   registerSaver: (fn: SettingsSaver | null) => void;
 }): React.JSX.Element {
-  const [smtpHost, setSmtpHost] = useState('');
-  const [smtpPort, setSmtpPort] = useState('587');
-  const [smtpUser, setSmtpUser] = useState('');
-  const [smtpPasswordEnv, setSmtpPasswordEnv] = useState('');
-  const [fromName, setFromName] = useState('');
-  const [fromEmail, setFromEmail] = useState('');
+  const [liveSender, setLiveSender] = useState<string | null>(null);
+  const [emailConfigured, setEmailConfigured] = useState(false);
   const [templates, setTemplates] = useState<Record<string, boolean>>({
     order_confirm: true,
     code_delivery: true,
@@ -1763,12 +1755,8 @@ function EmailSettings({
       .then(async (r): Promise<EmailSettingsData> => (r.ok ? r.json() : {}))
       .then((data) => {
         if (cancelled) return;
-        setSmtpHost(data.smtpHost ?? '');
-        setSmtpPort(String(data.smtpPort ?? 587));
-        setSmtpUser(data.smtpUser ?? '');
-        setSmtpPasswordEnv(data.smtpPasswordEnv ?? '');
-        setFromName(data.fromName ?? '');
-        setFromEmail(data.fromEmail ?? '');
+        setLiveSender(data.liveSender ?? null);
+        setEmailConfigured(Boolean(data.emailConfigured));
         setTemplates((t) => ({ ...t, ...(data.emailTemplates ?? {}) }));
       })
       .catch(() => {})
@@ -1781,21 +1769,9 @@ function EmailSettings({
   }, []);
 
   const valuesRef = useRef({
-    smtpHost,
-    smtpPort,
-    smtpUser,
-    smtpPasswordEnv,
-    fromName,
-    fromEmail,
     templates,
   });
   valuesRef.current = {
-    smtpHost,
-    smtpPort,
-    smtpUser,
-    smtpPasswordEnv,
-    fromName,
-    fromEmail,
     templates,
   };
 
@@ -1808,27 +1784,10 @@ function EmailSettings({
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          smtpHost: v.smtpHost.trim() === '' ? null : v.smtpHost.trim(),
-          smtpPort: Number(v.smtpPort) || 0,
-          smtpUser: v.smtpUser.trim() === '' ? null : v.smtpUser.trim(),
-          smtpPasswordEnv: v.smtpPasswordEnv.trim(),
-          fromName: v.fromName.trim() === '' ? null : v.fromName.trim(),
-          fromEmail: v.fromEmail.trim() === '' ? null : v.fromEmail.trim(),
           emailTemplates: v.templates,
         }),
       });
-      if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(
-          data.error === 'INVALID_SMTP_PORT'
-            ? 'SMTP Port ต้องเป็นตัวเลข 1-65535'
-            : data.error === 'INVALID_FROM_EMAIL'
-              ? 'รูปแบบอีเมลผู้ส่งไม่ถูกต้อง'
-              : data.error === 'INVALID_ENV_VAR_NAME'
-                ? 'ชื่อ environment variable ต้องเป็น A-Z ตัวใหญ่ ตัวเลข และ _ เท่านั้น'
-                : 'บันทึกไม่สำเร็จ',
-        );
-      }
+      if (!res.ok) throw new Error('บันทึกไม่สำเร็จ');
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (e) {
@@ -1845,177 +1804,40 @@ function EmailSettings({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [registerSaver]);
 
-  // ── Test connection (SMTP probe) — uses the values TYPED in the form;
-  // no save required. The route fills gaps from the saved settings.
-  const [probe, setProbe] = useState<SmtpProbeResult | null>(null);
-  const [testing, setTesting] = useState(false);
-  const [testError, setTestError] = useState<string | null>(null);
-
-  async function runConnectionTest(): Promise<void> {
-    setTesting(true);
-    setTestError(null);
-    setProbe(null);
-    try {
-      const res = await adminFetch('/api/v1/admin/settings/email-test', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          smtpHost: smtpHost.trim() || undefined,
-          smtpPort: Number(smtpPort) || undefined,
-          smtpUser: smtpUser.trim() || undefined,
-          smtpPasswordEnv: smtpPasswordEnv.trim() || undefined,
-        }),
-      });
-      const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-      if (!res.ok) {
-        setTestError(
-          data['error'] === 'SMTP_NOT_CONFIGURED'
-            ? 'กรอก SMTP Host และ Port ก่อนทดสอบ'
-            : data['error'] === 'INVALID_SMTP_HOST'
-              ? 'ชื่อโฮสต์ไม่ถูกต้อง'
-              : data['error'] === 'INVALID_ENV_VAR_NAME'
-                ? 'ชื่อ environment variable ต้องเป็น A-Z ตัวใหญ่ ตัวเลข และ _ เท่านั้น'
-                : 'ทดสอบไม่สำเร็จ',
-        );
-        return;
-      }
-      setProbe(data as unknown as SmtpProbeResult);
-    } catch {
-      setTestError('เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ');
-    } finally {
-      setTesting(false);
-    }
-  }
-
   if (loading) {
     return (
-      <Section title="การตั้งค่าอีเมล" subtitle="ตั้งค่า SMTP และรูปแบบอีเมลที่ส่งให้ลูกค้า">
+      <Section title="การตั้งค่าอีเมล" subtitle="ผู้ส่งจริงและเทมเพลตอีเมล">
         <p className="py-6 text-center text-sm text-fg-muted">กำลังโหลด...</p>
       </Section>
     );
   }
 
   return (
-    <Section title="การตั้งค่าอีเมล" subtitle="ตั้งค่า SMTP และรูปแบบอีเมลที่ส่งให้ลูกค้า">
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="SMTP Host">
-          <input
-            value={smtpHost}
-            onChange={(e) => setSmtpHost(e.target.value)}
-            placeholder="smtp.resend.com"
-            className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 font-mono text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
-          />
-        </Field>
-        <Field label="SMTP Port">
-          <input
-            value={smtpPort}
-            onChange={(e) => setSmtpPort(e.target.value.replace(/[^0-9]/g, ''))}
-            className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 font-mono text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
-          />
-        </Field>
-      </div>
-      <Field label="SMTP Username">
-        <input
-          value={smtpUser}
-          onChange={(e) => setSmtpUser(e.target.value)}
-          className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
-        />
-      </Field>
-      <Field label="ชื่อ Environment Variable ของรหัสผ่าน SMTP">
-        <input
-          value={smtpPasswordEnv}
-          onChange={(e) => setSmtpPasswordEnv(e.target.value)}
-          placeholder="SMTP_PASSWORD"
-          className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 font-mono text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
-        />
-        <p className="mt-1 text-xs text-clay-400">
-          รหัสผ่าน SMTP ไม่ถูกเก็บในฐานข้อมูล — ระบบอ่านจาก environment variable ที่ระบุชื่อไว้
-        </p>
-      </Field>
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="ชื่อผู้ส่ง (From Name)">
-          <input
-            value={fromName}
-            onChange={(e) => setFromName(e.target.value)}
-            className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
-          />
-        </Field>
-        <Field label="อีเมลผู้ส่ง (From Email)">
-          <input
-            value={fromEmail}
-            onChange={(e) => setFromEmail(e.target.value)}
-            placeholder="noreply@nong-kati.co.th"
-            className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
-          />
-        </Field>
-      </div>
-
+    <Section title="การตั้งค่าอีเมล" subtitle="ผู้ส่งจริงและเทมเพลตอีเมล">
       <div className="rounded-lg border border-line-subtle bg-surface p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h3 className="text-sm font-semibold text-fg-secondary">ทดสอบการเชื่อมต่อ SMTP</h3>
+            <h3 className="text-sm font-semibold text-fg-secondary">ผู้ส่งจริง (From)</h3>
             <p className="mt-0.5 text-xs text-clay-400">
-              ทดสอบ DNS → TCP → Greeting → EHLO ด้วยค่าในฟอร์ม (ไม่ต้องบันทึกก่อน) —
-              ไม่มีการส่งอีเมลจริง
+              อ่านจาก environment variable <code className="font-mono">NK_RESEND_FROM_EMAIL</code>{' '}
+              — แก้ที่ Infisical แล้ว restart แอป ไม่ใช่ที่หน้านี้
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => void runConnectionTest()}
-            disabled={testing}
-            className="flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm font-semibold text-fg transition-colors hover:border-peach-400 disabled:opacity-50"
-          >
-            {testing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-            {testing ? 'กำลังทดสอบ…' : 'ทดสอบการเชื่อมต่อ'}
-          </button>
-        </div>
-        {testError && (
-          <p className="mt-3 rounded-md bg-coral-500/10 px-3 py-2 text-sm text-fg-error">
-            {testError}
-          </p>
-        )}
-        {probe && (
-          <div className="mt-3 space-y-2">
-            <div className="flex items-center gap-2 text-sm">
-              {probe.ok ? (
-                <span className="flex items-center gap-1.5 font-semibold text-fg-success">
-                  <CheckCircle2 size={16} /> เชื่อมต่อสำเร็จ ({probe.latencyMs} ms)
-                </span>
-              ) : (
-                <span className="flex items-center gap-1.5 font-semibold text-fg-error">
-                  <AlertTriangle size={16} /> เชื่อมต่อไม่สำเร็จ
-                  {probe.error ? ` — ${probe.error}` : ''}
-                </span>
-              )}
-            </div>
-            <ul className="grid grid-cols-2 gap-1.5 text-xs sm:grid-cols-4">
-              {(
-                [
-                  ['DNS', probe.steps.dns],
-                  ['TCP', probe.steps.tcp],
-                  ['Greeting', probe.steps.greeting],
-                  ['EHLO', probe.steps.ehlo],
-                ] as const
-              ).map(([label, passed]) => (
-                <li
-                  key={label}
-                  className={cn(
-                    'flex items-center gap-1.5 rounded-md px-2.5 py-1.5',
-                    passed ? 'bg-jade-500/15 text-fg-success' : 'bg-coral-500/15 text-fg-error',
-                  )}
-                >
-                  {passed ? <CheckCircle2 size={12} /> : <AlertTriangle size={12} />} {label}
-                </li>
-              ))}
-            </ul>
-            {probe.ok && (
-              <p className="text-xs text-clay-400">
-                STARTTLS: {probe.capabilities.starttls ? 'รองรับ' : 'ไม่รองรับ'} · AUTH:{' '}
-                {probe.capabilities.auth ? 'รองรับ' : 'ไม่รองรับ'}
-              </p>
+          <span
+            className={cn(
+              'flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold',
+              emailConfigured
+                ? 'bg-jade-500/15 text-fg-success'
+                : 'bg-coral-500/15 text-fg-error',
             )}
-          </div>
-        )}
+          >
+            {emailConfigured ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />}
+            {emailConfigured ? 'พร้อมส่งอีเมล' : 'ยังไม่พร้อมส่ง'}
+          </span>
+        </div>
+        <p className="mt-3 rounded-md bg-surface-sunken px-3 py-2 font-mono text-sm text-fg">
+          {liveSender ?? 'NK_RESEND_FROM_EMAIL ยังไม่ได้ตั้งค่า'}
+        </p>
       </div>
 
       <div className="rounded-lg border border-line-subtle bg-surface p-4">
