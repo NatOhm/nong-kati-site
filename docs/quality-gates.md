@@ -1008,3 +1008,22 @@ slug ที่เป็น ASCII ไม่พังเพราะ `encodeURICom
 
 - เอา `--max-time` ออกจาก `curl` → D1 แดง
 - ใส่ `tr '\n' ' '` กลับเข้า guard → D5/D2 แดง (คำสั่งไม่ตรงกับที่พิมพ์)
+
+---
+
+## Origin ของ URL ที่เว็บประกาศตัวเอง ไม่ใช่ localhost (2 พ.ย. 2569) — `tests/public-origin.test.ts`
+
+production เสิร์ฟ canonical / `og:url` / ทุก `<loc>` ใน sitemap เป็น `http://localhost:4200` เพราะ `NEXT_PUBLIC_SITE_URL` ถูก **inline ตอน build** — ค่าที่ค้างมาจาก dev จึงถูกอบลง bundle ตรง ๆ และ `publicOrigin()` เดิมปล่อยค่าอะไรก็ได้ที่ "ไม่ว่าง" ผ่านไป พร้อม fallback เป็นโดเมน `vercel.app` ที่ไม่มีใครเข้า ผลคืองาน encode URL ภาษาไทยใน sitemap ที่เพิ่งทำไปเมื่อวานไม่มีความหมายเลย
+
+| ตัว | บังคับว่า |
+|---|---|
+| O1 | ค่าที่ตั้งไว้และใช้งานได้ (production domain) ถูกใช้ตามนั้น |
+| O2 | ตัด `/` ท้ายออก เพื่อไม่ให้ URL ที่ประกอบออกมามี `//` |
+| O3 | ไม่ตั้งค่า / ว่าง / มีแต่ช่องว่าง → ได้ `https://nongkatistore.com` (ไม่ใช่ `vercel.app`) |
+| O4 | ค่า loopback ทุกแบบ (`localhost`, `127.0.0.1`, `0.0.0.0`, `[::1]`, มี/ไม่มี port, ตัวพิมพ์ใหญ่) → ถูกมองว่า "ไม่ได้ตั้ง" และได้ production origin |
+
+**พังได้จริง — ทดสอบด้วยการใส่มั๊กกลับ**
+
+- เอา `LOOPBACK` guard ออก → O4 แดง (คืน `http://localhost:4200` ตามที่ production เคยเป็น)
+- เปลี่ยน fallback กลับเป็น `https://nong-kati.vercel.app` → O3 แดง
+- เอา `.replace(/\/+$/, '')` ออก → O2 แดง

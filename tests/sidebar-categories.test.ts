@@ -28,6 +28,29 @@ describe('mobile drawer categories', () => {
     expect(sidebar).toContain('href: `/category/${c.slug}`');
     expect(sidebar).toContain("fetch('/api/v1/categories')");
   });
+
+  it('shows placeholder rows while the fetch is in flight', () => {
+    // Audit 2026-11-02: the first open on a slow phone rendered the six static
+    // links and nothing where categories belong — the client's "menu has no
+    // categories" screenshot, just ~1s wide. The slot now holds skeletons.
+    expect(sidebar).toContain('SKELETON_ROWS');
+    expect(sidebar).toContain("'skeleton' in item");
+    expect(sidebar).toContain('aria-busy={loading}');
+  });
+
+  it('remembers only a successful answer, so a failure retries next open', () => {
+    // The bug: `r.ok ? json : { categories: [] }` turned a 500 into a cached
+    // empty list, so categories were gone until a full page reload. Exactly
+    // one write to the cache may exist, and it must sit in the success path.
+    expect(sidebar.match(/categoriesCache = /g)?.length, 'one cache write').toBe(1);
+    expect(sidebar).toContain('if (!r.ok) throw');
+    expect(sidebar).toContain('setFailed(true)');
+    expect(sidebar, 'a 500 cached as an empty list').not.toContain('r.ok ? r.json()');
+  });
+
+  it('tells the user when the list failed, without dead links', () => {
+    expect(sidebar).toContain('โหลดหมวดหมู่ไม่สำเร็จ');
+  });
 });
 
 describe('GET /api/v1/categories', () => {

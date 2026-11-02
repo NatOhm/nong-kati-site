@@ -58,12 +58,19 @@ interface SidebarCategory {
   icon?: string | null;
 }
 
-// One fetch per browser session: the drawer remounts on every open, and the
-// category tree changes when an admin edits it, not between taps.
+// One SUCCESSFUL fetch per browser session: the drawer remounts on every open,
+// and the category tree changes when an admin edits it, not between taps.
+// Failures are deliberately NOT cached — the drawer is remounted on each open,
+// so a transient 500 retries itself the next time the menu is opened instead
+// of leaving the menu category-less for the whole session (audit 2026-11-02).
 let categoriesCache: SidebarCategory[] | null = null;
 
 const CATEGORY_INSERT_AT = 4; // directly after รายการโปรด
 const COLLAPSED_LIMIT = 10;
+const SKELETON_ROWS = 3;
+
+/** A nav row, or the placeholder that stands in for a category row while loading. */
+type SidebarRow = NavItem | { skeleton: true };
 
 interface FacebookSidebarProps {
   isOpen?: boolean;
@@ -73,41 +80,59 @@ interface FacebookSidebarProps {
 function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
   const pathname = usePathname();
   const [showMore, setShowMore] = useState(false);
-  const [categories, setCategories] = useState<SidebarCategory[]>(categoriesCache ?? []);
+  // null = not loaded yet (in flight or failed); [] = loaded, genuinely empty.
+  const [categories, setCategories] = useState<SidebarCategory[] | null>(categoriesCache);
+  const [failed, setFailed] = useState(false);
 
-  // Load the real category list once. Failure (500/offline) leaves the
-  // section empty — the rest of the drawer still works, and no link is dead.
+  // Load the real category list once per session. A failed request leaves the
+  // cache untouched so the next open tries again — only a real answer is
+  // remembered. (Caching the failure was the bug: one 500 hid every category
+  // until a full page reload, with nothing on screen saying why.)
   useEffect(() => {
-    if (categoriesCache) return;
+    // useState already seeded from the cache: nothing to do on a repeat open.
+    if (categoriesCache !== null) return;
     let alive = true;
     fetch('/api/v1/categories')
-      .then((r) => (r.ok ? r.json() : { categories: [] }))
-      .then((d: { categories?: SidebarCategory[] }) => {
+      .then((r) => {
+        if (!r.ok) throw new Error(`categories ${r.status}`);
+        return r.json() as Promise<{ categories?: SidebarCategory[] }>;
+      })
+      .then((d) => {
         if (!alive) return;
         categoriesCache = d.categories ?? [];
         setCategories(categoriesCache);
       })
-      .catch(() => undefined);
+      .catch(() => {
+        if (alive) setFailed(true);
+      });
     return () => {
       alive = false;
     };
   }, []);
 
+  const loading = categories === null && !failed;
+
   // Categories splice in where the hardcoded ones used to sit, so the drawer
-  // order stays หน้าหลัก … รายการโปรด · categories … คำสั่งซื้อ.
-  const items: NavItem[] = [
+  // order stays หน้าหลัก … รายการโปรด · categories … คำสั่งซื้อ. While they
+  // are in flight the same slot holds placeholder rows, so a first open on a
+  // slow phone never looks like a menu that lost its categories.
+  const rows: SidebarRow[] = [
     ...NAV_ITEMS.slice(0, CATEGORY_INSERT_AT),
-    ...categories.map((c) => ({
-      href: `/category/${c.slug}`,
-      label: c.name,
-      color: 'text-fg-brand',
-      iconName: c.icon ?? null,
-    })),
+    ...(loading
+      ? Array.from({ length: SKELETON_ROWS }, (): SidebarRow => ({ skeleton: true }))
+      : (categories ?? []).map(
+          (c): SidebarRow => ({
+            href: `/category/${c.slug}`,
+            label: c.name,
+            color: 'text-fg-brand',
+            iconName: c.icon ?? null,
+          }),
+        )),
     ...NAV_ITEMS.slice(CATEGORY_INSERT_AT),
   ];
   // COLLAPSED_LIMIT keeps คำสั่งซื้อ visible on a phone even with several
   // root categories.
-  const visibleItems = showMore ? items : items.slice(0, COLLAPSED_LIMIT);
+  const visibleRows = showMore ? rows : rows.slice(0, COLLAPSED_LIMIT);
 
   // Close drawer on navigation (mobile). Track the previous path so the
   // effect's mount-run is a no-op — otherwise the drawer closes itself the
@@ -147,8 +172,28 @@ function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
 
       <div className="drawer-scroll flex-1 overflow-y-auto px-4 py-4">
         {/* Navigation Items */}
-        <nav className="space-y-1">
-          {visibleItems.map((item) => {
+        <nav className="space-y-1" aria-busy={loading}>
+          {loading && <span className="sr-only">กำลังโหลดหมวดหมู่</span>}
+          {/* Failed: say so, keep the rest of the menu usable, and retry the
+              next time the drawer opens (nothing was cached). */}
+          {failed && (
+            <p className="px-3 py-2 text-xs text-fg-placeholder">
+              โหลดหมวดหมู่ไม่สำเร็จ — เปิดเมนูอีกครั้งเพื่อลองใหม่
+            </p>
+          )}
+          {visibleRows.map((item, index) => {
+            if ('skeleton' in item) {
+              return (
+                <div
+                  key={`skeleton-${index}`}
+                  aria-hidden="true"
+                  className="flex items-center gap-3 rounded-lg px-3 py-2.5"
+                >
+                  <div className="h-9 w-9 shrink-0 animate-pulse rounded-full bg-surface-sunken" />
+                  <div className="h-3.5 w-24 animate-pulse rounded-full bg-surface-sunken" />
+                </div>
+              );
+            }
             const isActive =
               pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href));
             const Icon = item.icon;
@@ -192,7 +237,7 @@ function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
           })}
 
           {/* See more / See less — only when something is actually hidden */}
-          {items.length > COLLAPSED_LIMIT && (
+          {rows.length > COLLAPSED_LIMIT && (
           <button
             onClick={() => setShowMore(!showMore)}
             className="transition-smart flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-fg-muted duration-150 hover:bg-surface-sunken hover:text-fg"
