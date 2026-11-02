@@ -64,7 +64,7 @@ export default async function ConfirmationPage({
                     <SiteMascot size={96} className="mascot-celebrate" />
                   </>
                 ) : (
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-peach-100">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-surface-brand-subtle">
                     <Clock size={28} className="text-fg-brand" />
                   </div>
                 )}
@@ -100,7 +100,9 @@ export default async function ConfirmationPage({
             {/* Codes (if delivered) */}
             {isCompleted && (
               <div className="mb-6 rounded-md border border-jade-500/30 bg-jade-500/10 p-6">
-                <h2 className="mb-4 text-lg font-semibold text-jade-200">โค้ดของคุณ</h2>
+                <h2 className="mb-4 text-lg font-semibold text-jade-700 dark:text-jade-200">
+                  โค้ดของคุณ
+                </h2>
                 <p className="mb-4 text-sm text-fg-muted">
                   โปรดนำโค้ดไปใช้ตามวิธีการใช้งานของแต่ละสินค้า
                 </p>

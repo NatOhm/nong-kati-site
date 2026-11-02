@@ -34,7 +34,7 @@ export function ConsentCheckbox({
       htmlFor={id}
       className={cn(
         'flex cursor-pointer items-start gap-3 rounded-md border border-line bg-surface p-3 transition-colors hover:border-line-brand',
-        checked && 'border-line-brand bg-peach-50',
+        checked && 'border-line-brand bg-surface-brand-subtle',
         className,
       )}
     >

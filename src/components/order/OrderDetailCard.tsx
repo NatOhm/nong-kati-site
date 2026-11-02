@@ -98,7 +98,7 @@ export function OrderDetailCard({
 
       {/* Pending manual fulfilment message */}
       {order.status === 'pending_manual_fulfilment' && (
-        <div className="mb-4 rounded-md border border-line-brand bg-peach-50 px-4 py-3 text-sm text-peach-800">
+        <div className="mb-4 rounded-md border border-line-brand bg-surface-brand-subtle px-4 py-3 text-sm text-fg">
           การชำระเงินสำเร็จ โค้ดจะถูกส่งภายใน 2 ชั่วโมง
         </div>
       )}

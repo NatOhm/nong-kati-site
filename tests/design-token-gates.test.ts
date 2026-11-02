@@ -162,7 +162,7 @@ const ALLOWLIST: ReadonlyArray<{
   {
     rule: 'R2',
     file: 'src/components/order/OrderStatusBadge.tsx',
-    content: "bgClass: 'bg-coral-50',",
+    content: "bgClass: 'bg-coral-50 dark:bg-coral-900/40',",
     why: 'textClass text-fg-error sits on the adjacent line',
   },
 ];

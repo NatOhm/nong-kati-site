@@ -57,9 +57,14 @@ export function PaymentMethodSelector({
         {walletAvailable && (
           <label
             className={cn(
-              'flex cursor-pointer items-center gap-3 rounded-md border p-3 transition-colors',
+              // 56px rows: the radio, icon and two lines of Thai need a full
+              // finger height on a phone.
+              // Selected state uses the THEME-AWARE brand tint (bg-surface-brand-subtle):
+              // a raw bg-peach-50 stayed cream in dark mode while the fg tokens flipped
+              // light, which made the chosen method's label unreadable (1.0:1).
+              'flex min-h-[56px] cursor-pointer items-center gap-3 rounded-md border p-3 transition-colors',
               selected === 'wallet'
-                ? 'border-peach-500 bg-peach-50'
+                ? 'border-line-brand bg-surface-brand-subtle'
                 : 'border-line bg-surface hover:border-line-brand',
               disabled && 'cursor-not-allowed opacity-50',
             )}
@@ -76,7 +81,7 @@ export function PaymentMethodSelector({
             <Wallet size={20} className="text-fg-muted" strokeWidth={1.5} />
             <div>
               <p className="text-sm font-medium text-fg">เครดิตในกระเป๋า</p>
-              <p className="text-xs text-fg-placeholder">
+              <p className="text-xs text-fg">
                 ยอดเครดิต {formatThb(walletBalanceThb)} — หักจากเครดิตทันที ได้โค้ดเลย
               </p>
             </div>
@@ -86,9 +91,9 @@ export function PaymentMethodSelector({
         {/* PromptPay / Thai QR */}
         <label
           className={cn(
-            'flex cursor-pointer items-center gap-3 rounded-md border p-3 transition-colors',
+            'flex min-h-[56px] cursor-pointer items-center gap-3 rounded-md border p-3 transition-colors',
             selected === 'promptpay'
-              ? 'border-peach-500 bg-peach-50'
+              ? 'border-line-brand bg-surface-brand-subtle'
               : 'border-line bg-surface hover:border-line-brand',
             disabled && 'cursor-not-allowed opacity-50',
           )}
@@ -104,7 +109,7 @@ export function PaymentMethodSelector({
           <QrCode size={20} className="text-fg-muted" strokeWidth={1.5} />
           <div>
             <p className="text-sm font-medium text-fg">PromptPay / Thai QR</p>
-            <p className="text-xs text-fg-placeholder">สแกน QR จ่ายผ่านแอปธนาคาร</p>
+            <p className="text-xs text-fg">สแกน QR จ่ายผ่านแอปธนาคาร</p>
           </div>
         </label>
 
@@ -113,7 +118,7 @@ export function PaymentMethodSelector({
         {manualInfo && (
           <div
             className={cn(
-              'flex flex-col gap-1.5 rounded-md border border-line bg-surface p-3 opacity-80',
+              'flex flex-col gap-1.5 rounded-md border border-line-brand bg-surface-brand-subtle p-3',
               disabled && 'opacity-40',
             )}
             aria-label="ธนารคปลายทางของร้าน — โอนเงินแล้วอัปโหลดสลิป"
@@ -122,11 +127,11 @@ export function PaymentMethodSelector({
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <Banknote size={16} className="text-fg-muted" strokeWidth={1.5} />
-                <span className="text-xs font-medium text-fg-secondary">ช่องทางธนาคารของร้าน</span>
+                <span className="text-xs font-medium text-fg">ช่องทางธนาคารของร้าน</span>
               </div>
             </div>
             {/* Account info */}
-            <div className="rounded-md border border-line bg-fg/5 p-2 text-xs font-mono leading-relaxed">
+            <div className="rounded-md border border-line bg-surface p-2 text-xs font-mono leading-relaxed text-fg">
               <div className="flex justify-between gap-2">
                 <span>{manualInfo.accountName ?? 'ช่องทางการชำระเงินของร้าน'}</span>
                 <span className="font-normal text-fg-secondary">ชื่อบัญชี</span>
@@ -138,8 +143,8 @@ export function PaymentMethodSelector({
                 </div>
               )}
               {manualInfo.qrImageUrl && (
-                <div className="mt-1.5 flex flex-col items-center gap-1 text-xs text-fg-muted">
-                  <div className="mt-1 w-full overflow-hidden rounded-md bg-fg/5 p-1" title="QR พร้อมเพย์ — สแกนจากธนารคได้เลย">
+                <div className="mt-1.5 flex flex-col items-center gap-1 text-xs text-fg-secondary">
+                  <div className="mt-1 w-full overflow-hidden rounded-md bg-surface p-1" title="QR พร้อมเพย์ — สแกนจากธนารคได้เลย">
                     <BankNoteImage imageUrl={manualInfo.qrImageUrl} height={92} />
                   </div>
                   <span className="text-center">สแกนจากแอปธนารคได้ทันที</span>
@@ -151,7 +156,7 @@ export function PaymentMethodSelector({
         {!manualInfo && (
           <div
             className={cn(
-              'flex items-center gap-3 rounded-md border border-line bg-surface p-3 opacity-60',
+              'flex items-center gap-3 rounded-md border border-line bg-surface p-3',
               disabled && 'opacity-40',
             )}
             aria-disabled="true"
@@ -159,7 +164,7 @@ export function PaymentMethodSelector({
             <Banknote size={20} className="shrink-0 text-fg-muted" strokeWidth={1.5} />
             <div>
               <p className="text-sm font-medium text-fg">โอนเงินผ่านบัญชีร้าน</p>
-              <p className="text-xs text-fg-placeholder">
+              <p className="text-xs text-fg">
                 โอนแล้วอัปโหลดสลิป — เลือก “PromptPay / Thai QR” เพื่อดูบัญชีและส่งสลิป
               </p>
             </div>
