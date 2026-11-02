@@ -14,6 +14,7 @@
 | A     | Admin authz matrix (53 endpoints × no-auth + 6 roles) | `tests/admin-authz-matrix.test.ts` | `npm test`           | Unit Tests             |
 | P     | PII masking (permission-scoped response)              | `tests/admin-pii-masking.test.ts`  | `npm test`           | Unit Tests             |
 | W     | Coupon per-customer cap, wallet path (Serializable + P2034 retry) | `tests/wallet-coupon-race.test.ts` | `npm test` (vitest) | Unit Tests |
+| W2    | Coupon cap guard on the real claim helper (over-cap throws, first-wins) | `tests/coupon-cap-race.test.ts` | `npm test` (vitest) | Unit Tests |
 | C     | Concurrency (DB races — refresh CAS, lockout)         | `tests/admin-concurrency.test.ts`  | vitest + live server | Concurrency (DB races) |
 | S1    | Admin auth-mutation CSRF (origin + double-submit)      | `tests/admin-csrf.test.ts`          | `npm test` (vitest)  | Unit Tests             |
 | S2    | Webhook signature length-safe + production review fixes | `tests/security-fixes.test.ts`     | `npm test` (vitest)  | Unit Tests             |
@@ -35,7 +36,7 @@
 | RL    | Customer resend-email cap (3/order/hour, no quota burn on a failed email match) | `tests/customer-resend-rate-limit.test.ts` | `npm test` (vitest) | Unit Tests |
 | AR    | Admin resend-email — error contract (EMAIL_SEND_FAILED, not a transport string) | `tests/admin-resend-email.test.ts` | `npm test` (vitest) | Unit Tests |
 | CE    | CI env secrets meet the minimums the code enforces | `tests/ci-env-secrets.test.ts`   | `npm test` (vitest)  | Unit Tests             |
-| NB    | Navbar layout — nav keeps natural width, search yields (no one-glyph-per-line Thai) | `tests/navbar-layout-gates.test.ts` | `npm test` (vitest) | Unit Tests             |
+| NB    | Navbar layout — nav keeps natural width, search yields (no one-glyph-per-line Thai) · G5/G6 popovers portaled + measured · G7 notification/coupon bell must not be hidden on phones (client feedback 2026-11-01: coupon codes were desktop-only) | `tests/navbar-layout-gates.test.ts` | `npm test` (vitest) | Unit Tests             |
 | CK    | Combobox keyboard — arrow nav, aria-activedescendant, Enter fallthrough (WCAG 2.1.1) | `tests/combobox-keyboard.test.ts` | `npm test` (vitest) + `e2e/smoke.spec.ts` | Unit Tests + Browser Smoke |
 | NV    | Admin sidebar IA — 17 items → 7 sections, narrow `dashboard:read`, route preservation | `tests/admin-nav-sections.test.ts` | `npm test` (vitest) | Unit Tests |
 | HM    | Production health monitor — idle reap vs unexpected restart, alert threshold, CLI flag mapping, workflow wiring | `tests/prod-health-monitor.test.ts` | `npm test` (vitest) | Unit Tests + Production Health Monitor |
@@ -92,6 +93,7 @@
 | SB    | server.js Infisical boot decisions (audit #7, 26 ต.ค.) — wired/skip เมื่อไม่มี credential, base URL ตัด trailing slash + default `prod`, panel override ชนะเสมอ (`=== undefined` ไม่ใช่ falsy — ค่า `""` นับว่าตั้งแล้ว), row ไม่มี `secretKey` ถูกข้ามไม่ใช่ crash · แยกเป็น `server-bootstrap.js` ให้ test ได้โดยไม่แตะ network/exit | `tests/server-bootstrap.test.ts` | `npm test` (vitest) | Unit Tests |
 | HC    | Housekeeping cron wiring (audit #2, 26 ต.ค.) — `prod-health-monitor.yml` ต้องมีทั้ง cron ทุก 10 นาที (expire ×2 + drain) และ cron รายวัน `17 3 * * *` (slip retention) · ครบทั้ง 4 endpoint พร้อม header `x-cron-token` · retention ต้องอยู่ ใน branch ของ `github.event.schedule` (ไม่งั้นสแกน settings table ทุก 10 นาที) · ไม่ตั้ง `NK_CRON_SECRET` = ต้อง `exit 1` + `::error` ดัง ๆ (บั๊กต้นเรื่องคือปิดเงียบ) | `tests/housekeeping-cron.test.ts` | `npm test` (vitest) | Unit Tests |
 | BS    | Build stamp ต้องบอกของจริง (audit #1, 27 ต.ค.) — `.next/GIT_SHA` มาจา working tree ไม่ใช่ HEAD (ของจริง: `/api/v1/version` บอก `dbe8acd` แต่เสิร์ฟโค้ด `b057e55` เพราะ build ก่อน commit) · tree รก = stamp `<sha>-dirty` + เตือนดัง ๆ แต่ยัง exit 0 (คนยังแก้ของอยู่ ห้ามบล็อก build) · untracked file ก็นับ dirty (route ใหม่ที่ยังไม่ commit ก็เข้า build ได้) · ไม่มี `.next/BUILD_ID` = exit 1 | `tests/build-stamp.test.ts` | `npm test` (vitest) | Unit Tests |
+| PCV   | Payment-surface contrast (1 พ.ย. 2569) — ลูกค้าแจ้ง "ฟอนต์กลืนกับพื้นการ์ดตอนจ่ายเงิน": หน้าจ่ายเงินใช้สีแบบติดธีมเดียว (`bg-peach-50`/`bg-peach-100` เป็นครีมเสมอ, `bg-jade-900/20` + `text-jade-200` เป็นเข้มเสมอ) แต่ `text-fg*` พลิกตามธีม → แถบวิธีชำระที่เลือกในโหมดมืด (ธีมเริ่มต้น) วัดได้ **1.00:1** คือมองไม่เห็น · P1/P2 สแกน `components/checkout`, `components/order`, `app/checkout` ห้ามมี fill/สีตัวอักษรแบบธีมเดียว (ต้องประกาศ `dark:` คู่ หรือใช้ `bg-surface-brand-subtle`) · P3 คำนวณคอนทราสต์จริงจาก `tokens.css` ทั้ง light/dark ต้อง ≥ 4.5 (fg บน brand-subtle, fg-secondary บน surface, jade บนชิป 15%) และมี negative control ยืนยันว่าคู่เดิม (ฟ้าครืมใต้ตัวอักษรสว่าง) ยังถูกตัดสินว่าตก | `tests/payment-contrast-gate.test.ts` | `npm test` (vitest) | Unit Tests |
 | RB    | Release badge — เวอร์ชันที่แอดมินเห็น ต้องเป็นของจริงทุกหน้า (29 ต.ค.) — `fetch('/api/v1/version')` มีที่เดียวใน `src/` หลัง module-level cache (ไม่งั้นทุก navigation ในแอดมินเรียกซ้ำ) · chip ต้องอยู่ใน top bar (ทุกหน้า) และ sidebar footer ทั้ง desktop rail กับ mobile drawer · dashboard card อ่านจาก hook เดียวกัน ไม่มี fetch ส่วนตัว · ข้อความ fail/ไม่มีข้อมูล + dirty warning + ปุ่มคัดลอก ต้องอยู่ครบ | `tests/release-badge.test.ts` | `npm test` (vitest) | Unit Tests |
 
 **วิธีรัน:**
@@ -283,10 +285,11 @@ Playwright เลือก target ตาม `E2E_BASE_URL` > localhost:4200 (dev
 
 - **กฎ (external audit #4):** เมื่อเงินถูกพิสูจน์แล้วว่าได้รับ (SlipOK ตรวจสลิปผ่าน / webhook แจ้ง charge.complete) แต่ confirmation tx fail และ **recovery tx ก็ commit ไม่ได้ด้วย** ห้ามกลืนความล้มเหลวแล้วตอบ 200 เด็ดขาด — เคสเก่า `.catch(() => undefined)` กลืนแล้วตอบ `pending_manual_fulfilment` ทั้งที่ order ยัง pending_payment + attempt ยัง pending + **ไม่มีร่องรอยอะไรเลย** (เงินหายจากระบบโดยไม่มีหลักฐาน):
   - **Recovery ต้อง awaited + ตรวจผลก่อนตอบ** — success-shaped response (200) ได้เฉพาะหลัง recovery commit จริง (verified ผ่าน outcome); ตอบ 200 โดยไม่รู้ผล = โกหก
-  - **Recovery fail → 5xx + reconciliation record** — `recordPaymentReconciliation` (lib/paymentReconciliation.ts) เขียนแถว `AuditLog` action `payment_reconciliation_required` (actor system) พร้อม trigger/orderId/ref/attemptId/recoveryError — เงินที่พิสูจน์แล้วต้องไม่หายไร้ร่องรอย; ถ้าแม้แต่ record เขียนไม่ได้ = console.error ดัง ๆ เป็น trail สุดท้าย; route ตอบ `RECONCILIATION_REQUIRED` (500) หรือ `FULFILMENT_FAILED` (500) — ไม่มี success-shape
+  - **Recovery fail → 5xx + reconciliation record** — `recordPaymentReconciliation` (lib/paymentReconciliation.ts) เขียนแถว `AuditLog` action `payment_reconciliation_required` (actor system) พร้อม trigger/orderId/ref/attemptId/recoveryError — เงินที่พิสูจน์แล้วต้องไม่หายไร้ร่องรอย; ถ้าแม้แต่ record เขียนไม่ได้ = console.error ดัง ๆ เป็น trail สุดท้าย; route ตอบ `RECONCILIATION_REQUIRED` (500) — ไม่มี success-shape
+  - **อัปเดต 2026-11-01 (live NK-2026-000183):** `FULFILMENT_FAILED` ถูกยกเลิก — delivery fail หลังธนาคารอนุมัติจะ **park order** (`pending_manual_fulfilment`, reason `DELIVERY_PENDING`) แล้วตอบ 200 `pending_manual_fulfilment` + `paymentVerified: true` เพราะ 500 บอกลูกค้าว่า “จ่ายไม่สำเร็จ” ทั้งที่เงินเข้าแล้ว (ชวนโอนซ้ำ) และ order ที่ค้าง `pending_payment` จะหมดอายุ 5xx เหลือเฉพาะกรณี **เขียนสถานะไม่ได้เลย** (มี evidence row เสมอ) — และ confirmation tx ตั้ง `timeout: 30s` + retry P2028/P2034 หนึ่งครั้ง (default 5s เคยทำให้ P2028 หลังธนาคารตอบ OK)
   - **ALREADY_CLAIMED ≠ failure** — แยก race ที่แพ้ออกจาก failure จริงด้วยการอ่านสถานะ order ปัจจุบัน: completed/pending_manual_fulfilment = มีคนจัดการแล้ว (ตอบตามสถานะ ไม่มี record), ยัง pending_payment = failure จริง → record + 5xx
   - **ครอบ 3 path:** slip-verify (recovery + unexpected-fulfilment-failure fallback), admin verify-payment (fresh + resume + unexpected fallback), omise webhook (retries 3 ครั้งหมด → record ก่อน return 200 ต่อ LD-10 — gateway ต้องได้ 200 แต่เราต้องมีหลักฐานฝั่งเรา)
-- **เคส regression:** recovery commit → 200 + ไม่มี record, recovery fail → 500 `RECONCILIATION_REQUIRED` + แถว evidence พร้อม trigger/ref/error, ALREADY_CLAIMED race → 409 + ไม่มี record, unexpected failure → 5xx + record เสมอ, `recordPaymentReconciliation` เองต้อง never-throw
+- **เคส regression:** recovery commit → 200 + ไม่มี record, recovery fail → 500 `RECONCILIATION_REQUIRED` + แถว evidence พร้อม trigger/ref/error, ALREADY_CLAIMED race → 409 + ไม่มี record, unexpected delivery failure → 200 `pending_manual_fulfilment` + order park (ไม่มี record เพราะอนุมัติ commit แล้ว), park ไม่ได้ด้วย → 500 + record, `recordPaymentReconciliation` เองต้อง never-throw
 - **การตรวจฝั่งคน:** query แถวได้ด้วย `listReconciliationRecords()` (lib เดียวกัน) — ควรผูกเข้าหน้า admin audit viewer ถัดไป
 
 ## Real Omise/Opn adapter — `tests/omise-real-adapter.test.ts` (audit fix #1, 2026-09-27)
@@ -374,6 +377,13 @@ Test: 14 เคส + static guards (ไม่มี inline script ใน layout,
 - **gate 5 เคส:** transaction ขอ Serializable · P2034 ถูก retry แล้วคืนผลของรอบที่ retry · error ที่ไม่ใช่ P2034 ไม่ถูก retry · P2034 ครบ 3 รอบแล้วหยุด (ไม่วนไม่จบ) · balance guard ยังมาก่อน coupon check เสมอ · retry แล้วห้ามหักเงินซ้ำ (`customer.updateMany` + `topUpLog.create` รันครั้งเดียว)
 - **ไม่ได้ใช้ `@@unique([couponId, customerId])`:** constraint อ่านค่า `perCustomerLimit` ไม่ได้ จึงกด cap ทุกคูปองให้เหลือ 1 และ error จะถูก catch ที่ `orders.ts:540` กลืนเป็น idempotent retry — cap จะผ่านโดยไม่มีใครรู้ตัว
 - **ข้อจำกัดที่ต้องรู้:** เทสต์นี้ mock prisma จึงพิสูจน์แค่ "route ขอ Serializable + retry ถูก" **ไม่ได้** พิสูจน์ว่า DB serialize จริง — ต้องมี real-Postgres test ถึงจะปิด gap นี้
+## Coupon cap guard — real `claimOrderForConfirmation` (audit fix 3) — `tests/coupon-cap-race.test.ts`
+
+gate W พิสูจน์ wiring (route ขอ Serializable + retry P2034) ด้วย claim ที่ mock — ถ้าใครลบ guard `mine > per` ใน `claimOrderForConfirmation` เทสต์ W ยังเขียวอยู่ดี ชุดนี้จึงรัน helper จริงกับ tx mock ที่คุมค่าได้
+
+- **3 เคส:** อ่าน count เกิน cap แบบ strict → throw `COUPON_PER_CUSTOMER_LIMIT` · อ่านตรง cap พอดี → สำเร็จ + สร้าง redemption แถวเดียว · claim พร้อมกัน 2 ครั้งบน order เดียวกัน → confirm ครั้งเดียว (conditional `updateMany` first-wins อีกรายได้ `null`)
+- **negative control แล้ว:** ลบ guard ชั่วคราว → เคสแรกแดงทันที แล้ว restore กลับ (เขียว 3/3)
+
 ## Coupon per-customer cap — REAL Postgres (2026-10-03) — `tests/coupon-cap-concurrency.test.ts`
 
 > **สถานะ: ยังไม่เคยรัน และยังไม่ได้ต่อเข้า CI.** เขียนขึ้นเพื่อปิด gap ที่ W ทิ้งไว้ (เทสต์ W mock prisma จึงพิสูจน์ได้แค่ว่า route "ขอ" Serializable — ไม่ได้พิสูจน์ว่า DB serialize จริง) แต่ยังไม่เคย execute แม้แต่ครั้งเดียว เพราะเครื่อง dev นี้ไม่มี Postgres (Docker daemon ไม่ทำงาน) — **อย่าคิดว่าผ่านจนกว่าจะเห็นผลรันจริง** รายการ gate จึงเขียนกำกับว่ายังไม่ต่อ CI โดยเจตนา การใส่เข้า job `Concurrency (DB races)` ต้องรันเขียวก่อน เพราะ job นั้นอยู่ใน `needs` ของ Build
@@ -876,6 +886,15 @@ feedback 19 ต.ค.: (1) สินค้าที่มีรหัสเติ
 | RB2 | top bar ต้อง mount `<ReleaseBadge variant="chip" commit="responsive" />` — ครึ่ง `commit` หายไปต่ำกว่า `sm` ไม่ให้เบียด bell/logout บนจอ 390px |
 | RB3 | sidebar ต้องผ่าน `SidebarRelease` สองจุด (rail + drawer) และตอน collapsed ต้อง `commit='none'` + `minimal` — คอลัมน์ 4rem ใส่ prefix/commit ไม่ได้ ปล่อยให้ truncate ตัด ไม่ใช่ overflow |
 | RB4 | dashboard ต้อง render `<ReleaseCard />` ที่อ่าน `useRelease()` (ไม่มี fetch ของตัวเอง) และยังมี `ดึงข้อมูลเวอร์ชันไม่สำเร็จ`, `ไม่มีข้อมูลเวอร์ชัน`, `DIRTY_WARNING_TEXT` และปุ่ม `คัดลอกแล้ว` |
+| RB5 | สิ่งที่ chip แสดงคือ `v<MAJOR.MINOR.PATCH>` จาก `.next/VERSION` (คัดลอกมาจาก `package.json` ตอน build) ถอยไปเป็น `#<commit count>` แล้วจึงเป็น build id — `package.json` เป็นแหล่งเดียวของ version และค่าที่ไม่ตรง `\d+.\d+.\d+` ต้องไม่ถูกแสดงทั้งฝั่ง server (`/api/v1/version`) และฝั่ง client (`loadRelease`) |
+
+**การขึ้นเลขเวอร์ชัน (2 พ.ย. 2569)** — แก้บรรทัดเดียวใน `package.json` ก่อน build แล้ว `npm run build` จะคัดลอกลง `.next/VERSION` เอง ไม่มีสคริปต์ bump อัตโนมัติ เพราะเลขที่ไม่มีคนเลือกแย่กว่าเลขที่คนเลือก
+
+| ช่อง | ใช้เมื่อ |
+|---|---|
+| **major** | รื้อหรือเปลี่ยนจนลูกค้าต้องเรียนรู้ใหม่ (โครงหน้า, วิธีจ่ายเงิน) |
+| **minor** | เพิ่มความสามารถใหม่ โดยของเดิมยังทำงานเหมือนเดิม |
+| **patch** | แก้บั๊ก/แก้ข้อความล้วน ไม่มีพฤติกรรมใหม่ |
 
 **พังได้จริง — ทดสอบด้วยการใส่มั๊กกลับ**
 
@@ -883,3 +902,46 @@ feedback 19 ต.ค.: (1) สินค้าที่มีรหัสเติ
 - ลบ `<ReleaseBadge/>` จาก top bar → RB2 แดง
 - เอา `<SidebarRelease collapsed={false}/>` ออกจาก drawer → RB3 แดง
 - ให้ dashboard กลับไป declare `release` state เอง → RB4 แดง
+- ให้ `displayBuild` กลับไปอ่าน `buildNumber` ก่อน `version` → RB5 แดง
+
+---
+
+## Fixed element ไม่ถูกจับเป็นลูกของ containing block (1 พ.ย. 2569) — `tests/fixed-positioning-guard.test.ts`
+
+บั๊กคลาสเดียวกันกลับมาสามรอบ: `position: fixed` ที่อยู่ใน ancestor ซึ่งมี `transform` / `will-change` / `filter` จะยึดกล่องของ ancestor เป็น containing block แทน viewport — (1) `ScrollReveal` เก็บ `will-change-transform` หลัง reveal ทำให้ quick-view modal ของหน้า “สินค้าแนะนำ” เพี้ยน (2) จึงย้าย modal ไป `createPortal(…, document.body)` (3) `.page-enter` ใช้ `animation-fill-mode: both` ทำให้ `translateY(0)` ค้างตลอด → sticky buy bar, cart drawer และ ScrollToTop ที่อยู่ใน route wrapper เลื่อนหลุดจอ
+
+รอบนี้จึงรวม invariant ให้มี **เจ้าของเดียว** และขยาย gate ให้คลุมทุกพื้นผิว fixed ฝั่งลูกค้า ไม่ใช่แค่ selector เดียว
+
+| ตัว | บังคับว่า |
+|---|---|
+| G1 | route-entry animation มีเจ้าของเดียว: `.page-enter` ใน `globals.css` ไม่มี fill-mode `both`/`forwards` และ `tailwind.config.ts` ต้องไม่มี `page-enter` utility ซ้อน (เดิมมี `animate-page-enter` อีกตัว คนละ duration) |
+| G2 | animation ที่ fill ไปข้างหน้า (`both`/`forwards`) ต้องไม่ค้าง `transform`/`translate`/`scale`/`rotate`/`will-change` ใน keyframe สุดท้าย — ยกเว้น `modal-exit`/`toast-exit` ที่ animate ตัว overlay เองแล้ว unmount |
+| G3 | branch ที่ reveal แล้วของ `ScrollReveal` ต้องเป็น `opacity-100` เฉย ๆ ไม่มี `will-change`/`translate-`/`scale-` |
+| G4 | overlay ที่ต้องหลุดทุก ancestor ถูก portal ไป `document.body` (`QuickViewModal`, `AnchoredPopover`) และพื้นผิว fixed ระดับ shell (`MobileBottomNav`, `AnnouncementBar`) ถูก mount จาก layout เท่านั้น ห้ามสร้างซ้ำใน page |
+
+**พังได้จริง — ทดสอบด้วยการใส่มั๊กกลับ (รันแล้ว: 3/9 แดง)**
+
+- เปลี่ยน `backwards` กลับเป็น `both` ใน `globals.css` → G1 แดง
+- ใส่ `'page-enter'` กลับเข้า `animation` map ใน `tailwind.config.ts` → G1 แดง
+- เติม `both` ให้ animation ที่จบด้วย transform (เช่น `seed-pop`) → G2 แดง
+- ย้าย `will-change-transform` ไปฝั่ง `opacity-100` ใน `ScrollReveal` → G3 แดง
+- ถอด `createPortal` ออกจาก `QuickViewModal`/`AnchoredPopover` → G4 แดง
+
+---
+
+## วัน/เดือนของยอดขายอิงเวลาไทย ไม่ใช่เวลาของเครื่อง (2 พ.ย. 2569) — `tests/bangkok-day-boundary.test.ts`
+
+แดชบอร์ด ("วันนี้", "เดือนนี้") รายงานยอดขายลูกค้า และยอดใช้จ่ายในกระเป๋าเงิน ตัดขอบเขตด้วย `new Date()` + `setHours(0, 0, 0, 0)` ซึ่งคือเที่ยงคืนของ**เครื่องที่รัน** ไม่ใช่ของร้าน — deploy ไม่ได้ตั้ง `TZ` ไว้ และ Linux ปกติเป็น UTC (ช้ากว่าไทย 7 ชั่วโมง) ออเดอร์ที่จ่ายช่วง 00:00–07:00 ของไทยจึงถูกนับเป็นของเมื่อวาน ทุกวัน
+
+ไทยเป็น UTC+7 ตลอดปี (ไม่มี DST ตั้งแต่ปี 2484) จึงใช้ offset คงที่ได้แม่นยำ และขอบเขตไม่ขึ้นกับ TZ ของเครื่อง
+
+| ตัว | บังคับว่า |
+|---|---|
+| B1 | `bangkokDayStart()` คืนเที่ยงคืนของวันไทย — 03:30 ไทยต้องเป็นวันเดียวกัน ไม่ใช่เมื่อวาน |
+| B2 | `bangkokDayStart(n)` ถอยหลังเป็นจำนวนวันไทยเต็มวัน (หน้าต่าง 7 วัน, กราฟรายวัน) |
+| B3 | `bangkokMonthStart()` ขึ้นเดือนใหม่ตามเวลาไทย (1 พ.ย. 02:00 ไทย ต้องไม่ค้างเป็น ต.ค.) |
+
+**พังได้จริง — ทดสอบด้วยการใส่มั๊กกลับ**
+
+- เปลี่ยน `bangkokMonthStart()` กลับเป็น `new Date(y, m, 1)` → B3 แดง
+- เอา `+ OFFSET_MS` ออกจาก `bangkokDayStart` (กลายเป็น UTC midnight) → B1 แดง
