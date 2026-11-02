@@ -9,19 +9,26 @@ import {
   MessageCircle,
   ChevronDown,
   ChevronUp,
-  Tv,
-  Gamepad2,
-  Music,
-  Scissors,
   Heart,
   Sparkles,
   X,
+  type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { HamsterFace } from '@/components/ui/ClayIcons';
+import { CategoryIcon } from '@/components/product/CategoryIcon';
 import { useState, useEffect, useRef, useCallback, type MouseEventHandler } from 'react';
 
-const NAV_ITEMS = [
+interface NavItem {
+  href: string;
+  label: string;
+  color: string;
+  /** Static links ship their component; category links carry the DB icon name. */
+  icon?: LucideIcon;
+  iconName?: string | null;
+}
+
+const NAV_ITEMS: NavItem[] = [
   { icon: Home, href: '/', label: 'หน้าหลัก', color: 'text-fg-brand' },
   { icon: Grid3X3, href: '/search', label: 'สินค้าทั้งหมด', color: 'text-sapphire-400' },
   // Below xl the header text links are hidden (navbar width budget), so the
@@ -29,10 +36,11 @@ const NAV_ITEMS = [
   // on tablets and small laptops. Mirrors NAV_ITEMS in FacebookNavbar.tsx.
   { icon: Sparkles, href: '/recommended', label: 'สินค้าแนะนำ', color: 'text-peach-500' },
   { icon: Heart, href: '/account/wishlist', label: 'รายการโปรด', color: 'text-peach-600' },
-  { icon: Tv, href: '/category/movie-series', label: 'ดูหนัง/ซีรีส์', color: 'text-coral-500' },
-  { icon: Music, href: '/category/music', label: 'ดนตรี', color: 'text-pink-400' },
-  { icon: Gamepad2, href: '/category/chinese-apps', label: 'แอปจีน', color: 'text-jade-500' },
-  { icon: Scissors, href: '/category/editing', label: 'แอปตัดต่อ', color: 'text-purple-400' },
+  // Categories are NOT listed here: they are read from /api/v1/categories and
+  // spliced in after รายการโปรด (see SidebarContent). They used to be four
+  // hardcoded links — movie-series, music, chinese-apps, editing — slugs that
+  // never existed, so every one 404'd and the drawer never followed the
+  // catalogue (client report 2026-11-02: "3 ขีดไม่ซิงก์หมวดหมู่").
   { icon: ShoppingBag, href: '/orders/lookup', label: 'คำสั่งซื้อ', color: 'text-orange-400' },
   {
     icon: MessageCircle,
@@ -42,6 +50,21 @@ const NAV_ITEMS = [
   },
 ];
 
+/** Root categories from GET /api/v1/categories (only what the drawer needs). */
+interface SidebarCategory {
+  id: string;
+  name: string;
+  slug: string;
+  icon?: string | null;
+}
+
+// One fetch per browser session: the drawer remounts on every open, and the
+// category tree changes when an admin edits it, not between taps.
+let categoriesCache: SidebarCategory[] | null = null;
+
+const CATEGORY_INSERT_AT = 4; // directly after รายการโปรด
+const COLLAPSED_LIMIT = 10;
+
 interface FacebookSidebarProps {
   isOpen?: boolean;
   onClose?: () => void;
@@ -50,10 +73,41 @@ interface FacebookSidebarProps {
 function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
   const pathname = usePathname();
   const [showMore, setShowMore] = useState(false);
-  // 8, not 6: the two links the header text row hides below xl (แนะนำ,
-  // รายการโปรด) now live here, and คำสั่งซื้อ must not get pushed behind
-  // "show more" on tablets.
-  const visibleItems = showMore ? NAV_ITEMS : NAV_ITEMS.slice(0, 8);
+  const [categories, setCategories] = useState<SidebarCategory[]>(categoriesCache ?? []);
+
+  // Load the real category list once. Failure (500/offline) leaves the
+  // section empty — the rest of the drawer still works, and no link is dead.
+  useEffect(() => {
+    if (categoriesCache) return;
+    let alive = true;
+    fetch('/api/v1/categories')
+      .then((r) => (r.ok ? r.json() : { categories: [] }))
+      .then((d: { categories?: SidebarCategory[] }) => {
+        if (!alive) return;
+        categoriesCache = d.categories ?? [];
+        setCategories(categoriesCache);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Categories splice in where the hardcoded ones used to sit, so the drawer
+  // order stays หน้าหลัก … รายการโปรด · categories … คำสั่งซื้อ.
+  const items: NavItem[] = [
+    ...NAV_ITEMS.slice(0, CATEGORY_INSERT_AT),
+    ...categories.map((c) => ({
+      href: `/category/${c.slug}`,
+      label: c.name,
+      color: 'text-fg-brand',
+      iconName: c.icon ?? null,
+    })),
+    ...NAV_ITEMS.slice(CATEGORY_INSERT_AT),
+  ];
+  // COLLAPSED_LIMIT keeps คำสั่งซื้อ visible on a phone even with several
+  // root categories.
+  const visibleItems = showMore ? items : items.slice(0, COLLAPSED_LIMIT);
 
   // Close drawer on navigation (mobile). Track the previous path so the
   // effect's mount-run is a no-op — otherwise the drawer closes itself the
@@ -101,7 +155,8 @@ function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
 
             return (
               <Link
-                key={item.href}
+                // Two entries can share a href (คำสั่งซื้อ / ติดตามคำสั่งซื้อ).
+                key={`${item.href}-${item.label}`}
                 href={item.href}
                 onClick={linkClickHandler}
                 className={cn(
@@ -117,18 +172,27 @@ function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
                     isActive ? 'bg-peach-200' : 'bg-surface-sunken',
                   )}
                 >
-                  <Icon
-                    size={18}
-                    className={isActive ? 'text-fg-brand' : item.color}
-                    strokeWidth={1.5}
-                  />
+                  {Icon ? (
+                    <Icon
+                      size={18}
+                      className={isActive ? 'text-fg-brand' : item.color}
+                      strokeWidth={1.5}
+                    />
+                  ) : (
+                    <CategoryIcon
+                      name={item.iconName ?? null}
+                      size={18}
+                      className={isActive ? 'text-fg-brand' : item.color}
+                    />
+                  )}
                 </div>
                 <span>{item.label}</span>
               </Link>
             );
           })}
 
-          {/* See more / See less */}
+          {/* See more / See less — only when something is actually hidden */}
+          {items.length > COLLAPSED_LIMIT && (
           <button
             onClick={() => setShowMore(!showMore)}
             className="transition-smart flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-fg-muted duration-150 hover:bg-surface-sunken hover:text-fg"
@@ -142,6 +206,7 @@ function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
             </div>
             <span>{showMore ? 'แสดงน้อยลง' : 'ดูเพิ่มเติม'}</span>
           </button>
+          )}
         </nav>
       </div>
 

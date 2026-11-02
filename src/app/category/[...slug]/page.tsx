@@ -18,6 +18,7 @@ import { SearchToolbar } from '@/components/search/SearchToolbar';
 
 import { getCategoryBySlug, getProductsByCategory, type CatalogSort } from '@/lib/data';
 import { publicOrigin } from '@/lib/siteConfig';
+import { decodeSlugParam } from '@/utils/slugParam';
 
 interface CategoryPageProps {
   params: Promise<{ slug: string[] }>;
@@ -54,7 +55,8 @@ function buildCategoryUrl(
 
 export async function generateMetadata({ params }: CategoryPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const slugPath = slug.join('/');
+  // Catch-all segments arrive percent-encoded too (see utils/slugParam.ts).
+  const slugPath = slug.map(decodeSlugParam).join('/');
   let result: Awaited<ReturnType<typeof getCategoryBySlug>> = null;
   try {
     result = await getCategoryBySlug(slugPath);
@@ -90,7 +92,7 @@ export default async function CategoryPage({
 }: CategoryPageProps): Promise<React.JSX.Element> {
   const { slug } = await params;
   const { sort: sortParam, page: pageParam, available } = await searchParams;
-  const slugPath = slug.join('/');
+  const slugPath = slug.map(decodeSlugParam).join('/');
   const categoryPath = `/category/${slugPath}`;
 
   const sort: CatalogSort = SORT_OPTIONS.find((o) => o.value === sortParam)?.value ?? 'featured';

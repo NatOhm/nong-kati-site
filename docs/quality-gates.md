@@ -945,3 +945,66 @@ feedback 19 ต.ค.: (1) สินค้าที่มีรหัสเติ
 
 - เปลี่ยน `bangkokMonthStart()` กลับเป็น `new Date(y, m, 1)` → B3 แดง
 - เอา `+ OFFSET_MS` ออกจาก `bangkokDayStart` (กลายเป็น UTC midnight) → B1 แดง
+
+---
+
+## สินค้าที่ slug เป็นภาษาไทยเปิดดูได้ (2 พ.ย. 2569) — `tests/product-slug-encoding.test.ts`
+
+Next ส่ง dynamic segment ให้ page แบบ **percent-encoded** (`getDynamicParam` เรียก `encodeURIComponent` ทุก segment) `/product/microsoft-365-30-วัน-ytbr` จึงมาถึง page เป็น `microsoft-365-30-%E0%B8%A7…` แล้ว `getProductBySlug` มองหา string นั้นใน DB → ไม่เจอ → `notFound()` → 404 ลูกค้าแจ้งว่า "กดสินค้าบางอันเข้าไปดูแบบละเอียดไม่ได้" ทั้งที่สินค้าอยู่ใน sitemap และ `/api/v1/products`
+
+slug ที่เป็น ASCII ไม่พังเพราะ `encodeURIComponent` ไม่เปลี่ยนอะไร — จึงพังเฉพาะสินค้าที่มีชื่อไทย (11 รายการจาก sitemap)
+
+| ตัว | บังคับว่า |
+|---|---|
+| P1 | `decodeSlugParam()` คืน slug ที่เก็บใน DB จากค่าที่ Next ส่งมา (ไทย + `ไม่ต่อ-zli2`) |
+| P2 | slug ASCII ผ่านไปโดยไม่เปลี่ยน |
+| P3 | input เสียรูป (`100%-off`, `%E0%B8`) คืนค่าเดิม ไม่ throw — ต้องได้ 404 ไม่ใช่ 500 |
+| P4 | ทั้ง `generateMetadata` และ `ProductPage` decode ก่อนเรียก `getProductBySlug` |
+| P5 | canonical/OpenGraph เป็น URL ที่ encode แล้ว (`encodeURIComponent(slug)`) |
+| P6 | catch-all ของ `/category/[...slug]` decode ทุก segment |
+| P7 | `sitemap.ts` ไม่เขียนไทยดิบลงใน `<loc>` |
+
+**พังได้จริง — ทดสอบด้วยการใส่มั๊กกลับ**
+
+- เอา `decodeSlugParam` ออกจาก `product/[slug]/page.tsx` → P4 แดง
+- ส่ง `rawSlug` เข้า `getProductBySlug` → P4 แดง
+- เอา `encodeURIComponent` ออกจาก canonical → P5 แดง
+
+---
+
+## หมวดหมู่ในเมนู 3 ขีดมาจากฐานข้อมูล (2 พ.ย. 2569) — `tests/sidebar-categories.test.ts`
+
+`FacebookSidebar` เคย hardcode 4 ลิงก์หมวดหมู่ — `movie-series`, `music`, `chinese-apps`, `editing` — ซึ่ง **ไม่มีอยู่จริงในตาราง category** ทั้งสี่ตัวจึง 404 และเมนูไม่ตามการแก้หมวดหมู่ของแอดมินเลย (ลูกค้าแจ้ง: "3 ขีดไม่ซิงก์หมวดหมู่ — ทำงาน / ดูหนัง/ซีรีส์ / แอพจีน") ตอนนี้อ่านจาก `GET /api/v1/categories` ซึ่งเป็น reader ตัวเดียวกับที่หน้าแรกใช้
+
+| ตัว | บังคับว่า |
+|---|---|
+| S1 | `FacebookSidebar.tsx` ไม่มี `/category/<slug>` แบบ hardcode และเรียก `/api/v1/categories` |
+| S2 | href ของแต่ละหมวดสร้างจาก `c.slug` ที่ได้จาก API |
+| S3 | route `/api/v1/categories` เสิร์ฟ tree จาก `getCategoriesWithProductCounts()` |
+| S4 | route นี้อยู่ใน rate-limit table (กฎมีอยู่ก่อน route จะเกิด) |
+
+**พังได้จริง — ทดสอบด้วยการใส่มั๊กกลับ**
+
+- ใส่ `/category/movie-series` กลับเป็น literal → S1 แดง
+- เปลี่ยน `href: \`/category/${c.slug}\`` เป็น slug คงที่ → S2 แดง
+
+---
+
+## Deploy runbook กับคำสั่งที่รันจริงใน Plesk ตรงกัน (2 พ.ย. 2569) — `tests/deploy-runbook.test.ts`
+
+คำสั่ง deploy บน Plesk ถูกก๊อปด้วยมือจากเอกสาร ถ้าเอกสารกับสคริปต์เพี้ยนจากกันเมื่อไหร่ ก็ deploy ผิดแบบเงียบ ๆ — รอบ 1.1.2 คำสั่งที่แปะไปใช้ `tr` ซึ่ง **ไม่มีใน chroot ของ Plesk** และตายก่อน swap (เว็บยังเสิร์ฟของเก่า) ต่อมาจึงเพิ่ม guard แบบ `grep` ล้วน
+
+| ตัว | บังคับว่า |
+|---|---|
+| D1 | `curl` มี `--max-time` และ bust cache ด้วย `$$` |
+| D2 | คำสั่งที่แปะไม่มี `"` และไม่มี `$(` (Plesk ตัด/แทนค่าทิ้ง) |
+| D3 | verify ก่อน swap และไม่ลบ `.next` เดิมทิ้ง |
+| D4 | รับ stamp ที่ลงท้าย `-dirty` และไม่บังคับ `VERSION` |
+| D5 | ข้อความที่สคริปต์พิมพ์ตรงกับบรรทัดในเอกสาร |
+| D6 | summary ที่พิมพ์ไม่มี backtick |
+| D7 | ขั้น pack ปฏิเสธ bundle ที่ dirty หรือ stamp ไม่ตรง |
+
+**พังได้จริง — ทดสอบด้วยการใส่มั๊กกลับ**
+
+- เอา `--max-time` ออกจาก `curl` → D1 แดง
+- ใส่ `tr '\n' ' '` กลับเข้า guard → D5/D2 แดง (คำสั่งไม่ตรงกับที่พิมพ์)

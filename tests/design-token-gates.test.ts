@@ -142,12 +142,6 @@ const ALLOWLIST: ReadonlyArray<{
   },
   {
     rule: 'R1',
-    file: 'src/components/layout/FacebookSidebar.tsx',
-    content: "label: 'ดูหนัง/ซีรีส์'",
-    why: 'color reaches the lucide Icon only',
-  },
-  {
-    rule: 'R1',
     file: 'src/components/product/WishlistButton.tsx',
     content: "wished ? 'text-coral-500'",
     why: 'Heart icon state colour',

@@ -47,7 +47,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }));
 
   const productPages: MetadataRoute.Sitemap = productSlugs.map((slug) => ({
-    url: `${BASE_URL}/product/${slug}`,
+    // Slugs may be Thai; a sitemap <loc> needs a valid URL, not raw UTF-8.
+    url: `${BASE_URL}/product/${encodeURIComponent(slug)}`,
     lastModified: now,
     changeFrequency: 'weekly' as const,
     priority: 0.9,

@@ -11,6 +11,7 @@ import { Breadcrumb } from '@/components/data-display/Breadcrumb';
 import { StructuredData } from '@/components/data-display/StructuredData';
 import { ProductDetailClient } from '@/components/product/ProductDetailClient';
 import { formatThb } from '@/utils/format';
+import { decodeSlugParam } from '@/utils/slugParam';
 
 import { getProductBySlug, getProductWishCount, getMostWishedProducts } from '@/lib/data';
 import { publicOrigin } from '@/lib/siteConfig';
@@ -22,7 +23,10 @@ interface ProductPageProps {
 }
 
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
-  const { slug } = await params;
+  const { slug: rawSlug } = await params;
+  // Next percent-encodes dynamic segments — decode before the DB lookup, or
+  // every non-ASCII slug (Thai product names) 404s. See utils/slugParam.ts.
+  const slug = decodeSlugParam(rawSlug);
   let product: Awaited<ReturnType<typeof getProductBySlug>> = null;
   try {
     product = await getProductBySlug(slug);
@@ -39,7 +43,8 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
   }
 
   const siteUrl = publicOrigin();
-  const productUrl = `${siteUrl}/product/${slug}`;
+  // Canonical/OG must be a valid encoded URL — the decoded slug may be Thai.
+  const productUrl = `${siteUrl}/product/${encodeURIComponent(slug)}`;
 
   return {
     title: `${product.name} — ซื้อบัตรออนไลน์`,
@@ -59,7 +64,8 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
 export default async function ProductPage({
   params,
 }: ProductPageProps): Promise<React.JSX.Element> {
-  const { slug } = await params;
+  const { slug: rawSlug } = await params;
+  const slug = decodeSlugParam(rawSlug);
   let product: Awaited<ReturnType<typeof getProductBySlug>> = null;
   try {
     product = await getProductBySlug(slug);
@@ -88,7 +94,7 @@ export default async function ProductPage({
   }
   if (!product) notFound();
   const siteUrl = publicOrigin();
-  const productUrl = `${siteUrl}/product/${slug}`;
+  const productUrl = `${siteUrl}/product/${encodeURIComponent(slug)}`;
   const totalStock = product.variants.reduce((sum, v) => sum + v.stock, 0);
   // Social proof: real wishlist table (both degrade gracefully to empty).
   const [wishCount, alsoWished] = await Promise.all([
