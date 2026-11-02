@@ -23,6 +23,7 @@
 import type { Prisma } from '@prisma/client';
 
 import { prisma } from '@/lib/db';
+import { newId } from '@/lib/ids';
 
 /**
  * Resolve Next's `after` at runtime. writeAuditLog only ever runs on the
@@ -95,7 +96,7 @@ export async function writeAuditLog(params: {
   tx?: AuditTx;
 }): Promise<AuditLogEntry> {
   const entry: AuditLogEntry = {
-    id: `audit_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    id: newId('audit'),
     actorType: params.actorType,
     actorId: params.actorId,
     actorEmail: params.actorEmail,

@@ -10,6 +10,7 @@
 import { OmiseAdapter } from '@/lib/payment/omise';
 import { gatewayCircuitBreaker, GatewayUnavailableError } from '@/lib/payment/circuitBreaker';
 import { reserveCodes } from '@/lib/delivery/reservation';
+import { newId } from '@/lib/ids';
 import type { Order } from './orders';
 
 // Lazy gateway adapter — never construct at module scope (build-time route
@@ -70,7 +71,7 @@ export async function initiatePayment(
   const amountThb = Number(order.totalAmountThb);
 
   // Create payment attempt record
-  const attemptId = `pa_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const attemptId = newId('pa');
 
   try {
     if (paymentMethod === 'promptpay') {

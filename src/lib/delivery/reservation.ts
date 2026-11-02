@@ -11,6 +11,7 @@
  */
 
 import { encryptCode, hashCode } from '@/lib/crypto/giftCode';
+import { newId } from '@/lib/ids';
 
 export interface ReservationResult {
   success: boolean;
@@ -60,7 +61,7 @@ export function initMockCodes(variantId: string, codes: string[]): void {
     const hash = hashCode(code);
 
     mockCodeStore.set(hash.toString('hex'), {
-      id: `gc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      id: newId('gc'),
       variantId,
       codeEncrypted: ciphertext,
       codeHash: hash,
