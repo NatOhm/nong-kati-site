@@ -6,6 +6,7 @@ import { ArrowLeft } from 'lucide-react';
 
 import { PageShell } from '@/components/layout/PageShell';
 import { OrderLookupForm } from '@/components/order/OrderLookupForm';
+import { safeJson } from '@/lib/json';
 
 interface LookupResponse {
   success?: boolean;
@@ -35,7 +36,7 @@ export default function OrderLookupPage(): React.JSX.Element {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, orderNumber }),
       });
-      const data: LookupResponse = await res.json().catch(() => ({}));
+      const data = await safeJson<LookupResponse>(res);
       if (res.ok && data.success && data.order) {
         // Redirect to order detail
         window.location.href = `/orders/${data.order.confirmationUuid}`;

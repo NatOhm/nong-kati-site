@@ -9,6 +9,7 @@ import { useState } from 'react';
 import { Send, CheckCircle } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import type { DataRequestType } from '@/api/dataRequests';
+import { safeJson } from '@/lib/json';
 
 const REQUEST_TYPES: { value: DataRequestType; label: string; description: string }[] = [
   { value: 'access', label: 'ขอเข้าถึงข้อมูล', description: 'ขอรับสำเนาข้อมูลส่วนบุคคลของคุณ' },
@@ -48,7 +49,7 @@ export function DataRequestForm(): React.JSX.Element {
       } else if (res.status === 429) {
         setError('ส่งคำขอบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่');
       } else {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        const body = await safeJson<{ error?: string }>(res);
         setError(
           body.error === 'INVALID_EMAIL'
             ? 'กรุณากรอกอีเมลที่ถูกต้อง'

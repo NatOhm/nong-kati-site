@@ -12,6 +12,7 @@ import { AdminShell } from '@/components/layout/AdminShell';
 import { adminFetch } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
 import type { DataRequest, DataRequestStatus } from '@/api/dataRequests';
+import { safeJson } from '@/lib/json';
 
 const STATUS_LABELS: Record<
   DataRequestStatus,
@@ -61,10 +62,10 @@ export default function AdminPdpaPage(): React.JSX.Element {
         const filter = status ?? (statusFilter as DataRequestStatus | '');
         const qs = filter ? `?status=${encodeURIComponent(filter)}` : '';
         const res = await adminFetch(`/api/v1/pdpa/data-requests${qs}`);
-        const result = (await res.json().catch(() => ({}))) as {
+        const result = await safeJson<{
           data?: DataRequest[];
           total?: number;
-        };
+        }>(res);
         if (!res.ok) throw new Error('load failed');
         setRequests(result.data ?? []);
         setTotal(result.total ?? 0);

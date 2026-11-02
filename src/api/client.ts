@@ -1,3 +1,4 @@
+import { safeJson } from '@/lib/json';
 /**
  * API Client — Typed fetch wrapper for server-side data fetching.
  * SSR-safe: no browser-only APIs; uses absolute URLs derived from env or request origin.
@@ -47,7 +48,7 @@ export async function apiFetch<T>(endpoint: string, options: FetchOptions = {}):
   });
 
   if (!res.ok) {
-    const data = await res.json().catch(() => null);
+    const data = await safeJson<unknown>(res);
     throw new ApiError(res.status, `API error: ${res.status} ${res.statusText}`, data);
   }
 

@@ -6,6 +6,7 @@
 
 import type { CartState } from '@/lib/cart';
 import type { Order } from './orders';
+import { safeJson } from '@/lib/json';
 
 export type { Order, OrderItem } from './orders';
 
@@ -44,7 +45,7 @@ export async function apiCreateOrder(
       items: cart.items.map((i) => ({ variantId: i.variantId, quantity: i.quantity })),
     }),
   });
-  const body = await res.json().catch(() => ({}));
+  const body = await safeJson<any>(res);
   if (!res.ok) {
     throw new Error(body?.error?.code ?? body?.error ?? 'ORDER_CREATE_FAILED');
   }
@@ -63,7 +64,7 @@ export async function apiInitiatePayment(orderId: string): Promise<{
     credentials: 'include',
     body: JSON.stringify({ orderId }),
   });
-  const body = await res.json().catch(() => ({}));
+  const body = await safeJson<any>(res);
   if (!res.ok) {
     throw new Error(body?.error?.code ?? body?.error ?? 'PAYMENT_INIT_FAILED');
   }

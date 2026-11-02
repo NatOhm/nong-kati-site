@@ -1,3 +1,4 @@
+import { safeJson } from '@/lib/json';
 /**
  * Facebook OAuth for customer sign-in — mirrors the Google/LINE integration
  * in lib/oauth.ts (client ask: "customer login can be login with LINE,
@@ -91,7 +92,7 @@ export async function exchangeFacebookCodeForProfile(params: {
     return null;
   }
   if (!tokenRes.ok) return null;
-  const tokens = (await tokenRes.json().catch(() => null)) as FbTokenResponse | null;
+  const tokens = await safeJson<FbTokenResponse>(tokenRes);
   if (!tokens?.access_token) return null;
 
   const profileUrl = new URL(FB_PROFILE_URL);
@@ -105,7 +106,7 @@ export async function exchangeFacebookCodeForProfile(params: {
     return null;
   }
   if (!profileRes.ok) return null;
-  const profile = (await profileRes.json().catch(() => null)) as FbProfileResponse | null;
+  const profile = await safeJson<FbProfileResponse>(profileRes);
   if (!profile?.id || !profile.email) return null;
 
   return {

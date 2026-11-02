@@ -14,6 +14,7 @@ import {
 } from '@/lib/data';
 import type { CategoryItem, ProductItem } from '@/lib/data';
 import { adminFetch, adminFetchJson } from '@/lib/adminSession';
+import { safeJson } from '@/lib/json';
 
 // ─── Types ──────────────────────────────────────────────
 
@@ -207,14 +208,14 @@ export async function adminDeleteProductPermanent(id: string): Promise<{
 }> {
   const res = await adminFetch(`/api/v1/admin/products/${id}`, { method: 'DELETE' });
   if (res.ok) {
-    const data = (await res.json().catch(() => ({}))) as { counts?: Record<string, number> };
+    const data = await safeJson<{ counts?: Record<string, number> }>(res);
     return data.counts ? { success: true, counts: data.counts } : { success: true };
   }
-  const err = (await res.json().catch(() => ({}))) as {
+  const err = await safeJson<{
     error?: string;
     orderNumbers?: string[];
     detail?: string;
-  };
+  }>(res);
   if (err.error === 'IN_FLIGHT_ORDER') {
     // The numbers come back structured so the UI can deep-link them into
     // /management/orders?orderNumber=… instead of dead plain text.
@@ -287,7 +288,7 @@ export async function adminCreateCategory(input: {
     const slug = data.category?.slug;
     return slug ? { success: true, slug } : { success: true };
   }
-  const err = (await res.json().catch(() => ({}))) as { error?: string };
+  const err = await safeJson<{ error?: string }>(res);
   return { success: false, error: err.error ?? `HTTP_${res.status}` };
 }
 
@@ -307,7 +308,7 @@ export async function adminUpdateCategory(
     const slug = data.category?.slug;
     return slug ? { success: true, slug } : { success: true };
   }
-  const err = (await res.json().catch(() => ({}))) as { error?: string };
+  const err = await safeJson<{ error?: string }>(res);
   return { success: false, error: err.error ?? `HTTP_${res.status}` };
 }
 
@@ -326,12 +327,12 @@ export async function adminDeleteCategory(
     : `/api/v1/admin/categories/${id}`;
   const res = await adminFetch(url, { method: 'DELETE' });
   if (res.ok) return { success: true };
-  const err = (await res.json().catch(() => ({}))) as {
+  const err = await safeJson<{
     error?: string;
     products?: number;
     orderNumbers?: string[];
     detail?: string;
-  };
+  }>(res);
   if (err.error === 'HAS_PRODUCTS') {
     return {
       success: false,

@@ -5,6 +5,7 @@ import { Eye, EyeOff, Loader2, Ban, RefreshCw, Send, Pencil, Copy, Check } from 
 
 import { adminFetch, adminJson } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
+import { safeJson } from '@/lib/json';
 
 /**
  * Stored-account viewer for one variant.
@@ -158,7 +159,7 @@ export function VariantCodesDialog({
         cache: 'no-store',
       });
       if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        const body = await safeJson<{ error?: string }>(res);
         setError(apiError(body.error, 'เปิดดูบัญชีไม่สำเร็จ'));
         return;
       }
@@ -192,7 +193,7 @@ export function VariantCodesDialog({
         cache: 'no-store',
       });
       if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        const body = await safeJson<{ error?: string }>(res);
         setError(apiError(body.error, 'เปิดบัญชีเพื่อแก้ไขไม่สำเร็จ'));
         return;
       }
@@ -228,7 +229,7 @@ export function VariantCodesDialog({
         body: JSON.stringify({ code: next }),
       });
       if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        const body = await safeJson<{ error?: string }>(res);
         setError(apiError(body.error, 'บันทึกการแก้ไขไม่สำเร็จ'));
         return;
       }
@@ -299,7 +300,7 @@ export function VariantCodesDialog({
         body: JSON.stringify({}),
       });
       if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        const body = await safeJson<{ error?: string }>(res);
         setError(apiError(body.error, 'ปิดใช้งานไม่สำเร็จ'));
         return;
       }
@@ -337,7 +338,7 @@ export function VariantCodesDialog({
         body: JSON.stringify({ codeId: id }),
       });
       if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        const body = await safeJson<{ error?: string }>(res);
         setError(apiError(body.error, 'ส่งบัญชีไม่สำเร็จ'));
         return;
       }

@@ -40,6 +40,7 @@ import {
   type RefundRequest,
   type RefundResult,
 } from './gateway';
+import { safeJson } from '@/lib/json';
 
 const DEFAULT_API_BASE = 'https://api.omise.co';
 const REQUEST_TIMEOUT_MS = 15_000;
@@ -283,7 +284,7 @@ export class OmiseAdapter implements PaymentGateway {
         },
         signal: controller.signal,
       });
-      const parsed = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      const parsed = await safeJson<Record<string, unknown>>(res);
       if (!res.ok) {
         const code = typeof parsed['code'] === 'string' ? parsed['code'] : 'unknown';
         throw new Error(`OMISE_API_ERROR: charge lookup ${res.status} ${code}`);
@@ -337,7 +338,7 @@ export class OmiseAdapter implements PaymentGateway {
     }
     clearTimeout(timeout);
 
-    const parsed = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    const parsed = await safeJson<Record<string, unknown>>(res);
     if (!res.ok) {
       const code = typeof parsed['code'] === 'string' ? parsed['code'] : 'unknown';
       const message = typeof parsed['message'] === 'string' ? parsed['message'] : '';

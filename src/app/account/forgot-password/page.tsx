@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Clock, KeyRound, Mail, Send } from 'lucide-react';
+import { safeJson } from '@/lib/json';
 
 type Phase = 'request' | 'sent';
 
@@ -49,7 +50,7 @@ export default function ForgotPasswordPage(): React.JSX.Element {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      const data = await safeJson<{ error?: string }>(res);
 
       if (res.ok) {
         setSentTo(email);

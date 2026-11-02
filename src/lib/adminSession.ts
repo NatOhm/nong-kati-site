@@ -1,3 +1,4 @@
+import { safeJson } from '@/lib/json';
 /**
  * Admin session helpers used by the admin SPA: the client pages import the
  * cookie/session marker helpers from here, while route handlers keep using
@@ -102,7 +103,7 @@ export async function adminFetch(path: string, init: AdminFetchInit = {}): Promi
 export async function adminJson<T>(path: string, init: AdminFetchInit = {}): Promise<T> {
   const res = await adminFetch(path, init);
   if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    const body = await safeJson<{ error?: string }>(res);
     throw new Error(body.error ?? `HTTP ${res.status}`);
   }
   return res.json() as Promise<T>;

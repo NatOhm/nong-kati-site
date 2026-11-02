@@ -5,6 +5,7 @@ import { Download, FileUp, Loader2, X, CheckCircle2, AlertTriangle, XCircle } fr
 
 import { adminFetch } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
+import { safeJson } from '@/lib/json';
 
 /**
  * Bulk product import (client ask: ลงสินค้าทีละหลายชิ้นได้).
@@ -86,9 +87,10 @@ export function ImportDialog({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ csv, mode }),
       });
-      const data = (await res.json().catch(() => ({}))) as
+      const data = await safeJson<
         | (ImportResponse & { error?: string })
-        | { error: string };
+        | { error: string }
+      >(res);
       if (!res.ok) {
         throw new Error(
           'error' in data && data.error

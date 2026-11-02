@@ -30,6 +30,7 @@ import { prisma } from '@/lib/db';
 import { checkPermission } from '@/lib/rbac';
 import { getAdminToken } from '@/lib/adminRequest';
 import { writeAuditLog } from '@/lib/auditLog';
+import { safeJson } from '@/lib/json';
 
 /**
  * States in which handing over an account is legitimate. `pending_payment`
@@ -60,7 +61,7 @@ export async function POST(
   let codeId = '';
   let replaceCodeId: string | null = null;
   try {
-    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    const body = await safeJson<Record<string, unknown>>(req);
     codeId = typeof body['codeId'] === 'string' ? body['codeId'].trim() : '';
     replaceCodeId =
       typeof body['replaceCodeId'] === 'string' && body['replaceCodeId'].trim()

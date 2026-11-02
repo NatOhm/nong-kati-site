@@ -23,6 +23,7 @@ import {
   fbAppId,
   fbAppSecret,
 } from './oauthFacebook';
+import { safeJson } from '@/lib/json';
 
 // ─── Provider configuration ─────────────────────────────
 
@@ -219,7 +220,7 @@ export async function exchangeCodeForProfile(params: {
     return null;
   }
   if (!tokenRes.ok) return null;
-  const tokens = (await tokenRes.json().catch(() => null)) as TokenResponse | null;
+  const tokens = await safeJson<TokenResponse>(tokenRes);
   if (!tokens?.access_token && !tokens?.id_token) return null;
 
   if (params.provider === 'google') {
@@ -228,13 +229,13 @@ export async function exchangeCodeForProfile(params: {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
     }).catch(() => null);
     if (!uiRes?.ok) return null;
-    const ui = (await uiRes.json().catch(() => null)) as {
+    const ui = await safeJson<{
       sub?: string;
       email?: string;
       email_verified?: boolean;
       name?: string;
       picture?: string;
-    } | null;
+    }>(uiRes);
     if (!ui?.sub || !ui.email) return null;
     return {
       subject: ui.sub,

@@ -25,6 +25,7 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 import { safeRedirect } from '@/lib/safeRedirect';
+import { safeJson } from '@/lib/json';
 
 /**
  * Only allow same-site relative paths in ?next= (no open redirect).
@@ -65,7 +66,7 @@ export default function MagicLinkPage(): React.JSX.Element {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token }),
         });
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        const data = await safeJson<{ error?: string }>(res);
 
         if (res.ok && data) {
           setConsume('success');
@@ -104,7 +105,7 @@ export default function MagicLinkPage(): React.JSX.Element {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      const data = await safeJson<{ error?: string }>(res);
 
       if (res.ok) {
         setSentTo(email);

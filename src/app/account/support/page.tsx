@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Send, CheckCircle, MessageSquareText, Loader2 } from 'lucide-react';
 
 import { cn } from '@/utils/cn';
+import { safeJson } from '@/lib/json';
 
 interface MyTicket {
   id: string;
@@ -61,10 +62,10 @@ export default function AccountSupportPage(): React.JSX.Element {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ subject, message }),
         });
-        const data = (await res.json().catch(() => ({}))) as {
+        const data = await safeJson<{
           ticketNumber?: string;
           error?: string;
-        };
+        }>(res);
         if (!res.ok || !data.ticketNumber) {
           setError(
             data.error === 'RATE_LIMITED'

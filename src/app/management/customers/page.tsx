@@ -9,6 +9,7 @@ import { TIER_LABELS, type PriceTier } from '@/lib/pricing';
 import { cn } from '@/utils/cn';
 import { formatThb } from '@/lib/pricing';
 import { withStatusColors } from '@/lib/orderStatus';
+import { safeJson } from '@/lib/json';
 
 /**
  * Admin Customers — real DB-backed list + detail + price-tier management
@@ -128,7 +129,7 @@ export default function AdminCustomersPage(): React.JSX.Element {
         cache: 'no-store',
       });
       if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        const data = await safeJson<{ error?: string }>(res);
         throw new Error(data.error ?? `HTTP ${res.status}`);
       }
       const result = (await res.json()) as { data: CustomerListItem[] };
@@ -174,7 +175,7 @@ export default function AdminCustomersPage(): React.JSX.Element {
         cache: 'no-store',
       });
       if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        const data = await safeJson<{ error?: string }>(res);
         throw new Error(data.error ?? `HTTP ${res.status}`);
       }
       const result = (await res.json()) as CustomerHistory;
@@ -239,7 +240,7 @@ export default function AdminCustomersPage(): React.JSX.Element {
           note: creditNote || undefined,
         }),
       });
-      const data = (await res.json().catch(() => ({}))) as { error?: string; balanceThb?: number };
+      const data = await safeJson<{ error?: string; balanceThb?: number }>(res);
       if (!res.ok) {
         setActionMessage(
           data.error === 'INSUFFICIENT_BALANCE'
@@ -267,7 +268,7 @@ export default function AdminCustomersPage(): React.JSX.Element {
       body: JSON.stringify({ tier }),
     });
     if (!res.ok) {
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      const data = await safeJson<{ error?: string }>(res);
       setActionMessage(data.error ?? 'เปลี่ยนระดับราคาไม่สำเร็จ');
       return;
     }

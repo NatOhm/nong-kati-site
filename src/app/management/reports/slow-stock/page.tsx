@@ -6,6 +6,7 @@ import { Download, Loader2, RefreshCw, Save, Search } from 'lucide-react';
 import { AdminShell } from '@/components/layout/AdminShell';
 import { adminFetch } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
+import { safeJson } from '@/lib/json';
 
 /**
  * Slow-moving stock report (client ask #15: "รายงานสต๊อก — ขายดี และสินค้าค้างสต๊อก").
@@ -62,7 +63,7 @@ export default function SlowStockReportPage(): React.JSX.Element {
     try {
       const res = await adminFetch('/api/v1/admin/reports/slow-stock');
       if (!res.ok)
-        throw new Error((await res.json().catch(() => ({}))).error ?? `HTTP ${res.status}`);
+        throw new Error((await safeJson<{ error?: string }>(res)).error ?? `HTTP ${res.status}`);
       const data = (await res.json()) as { days: number; rows: Row[]; totals: Totals };
       setRows(data.rows);
       setTotals(data.totals);
@@ -94,7 +95,7 @@ export default function SlowStockReportPage(): React.JSX.Element {
         body: JSON.stringify({ days: n }),
       });
       if (!res.ok)
-        throw new Error((await res.json().catch(() => ({}))).error ?? `HTTP ${res.status}`);
+        throw new Error((await safeJson<{ error?: string }>(res)).error ?? `HTTP ${res.status}`);
       await load();
       setDaysMsg('บันทึกแล้ว');
     } catch (e) {

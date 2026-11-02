@@ -28,6 +28,7 @@ import { ImportDialog } from './ImportDialog';
 import { BulkPricingDialog } from './BulkPricingDialog';
 import { BulkStockDialog } from './BulkStockDialog';
 import { VariantCodesDialog } from '../inventory/VariantCodesDialog';
+import { safeJson } from '@/lib/json';
 /**
  * Admin Products Management — real CRUD over the Prisma catalog.
  * List, search, create, edit (info + image + variants), archive,
@@ -277,7 +278,7 @@ export default function AdminProductsPage(): React.JSX.Element {
         adminFetch('/api/v1/admin/tags', { cache: 'no-store' }),
       ]);
       if (!productsRes.ok) {
-        const data = (await productsRes.json().catch(() => ({}))) as { error?: string };
+        const data = await safeJson<{ error?: string }>(productsRes);
         throw new Error(data.error ?? `HTTP ${productsRes.status}`);
       }
       const list = (await productsRes.json()) as AdminProduct[];
@@ -873,7 +874,7 @@ function ProductEditor({
         body: JSON.stringify({ dataUrl, filename: file.name }),
       });
       if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
+        const data = await safeJson<{ error?: string; message?: string }>(res);
         throw new Error(data.message ?? data.error ?? `HTTP ${res.status}`);
       }
       const { path } = (await res.json()) as { path: string };
@@ -895,7 +896,7 @@ function ProductEditor({
         body: JSON.stringify({ name: newTagName.trim() }),
       });
       if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        const data = await safeJson<{ error?: string }>(res);
         throw new Error(data.error ?? `HTTP ${res.status}`);
       }
       const tag = (await res.json()) as { id: string; name: string };
@@ -942,7 +943,7 @@ function ProductEditor({
         },
       );
       if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        const data = await safeJson<{ error?: string }>(res);
         throw new Error(SAVE_ERR_TH[data.error ?? ''] ?? data.error ?? `HTTP ${res.status}`);
       }
       // Variant cleanup the server applied to rows dropped in this save:
@@ -950,9 +951,9 @@ function ProductEditor({
       // they still serve history — say so instead of silently resurrecting.
       let notice: string | null = null;
       if (product) {
-        const saved = (await res.json().catch(() => ({}))) as {
+        const saved = await safeJson<{
           variantCleanup?: { deletedIds?: unknown; deactivatedIds?: unknown };
-        };
+        }>(res);
         const deleted = Array.isArray(saved.variantCleanup?.deletedIds)
           ? (saved.variantCleanup.deletedIds as unknown[]).length
           : 0;

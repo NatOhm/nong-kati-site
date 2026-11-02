@@ -6,6 +6,7 @@ import { Download, Loader2, RefreshCw, Search } from 'lucide-react';
 import { AdminShell } from '@/components/layout/AdminShell';
 import { adminFetch } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
+import { safeJson } from '@/lib/json';
 
 /**
  * Per-dealer/member sales report (client ask: "สถิติตัวแทน/สมาชิกที่ซื้อสินค้า —
@@ -61,7 +62,7 @@ export default function CustomerSalesReportPage(): React.JSX.Element {
     try {
       const res = await adminFetch(`/api/v1/admin/reports/customer-sales?period=${p}`);
       if (!res.ok)
-        throw new Error((await res.json().catch(() => ({}))).error ?? `HTTP ${res.status}`);
+        throw new Error((await safeJson<{ error?: string }>(res)).error ?? `HTTP ${res.status}`);
       const data = (await res.json()) as { customers: Row[]; totals: Totals };
       setRows(data.customers);
       setTotals(data.totals);
@@ -106,7 +107,7 @@ export default function CustomerSalesReportPage(): React.JSX.Element {
           );
           return;
         }
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        const data = await safeJson<{ error?: string }>(res);
         setExportError(data.error ? `ส่งออกไม่สำเร็จ: ${data.error}` : 'ส่งออกไม่สำเร็จ');
         return;
       }

@@ -27,6 +27,7 @@ import { prisma } from '@/lib/db';
 import { checkPermission } from '@/lib/rbac';
 import { getAdminToken } from '@/lib/adminRequest';
 import { writeAuditLog } from '@/lib/auditLog';
+import { safeJson } from '@/lib/json';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,7 +51,7 @@ export async function PATCH(
 
   let reason = '';
   try {
-    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    const body = await safeJson<Record<string, unknown>>(req);
     if (typeof body['reason'] === 'string') reason = body['reason'].trim();
   } catch {
     // Body is optional — a void with no stated reason is still recorded,

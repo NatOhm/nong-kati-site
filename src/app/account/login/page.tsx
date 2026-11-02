@@ -17,6 +17,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, LogIn, Mail, Lock, Eye, EyeOff, Phone } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { safeRedirect } from '@/lib/safeRedirect';
+import { safeJson } from '@/lib/json';
 
 /** Brand marks for the social buttons (simple, current-color paths). */
 function GoogleMark(): React.JSX.Element {
@@ -179,11 +180,11 @@ export default function LoginPage(): React.JSX.Element {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone }),
       });
-      const data = (await res.json().catch(() => ({}))) as {
+      const data = await safeJson<{
         success?: boolean;
         message?: string;
         error?: string;
-      };
+      }>(res);
       if (res.ok && data.success) {
         setOtpSent(true);
         setOtpMessage(data.message ?? 'ส่งรหัส 6 หลักทาง SMS แล้ว');
@@ -206,11 +207,11 @@ export default function LoginPage(): React.JSX.Element {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone, code: otpCode }),
       });
-      const data = (await res.json().catch(() => ({}))) as {
+      const data = await safeJson<{
         success?: boolean;
         isNewAccount?: boolean;
         error?: string;
-      };
+      }>(res);
       if (res.ok && data.success) {
         // New phone-only accounts land in settings to set their real email;
         // everyone else continues to wherever they were heading.

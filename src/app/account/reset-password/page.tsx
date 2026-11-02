@@ -20,6 +20,7 @@ import {
   Link2,
   ShieldAlert,
 } from 'lucide-react';
+import { safeJson } from '@/lib/json';
 
 type ConsumeState = 'form' | 'success' | 'used' | 'expired' | 'invalid' | 'blocked';
 
@@ -63,7 +64,7 @@ export default function ResetPasswordPage(): React.JSX.Element {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, password }),
       });
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      const data = await safeJson<{ error?: string }>(res);
 
       if (res.ok) {
         setState('success');

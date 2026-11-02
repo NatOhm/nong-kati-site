@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { AdminShell } from '@/components/layout/AdminShell';
 import { adminFetch } from '@/lib/adminSession';
+import { safeJson } from '@/lib/json';
 
 /**
  * ONE-CLICK TEST SETUP (dev only — the backing endpoint 404s in production).
@@ -31,7 +32,7 @@ export default function DevSeedPage(): React.JSX.Element {
     setError(null);
     try {
       const res = await adminFetch('/api/v1/admin/dev-seed', { method: 'POST' });
-      const body = (await res.json().catch(() => ({}))) as SeedResult;
+      const body = await safeJson<SeedResult>(res);
       if (!res.ok) {
         setError(body.error ?? `HTTP ${res.status}`);
         setResult(null);
