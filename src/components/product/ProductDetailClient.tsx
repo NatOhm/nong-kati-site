@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ShoppingCart, Check } from 'lucide-react';
 import { useCart } from '@/hooks/useCart';
 import { formatThb } from '@/utils/format';
@@ -67,6 +67,20 @@ export function ProductDetailClient({
   );
   const [addedToCart, setAddedToCart] = useState(false);
   const [quantity, setQuantity] = useState(1);
+  // Phone-only buy bar: the real CTA sits below the package grid, often a
+  // full screen down on a 390px handset.
+  const ctaRef = useRef<HTMLButtonElement>(null);
+  const [showStickyCta, setShowStickyCta] = useState(false);
+
+  useEffect(() => {
+    const el = ctaRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(([entry]) =>
+      setShowStickyCta(Boolean(entry && !entry.isIntersecting)),
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [selectedVariant]);
 
   const handleAddToCart = () => {
     if (!selectedVariant || selectedVariant.stock === 0) return;
@@ -167,7 +181,9 @@ export function ProductDetailClient({
                     so their text stays dark for contrast. */}
                 <span
                   className={cn(
-                    'line-clamp-1 text-sm font-semibold',
+                    // Two lines, not one: Thai package labels were being cut
+                    // to “Microsoft 365 30…” in the two-column phone grid.
+                    'line-clamp-2 text-sm font-semibold',
                     isSelected ? 'text-clay-900' : 'text-fg',
                   )}
                 >
@@ -218,7 +234,7 @@ export function ProductDetailClient({
             <button
               onClick={() => setQuantity(Math.max(1, quantity - 1))}
               aria-label="ลดจำนวน"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-line bg-surface text-lg text-fg-secondary transition-colors hover:border-peach-400 hover:text-fg active:scale-90"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-line bg-surface text-lg text-fg-secondary transition-colors hover:border-peach-400 hover:text-fg active:scale-90"
             >
               −
             </button>
@@ -230,7 +246,7 @@ export function ProductDetailClient({
                 setQuantity(Math.min(Math.min(10, selectedVariant.stock), quantity + 1))
               }
               aria-label="เพิ่มจำนวน"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-line bg-surface text-lg text-fg-secondary transition-colors hover:border-peach-400 hover:text-fg active:scale-90"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-line bg-surface text-lg text-fg-secondary transition-colors hover:border-peach-400 hover:text-fg active:scale-90"
             >
               +
             </button>
@@ -240,6 +256,7 @@ export function ProductDetailClient({
           </div>
 
           <button
+            ref={ctaRef}
             onClick={handleAddToCart}
             disabled={!selectedVariant || selectedVariant.stock === 0 || addedToCart}
             className={cn(
@@ -267,6 +284,40 @@ export function ProductDetailClient({
             </p>
           )}
         </section>
+      )}
+
+      {/* Sticky buy bar (phones only) — hidden once the real CTA is on screen,
+          and parked above the fixed bottom taskbar. */}
+      {showStickyCta && selectedVariant && selectedVariant.stock > 0 && (
+        <div className="fixed inset-x-0 bottom-16 z-40 border-t border-line-subtle bg-surface-base/95 px-4 py-2.5 backdrop-blur-md lg:hidden">
+          <div className="flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs text-fg-muted">{productName}</p>
+              <p className="text-base font-bold text-fg-brand-strong">
+                {formatThb(
+                  selectedVariant.promotion?.discountedPriceThb ?? selectedVariant.effectivePrice,
+                )}
+              </p>
+            </div>
+            <button
+              onClick={handleAddToCart}
+              disabled={addedToCart}
+              className="clay-btn inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-peach-500 px-5 text-sm font-semibold text-white shadow-clay-brand active:scale-95 disabled:opacity-70"
+            >
+              {addedToCart ? (
+                <>
+                  <Check size={16} strokeWidth={2.5} />
+                  เพิ่มแล้ว
+                </>
+              ) : (
+                <>
+                  <ShoppingCart size={16} />
+                  เพิ่มลงตะกร้า
+                </>
+              )}
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

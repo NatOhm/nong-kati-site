@@ -706,3 +706,25 @@ body {
 [data-theme='light'] .admin-shell {
   --fg-success: #1f6b44;
 }
+
+/* ── Phone usability floor (measured at 390px, 2026-11-01) ────────────────
+   Two problems a phone user feels immediately:
+   1. The density utilities (text-[10px] / text-[11px]) looked fine on a
+      desktop screenshot and are unreadable in the hand — 35 of them on the
+      homepage alone. Lift them one step on phones only.
+   2. Every text field rendered at 14px. Safari on iOS zooms the whole page
+      when an input under 16px takes focus, so checkout/login jumped on the
+      first tap. 16px is the threshold; desktop keeps its compact sizing.
+   Deliberately plain (unlayered) rules so they win over @layer utilities. */
+@media (max-width: 639px) {
+  .text-\[10px\],
+  .text-\[11px\] {
+    font-size: 12px;
+    line-height: 1.35;
+  }
+  input:not([type='checkbox']):not([type='radio']):not([type='color']),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}

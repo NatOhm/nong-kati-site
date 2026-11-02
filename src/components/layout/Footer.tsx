@@ -51,28 +51,28 @@ export async function Footer(): Promise<React.JSX.Element> {
             {(store.phone || store.email || store.line) && (
               <ul className="mt-3 space-y-1 text-sm text-fg-muted">
                 {store.phone && (
-                  <li className="flex min-h-[36px] items-center">
+                  <li className="flex min-h-[44px] items-center">
                     โทร{' '}
                     <a
                       href={`tel:${store.phone.replace(/\s/g, '')}`}
-                      className="inline-flex min-h-[32px] items-center hover:text-fg-brand"
+                      className="inline-flex min-h-[44px] items-center hover:text-fg-brand"
                     >
                       {store.phone}
                     </a>
                   </li>
                 )}
                 {store.email && (
-                  <li className="flex min-h-[36px] items-center">
+                  <li className="flex min-h-[44px] items-center">
                     <a
                       href={`mailto:${store.email}`}
-                      className="inline-flex min-h-[32px] items-center hover:text-fg-brand"
+                      className="inline-flex min-h-[44px] items-center hover:text-fg-brand"
                     >
                       {store.email}
                     </a>
                   </li>
                 )}
                 {store.line && (
-                  <li className="flex min-h-[36px] items-center">LINE: {store.line}</li>
+                  <li className="flex min-h-[44px] items-center">LINE: {store.line}</li>
                 )}
               </ul>
             )}
@@ -82,10 +82,10 @@ export async function Footer(): Promise<React.JSX.Element> {
               <h3 className="mb-3 text-sm font-semibold text-fg">{col.title}</h3>
               <ul className="flex flex-col gap-0">
                 {col.links.map((link) => (
-                  <li key={link.href} className="flex min-h-[36px] items-center">
+                  <li key={link.href} className="flex min-h-[44px] items-center">
                     <a
                       href={link.href}
-                      className="inline-flex min-h-[32px] items-center text-sm text-fg-muted hover:text-fg-brand"
+                      className="inline-flex min-h-[44px] items-center text-sm text-fg-muted hover:text-fg-brand"
                     >
                       {link.label}
                     </a>
@@ -103,7 +103,11 @@ export async function Footer(): Promise<React.JSX.Element> {
           </p>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
             {LEGAL_LINKS.map((link) => (
-              <a key={link.href} href={link.href} className="hover:text-fg-secondary">
+              <a
+                key={link.href}
+                href={link.href}
+                className="inline-flex min-h-[44px] items-center hover:text-fg-secondary"
+              >
                 {link.label}
               </a>
             ))}

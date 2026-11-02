@@ -128,7 +128,7 @@ export default async function HomePage(): Promise<React.JSX.Element> {
             </p>
             <Link
               href="/search"
-              className="transition-smart mt-4 inline-flex items-center justify-center rounded-full bg-peach-500 px-8 py-2.5 text-sm font-semibold text-white shadow-clay-brand hover:bg-peach-400 hover:shadow-clay-lg active:scale-95 active:shadow-clay-press"
+              className="transition-smart mt-4 inline-flex min-h-[48px] w-full items-center justify-center rounded-full bg-peach-500 px-8 py-2.5 text-sm font-semibold text-white shadow-clay-brand hover:bg-peach-400 hover:shadow-clay-lg active:scale-95 active:shadow-clay-press sm:w-auto"
             >
               เลือกซื้อสินค้า
             </Link>
@@ -278,7 +278,10 @@ export default async function HomePage(): Promise<React.JSX.Element> {
                       ดูทั้งหมด →
                     </Link>
                   </div>
-                  <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
+                  {/* Two columns on phones: at 390px the old 3-up grid left
+                      ~111px tiles, where Thai app names and the จำนวน pill
+                      collided. */}
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
                     {group.children.map((cat) => (
                       <AppTile
                         key={cat.id}
@@ -295,7 +298,7 @@ export default async function HomePage(): Promise<React.JSX.Element> {
               ))}
 
               {looseApps.length > 0 && (
-                <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
                   {looseApps.map((cat) => (
                     <AppTile
                       key={cat.id}
