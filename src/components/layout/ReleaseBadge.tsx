@@ -15,13 +15,18 @@ import { cn } from '@/utils/cn';
 export interface ReleaseInfo {
   buildId: string | null;
   /**
-   * The human-facing release number (client ask, 2026-10-29): the commit
-   * count stamped into `.next/BUILD_NUMBER` at build time. Shown in place of
-   * the raw build id because an operator can read "337" aloud; `buildId`
-   * stays on the payload (and as the fallback below) because it is still the
-   * source of truth for WHICH bundle is serving requests.
-   * null until a stamped build ships the file — the UI then degrades to the
-   * raw id rather than to nothing.
+   * The version a person chose for this release (client ask, 2026-11-02):
+   * `package.json`'s MAJOR.MINOR.PATCH, stamped into `.next/VERSION` at build
+   * time. This is what the badge shows — major = a big rebuild, minor = new
+   * capability with the old flows intact, patch = fixes only.
+   * null until a stamped build ships the file; the UI then falls back to the
+   * commit count, then to the raw build id.
+   */
+  version: string | null;
+  /**
+   * The commit count stamped into `.next/BUILD_NUMBER` (the pre-1.1 reading,
+   * kept as the fallback). Still the honest fallback: monotonic, identical for
+   * two builds of the same commit, and readable aloud if no version shipped.
    */
   buildNumber: number | null;
   gitSha: string;
@@ -68,6 +73,12 @@ function loadRelease(): Promise<ReleaseInfo> {
         // and is handled below as "nothing verifiable" — never as a failure.
         const value: ReleaseInfo = {
           buildId: body.buildId ?? null,
+          // Shape-checked like the server side: anything that is not
+          // MAJOR.MINOR.PATCH is treated as "no version stamped".
+          version:
+            typeof body.version === 'string' && /^\d+\.\d+\.\d+$/.test(body.version)
+              ? body.version
+              : null,
           // Shape-checked like the server side: anything that is not a
           // positive integer is treated as "not stamped".
           buildNumber:
@@ -135,9 +146,10 @@ export interface DerivedRelease {
   /** First 8 chars of the build id, or null when not stamped. */
   shortBuild: string | null;
   /**
-   * What the chip actually renders as the build token: `#337` when the
-   * number is stamped, otherwise the short raw build id. One field so no
-   * placement can show the number while another still shows the id.
+   * What the chip actually renders as the build token: `v1.1.0` when a
+   * version is stamped, else `#337` (the commit count), else the short raw
+   * build id. One field so no placement can show the version while another
+   * still shows the number.
    */
   displayBuild: string | null;
   refKnown: boolean;
@@ -150,8 +162,11 @@ export function deriveRelease(release: ReleaseInfo): DerivedRelease {
   const shortSha = release.gitSha.replace(/-dirty$/, '').slice(0, 7);
   const shaKnown = /^[0-9a-f]{7}$/i.test(shortSha);
   const shortBuild = release.buildId ? release.buildId.slice(0, 8) : null;
-  const displayBuild =
-    release.buildNumber !== null ? `#${release.buildNumber}` : shortBuild;
+  const displayBuild = release.version
+    ? `v${release.version}`
+    : release.buildNumber !== null
+      ? `#${release.buildNumber}`
+      : shortBuild;
   const refKnown = Boolean(release.gitRef) && release.gitRef !== 'unknown';
   return {
     dirty,

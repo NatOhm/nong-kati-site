@@ -224,10 +224,22 @@ test.describe('API security headers', () => {
     const body = (await res.json()) as Record<string, unknown>;
     // `buildId` is read from .next/BUILD_ID on disk, so it is the only field
     // that cannot go stale the way the Infisical-fed gitSha can.
-    // `buildNumber` is the human-readable release number stamped by
-    // stamp-git-sha.mjs (shown by ReleaseBadge); null until stamped.
-    // tests/roadmap-hardening.test.ts pins this same four-key shape.
-    expect(Object.keys(body).sort()).toEqual(['buildId', 'buildNumber', 'gitRef', 'gitSha']);
+    // `version` is package.json's MAJOR.MINOR.PATCH, stamped into
+    // .next/VERSION by stamp-git-sha.mjs and shown by ReleaseBadge;
+    // `buildNumber` is the commit count kept as its fallback. Both null until
+    // a stamped build ships them. tests/roadmap-hardening.test.ts pins this
+    // same five-key shape.
+    expect(Object.keys(body).sort()).toEqual([
+      'buildId',
+      'buildNumber',
+      'gitRef',
+      'gitSha',
+      'version',
+    ]);
+    expect(
+      body['version'] === null || /^\d+\.\d+\.\d+$/.test(String(body['version'])),
+      'version must be null or MAJOR.MINOR.PATCH',
+    ).toBe(true);
     expect(
       body['buildNumber'] === null ||
         (typeof body['buildNumber'] === 'number' && Number.isInteger(body['buildNumber'])),

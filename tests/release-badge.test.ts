@@ -77,12 +77,13 @@ describe('release badge — single shared request', () => {
   });
 });
 
-describe('release badge — the build number, not the build id', () => {
+describe('release badge — the version, then the count, then the build id', () => {
   const SHA = 'd6335ad1f2da9dcee79cf19cb3670eebb41c7c75';
 
   it('renders the stamped release number as #N', () => {
     const d = deriveRelease({
       buildId: 'b3VolF0huX9073f7NUdKN',
+      version: null,
       buildNumber: 337,
       gitSha: SHA,
       gitRef: 'master',
@@ -94,9 +95,32 @@ describe('release badge — the build number, not the build id', () => {
     expect(d.displayBuild).not.toContain('b3VolF0');
   });
 
+  it('prefers the stamped version over the commit count', () => {
+    const d = deriveRelease({
+      buildId: 'b3VolF0huX9073f7NUdKN',
+      version: '1.1.0',
+      buildNumber: 346,
+      gitSha: SHA,
+      gitRef: 'master',
+    });
+
+    // The version a person chose is the release identity; the count is only
+    // the fallback for a build that shipped without one.
+    expect(d.displayBuild).toBe('v1.1.0');
+    expect(d.displayBuild).not.toBe('#346');
+  });
+
+  it('shape-checks the version before trusting it', () => {
+    // "1.1" / "v1.1.0" must not render as a release that is not in
+    // package.json — the server refuses them, the client must agree.
+    expect(badge).toContain('typeof body.version === ');
+    expect(badge).toContain('.test(body.version)');
+  });
+
   it('falls back to the short build id while nothing is stamped', () => {
     const d = deriveRelease({
       buildId: 'b3VolF0huX9073f7NUdKN',
+      version: null,
       buildNumber: null,
       gitSha: SHA,
       gitRef: 'master',
@@ -109,6 +133,7 @@ describe('release badge — the build number, not the build id', () => {
   it('stays unusable rather than rendering a junk number', () => {
     const d = deriveRelease({
       buildId: null,
+      version: null,
       buildNumber: null,
       gitSha: 'unknown',
       gitRef: 'unknown',

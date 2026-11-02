@@ -73,6 +73,8 @@ function makeRepo(withBuildId: boolean): string {
   git(dir, 'init', '-q');
   writeFileSync(join(dir, '.gitignore'), '.next/\nnode_modules/\n');
   writeFileSync(join(dir, 'index.ts'), 'export {};\n');
+  // The stamp copies this version into .next/VERSION (client ask 2026-11-02).
+  writeFileSync(join(dir, 'package.json'), `${JSON.stringify({ name: 'sandbox', version: '1.1.0' })}\n`);
   if (withBuildId) {
     mkdirSync(join(dir, '.next'), { recursive: true });
     writeFileSync(join(dir, '.next', 'BUILD_ID'), 'TESTBUILDID\n');
@@ -152,6 +154,7 @@ describe('stamp-git-sha', () => {
       expect(clean.code).toBe(0);
       expect(count).toMatch(/^\d+$/);
       expect(readNumber()).toBe(count);
+      expect(readFileSync(join(dir, '.next', 'VERSION'), 'utf8').trim()).toBe('1.1.0');
 
       // A dirty tree changes GIT_SHA, never the number: an operator reading
       // `#1` aloud must not also have to remember whether the tree was dirty.
@@ -164,6 +167,39 @@ describe('stamp-git-sha', () => {
       expect(readNumber()).not.toContain('dirty');
     },
   );
+
+  it('leaves .next/VERSION out when the package version is not MAJOR.MINOR.PATCH', () => {
+    const dir = makeRepo(true);
+    expect(stamp(dir).code).toBe(0);
+    rmSync(join(dir, '.next', 'VERSION'));
+
+    writeFileSync(join(dir, 'package.json'), `${JSON.stringify({ name: 'sandbox', version: '1.1' })}\n`);
+    const r = stamp(dir);
+
+    // Still a successful build — the badge falls back to the commit count.
+    expect(r.code).toBe(0);
+    expect(existsSync(join(dir, '.next', 'VERSION'))).toBe(false);
+    expect(r.out).toContain('not MAJOR.MINOR.PATCH');
+  });
+
+  it('keeps the other stamps when package.json is missing, and says only what failed', () => {
+    // Regression (2026-11-02): one shared try/catch made a missing package.json
+    // print "falls back to env GIT_SHA" even though GIT_SHA had just been
+    // written, and skipped the dirty-tree warning while exiting 0.
+    const dir = makeRepo(true);
+    const head = git(dir, 'rev-parse', 'HEAD').trim();
+    rmSync(join(dir, 'package.json'));
+
+    const r = stamp(dir);
+
+    expect(r.code).toBe(0);
+    expect(readStamp(dir)).toBe(`${head}-dirty`);
+    expect(existsSync(join(dir, '.next', 'VERSION'))).toBe(false);
+    expect(r.out).toContain('VERSION not stamped');
+    expect(r.out).not.toContain('falls back to env GIT_SHA');
+    // …and the dirty-tree warning still fires.
+    expect(r.out).toContain('Commit, then rebuild');
+  });
 
   it('refuses to stamp without .next/BUILD_ID (exit 1)', () => {
     const dir = makeRepo(false);

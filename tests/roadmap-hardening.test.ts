@@ -116,6 +116,7 @@ describe('§5 public version endpoint', () => {
     buildIdContents: string | Error,
     gitShaStamp?: string | Error,
     buildNumberContents?: string | Error,
+    versionContents?: string | Error,
   ): Promise<() => Promise<Response>> {
     vi.resetModules();
     vi.doMock('fs/promises', () => ({
@@ -130,6 +131,11 @@ describe('§5 public version endpoint', () => {
           if (buildNumberContents === undefined) throw new Error('ENOENT');
           if (buildNumberContents instanceof Error) throw buildNumberContents;
           return buildNumberContents;
+        }
+        if (path.includes(join('next', 'VERSION'))) {
+          if (versionContents === undefined) throw new Error('ENOENT');
+          if (versionContents instanceof Error) throw versionContents;
+          return versionContents;
         }
         expect(path).toContain(join('next', 'BUILD_ID'));
         if (buildIdContents instanceof Error) throw buildIdContents;
@@ -159,7 +165,7 @@ describe('§5 public version endpoint', () => {
     expect(body['buildId']).toBe('gUxcV6SEGUgIp6nFJf8hR');
     expect(body['gitSha']).toBe('abc1234');
     expect(body['gitRef']).toBe('master');
-    expect(Object.keys(body).sort()).toEqual(['buildId', 'buildNumber', 'gitRef', 'gitSha']);
+    expect(Object.keys(body).sort()).toEqual(['buildId', 'buildNumber', 'gitRef', 'gitSha', 'version']);
     expect(res.headers.get('Cache-Control')).toContain('no-store');
   });
 
@@ -192,8 +198,8 @@ describe('§5 public version endpoint', () => {
     expect(sha).toBe('d05c48ec4756a2d0c9fff4c1a456d3da2ab165ba-dirty');
     expect(sha).not.toBe('2ee2ae7');
     expect(sha?.endsWith('-dirty')).toBe(true);
-    // Response shape is a pinned contract (three keys, no extra field).
-    expect(Object.keys(body).sort()).toEqual(['buildId', 'buildNumber', 'gitRef', 'gitSha']);
+    // Response shape is a pinned contract (five keys, no extra field).
+    expect(Object.keys(body).sort()).toEqual(['buildId', 'buildNumber', 'gitRef', 'gitSha', 'version']);
   });
 
   it('a junk GIT_SHA stamp degrades to the env value instead of shipping nonsense', async () => {
@@ -219,6 +225,23 @@ describe('§5 public version endpoint', () => {
     expect((await versionBody('337\n'))['buildNumber']).toBe(337);
     expect((await versionBody('<html>502 Bad Gateway</html>'))['buildNumber']).toBeNull();
     expect((await versionBody(undefined))['buildNumber']).toBeNull();
+  });
+
+  it('reports the package version, degrading to null when it is not MAJOR.MINOR.PATCH', async () => {
+    // Client ask 2026-11-02: the badge shows "v1.1.0" from package.json
+    // instead of the commit count. Strict shape check like the other stamps —
+    // "1.1", "v1.1.0" and an HTML error page all degrade to null, so a bad
+    // stamp shows the count rather than a version that is not in package.json.
+    const versionOf = async (stamp?: string | Error): Promise<unknown> => {
+      const GET = await loadRoute('gUxcV6SEGUgIp6nFJf8hR', undefined, undefined, stamp);
+      return ((await (await GET()).json()) as Record<string, unknown>)['version'];
+    };
+
+    expect(await versionOf('1.1.0\n')).toBe('1.1.0');
+    expect(await versionOf('1.1\n')).toBeNull();
+    expect(await versionOf('v1.1.0\n')).toBeNull();
+    expect(await versionOf('<html>502 Bad Gateway</html>')).toBeNull();
+    expect(await versionOf(undefined)).toBeNull();
   });
 
   it('degrades to "unknown" instead of failing when no env identity is set', async () => {
