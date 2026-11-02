@@ -187,8 +187,8 @@ File Manager → `httpdocs/extract-check.txt` → two lines: BUILD_ID, then git 
 equal the Step-0 BUILD_ID exactly, the second the `git sha` the script printed. A `-dirty` suffix
 there is correct, not a mismatch — it means the bundle was built from a tree with uncommitted
 changes (`stamp-git-sha.mjs`). A stale artifact is visible here even though its stamps were
-well-formed. (Last recorded live build:
-`s3L0ijro_1BuotgUhnbfv`, git SHA `13bdf58…` — see the deploy log in
+well-formed. (Last recorded live build, 2026-11-02:
+`_pLwStTXORHAxmgMNNnFD`, git SHA `5d6a2d1c…`, v1.1.2 / #367 — see the deploy log in
 [hostatom-live.md](hostatom-live.md) §5; always trust the BUILD_ID the script just printed over
 that line.)
 
