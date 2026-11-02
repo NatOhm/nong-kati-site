@@ -126,9 +126,12 @@ cat <<SUMMARY
 
  2. Plesk → Scheduled Tasks → Run a command → paste → Run Now (don't save):
 
-cd httpdocs && curl -fsSLk -o deploy-bundle.tar.gz $RAW_URL && rm -rf .next && tar -xzf deploy-bundle.tar.gz && rm -f deploy-bundle.tar.gz && touch tmp/restart.txt && echo BUILD_ID_ON_DISK: > extract-check.txt && cat .next/BUILD_ID >> extract-check.txt
+cd httpdocs && rm -rf .next-stage && curl -fsSLk --max-time 180 -o deploy-bundle.tar.gz "$RAW_URL?cb=\$\$" && mkdir -p .next-stage && tar -xzf deploy-bundle.tar.gz -C .next-stage && cat .next-stage/.next/BUILD_ID .next-stage/.next/GIT_SHA | tr '\n' ' ' | grep -Eq '^[A-Za-z0-9_-]{8,} [0-9a-f]{40}(-dirty)? ?\$' && rm -rf .next.old && if test -d .next; then mv .next .next.old; fi && mv .next-stage/.next .next && cp -a .next-stage/. . && rm -rf .next-stage deploy-bundle.tar.gz && cat .next/BUILD_ID .next/GIT_SHA > extract-check.txt && touch tmp/restart.txt
 
- 3. Verify: httpdocs/extract-check.txt == BUILD_ID above
+ 3. Verify: httpdocs/extract-check.txt — line 1 == BUILD_ID above, line 2 == $START_SHA,
+    plus a -dirty suffix when the bundle came from an uncommitted tree (expected, not a
+    mismatch). Line 1 going stale = the CDN served a cached tarball; `.next.old` is the
+    on-disk rollback if the swap itself ever has to be undone.
     Node.js → Run Node.js commands (NOT a Scheduled Task — the task chroot has no node binary
     at all; `find / -name node -type f` returns nothing there):
       · deps changed (package.json)      →  npm ci --omit=dev

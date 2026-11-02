@@ -93,7 +93,7 @@ no CA certs (`curl` needs `-k`), absolute `/var/www/...` paths fail.
 2. Command (one line, chroot-safe):
 
 ```
-cd httpdocs && curl -fsSLk -o deploy-bundle.tar.gz https://raw.githubusercontent.com/NatOhm/nong-kati-site/deploy-artifact/deploy-bundle.tar.gz && rm -rf .next && tar -xzf deploy-bundle.tar.gz && rm -f deploy-bundle.tar.gz && touch tmp/restart.txt && echo BUILD_ID_ON_DISK: > extract-check.txt && cat .next/BUILD_ID >> extract-check.txt
+cd httpdocs && rm -rf .next-stage && curl -fsSLk --max-time 180 -o deploy-bundle.tar.gz https://raw.githubusercontent.com/NatOhm/nong-kati-site/deploy-artifact/deploy-bundle.tar.gz?cb=$$ && mkdir -p .next-stage && tar -xzf deploy-bundle.tar.gz -C .next-stage && cat .next-stage/.next/BUILD_ID .next-stage/.next/GIT_SHA | tr '\n' ' ' | grep -Eq '^[A-Za-z0-9_-]{8,} [0-9a-f]{40}(-dirty)? ?$' && rm -rf .next.old && if test -d .next; then mv .next .next.old; fi && mv .next-stage/.next .next && cp -a .next-stage/. . && rm -rf .next-stage deploy-bundle.tar.gz && cat .next/BUILD_ID .next/GIT_SHA > extract-check.txt && touch tmp/restart.txt
 ```
 
 > **⚠️ The command must contain ZERO double-quote characters.** The runner wraps it in a
@@ -104,12 +104,26 @@ cd httpdocs && curl -fsSLk -o deploy-bundle.tar.gz https://raw.githubusercontent
 > Corollary: never use `curl -w "code=%{http_code}"` here. Put the value in a file instead
 > (`-o head.txt`, or `-w` output appended with a plain `echo`), or drop `-w` entirely.
 
-3. Click **Run Now** (≈6 s). **Do not click OK/Save** — leave the task unsaved so it doesn't fire
+3. Click **Run Now**. **Do not click OK/Save** — leave the task unsaved so it doesn't fire
    on a schedule later. (If your Plesk build insists on saving, delete the task after the run.)
 
-What it does: fresh-download bundle → wipe old `.next` → extract → drop tarball → touch
-`tmp/restart.txt` (Passenger restart signal) → write the on-disk BUILD_ID into
-`httpdocs/extract-check.txt` for verification.
+What it does: download the bundle (180 s timeout) into `.next-stage` — **nothing live is touched
+yet** → verify it carries build stamps (8+ char `BUILD_ID`, 40-hex `GIT_SHA`, a `-dirty` suffix
+allowed because the tar route ships dirty trees); a truncated or foreign tarball fails HERE and
+exits before the swap → move the live `.next` aside to `.next.old`, move the staged one in, copy
+the rest over in place → drop the tarball → write both stamps into `httpdocs/extract-check.txt` →
+touch `tmp/restart.txt` (Passenger restart signal). `VERSION` is deliberately NOT required:
+`stamp-git-sha.mjs` only warns when it cannot stamp one, so demanding it here would block a deploy
+the build itself allows.
+
+> **Why staging (2026-11-02).** The old line deleted the live build before it knew the download was
+> usable: a truncated tar left no `.next` at all, and a stale-but-valid CDN copy silently
+> reinstalled the previous build (1.1.1's first Run Now). `?cb=$$` is the cache-buster — the wrapper
+> expands `$$` to the run's PID, so each run asks a different URL. Swap is last, and `.next.old`
+> stays as the on-disk rollback (`cd httpdocs && rm -rf .next && mv .next.old .next && touch
+> tmp/restart.txt`). The `rm -rf .next.old` stays BEFORE the rename on purpose: `mv .next .next.old`
+> would nest `.next` inside an existing `.next.old`. A refused bundle leaves `.next-stage` and the
+> tarball for inspection; the next Run Now clears both.
 
 ### The nightly task — guarded compare-before-extract (2026-10-27)
 
@@ -129,14 +143,19 @@ cd httpdocs && curl -fsSLk -o deploy-bundle.tar.gz https://raw.githubusercontent
 Design notes — do not "simplify" these away:
 
 - **Two one-liners on purpose.** The Step-2 command above stays UNGUARDED: a human deploy
-  intentionally changes what is live. The guard belongs only on the AUTOMATED task, where
-  "the artifact differs from production" always means something is wrong (a deploy landed
-  without updating the artifact branch, or the branch was force-pushed with something else).
+  intentionally changes what is live. It now verifies the bundle's own stamps, but it still
+  accepts whatever commit the artifact branch holds — only the nightly compares commits. The guard
+  belongs only on the AUTOMATED task, where "the artifact differs from production" always means
+  something is wrong (a deploy landed without updating the artifact branch, or the branch was
+  force-pushed with something else).
 - **No `"` and no `$(...)` in the command.** The Plesk runner wraps it in a double-quoted
   string: an inner `"` truncates it (see the warning above), and a `$(...)` would be expanded
   by the wrapper's shell against the wrong working directory BEFORE the chroot shell runs.
   The comparison is therefore `cmp -s` on the two GIT_SHA files (exit code, no substitution).
-  `cmp` missing from the chroot fails CLOSED — the extract half never runs.
+  `cmp` missing from the chroot fails CLOSED — the extract half never runs. The Step-2 line obeys
+  the same rule: `$$` is the only `$` in it (a cache-buster, not a substitution), and no variable
+  assignment is used there because the wrapper would expand `$NAME` to empty before the chroot
+  shell ever saw it.
 - **Equal → `UP-TO-DATE`, exit 0, `.next` untouched.** Mismatch → `MISMATCH` + both SHAs in
   `httpdocs/nightly-check.txt`, exit 1 so the failure is visible in the task log. A human
   resolves it by running the normal Step-2 deploy, after which the nightly goes green again.
@@ -161,10 +180,14 @@ session time hunting them** — they cannot fire from this scheduler and pose no
 
 ## Step 3 — Verify the extract
 
-File Manager → `httpdocs/extract-check.txt` → content must equal the Step-0 BUILD_ID exactly
-(current live build as of Oct 1, 2026: `s3L0ijro_1BuotgUhnbfv`, git SHA `13bdf58…` — see the deploy
-log in [hostatom-live.md](hostatom-live.md) §5; always trust the BUILD_ID the script just printed
-over this line).
+File Manager → `httpdocs/extract-check.txt` → two lines: BUILD_ID, then git SHA — the first must
+equal the Step-0 BUILD_ID exactly, the second the `git sha` the script printed. A `-dirty` suffix
+there is correct, not a mismatch — it means the bundle was built from a tree with uncommitted
+changes (`stamp-git-sha.mjs`). A stale artifact is visible here even though its stamps were
+well-formed. (Last recorded live build:
+`s3L0ijro_1BuotgUhnbfv`, git SHA `13bdf58…` — see the deploy log in
+[hostatom-live.md](hostatom-live.md) §5; always trust the BUILD_ID the script just printed over
+that line.)
 
 **Only if dependencies changed** also install them (this is the slow one, 5–15 min).
 
