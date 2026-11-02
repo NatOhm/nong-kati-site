@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { readFile } from 'fs/promises';
 import path from 'path';
 
+import { readReleaseVersion } from '@/lib/releaseVersion';
+
 export const dynamic = 'force-dynamic';
 
 /**
@@ -88,24 +90,6 @@ async function readBuildNumber(): Promise<number | null> {
     return null;
   }
 }
-/**
- * The version a person chose (client ask 2026-11-02): stamp-git-sha.mjs copies
- * `package.json`'s version into .next/VERSION, so the badge can show "v1.1.0"
- * instead of a commit count. Strict MAJOR.MINOR.PATCH or nothing — "1.1" or
- * "v1.1.0" would report a release that is not the one in package.json.
- */
-const VERSION_RE = /^\d+\.\d+\.\d+$/;
-
-async function readVersion(): Promise<string | null> {
-  try {
-    const raw = await readFile(path.join(process.cwd(), '.next', 'VERSION'), 'utf8');
-    const trimmed = raw.trim();
-    return VERSION_RE.test(trimmed) ? trimmed : null;
-  } catch {
-    return null;
-  }
-}
-
 export async function GET(): Promise<NextResponse> {
   const buildId = await readBuildId();
 
@@ -119,7 +103,7 @@ export async function GET(): Promise<NextResponse> {
     {
       buildId,
       // MAJOR.MINOR.PATCH from package.json; null until a stamped build ships it.
-      version: await readVersion(),
+      version: await readReleaseVersion(),
       // Monotonic commit count, kept as the fallback reading; null until stamped.
       buildNumber: await readBuildNumber(),
       // Retained fields: same names as before, but 'unknown' rather than a

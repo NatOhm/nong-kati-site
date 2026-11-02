@@ -40,6 +40,7 @@ const prismaMock = vi.hoisted(() => ({
     findMany: vi.fn(async () => []),
     count: vi.fn(async () => 0),
   },
+  $queryRaw: vi.fn(async (): Promise<unknown[]> => [{ ok: 1 }]),
   $queryRawUnsafe: vi.fn(async (_sql?: unknown): Promise<unknown[]> => []),
 }));
 
@@ -376,6 +377,27 @@ describe('§2 email provider idempotency + dead letters', () => {
         metadata: expect.objectContaining({ attempts: 8, toEmail: 'c@test.dev' }),
       }),
     });
+  });
+});
+
+describe('§5 health names the same release as /api/v1/version', () => {
+  it('reports the stamped .next/VERSION instead of a frozen npm_package_version', async () => {
+    // Passenger starts server.js directly, so `npm_package_version` never
+    // exists in production and health answered "0.1.0" (a hard-coded
+    // fallback) while /api/v1/version answered the real release.
+    vi.resetModules();
+    vi.doMock('fs/promises', () => ({ readFile: vi.fn(async () => '1.1.1\n') }));
+    delete process.env['npm_package_version'];
+    try {
+      const { GET } = await import('@/app/api/v1/health/route');
+      const res = await GET();
+      const body = (await res.json()) as { version?: string; status?: string };
+
+      expect(res.status).toBe(200);
+      expect(body.version).toBe('1.1.1');
+    } finally {
+      vi.doUnmock('fs/promises');
+    }
   });
 });
 

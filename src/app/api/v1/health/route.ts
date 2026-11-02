@@ -6,6 +6,7 @@
 
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { readReleaseVersion } from '@/lib/releaseVersion';
 
 // Always re-evaluate: monitoring must see live DB/uptime, not a CDN-cached
 // snapshot (the no-store header alone was not enough on Vercel — the route
@@ -30,7 +31,10 @@ export async function GET(): Promise<NextResponse> {
   const health: HealthStatus = {
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    version: process.env['npm_package_version'] ?? '0.1.0',
+    // The stamped release, not `npm_package_version`: Passenger runs server.js
+    // directly, so that env var only exists under `npm run …` and this field
+    // said "0.1.0" in production while /api/v1/version said the truth.
+    version: (await readReleaseVersion()) ?? 'unknown',
     checks: {
       database: 'ok',
       uptime: process.uptime(),
