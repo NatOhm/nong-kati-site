@@ -188,7 +188,7 @@ equal the Step-0 BUILD_ID exactly, the second the `git sha` the script printed. 
 there is correct, not a mismatch — it means the bundle was built from a tree with uncommitted
 changes (`stamp-git-sha.mjs`). A stale artifact is visible here even though its stamps were
 well-formed. (Last recorded live build, 2026-11-02:
-`46CiMm7RsXYLfD_rc-bNe`, git SHA `a126c25…`, v1.1.3 / #371 — see the deploy log in
+`hBw7TZNRpvt7qoI6MiulS`, git SHA `4e9dcbf…`, v1.1.4 / #373 — see the deploy log in
 [hostatom-live.md](hostatom-live.md) §5; always trust the BUILD_ID the script just printed over
 that line.)
 
