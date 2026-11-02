@@ -42,6 +42,12 @@ export interface OgShareSettings {
   ogTitle: string;
   /** og:description for the homepage link preview. */
   ogDescription: string;
+  /**
+   * Admin-uploaded card artwork (`/api/v1/images/<key>`). When set, the
+   * 1200×630 share image is this picture instead of the drawn clay card;
+   * null = the built-in illustration (identical to before it was editable).
+   */
+  imageUrl: string | null;
 }
 
 /**
@@ -56,9 +62,23 @@ export const DEFAULT_OG_SHARE: OgShareSettings = {
   pill2: 'ส่งโค้ดทันที',
   ogTitle: 'Nong-Kati — แอคดูหนัง ซีรีส์ ส่งถึงอีเมลทันที',
   ogDescription: 'ราคาดี โอนเงินพร้อมส่งสลิปยืนยัน ทีมงานยืนยันแล้วส่งโค้ดถึงอีเมล',
+  imageUrl: null,
 };
 
-const LIMITS: Record<keyof OgShareSettings, number> = {
+/** Only the copy fields go through the length caps. */
+const TEXT_KEYS = [
+  'headingLine1',
+  'headingLine2',
+  'channels',
+  'pill1',
+  'pill2',
+  'ogTitle',
+  'ogDescription',
+] as const;
+
+type TextKey = (typeof TEXT_KEYS)[number];
+
+const LIMITS: Record<TextKey, number> = {
   headingLine1: OG_SHARE_HEADING_MAX,
   headingLine2: OG_SHARE_HEADING_MAX,
   channels: OG_SHARE_CHANNEL_MAX,
@@ -68,7 +88,8 @@ const LIMITS: Record<keyof OgShareSettings, number> = {
   ogDescription: OG_SHARE_META_DESC_MAX,
 };
 
-const KEYS = Object.keys(DEFAULT_OG_SHARE) as (keyof OgShareSettings)[];
+/** Same rule as the mascot: only paths our own upload route produced. */
+const IMAGE_PATH_RE = /^\/api\/v1\/images\/[0-9a-z-]+$/i;
 
 /** Control chars + collapsed whitespace — meta tags and satori only see clean text. */
 function sanitize(raw: string, max: number): string {
@@ -98,12 +119,17 @@ export function parseOgShare(value: string | null | undefined): OgShareSettings 
     unknown
   >;
   const out: OgShareSettings = { ...DEFAULT_OG_SHARE };
-  for (const key of KEYS) {
+  for (const key of TEXT_KEYS) {
     const raw = src[key];
     if (typeof raw !== 'string' || raw.trim() === '') continue;
     const clean = sanitize(raw, LIMITS[key]);
     if (clean !== '') out[key] = clean;
   }
+  // Explicit null clears the upload (back to the drawn card); anything that
+  // is not one of our own image paths is ignored, never stored.
+  const image = src['imageUrl'];
+  if (image === null) out.imageUrl = null;
+  else if (typeof image === 'string' && IMAGE_PATH_RE.test(image)) out.imageUrl = image;
   return out;
 }
 

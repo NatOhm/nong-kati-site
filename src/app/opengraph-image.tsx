@@ -3,6 +3,7 @@ import path from 'node:path';
 import { ImageResponse } from 'next/og';
 
 import { getOgShareSettings } from '@/lib/data';
+import { prisma } from '@/lib/db';
 import { DEFAULT_OG_SHARE } from '@/lib/ogShareSettings';
 
 /**
@@ -241,6 +242,39 @@ export default async function OpengraphImage(): Promise<ImageResponse> {
   // Admin-editable share copy; reader already falls back internally, the
   // .catch keeps the card rendering even if data.ts itself blows up.
   const og = await getOgShareSettings().catch(() => ({ ...DEFAULT_OG_SHARE }));
+
+  // Admin-uploaded card art (ตั้งค่า → รูปแชร์ลิงก์). Read the same SiteSetting
+  // row the public image route serves and inline it as a data URI — satori
+  // cannot resolve a relative URL. Any miss falls through to the drawn card.
+  if (og.imageUrl) {
+    try {
+      const row = await prisma.siteSetting.findUnique({
+        where: { key: `image:${og.imageUrl.slice('/api/v1/images/'.length)}` },
+        select: { value: true },
+      });
+      if (row && /^data:image\/[a-z+]+;base64,[A-Za-z0-9+/=]+$/.test(row.value)) {
+        const art = row.value;
+        return new ImageResponse(
+          (
+            <div style={{ display: 'flex', width: '100%', height: '100%' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element -- next/image cannot render inside ImageResponse */}
+              <img
+                src={art}
+                alt=""
+                width={size.width}
+                height={size.height}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            </div>
+          ),
+          { ...size },
+        );
+      }
+    } catch {
+      // Corrupt/unreadable upload — the drawn card below is still valid.
+    }
+  }
+
   return new ImageResponse(
     (
       <div

@@ -28,7 +28,8 @@ function sameSettings(a: OgShareSettings, b: OgShareSettings): boolean {
     a.pill1 === b.pill1 &&
     a.pill2 === b.pill2 &&
     a.ogTitle === b.ogTitle &&
-    a.ogDescription === b.ogDescription
+    a.ogDescription === b.ogDescription &&
+    a.imageUrl === b.imageUrl
   );
 }
 
