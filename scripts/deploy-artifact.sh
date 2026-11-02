@@ -47,7 +47,7 @@ BUNDLE="deploy-bundle.tar.gz"
   || die "Run from the repo (scripts/ lives in the project root's clone)."
 command -v tar >/dev/null || die "tar not found."
 command -v git >/dev/null || die "git not found."
-git diff --quiet || warn "Working tree has uncommitted changes — the bundle reflects the DISK state, not HEAD. That's fine for deploys, but GIT_SHA below is informational."
+git diff --quiet || warn "Working tree has uncommitted changes — the build stamps <sha>-dirty and the pack guard below will REFUSE it. Commit, then re-run."
 
 START_SHA="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
 
@@ -87,6 +87,23 @@ if [ "$SIZE_BYTES" -gt 62914560 ]; then
 fi
 
 say "Bundle ready: $BUNDLE ($SIZE) · BUILD_ID=$BUILD_ID · git=$START_SHA"
+
+# ── Guard: the packed stamps must name a real commit ────────────────────────
+# Same rule .verify-bundle.ps1 applies to the zip route, read off the tar
+# itself (what actually ships) rather than the disk. A dirty build compiles
+# code that exists in NO commit, so it can be named, rolled back or diffed
+# against production by nothing; a mismatched BUILD_ID means the tar is not
+# the build we just made. Both are cheaper to catch here than on Plesk.
+TAR_BUILD_ID="$(tar -xzOf "$BUNDLE" ./.next/BUILD_ID 2>/dev/null | tr -d '[:space:]')"
+TAR_GIT_SHA="$(tar -xzOf "$BUNDLE" ./.next/GIT_SHA 2>/dev/null | tr -d '[:space:]')"
+[ "$TAR_BUILD_ID" = "$BUILD_ID" ] \
+  || die "Bundle BUILD_ID '$TAR_BUILD_ID' is not the build we just made ('$BUILD_ID') — refit the tar, do not ship it."
+case "$TAR_GIT_SHA" in
+  (*-dirty) die "Bundle was built from an uncommitted working tree ($TAR_GIT_SHA), so it matches NO commit. Commit, then re-run." ;;
+esac
+echo "$TAR_GIT_SHA" | grep -Eq '^[0-9a-f]{40}$' \
+  || die "Bundle GIT_SHA '$TAR_GIT_SHA' is not a 40-hex commit id — stamp-git-sha.mjs did not run."
+say "Stamps verified: BUILD_ID=$TAR_BUILD_ID · git=$TAR_GIT_SHA (clean)"
 
 # ── Step 1: publish as artifact branch ──────────────────────────────────────
 if [ "${DRY_RUN:-0}" = "1" ]; then

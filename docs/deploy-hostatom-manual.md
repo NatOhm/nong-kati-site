@@ -108,8 +108,9 @@ cd httpdocs && rm -rf .next-stage && curl -fsSLk --max-time 180 -o deploy-bundle
    on a schedule later. (If your Plesk build insists on saving, delete the task after the run.)
 
 What it does: download the bundle (180 s timeout) into `.next-stage` — **nothing live is touched
-yet** → verify it carries build stamps (8+ char `BUILD_ID`, 40-hex `GIT_SHA`, a `-dirty` suffix
-allowed because the tar route ships dirty trees); a truncated or foreign tarball fails HERE and
+yet** → verify it carries build stamps (8+ char `BUILD_ID`, 40-hex `GIT_SHA`; `-dirty` is only
+tolerated here as a backstop for a hand-built tar — `scripts/deploy-artifact.sh` refuses a dirty
+bundle before publishing); a truncated or foreign tarball fails HERE and
 exits before the swap → move the live `.next` aside to `.next.old`, move the staged one in, copy
 the rest over in place → drop the tarball → write both stamps into `httpdocs/extract-check.txt` →
 touch `tmp/restart.txt` (Passenger restart signal). `VERSION` is deliberately NOT required:

@@ -13,6 +13,7 @@
  * D4 matches what stamp-git-sha.mjs writes: `<sha>-dirty` is legal, VERSION optional
  * D5 scripts/deploy-artifact.sh prints that same command
  * D6 that printed summary stays literal (unquoted heredoc: a backtick runs)
+ * D7 the pack step refuses a dirty or mismatched bundle before publishing
  */
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -87,5 +88,18 @@ describe('Hostatom deploy one-liner', () => {
     // ran it as a command and killed the handoff on the 1.1.2 dry run.
     const summary = script.slice(script.indexOf('cat <<SUMMARY'), script.lastIndexOf('SUMMARY'));
     expect(summary, 'D6: a backtick in the summary runs as a command').not.toContain('`');
+  });
+
+  it('D7: the pack step refuses a dirty or mismatched bundle', () => {
+    // Same rule .verify-bundle.ps1 enforces for the zip route, read off the
+    // tar. Refusing here (before the push) is the last cheap checkpoint.
+    const guard = script.slice(script.indexOf('TAR_BUILD_ID='), script.indexOf('Pushing bundle'));
+    expect(guard, 'D7: the bundle BUILD_ID is never compared to the build').toContain(
+      'TAR_BUILD_ID" = "$BUILD_ID',
+    );
+    expect(guard, 'D7: a `<sha>-dirty` bundle would ship').toContain('*-dirty');
+    expect(script.indexOf('TAR_GIT_SHA='), 'D7: stamps checked after the push').toBeLessThan(
+      script.indexOf('git push'),
+    );
   });
 });
