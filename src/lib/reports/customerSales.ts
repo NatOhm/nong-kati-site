@@ -14,6 +14,7 @@
  * emails) land verbatim in a file staff will open in Excel/Sheets.
  */
 import { prisma } from '@/lib/db';
+import { bangkokMonthStart } from '@/lib/bangkokTime';
 
 import { maskEmail } from '@/lib/rbac';
 
@@ -57,11 +58,8 @@ export interface CustomerSalesRow {
 export async function aggregateCustomerSales(
   period: 'all' | 'month',
 ): Promise<CustomerSalesRawRow[]> {
-  const since = new Date();
-  if (period === 'month') {
-    since.setDate(1);
-    since.setHours(0, 0, 0, 0);
-  }
+  // Bangkok midnight — the cutoff follows the shop's day, not the host's.
+  const since = bangkokMonthStart();
 
   const orders = await prisma.order.findMany({
     where: {

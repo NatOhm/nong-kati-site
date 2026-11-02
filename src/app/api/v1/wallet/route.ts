@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { getCustomerFromToken } from '@/api/customerAuth';
 import { prisma } from '@/lib/db';
+import { bangkokMonthStart } from '@/lib/bangkokTime';
 
 const COOKIE = 'nk_session';
 
@@ -23,8 +24,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: { code: 'UNAUTHENTICATED' } }, { status: 401 });
   }
 
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthStart = bangkokMonthStart();
 
   const [customer, topups, monthSpendAgg, allTimeSpendAgg] = await Promise.all([
     prisma.customer.findUnique({

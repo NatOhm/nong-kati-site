@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { checkPermission, maskEmail } from '@/lib/rbac';
 import { getAdminToken } from '@/lib/adminRequest';
 import { LOW_STOCK_THRESHOLD } from '@/lib/lowStock';
+import { bangkokDayStart, bangkokMonthStart } from '@/lib/bangkokTime';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,18 +12,6 @@ function bearer(req: NextRequest): string | null {
   const token = getAdminToken(req);
   if (!token) return null;
   return token;
-}
-
-function dayStart(offsetDays = 0): Date {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() - offsetDays);
-  return d;
-}
-
-function monthStart(): Date {
-  const d = new Date();
-  return new Date(d.getFullYear(), d.getMonth(), 1);
 }
 
 /**
@@ -42,9 +31,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: check.error ?? 'FORBIDDEN' }, { status: 403 });
   }
 
-  const today = dayStart(0);
-  const weekAgo = dayStart(6);
-  const month = monthStart();
+  const today = bangkokDayStart(0);
+  const weekAgo = bangkokDayStart(6);
+  const month = bangkokMonthStart();
 
   // Review: revenue figures must exclude pending/failed/expired orders.
   // Same canonical set the customer-sales report uses.
@@ -116,8 +105,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const revenueByDay: { date: string; revenue: number; isToday: boolean }[] = [];
   for (let i = 6; i >= 0; i--) {
-    const start = dayStart(i);
-    const end = dayStart(i - 1);
+    const start = bangkokDayStart(i);
+    const end = bangkokDayStart(i - 1);
     const agg = await prisma.order.aggregate({
       where: { status: 'completed', completedAt: { gte: start, lt: end } },
       _sum: { totalAmountThb: true },
