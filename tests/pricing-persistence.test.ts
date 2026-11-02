@@ -70,6 +70,14 @@ function makeTx(overrides: Record<string, unknown> = {}): TxMock {
     promotion: {
       findMany: vi.fn(async () => []),
     },
+    // Available gift codes per variant — resolveOrderPricing gates on these,
+    // not on the staff-editable stock number. Answer for every id asked about,
+    // so multi-variant fixtures keep asserting pricing rather than stock.
+    giftCode: {
+      groupBy: vi.fn(async (args: { where: { variantId: { in: string[] } } }) =>
+        args.where.variantId.in.map((id) => ({ variantId: id, _count: { _all: 100 } })),
+      ),
+    },
     order: {
       count: vi.fn(async () => 0),
       create: vi.fn(),
@@ -625,6 +633,11 @@ describe('pricing persistence — seven-blocker coverage', () => {
         customer: { findUnique: vi.fn(async () => null) },
         siteSetting: { findUnique: vi.fn(async () => null) },
         promotion: { findMany: vi.fn(async () => []) },
+        giftCode: {
+          groupBy: vi.fn(async (args: { where: { variantId: { in: string[] } } }) =>
+            args.where.variantId.in.map((id) => ({ variantId: id, _count: { _all: 100 } })),
+          ),
+        },
         order: {
           count: vi.fn(async () => 0),
           create: vi.fn(async () => ({
@@ -737,6 +750,11 @@ describe('pricing persistence — seven-blocker coverage', () => {
         customer: { findUnique: vi.fn(async () => null) },
         siteSetting: { findUnique: vi.fn(async () => null) }, // no VAT -> disabled
         promotion: { findMany: vi.fn(async () => []) },
+        giftCode: {
+          groupBy: vi.fn(async (args: { where: { variantId: { in: string[] } } }) =>
+            args.where.variantId.in.map((id) => ({ variantId: id, _count: { _all: 100 } })),
+          ),
+        },
         order: {
           count: vi.fn(async () => 0),
           create: vi.fn(async () => ({

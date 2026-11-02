@@ -90,6 +90,7 @@ describe('OUT_OF_STOCK guard', () => {
             customer: { findUnique: vi.fn(async () => null) },
             siteSetting: { findUnique: vi.fn(async () => null) },
             promotion: { findMany: vi.fn(async () => []) },
+            giftCode: { groupBy: vi.fn(async () => []) },
             order: {
               count: vi.fn(async () => 0),
               create: vi.fn(),
@@ -164,6 +165,9 @@ describe('OUT_OF_STOCK guard', () => {
             customer: { findUnique: vi.fn(async () => null) },
             promotion: { findMany: vi.fn(async () => []) },
             siteSetting: { findUnique: vi.fn(async () => null) },
+            giftCode: {
+              groupBy: vi.fn(async () => [{ variantId: 'v1', _count: { _all: 3 } }]),
+            },
             order: {
               count: vi.fn(async () => 0),
               findMany: vi.fn(async () => []),

@@ -1027,3 +1027,29 @@ production เสิร์ฟ canonical / `og:url` / ทุก `<loc>` ใน si
 - เอา `LOOPBACK` guard ออก → O4 แดง (คืน `http://localhost:4200` ตามที่ production เคยเป็น)
 - เปลี่ยน fallback กลับเป็น `https://nong-kati.vercel.app` → O3 แดง
 - เอา `.replace(/\/+$/, '')` ออก → O2 แดง
+
+---
+
+## ขายได้เท่าที่ส่งมอบได้จริง ไม่ใช่เท่าที่พิมพ์สต็อก (2 พ.ย. 2569) — `tests/sellable-stock.test.ts`
+
+`ProductVariant.stock` เป็นตัวเลขที่แอดมินแก้มือได้ (เติมสต็อก) แต่การส่งมอบอ่าน `GiftCode` ที่มีอยู่จริง — ไม่มีอะไรผูกสองค่านี้ไว้ด้วยกัน เดิม `resolveOrderPricing` เช็คแค่ `stock` ดังนั้นการเติมสต็อกโดยไม่อัปโหลดโค้ดทำให้ขายของที่ส่งไม่ได้: ลูกค้าจ่ายเงิน → fulfilment โยน `INSUFFICIENT_STOCK` → ออเดอร์ไปค้างที่ `pending_manual_fulfilment` ทั้งที่เงินเข้าแล้ว
+
+`resolveOrderPricing` เป็นตัวเดียวที่ทั้ง `previewOrder` และ `createOrderInner` ใช้ จึงกันที่จุดนี้จุดเดียว — จำนวนที่ขายได้ = `sellableStock(stock, codesAvailable)` (`src/lib/stock.ts`)
+
+| ตัว | บังคับว่า |
+|---|---|
+| SS1 | จำนวนที่ขายได้คือค่าที่น้อยกว่าระหว่าง stock กับโค้ดที่ยังว่าง |
+| SS2 | ข้างใดข้างหนึ่งเป็น 0 → ขายได้ 0 |
+| SS3 | ค่าติดลบไม่ทำให้ตัวเลขติดลบ (คืน 0) |
+| SS4 | stock 10 / โค้ด 0 → สร้างออเดอร์ไม่ได้ (`OUT_OF_STOCK`) |
+| SS5 | stock 10 / โค้ด 3 ขอ 4 → ปฏิเสธแม้ stock พอ |
+| SS6 | stock 10 / โค้ด 3 ขอ 3 → ผ่าน |
+| SS7 | โค้ดเยอะแต่ stock น้อย → ยังปฏิเสธ (ของจริงมีทั้งสองด้าน) |
+
+หน้าสินค้าใช้ตัวเลขเดียวกัน: `getProductBySlug` นับ `giftCodes` ที่ available มาด้วย และ `mapProduct` ส่ง `sellableStock` ออกไปเป็น `stock` — badge/จำนวนสูงสุดที่สั่งได้/JSON-LD availability จึงตรงกับที่ resolver จะยอมรับ (query ที่ไม่ดึง `_count` ยังคืน `stock` เดิม)
+
+**พังได้จริง — ทดสอบด้วยการใส่มั๊กกลับ**
+
+- เปลี่ยน guard กลับเป็น `v.stock < qty` → SS4/SS5 แดง
+- ให้ `mapProduct` ส่ง `v.stock` ตรง ๆ (ไม่ผ่าน `sellableStock`) → SS1 แดงที่ระดับ helper
+- ตัด `_count` ออกจาก `getProductBySlug` → หน้าสินค้าโฆษณาสต็อกที่ส่งไม่ได้ (ไม่มีเทสต์ครอบหน้านี้ — กันด้วย SS1–SS7 ที่ resolver)

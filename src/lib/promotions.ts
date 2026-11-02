@@ -26,6 +26,7 @@ import {
   normalizeTier,
   tierPrice,
 } from '@/lib/pricing';
+import { sellableStock } from '@/lib/stock';
 
 /** Immutable VAT configuration. */
 export interface VatConfig {
@@ -718,6 +719,18 @@ export async function resolveOrderPricing(
     v.dealerPrice = v.dealerPrice != null ? Number(v.dealerPrice) : null;
   }
 
+  // Deliverable units, not the staff-editable stock number. `stock` can be
+  // raised by เติมสต็อก without uploading a single code, so checking it alone
+  // let a customer pay for units fulfilment could never send. One grouped
+  // query; this resolver is shared by preview and order creation, so the gate
+  // covers both.
+  const codeCounts = await db.giftCode.groupBy({
+    by: ['variantId'],
+    where: { variantId: { in: variants.map((v) => v.id) }, status: 'available' },
+    _count: { _all: true },
+  });
+  const availableCodes = new Map(codeCounts.map((row) => [row.variantId, row._count._all]));
+
   let tier: 'retail' | 'member' | 'dealer' = 'retail';
   if (input.customerId) {
     const customer = await db.customer.findUnique({
@@ -742,7 +755,7 @@ export async function resolveOrderPricing(
     if (!Number.isInteger(qty) || qty < 1 || qty > 50) {
       throw new Error('INVALID_QUANTITY');
     }
-    if (v.stock < qty) {
+    if (sellableStock(v.stock, availableCodes.get(v.id) ?? 0) < qty) {
       throw new Error('OUT_OF_STOCK');
     }
     const unit = tierPrice(Number(v.price), tier, {

@@ -15,6 +15,7 @@ import {
 import { DEFAULT_OG_SHARE, parseOgShare, type OgShareSettings } from '@/lib/ogShareSettings';
 import { normalizeTier, tierPrice, type PriceTier } from '@/lib/pricing';
 import { getEligiblePromotions } from '@/lib/promotions';
+import { sellableStock } from '@/lib/stock';
 
 // ─── Tier-aware price resolution ──────────────────────
 
@@ -327,7 +328,7 @@ function mapProduct(
         memberPrice: v.memberPrice != null ? Number(v.memberPrice) : null,
         dealerPrice: v.dealerPrice != null ? Number(v.dealerPrice) : null,
       }),
-      stock: v.stock,
+      stock: v._count ? sellableStock(v.stock, v._count.giftCodes) : v.stock,
       isActive: v.isActive,
       sortOrder: v.sortOrder,
     })),
@@ -559,7 +560,14 @@ export async function getProductBySlug(slug: string): Promise<ProductItem | null
     where: { slug, isActive: true },
     include: {
       category: { select: { id: true, name: true, slug: true } },
-      variants: { where: { isActive: true }, orderBy: { sortOrder: 'asc' } },
+      variants: {
+        where: { isActive: true },
+        orderBy: { sortOrder: 'asc' },
+        // Deliverable units, so the stock badge and quantity cap match what
+        // the pricing resolver accepts (a manual restock with no codes must
+        // not advertise stock).
+        include: { _count: { select: { giftCodes: { where: { status: 'available' } } } } },
+      },
       aliases: true,
       tags: { include: { tag: true } },
     },

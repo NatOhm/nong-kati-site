@@ -35,6 +35,10 @@ function pricingDb(
       },
       customer: { findUnique: vi.fn(async () => null) },
       siteSetting: { findUnique: vi.fn(async () => null) },
+      // resolveOrderPricing gates quantities on available gift codes.
+      giftCode: {
+        groupBy: vi.fn(async () => [{ variantId: 'variant-1', _count: { _all: 10 } }]),
+      },
       promotion: {
         findMany: vi.fn(async () => withPromotion ? [{
           id: 'promotion-1', name: 'Sale', description: null,
