@@ -29,6 +29,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       order: { customerId: session.id },
     },
     orderBy: { deliveredAt: 'desc' },
+    // One extra row is the hasMore probe — no second count query. Real
+    // paging only when a customer owning >100 codes needs the older ones.
+    take: 101,
     select: {
       id: true,
       codeEncrypted: true,
@@ -42,8 +45,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     },
   });
 
+  const hasMore = rows.length > 100;
+  const page = hasMore ? rows.slice(0, 100) : rows;
+
   return NextResponse.json({
-    codes: rows.map((row) => ({
+    hasMore,
+    codes: page.map((row) => ({
       id: row.id,
       code: decryptCode(row.codeEncrypted, row.nonce, row.keyVersion),
       product: row.orderItem?.productNameTh ?? '',

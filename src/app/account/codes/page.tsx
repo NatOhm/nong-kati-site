@@ -22,6 +22,7 @@ interface CodeRow {
 
 export default function AccountCodesPage(): React.JSX.Element {
   const [codes, setCodes] = useState<CodeRow[]>([]);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -33,8 +34,9 @@ export default function AccountCodesPage(): React.JSX.Element {
     try {
       const res = await fetch('/api/v1/account/codes', { cache: 'no-store' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = (await res.json()) as { codes: CodeRow[] };
+      const data = (await res.json()) as { codes: CodeRow[]; hasMore?: boolean };
       setCodes(data.codes);
+      setHasMore(data.hasMore === true);
     } catch {
       setError('โหลดโค้ดไม่สำเร็จ กรุณาลองใหม่');
     } finally {
@@ -82,6 +84,13 @@ export default function AccountCodesPage(): React.JSX.Element {
           className="w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-3 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand"
         />
       </div>
+
+      {/* Newest 100 only: say so rather than let older paid-for codes look absent. */}
+      {!loading && hasMore && (
+        <p className="rounded-lg bg-surface-elevated px-3 py-2 text-xs text-fg-muted">
+          แสดง {codes.length} โค้ดล่าสุด — โค้ดที่เก่ากว่านี้ติดต่อทีมงานผ่านหน้าช่วยเหลือ
+        </p>
+      )}
 
       {error && (
         <p className="bg-error rounded-lg px-3 py-2 text-sm text-fg-error dark:bg-coral-900/20 dark:text-coral-300">
