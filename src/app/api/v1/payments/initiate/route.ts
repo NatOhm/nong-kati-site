@@ -4,7 +4,6 @@ import { OmiseAdapter } from '@/lib/payment/omise';
 import { gatewayCircuitBreaker, GatewayUnavailableError } from '@/lib/payment/circuitBreaker';
 import { getOrderById } from '@/api/orders';
 import { prisma } from '@/lib/db';
-import { notifyNewOrder } from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
 
@@ -93,13 +92,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   });
 
   // Discord: new order (fire-and-forget — never blocks checkout).
-  void notifyNewOrder({
-    orderNumber: order.orderNumber,
-    email: order.customerEmail,
-    totalThb: Number(order.totalAmountThb),
-    itemCount: order.items.reduce((n, i) => n + i.quantity, 0),
-    paymentMethod: 'promptpay',
-  });
+  // The "พบการซื้อสินค้า" card now fires once, at order creation
+  // (POST /api/v1/orders) — the event every payment path goes through. Posting
+  // it here too would put two identical cards in the channel for one purchase
+  // whenever a customer opens the QR page.
 
   return NextResponse.json({
     paymentAttemptId: attempt.id,

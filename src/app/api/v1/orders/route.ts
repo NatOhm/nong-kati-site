@@ -7,6 +7,7 @@ import { hasUsableChannel, resolvePaymentChannels } from '@/lib/paymentChannels'
 import { isOpnConfigured } from '@/lib/payment/omise';
 import { prisma } from '@/lib/db';
 import { applyRateLimit, checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { notifyNewOrder } from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
 
@@ -156,6 +157,23 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // FR-144 counts ORDERS, so the quota is consumed only now that one
     // exists (see the pre-check above).
     if (emailKey) await checkRateLimit('_order_velocity_email', emailKey);
+
+    // "Who bought what" — the ops channel card the client reads. It used to
+    // fire from /payments/initiate only, which the manual-transfer checkout
+    // never calls, so production showed the team nothing when someone bought.
+    // Order creation is the one event every payment path shares (promptpay,
+    // slip, wallet), so it is the owner of this notification; /payments/
+    // initiate no longer posts a second card for the same order.
+    void notifyNewOrder({
+      orderNumber: result.order.orderNumber,
+      email: result.order.customerEmail,
+      totalThb: result.order.totalAmountThb,
+      itemCount: result.order.items.reduce((n, i) => n + i.quantity, 0),
+      // The order's own fields: the card may not name a channel or a state
+      // the order does not have.
+      status: result.order.status,
+      paymentMethod: result.order.paymentMethod,
+    });
 
     return NextResponse.json(result, { status: 201 });
   } catch (err) {

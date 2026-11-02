@@ -14,12 +14,25 @@ import { NextRequest } from 'next/server';
 
 import { POST } from '@/app/api/v1/orders/route';
 
+const notifyMock = vi.hoisted(() => ({ notifyNewOrder: vi.fn(async () => undefined) }));
+vi.mock('@/lib/notify', () => notifyMock);
+
 vi.mock('@/api/orders', () => ({
-  createOrder: vi.fn(async (input: { items?: unknown[] }) => {
+  createOrder: vi.fn(async (input: { items?: unknown[]; customerEmail?: string }) => {
     // A request with no items fails validation exactly like a real
     // malformed body — no order row, HTTP 400 from orderErrorStatus.
     if (!input.items?.length) throw new Error('INVALID_ITEMS');
-    return { order: { id: 'ord-vel' } };
+    return {
+      order: {
+        id: 'ord-vel',
+        orderNumber: 'NK-2026-VEL1',
+        customerEmail: input.customerEmail,
+        totalAmountThb: 250,
+        items: [{ quantity: 1 }],
+        status: 'pending_payment',
+        paymentMethod: 'promptpay',
+      },
+    };
   }),
   orderErrorStatus: () => 400,
 }));
@@ -104,6 +117,25 @@ describe('order velocity caps (FR-144 / FR-145)', () => {
     expect(blocked.status).toBe(429);
     const payload = await blocked.json();
     expect(payload.error.code).toBe('RATE_LIMIT_EXCEEDED');
+  });
+
+  it('posts the “พบการซื้อสินค้า” card with the buyer email at order creation', async () => {
+    // Client ask 2026-11-01: the Discord card must say WHO bought. Only
+    // /payments/initiate used to send it, and the manual-transfer checkout
+    // never calls that route — so the channel saw nothing at all.
+    notifyMock.notifyNewOrder.mockClear();
+    const res = await POST(goodReq(`buy-${RUN}@example.test`, '203.0.118.7'));
+
+    expect(res.status).toBe(201);
+    expect(notifyMock.notifyNewOrder).toHaveBeenCalledTimes(1);
+    expect(notifyMock.notifyNewOrder).toHaveBeenCalledWith({
+      orderNumber: 'NK-2026-VEL1',
+      email: `buy-${RUN}@example.test`,
+      totalThb: 250,
+      itemCount: 1,
+      status: 'pending_payment',
+      paymentMethod: 'promptpay',
+    });
   });
 
   it('leaves a normal checkout flow unaffected', async () => {

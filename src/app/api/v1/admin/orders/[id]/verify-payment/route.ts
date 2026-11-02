@@ -363,6 +363,7 @@ export async function POST(
   void notifyPaymentConfirmed({
     orderNumber: claimed.orderNumber,
     totalThb: Number(claimed.totalAmountThb),
+    customerEmail: claimed.customerEmail,
   });
 
   const variantIds = [...new Set(claimed.items.map((i: { variantId: string }) => i.variantId))];

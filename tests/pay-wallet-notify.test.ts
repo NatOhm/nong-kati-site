@@ -57,6 +57,7 @@ const ORDER = {
   status: 'pending_payment',
   totalAmountThb: '250',
   orderNumber: 'NK-2026-WAL1',
+  customerEmail: 'buyer@example.test',
 };
 
 let route: Record<string, unknown>;
@@ -113,9 +114,11 @@ describe('A. pay-wallet notification wiring', () => {
     expect(res.status).toBe(200);
     expect(((await res.json()) as { success?: boolean }).success).toBe(true);
     expect(notifyMock.notifyPaymentConfirmed).toHaveBeenCalledTimes(1);
+    // The ops channel must name the buyer (client ask 2026-11-01).
     expect(notifyMock.notifyPaymentConfirmed).toHaveBeenCalledWith({
       orderNumber: ORDER.orderNumber,
       totalThb: 250,
+      customerEmail: ORDER.customerEmail,
     });
     expect(notifyMock.notifyStockAlertsForVariants).toHaveBeenCalledTimes(1);
     // Detached line (null variantId) filtered — the helper takes real ids only.
@@ -217,10 +220,84 @@ describe('B. embed titles — old Torishop wording (real notify, stubbed fetch)'
         email: 'buyer@example.test',
         totalThb: 250,
         itemCount: 1,
+        status: 'pending_payment',
         paymentMethod: 'promptpay',
       }),
     );
     expect(title).toBe('🛒 พบการซื้อสินค้า: NK-2026-T1');
+  });
+
+  it('names the order’s own channel and status, never a default', async () => {
+    // Regression (2026-11-02): the card hard-coded "พร้อมเพย์ · รอชำระเงิน",
+    // so a wallet order whose code had already been delivered still read as an
+    // unpaid PromptPay order.
+    const { notifyNewOrder } = await realNotify();
+    process.env['NK_DISCORD_WEBHOOK_URL'] = 'https://discord.com/api/webhooks/123/tok';
+    const fetchMock = stubFetch();
+
+    await notifyNewOrder({
+      orderNumber: 'NK-2026-T2',
+      email: 'buyer@example.test',
+      totalThb: 250,
+      itemCount: 1,
+      status: 'code_delivered',
+      paymentMethod: 'wallet',
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(String(init.body)) as {
+      embeds: Array<{ fields: Array<{ name: string; value: string }> }>;
+    };
+    const field = (name: string): string | undefined =>
+      body.embeds[0]?.fields.find((f) => f.name === name)?.value;
+
+    expect(field('ช่องทางชำระเงิน')).toBe('เงินในกระเป๋า');
+    expect(field('สถานะ')).toBe('ส่งโค้ดสำเร็จ');
+  });
+
+  it('keeps Thai channel copy on the card (พร้อมเพย์), not the admin brand label', async () => {
+    const { notifyNewOrder } = await realNotify();
+    process.env['NK_DISCORD_WEBHOOK_URL'] = 'https://discord.com/api/webhooks/123/tok';
+    const fetchMock = stubFetch();
+
+    await notifyNewOrder({
+      orderNumber: 'NK-2026-T4',
+      email: 'buyer@example.test',
+      totalThb: 250,
+      itemCount: 1,
+      status: 'pending_payment',
+      paymentMethod: 'promptpay',
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(String(init.body)) as {
+      embeds: Array<{ fields: Array<{ name: string; value: string }> }>;
+    };
+    const channel = body.embeds[0]?.fields.find((f) => f.name === 'ช่องทางชำระเงิน')?.value;
+
+    expect(channel).toBe('พร้อมเพย์');
+    expect(channel).not.toBe('PromptPay');
+  });
+
+  it('renders an em dash rather than inventing a channel while none is chosen', async () => {
+    const { notifyNewOrder } = await realNotify();
+    process.env['NK_DISCORD_WEBHOOK_URL'] = 'https://discord.com/api/webhooks/123/tok';
+    const fetchMock = stubFetch();
+
+    await notifyNewOrder({
+      orderNumber: 'NK-2026-T3',
+      email: 'buyer@example.test',
+      totalThb: 250,
+      itemCount: 1,
+      status: 'pending_payment',
+      paymentMethod: null,
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(String(init.body)) as {
+      embeds: Array<{ fields: Array<{ name: string; value: string }> }>;
+    };
+    expect(body.embeds[0]?.fields.find((f) => f.name === 'ช่องทางชำระเงิน')?.value).toBe('—');
   });
 
   it('notifyStockOutOf carries “สินค้าหมดแล้ว”', async () => {

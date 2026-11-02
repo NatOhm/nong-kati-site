@@ -9,6 +9,8 @@
  */
 
 import { prisma } from '@/lib/db';
+import { orderStatusLabel } from '@/lib/orderStatus';
+import { paymentMethodLabel } from '@/lib/paymentMethods';
 
 const SETTING_KEY = 'notifications';
 
@@ -135,23 +137,51 @@ export async function sendTestDiscordMessage(): Promise<DiscordTestResult> {
   }
 }
 
+/**
+ * Ops-only webhook: buyer emails appear here in clear on purpose (client ask
+ * 2026-10-27 — "who bought"). The admin API masks them for roles without
+ * `orders:read:full`; this channel is the privileged surface instead.
+ *
+ * `status` and `paymentMethod` are the ORDER's own fields, required and with
+ * no defaults: a card that names a channel or a state the order does not have
+ * is worse than no card, and an earlier version posted "พร้อมเพย์ · รอชำระเงิน"
+ * for orders created by other paths.
+ */
+/**
+ * The Discord card is Thai copy: the shared admin map names the brand
+ * "PromptPay", which reads as English on this channel. Only the entries that
+ * differ live here — everything else falls through to paymentMethodLabel.
+ */
+const CARD_CHANNEL_TH: Record<string, string> = { promptpay: 'พร้อมเพย์' };
+
 export async function notifyNewOrder(params: {
   orderNumber: string;
   email: string;
   totalThb: number;
   itemCount: number;
-  paymentMethod: string;
+  status: string;
+  /** null until a channel is chosen — rendered as an em dash, not a guess. */
+  paymentMethod: string | null;
 }): Promise<void> {
   await sendDiscordEmbed([
     {
       // "พบการซื้อสินค้า" — the exact status name the old Torishop bot used
-      // in #เว็บ (client alignment, 2026-10-27); was "ออเดอร์ใหม่".
+      // in #เว็บ (client alignment, 2026-10-27); was "ออเดอร์ใหม่". It fires on
+      // order creation, so the status field states what this card is NOT:
+      // ✅ การชำระเงินสำเร็จ is the one that means the money landed.
       title: `🛒 พบการซื้อสินค้า: ${params.orderNumber}`,
       color: COLORS.INFO,
       fields: [
         { name: 'ยอดรวม', value: `฿${params.totalThb.toLocaleString('th-TH')}`, inline: true },
         { name: 'จำนวนรายการ', value: String(params.itemCount), inline: true },
-        { name: 'ช่องทางชำระเงิน', value: params.paymentMethod === 'promptpay' ? 'พร้อมเพย์' : params.paymentMethod, inline: true },
+        {
+          name: 'ช่องทางชำระเงิน',
+          value: params.paymentMethod
+            ? (CARD_CHANNEL_TH[params.paymentMethod] ?? paymentMethodLabel(params.paymentMethod))
+            : '—',
+          inline: true,
+        },
+        { name: 'สถานะ', value: orderStatusLabel(params.status), inline: true },
         { name: 'ลูกค้า', value: params.email, inline: false },
       ],
       footer: { text: 'Nong-Kati — ระบบอัตโนมัติ' },

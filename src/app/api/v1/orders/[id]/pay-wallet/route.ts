@@ -90,6 +90,7 @@ export async function POST(
           status: true,
           totalAmountThb: true,
           orderNumber: true,
+          customerEmail: true,
         },
       });
       if (!order || order.customerId !== session.id) {
@@ -141,7 +142,12 @@ export async function POST(
         data: { paymentMethod: 'wallet' },
       });
 
-      return { code: 'OK' as const, orderNumber: order.orderNumber, total };
+      return {
+        code: 'OK' as const,
+        orderNumber: order.orderNumber,
+        customerEmail: order.customerEmail,
+        total,
+      };
     });
 
     if (result.code === 'ORDER_NOT_FOUND') {
@@ -171,6 +177,7 @@ export async function POST(
       void notifyPaymentConfirmed({
         orderNumber: result.orderNumber,
         totalThb: result.total,
+        customerEmail: result.customerEmail,
       });
       const soldVariantRows = await prisma.orderItem.findMany({
         where: { orderId: id },

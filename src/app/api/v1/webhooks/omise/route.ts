@@ -191,6 +191,7 @@ async function handleChargeSucceeded(chargeId: string, gatewayAmount: number): P
     void notifyPaymentConfirmed({
       orderNumber: claimed.orderNumber,
       totalThb: Number(claimed.totalAmountThb),
+      customerEmail: claimed.customerEmail,
     });
     const variantIds = [...new Set(claimed.items.map((i: { variantId: string }) => i.variantId))];
     // Post-fulfilment stock policy lives in notifyStockAlertsForVariants
