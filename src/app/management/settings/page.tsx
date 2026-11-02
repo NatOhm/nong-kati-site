@@ -35,6 +35,7 @@ import { AdminShell } from '@/components/layout/AdminShell';
 import { adminFetch, clearAdminSession } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
 import type { SmtpProbeResult } from '@/lib/email/smtpProbe';
+import { safeJson } from '@/lib/json';
 
 /** A tab's save implementation, registered with the page so the header
  *  button can trigger the active tab's real save. */
@@ -199,7 +200,7 @@ function AnnouncementSettings({
     let cancelled = false;
     adminFetch('/api/v1/admin/announcement')
       .then(async (r) => {
-        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? `HTTP ${r.status}`);
+        if (!r.ok) throw new Error((await safeJson<{ error?: string }>(r)).error ?? `HTTP ${r.status}`);
         return r.json() as Promise<AnnouncementContent>;
       })
       .then((data) => {
@@ -231,7 +232,7 @@ function AnnouncementSettings({
       body: JSON.stringify({ message: m.trim(), href: h.trim() || null, enabled: en }),
     });
     if (!res.ok) {
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      const data = await safeJson<{ error?: string }>(res);
       throw new Error(data.error ?? `HTTP ${res.status}`);
     }
   }
@@ -367,7 +368,7 @@ function AppearanceSettings({
     let cancelled = false;
     adminFetch('/api/v1/admin/settings/appearance')
       .then(async (r) => {
-        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? `HTTP ${r.status}`);
+        if (!r.ok) throw new Error((await safeJson<{ error?: string }>(r)).error ?? `HTTP ${r.status}`);
         return r.json() as Promise<{
           accent?: string | null;
           speed?: string;
@@ -403,7 +404,7 @@ function AppearanceSettings({
       body: JSON.stringify({ accent: a, speed: s }),
     });
     if (!res.ok) {
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      const data = await safeJson<{ error?: string }>(res);
       throw new Error(data.error ?? `HTTP ${res.status}`);
     }
   }
@@ -438,7 +439,7 @@ function AppearanceSettings({
       body: JSON.stringify({ accent: a, speed: s, mascotUrl: url }),
     });
     if (!res.ok) {
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      const data = await safeJson<{ error?: string }>(res);
       throw new Error(data.error ?? `HTTP ${res.status}`);
     }
   }
@@ -459,7 +460,7 @@ function AppearanceSettings({
         body: JSON.stringify({ dataUrl, filename: file.name }),
       });
       if (!up.ok) {
-        const data = (await up.json().catch(() => ({}))) as { error?: string; message?: string };
+        const data = await safeJson<{ error?: string; message?: string }>(up);
         throw new Error(data.message ?? data.error ?? `HTTP ${up.status}`);
       }
       const { path } = (await up.json()) as { path: string };
@@ -576,8 +577,8 @@ function AppearanceSettings({
               <div className="min-w-0 flex-1 space-y-2">
                 <p className="text-xs text-fg-placeholder">
                   {mascotUrl
-                    ? 'ใช้รูปที่อัปโหลดแล้ว — แสดงแทนแฮมสเตอร์ทุกจุด (หน้าแรก, ตะกร้า, ชำระเงิน, toast)'
-                    : 'ยังใช้แฮมสเตอร์ตัวเดิม — อัปโหลดรูป PNG/JPG/WebP/GIF (สูงสุด 5MB) เพื่อเปลี่ยน'}
+                    ? 'ใช้รูปที่อัปโหลดแล้ว — โลโก้บนแถบเมนูและแฮมสเตอร์ทุกจุด (หน้าแรก, ตะกร้า, ชำระเงิน, toast)'
+                    : 'ยังใช้แฮมสเตอร์ตัวเดิม — อัปโหลดรูป PNG/JPG/WebP/GIF (สูงสุด 5MB) เพื่อเปลี่ยนโลโก้และมาสคอต'}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <button
@@ -700,7 +701,7 @@ function StoreSettings({
     let cancelled = false;
     adminFetch('/api/v1/admin/settings/store-info')
       .then(async (r) => {
-        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? `HTTP ${r.status}`);
+        if (!r.ok) throw new Error((await safeJson<{ error?: string }>(r)).error ?? `HTTP ${r.status}`);
         return r.json() as Promise<Partial<StoreInfoForm>>;
       })
       .then((data) => {
@@ -742,7 +743,7 @@ function StoreSettings({
       body: JSON.stringify(formRef.current),
     });
     if (!res.ok) {
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      const data = await safeJson<{ error?: string }>(res);
       throw new Error(data.error ?? `HTTP ${res.status}`);
     }
   }
@@ -881,7 +882,7 @@ function VatSettings({
     let cancelled = false;
     adminFetch('/api/v1/admin/settings/vat')
       .then(async (r) => {
-        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? `HTTP ${r.status}`);
+        if (!r.ok) throw new Error((await safeJson<{ error?: string }>(r)).error ?? `HTTP ${r.status}`);
         return r.json() as Promise<{ enabled: boolean; rate: number }>;
       })
       .then((data) => {
@@ -912,7 +913,7 @@ function VatSettings({
       body: JSON.stringify({ enabled: e, rate: Number(r) }),
     });
     if (!res.ok) {
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      const data = await safeJson<{ error?: string }>(res);
       throw new Error(data.error ?? `HTTP ${res.status}`);
     }
   }
@@ -1086,7 +1087,7 @@ function ManualTransferSettings(): React.JSX.Element {
         body: JSON.stringify({ dataUrl, filename: file.name }),
       });
       if (!up.ok) {
-        const data = (await up.json().catch(() => ({}))) as { error?: string; message?: string };
+        const data = await safeJson<{ error?: string; message?: string }>(up);
         throw new Error(data.message ?? data.error ?? `HTTP ${up.status}`);
       }
       const { path } = (await up.json()) as { path: string };
@@ -1104,7 +1105,7 @@ function ManualTransferSettings(): React.JSX.Element {
     let cancelled = false;
     adminFetch('/api/v1/admin/settings/manual-transfer')
       .then(async (r) => {
-        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? `HTTP ${r.status}`);
+        if (!r.ok) throw new Error((await safeJson<{ error?: string }>(r)).error ?? `HTTP ${r.status}`);
         return r.json() as Promise<Partial<ManualTransferForm>>;
       })
       .then((data) => {
@@ -1148,7 +1149,7 @@ function ManualTransferSettings(): React.JSX.Element {
         }),
       });
       if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        const data = await safeJson<{ error?: string }>(res);
         throw new Error(
           data.error === 'INVALID_QR_IMAGE_URL'
             ? 'พาธรูป QR ไม่ถูกต้อง — ต้องเป็นไฟล์ที่อัปโหลดผ่านระบบเท่านั้น'
@@ -1358,7 +1359,7 @@ function Slip2GoProbeCard(): React.JSX.Element {
         headers: { 'Content-Type': 'application/json' },
         body: '{}',
       });
-      const data = (await res.json().catch(() => ({}))) as {
+      const data = await safeJson<{
         ok?: boolean;
         code?: string;
         detail?: string;
@@ -1371,7 +1372,7 @@ function Slip2GoProbeCard(): React.JSX.Element {
           tokenLimit?: number | null;
           creditRemaining?: number | null;
         };
-      };
+      }>(res);
       if (!res.ok) {
         setResult({ ok: false, message: 'ตรวจสอบไม่สำเร็จ — ลองใหม่อีกครั้ง' });
         return;
@@ -1552,7 +1553,7 @@ function PaymentSettings({
         }),
       });
       if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        const data = await safeJson<{ error?: string }>(res);
         throw new Error(
           data.error === 'INVALID_PROMPTPAY_ID'
             ? 'PromptPay ID ต้องเป็นตัวเลข 13 หลัก'
@@ -1717,8 +1718,9 @@ interface EmailSettingsData {
   smtpPort?: number;
   smtpUser?: string | null;
   smtpPasswordEnv?: string | null;
-  fromName?: string | null;
-  fromEmail?: string | null;
+  /** Read-only: the From header the mailer actually sends with. */
+  liveSender?: string | null;
+  emailConfigured?: boolean;
   emailTemplates?: Partial<
     Record<'order_confirm' | 'code_delivery' | 'low_stock' | 'invoice', boolean>
   >;
@@ -1744,8 +1746,8 @@ function EmailSettings({
   const [smtpPort, setSmtpPort] = useState('587');
   const [smtpUser, setSmtpUser] = useState('');
   const [smtpPasswordEnv, setSmtpPasswordEnv] = useState('');
-  const [fromName, setFromName] = useState('');
-  const [fromEmail, setFromEmail] = useState('');
+  const [liveSender, setLiveSender] = useState<string | null>(null);
+  const [emailConfigured, setEmailConfigured] = useState(false);
   const [templates, setTemplates] = useState<Record<string, boolean>>({
     order_confirm: true,
     code_delivery: true,
@@ -1767,8 +1769,8 @@ function EmailSettings({
         setSmtpPort(String(data.smtpPort ?? 587));
         setSmtpUser(data.smtpUser ?? '');
         setSmtpPasswordEnv(data.smtpPasswordEnv ?? '');
-        setFromName(data.fromName ?? '');
-        setFromEmail(data.fromEmail ?? '');
+        setLiveSender(data.liveSender ?? null);
+        setEmailConfigured(Boolean(data.emailConfigured));
         setTemplates((t) => ({ ...t, ...(data.emailTemplates ?? {}) }));
       })
       .catch(() => {})
@@ -1785,8 +1787,6 @@ function EmailSettings({
     smtpPort,
     smtpUser,
     smtpPasswordEnv,
-    fromName,
-    fromEmail,
     templates,
   });
   valuesRef.current = {
@@ -1794,8 +1794,6 @@ function EmailSettings({
     smtpPort,
     smtpUser,
     smtpPasswordEnv,
-    fromName,
-    fromEmail,
     templates,
   };
 
@@ -1812,19 +1810,15 @@ function EmailSettings({
           smtpPort: Number(v.smtpPort) || 0,
           smtpUser: v.smtpUser.trim() === '' ? null : v.smtpUser.trim(),
           smtpPasswordEnv: v.smtpPasswordEnv.trim(),
-          fromName: v.fromName.trim() === '' ? null : v.fromName.trim(),
-          fromEmail: v.fromEmail.trim() === '' ? null : v.fromEmail.trim(),
           emailTemplates: v.templates,
         }),
       });
       if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        const data = await safeJson<{ error?: string }>(res);
         throw new Error(
           data.error === 'INVALID_SMTP_PORT'
             ? 'SMTP Port ต้องเป็นตัวเลข 1-65535'
-            : data.error === 'INVALID_FROM_EMAIL'
-              ? 'รูปแบบอีเมลผู้ส่งไม่ถูกต้อง'
-              : data.error === 'INVALID_ENV_VAR_NAME'
+            : data.error === 'INVALID_ENV_VAR_NAME'
                 ? 'ชื่อ environment variable ต้องเป็น A-Z ตัวใหญ่ ตัวเลข และ _ เท่านั้น'
                 : 'บันทึกไม่สำเร็จ',
         );
@@ -1866,7 +1860,7 @@ function EmailSettings({
           smtpPasswordEnv: smtpPasswordEnv.trim() || undefined,
         }),
       });
-      const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      const data = await safeJson<Record<string, unknown>>(res);
       if (!res.ok) {
         setTestError(
           data['error'] === 'SMTP_NOT_CONFIGURED'
@@ -1932,22 +1926,30 @@ function EmailSettings({
           รหัสผ่าน SMTP ไม่ถูกเก็บในฐานข้อมูล — ระบบอ่านจาก environment variable ที่ระบุชื่อไว้
         </p>
       </Field>
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="ชื่อผู้ส่ง (From Name)">
-          <input
-            value={fromName}
-            onChange={(e) => setFromName(e.target.value)}
-            className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
-          />
-        </Field>
-        <Field label="อีเมลผู้ส่ง (From Email)">
-          <input
-            value={fromEmail}
-            onChange={(e) => setFromEmail(e.target.value)}
-            placeholder="noreply@nong-kati.co.th"
-            className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
-          />
-        </Field>
+      <div className="rounded-lg border border-line-subtle bg-surface p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-semibold text-fg-secondary">ผู้ส่งจริง (From)</h3>
+            <p className="mt-0.5 text-xs text-clay-400">
+              ค่านี้อ่านจาก environment variable <code className="font-mono">NK_RESEND_FROM_EMAIL</code> —
+              แก้ที่ Infisical แล้ว restart แอป ไม่ใช่ที่หน้านี้
+            </p>
+          </div>
+          <span
+            className={cn(
+              'flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold',
+              emailConfigured
+                ? 'bg-success-500/10 text-fg-success'
+                : 'bg-coral-500/10 text-fg-error',
+            )}
+          >
+            {emailConfigured ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />}
+            {emailConfigured ? 'พร้อมส่งอีเมล' : 'ยังไม่พร้อมส่ง'}
+          </span>
+        </div>
+        <p className="mt-3 rounded-md bg-surface-sunken px-3 py-2 font-mono text-sm text-fg">
+          {liveSender ?? 'NK_RESEND_FROM_EMAIL ยังไม่ได้ตั้งค่า'}
+        </p>
       </div>
 
       <div className="rounded-lg border border-line-subtle bg-surface p-4">
@@ -2154,7 +2156,7 @@ function SecuritySettings({
         }),
       });
       if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        const data = await safeJson<{ error?: string }>(res);
         throw new Error(
           data.error === 'INVALID_LOCKOUT_ATTEMPTS'
             ? 'จำนวนครั้งก่อนล็อกต้องเป็น 3-10'
@@ -2358,7 +2360,7 @@ function NotificationSettings({
         }),
       });
       if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        const data = await safeJson<{ error?: string }>(res);
         throw new Error(
           data.error === 'INVALID_THRESHOLD'
               ? 'ค่าเตือนสต๊อกต้องเป็นตัวเลข 0-1000'
@@ -2387,11 +2389,11 @@ function NotificationSettings({
         headers: { 'Content-Type': 'application/json' },
         body: '{}',
       });
-      const data = (await res.json().catch(() => ({}))) as {
+      const data = await safeJson<{
         ok?: boolean;
         error?: string;
         status?: number;
-      };
+      }>(res);
       if (!res.ok) {
         setTestResult({ ok: false, message: 'ทดสอบไม่สำเร็จ — ลองใหม่อีกครั้ง' });
         return;
@@ -2525,10 +2527,10 @@ function ChangePassword(): React.JSX.Element {
       body: JSON.stringify({ currentPassword: current, newPassword: next }),
     })
       .then(async (res) => {
-        const data = (await res.json().catch(() => ({}))) as {
+        const data = await safeJson<{
           success?: boolean;
           error?: string;
-        };
+        }>(res);
         if (!res.ok || !data.success) {
           setError(
             data.error === 'CURRENT_PASSWORD_INCORRECT'
@@ -2724,7 +2726,7 @@ function BannerSettings(): React.JSX.Element {
     try {
       const res = await adminFetch('/api/v1/admin/hero-slides');
       if (!res.ok)
-        throw new Error((await res.json().catch(() => ({}))).error ?? `HTTP ${res.status}`);
+        throw new Error((await safeJson<{ error?: string }>(res)).error ?? `HTTP ${res.status}`);
       const data = (await res.json()) as { slides: AdminHeroSlide[] };
       setSlides(data.slides);
       setError(null);
@@ -2748,7 +2750,7 @@ function BannerSettings(): React.JSX.Element {
         body: JSON.stringify(data),
       });
       if (!res.ok)
-        throw new Error((await res.json().catch(() => ({}))).error ?? `HTTP ${res.status}`);
+        throw new Error((await safeJson<{ error?: string }>(res)).error ?? `HTTP ${res.status}`);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
@@ -2763,7 +2765,7 @@ function BannerSettings(): React.JSX.Element {
     try {
       const res = await adminFetch(`/api/v1/admin/hero-slides/${id}`, { method: 'DELETE' });
       if (!res.ok)
-        throw new Error((await res.json().catch(() => ({}))).error ?? `HTTP ${res.status}`);
+        throw new Error((await safeJson<{ error?: string }>(res)).error ?? `HTTP ${res.status}`);
       setSlides((s) => s.filter((x) => x.id !== id));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'ลบไม่สำเร็จ');
@@ -2789,7 +2791,7 @@ function BannerSettings(): React.JSX.Element {
         body: JSON.stringify({ label: label.trim(), sortOrder: slides.length }),
       });
       if (!res.ok)
-        throw new Error((await res.json().catch(() => ({}))).error ?? `HTTP ${res.status}`);
+        throw new Error((await safeJson<{ error?: string }>(res)).error ?? `HTTP ${res.status}`);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'เพิ่มสไลด์ไม่สำเร็จ');
@@ -2812,7 +2814,7 @@ function BannerSettings(): React.JSX.Element {
         body: JSON.stringify({ dataUrl, filename: file.name }),
       });
       if (!up.ok) {
-        const data = (await up.json().catch(() => ({}))) as { error?: string; message?: string };
+        const data = await safeJson<{ error?: string; message?: string }>(up);
         throw new Error(data.message ?? data.error ?? `HTTP ${up.status}`);
       }
       const { path } = (await up.json()) as { path: string };
@@ -2826,7 +2828,7 @@ function BannerSettings(): React.JSX.Element {
         }),
       });
       if (!res.ok)
-        throw new Error((await res.json().catch(() => ({}))).error ?? `HTTP ${res.status}`);
+        throw new Error((await safeJson<{ error?: string }>(res)).error ?? `HTTP ${res.status}`);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'เพิ่มสไลด์ไม่สำเร็จ');
@@ -2855,7 +2857,7 @@ function BannerSettings(): React.JSX.Element {
         body: JSON.stringify({ dataUrl, filename: file.name }),
       });
       if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
+        const data = await safeJson<{ error?: string; message?: string }>(res);
         throw new Error(data.message ?? data.error ?? `HTTP ${res.status}`);
       }
       const { path } = (await res.json()) as { path: string };

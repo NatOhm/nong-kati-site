@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db';
 import { checkPermission } from '@/lib/rbac';
 import { getAdminToken } from '@/lib/adminRequest';
 import { writeAuditLog } from '@/lib/auditLog';
+import { emailSender, isEmailDeliveryConfigured } from '@/lib/email/config';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,6 +21,17 @@ const VALID_KEYS = new Set([
   'email',
   'security',
 ]);
+
+/**
+ * Read-only truth for the email screen: the sender the mailer ACTUALLY uses
+ * and whether delivery is wired at all. The transport config lives in the
+ * environment (Infisical → server.js), so this is displayed, never edited —
+ * the dashboard used to offer a `fromEmail` field that nothing read back
+ * (audit finding 2, 2026-10-31).
+ */
+function emailLiveFields(): Record<string, unknown> {
+  return { liveSender: emailSender(), emailConfigured: isEmailDeliveryConfigured() };
+}
 
 function bearer(req: NextRequest): string | null {
   const token = getAdminToken(req);
@@ -49,7 +61,9 @@ export async function GET(
     return NextResponse.json(
       key === 'notifications'
         ? { discordConfigured: Boolean(process.env['NK_DISCORD_WEBHOOK_URL']) }
-        : {},
+        : key === 'email'
+          ? emailLiveFields()
+          : {},
       { status: 200 },
     );
   }
@@ -62,9 +76,10 @@ export async function GET(
         discordConfigured: Boolean(process.env['NK_DISCORD_WEBHOOK_URL']),
       }, { status: 200 });
     }
+    if (key === 'email') return NextResponse.json({ ...value, ...emailLiveFields() }, { status: 200 });
     return NextResponse.json(value, { status: 200 });
   } catch {
-    return NextResponse.json({}, { status: 200 });
+    return NextResponse.json(key === 'email' ? emailLiveFields() : {}, { status: 200 });
   }
 }
 
@@ -255,20 +270,10 @@ export async function PUT(
       }
       next['smtpPasswordEnv'] = v === '' ? null : v;
     }
-    if (b['fromName'] === null) {
-      next['fromName'] = null;
-    } else if (typeof b['fromName'] === 'string') {
-      next['fromName'] = (b['fromName'] as string).trim().slice(0, 120) || null;
-    }
-    if (b['fromEmail'] === null) {
-      next['fromEmail'] = null;
-    } else if (typeof b['fromEmail'] === 'string') {
-      const v = (b['fromEmail'] as string).trim();
-      if (v !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) {
-        return NextResponse.json({ error: 'INVALID_FROM_EMAIL' }, { status: 400 });
-      }
-      next['fromEmail'] = v === '' ? null : v;
-    }
+    // fromName / fromEmail are NOT accepted: the sender comes from
+    // NK_RESEND_FROM_EMAIL via '@/lib/email/config'. Persisting a second
+    // copy here is what made an admin's "saved" edit invisible on the wire
+    // (audit finding 2, 2026-10-31). The screen shows the live value instead.
     if (typeof b['emailTemplates'] === 'object' && b['emailTemplates'] !== null) {
       // Toggle map for the fixed template set — only known keys survive.
       const t = b['emailTemplates'] as Record<string, unknown>;
