@@ -87,13 +87,15 @@ holds only the tarball, force-pushed each deploy).
 ## Step 2 — Scheduled Task (Run Now, don't save)
 
 Plesk scheduled tasks run **chrooted**: relative paths only (`httpdocs/…`), no `pkill`/`sleep`,
-no CA certs (`curl` needs `-k`), absolute `/var/www/...` paths fail.
+no CA certs (`curl` needs `-k`), absolute `/var/www/...` paths fail. **`tr` is not installed
+there** (2026-11-02: a `cat … | tr … | grep` stamp check died with `tr: command not found` and
+took the deploy with it) — `grep`, `cat`, `tar`, `cp`, `mv`, `rm` all work.
 
 1. Plesk → **Websites & Domains** → **Scheduled Tasks** → **Add Task** → type **Run a command**.
 2. Command (one line, chroot-safe):
 
 ```
-cd httpdocs && rm -rf .next-stage && curl -fsSLk --max-time 180 -o deploy-bundle.tar.gz https://raw.githubusercontent.com/NatOhm/nong-kati-site/deploy-artifact/deploy-bundle.tar.gz?cb=$$ && mkdir -p .next-stage && tar -xzf deploy-bundle.tar.gz -C .next-stage && cat .next-stage/.next/BUILD_ID .next-stage/.next/GIT_SHA | tr '\n' ' ' | grep -Eq '^[A-Za-z0-9_-]{8,} [0-9a-f]{40}(-dirty)? ?$' && rm -rf .next.old && if test -d .next; then mv .next .next.old; fi && mv .next-stage/.next .next && cp -a .next-stage/. . && rm -rf .next-stage deploy-bundle.tar.gz && cat .next/BUILD_ID .next/GIT_SHA > extract-check.txt && touch tmp/restart.txt
+cd httpdocs && rm -rf .next-stage && curl -fsSLk --max-time 180 -o deploy-bundle.tar.gz https://raw.githubusercontent.com/NatOhm/nong-kati-site/deploy-artifact/deploy-bundle.tar.gz?cb=$$ && mkdir -p .next-stage && tar -xzf deploy-bundle.tar.gz -C .next-stage && grep -Eq '^[A-Za-z0-9_-]{8,}$' .next-stage/.next/BUILD_ID && grep -Eq '^[0-9a-f]{40}(-dirty)?$' .next-stage/.next/GIT_SHA && rm -rf .next.old && if test -d .next; then mv .next .next.old; fi && mv .next-stage/.next .next && cp -a .next-stage/. . && rm -rf .next-stage deploy-bundle.tar.gz && cat .next/BUILD_ID .next/GIT_SHA > extract-check.txt && touch tmp/restart.txt
 ```
 
 > **⚠️ The command must contain ZERO double-quote characters.** The runner wraps it in a

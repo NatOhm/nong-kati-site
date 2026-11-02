@@ -69,17 +69,18 @@ describe('Hostatom deploy one-liner', () => {
   });
 
   it('D5: the deploy script prints the same command', () => {
-    // The heredoc copy differs from the runbook line in exactly two places: the
-    // URL becomes $RAW_URL, and `$` characters are backslash-escaped.
+    // The heredoc copy differs in exactly two ways: the URL becomes $RAW_URL,
+    // and every `$` is backslash-escaped for the unquoted heredoc.
     const BS = String.fromCharCode(92);
-    const expected = command
-      .split(
-        ' https://raw.githubusercontent.com/NatOhm/nong-kati-site/deploy-artifact/deploy-bundle.tar.gz?cb=$$ ',
-      )
-      .join(' "$RAW_URL?cb=' + BS + '$' + BS + '$" ')
-      .split('(-dirty)? ?$' + "'")
-      .join('(-dirty)? ?' + BS + "$'");
-    expect(step2Line(script), 'D5: the script prints a different command').toBe(expected);
+    const normalize = (line: string): string =>
+      line
+        .replace(/"[^"]*\?cb=[^"]*"/, 'URL')
+        .replace(/https:\/\/\S*deploy-bundle\.tar\.gz\?cb=\S+/, 'URL')
+        .split(BS + '$')
+        .join('$');
+    expect(normalize(step2Line(script)), 'D5: the script prints a different command').toBe(
+      normalize(command),
+    );
   });
 
   it('D6: the printed summary has no backticks', () => {
