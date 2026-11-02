@@ -103,6 +103,49 @@ describe('SlipUploadPanel — auto verify with admin fallback', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('shows the product and its code right here once the slip confirms', async () => {
+    // Client ask 2026-11-01: the bought product should appear on the page when
+    // payment is correct and fulfilled, not only in an email.
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        status: 'confirmed',
+        confirmationUuid: 'cu-1',
+        codes: [{ code: 'M365-AAAA-BBBB', productName: 'Microsoft 365 30 วัน', denomination: 18 }],
+        message: 'ตรวจสลิปผ่าน — ส่งโค้ดเรียบร้อยแล้ว ดูโค้ดด้านล่างได้เลย',
+      }),
+    });
+    const onConfirmed = vi.fn();
+    render(
+      <SlipUploadPanel orderId="o1" slipUploadToken="tok" slipVerifyEnabled onConfirmed={onConfirmed} />,
+    );
+    pickAndSubmit();
+
+    expect(await screen.findByText('M365-AAAA-BBBB')).toBeTruthy();
+    expect(screen.getByText(/Microsoft 365 30 วัน/)).toBeTruthy();
+    expect(onConfirmed).toHaveBeenCalledWith('confirmed');
+    // The upload controls are gone — nothing left to submit.
+    expect(screen.queryByRole('button', { name: /เลือกไฟล์สลิป/ })).toBeNull();
+    const link = screen.getByRole('link', { name: /ดูรายละเอียดคำสั่งซื้อ/ });
+    expect(link.getAttribute('href')).toBe('/checkout/confirmation/cu-1');
+  });
+
+  it('never prints a machine error code when the verify response carries no message', async () => {
+    // THE client screenshot: `NO_PENDING_ATTEMPT` in red on the payment page.
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 409,
+      json: async () => ({ error: 'NO_PENDING_ATTEMPT', slipStored: true }),
+    });
+    render(<SlipUploadPanel orderId="o1" slipUploadToken="tok" slipVerifyEnabled />);
+    pickAndSubmit();
+
+    const box = await screen.findByRole('status');
+    expect(box.textContent).toContain('แอดมิน');
+    expect(box.textContent).not.toContain('NO_PENDING_ATTEMPT');
+  });
+
   it('goes straight to the admin when auto verification is off', async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,

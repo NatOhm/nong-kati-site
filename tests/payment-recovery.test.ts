@@ -5,10 +5,13 @@
  *  1. The recovery transaction (manual-fulfilment parking after
  *     INSUFFICIENT_STOCK) is AWAITED and its outcome verified BEFORE the
  *     route answers. Success-shaped answers only after a real commit.
- *  2. A failed recovery answers 5xx (RECONCILIATION_REQUIRED /
- *     FULFILMENT_FAILED) and leaves a durable
- *     `payment_reconciliation_required` audit row (money was PROVEN
+ *  2. A failed recovery answers 5xx (RECONCILIATION_REQUIRED) and leaves a
+ *     durable `payment_reconciliation_required` audit row (money was PROVEN
  *     received — SlipOK said so — and must never vanish unrecorded).
+ *     Refined 2026-11-01: when the parking write itself succeeds, a delivery
+ *     failure is answered 200 `pending_manual_fulfilment` (verified + queued)
+ *     instead of a 5xx — the old 500 told the customer the whole charge had
+ *     failed after the bank had already approved it.
  *  3. ALREADY_CLAIMED races are separated from real failures by reading the
  *     live order status, and every stale route still answers honestly.
  *
@@ -255,7 +258,7 @@ describe('POST /api/v1/payments/slip-verify — recovery honesty (audit #4)', ()
     expect(reconCalls()).toHaveLength(1);
   });
 
-  it('unexpected fulfilment failure → 5xx + reconciliation (money never unrecorded)', async () => {
+  it('unexpected fulfilment failure → parked + honest pending (200, never a 5xx)', async () => {
     seedHappyDb();
     verifySlipMock.verifySlip.mockResolvedValue({
       ok: true,
@@ -265,12 +268,52 @@ describe('POST /api/v1/payments/slip-verify — recovery honesty (audit #4)', ()
       raw: {},
     });
     ordersMock.claimOrderForConfirmation.mockResolvedValue({ id: 'ord-sv' });
-    // Any unexpected fulfilment error (not INSUFFICIENT_STOCK).
-    fulfilmentMock.fulfilOrder.mockRejectedValue(new Error('write conflict'));
+    // Any unexpected delivery error (not INSUFFICIENT_STOCK).
+    fulfilmentMock.fulfilOrder.mockRejectedValue(new Error('locked row'));
 
     const res = await call(post());
-    expect([500, 502]).toContain(res.status);
-    expect(res.status).not.toBe(200);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      status: string;
+      paymentVerified: boolean;
+      message: string;
+    };
+    expect(body.status).toBe('pending_manual_fulfilment');
+    expect(body.paymentVerified).toBe(true);
+    // The copy says the payment WAS verified and delivery is queued; the old
+    // 500 claimed the charge as a whole had failed.
+    expect(body.message).toContain('ตรวจสลิปผ่านแล้ว');
+    expect(body.message).not.toContain('ไม่สำเร็จ');
+    // Parked — a pending_payment order would expire and take the money with it.
+    expect(prismaMock.order.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'ord-sv' },
+        data: expect.objectContaining({ status: 'pending_manual_fulfilment' }),
+      }),
+    );
+    // The approval committed, so no evidence row is needed.
+    expect(reconCalls()).toHaveLength(0);
+  });
+
+  it('fulfilment AND parking both fail → 5xx that still says the payment was verified', async () => {
+    seedHappyDb();
+    verifySlipMock.verifySlip.mockResolvedValue({
+      ok: true,
+      ref: 'ref-4',
+      amountThb: 107,
+      receiverAccount: 'x',
+      raw: {},
+    });
+    ordersMock.claimOrderForConfirmation.mockResolvedValue({ id: 'ord-sv' });
+    fulfilmentMock.fulfilOrder.mockRejectedValue(new Error('locked row'));
+    // ONE rejection — a persistent one would leak into later cases.
+    prismaMock.order.update.mockRejectedValueOnce(new Error('db down'));
+
+    const res = await call(post());
+    expect(res.status).toBe(500);
+    const body = (await res.json()) as { error: string; message: string };
+    expect(body.error).toBe('RECONCILIATION_REQUIRED');
+    expect(body.message).toContain('ตรวจสลิปผ่านแล้ว');
     expect(reconCalls()).toHaveLength(1);
   });
 });
@@ -408,7 +451,10 @@ describe('POST /api/v1/admin/orders/[id]/verify-payment — audit evidence', () 
 
     const rows = auditArgs().filter((a) => a['action'] === 'order.payment_verified');
     expect(rows).toHaveLength(1);
-    const diff = rows[0]!['diff'] as { before: Record<string, unknown>; after: Record<string, unknown> };
+    const diff = rows[0]!['diff'] as {
+      before: Record<string, unknown>;
+      after: Record<string, unknown>;
+    };
     expect(diff.before['status']).toBe('pending_manual_fulfilment');
     expect(rows[0]!['metadata']).toMatchObject({ resumed: true, codesDelivered: 1 });
   });
@@ -422,7 +468,10 @@ describe('POST /api/v1/admin/orders/[id]/verify-payment — audit evidence', () 
 
     const rows = auditArgs().filter((a) => a['action'] === 'order.payment_verified');
     expect(rows).toHaveLength(1);
-    const diff = rows[0]!['diff'] as { before: Record<string, unknown>; after: Record<string, unknown> };
+    const diff = rows[0]!['diff'] as {
+      before: Record<string, unknown>;
+      after: Record<string, unknown>;
+    };
     expect(diff.after['status']).toBe('pending_manual_fulfilment');
     expect(rows[0]!['metadata']).toMatchObject({ codesDelivered: 0, deferredForStock: true });
   });

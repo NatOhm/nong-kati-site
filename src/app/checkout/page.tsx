@@ -18,6 +18,7 @@ import { useCart } from '@/hooks/useCart';
 import { apiCreateOrder, apiInitiatePayment, apiPollPayment, type Order } from '@/api/orderClient';
 import { formatThb } from '@/lib/pricing';
 import { cn } from '@/utils/cn';
+import { safeJson } from '@/lib/json';
 
 /** Map internal error codes to Thai copy users can act on — never raw codes. */
 function friendlyOrderError(err: unknown): string {
@@ -347,11 +348,11 @@ export default function CheckoutPage(): React.JSX.Element {
         method: 'POST',
         credentials: 'include',
       });
-      const body = (await res.json().catch(() => ({}))) as {
+      const body = await safeJson<{
         success?: boolean;
         code?: string;
         error?: { code?: string };
-      };
+      }>(res);
       if (res.ok && body.success) {
         clearCart();
         window.location.href = `/checkout/confirmation/${order.confirmationUuid}`;
@@ -378,6 +379,18 @@ export default function CheckoutPage(): React.JSX.Element {
   }, [order, walletBusy, clearCart, handleInitiatePayment]);
 
   // Handle QR expiry
+  /** Slip verified (or verified-but-parked): the panel above now shows the
+   *  product + code, so all the page has to do is drop the cart and keep the
+   *  paid state. Client feedback: "can the product be shown on the webpage
+   *  when payment transaction is correct and fulfil". */
+  const handleSlipConfirmed = useCallback(
+    (status: 'confirmed' | 'pending_manual_fulfilment') => {
+      setSlipConfirmed(status);
+      clearCart();
+    },
+    [clearCart],
+  );
+
   const handleQrExpire = useCallback(() => {
     setPaymentState((prev) => (prev ? { ...prev, status: 'expired' } : null));
   }, []);
@@ -535,8 +548,8 @@ export default function CheckoutPage(): React.JSX.Element {
               {/* Wallet pay panel */}
               {paymentMethod === 'wallet' && (
                 <div className="mt-6">
-                  <div className="rounded-md border border-line-brand bg-peach-50 p-4">
-                    <p className="text-sm text-fg-brand">
+                  <div className="rounded-md border border-line-brand bg-surface-brand-subtle p-4">
+                    <p className="text-sm text-fg">
                       ยอดชำระ {formatThb(order?.totalAmountThb ?? 0)} จะถูกหักจากเครดิต (
                       {formatThb(walletBalanceThb ?? 0)}) ทันที — โค้ดส่งถึงหน้าถัดไปเลย
                     </p>
@@ -562,7 +575,7 @@ export default function CheckoutPage(): React.JSX.Element {
                   admin (or SlipOK) confirms. */}
               {paymentMethod === 'promptpay' && !paymentState?.qrImageUrl && manualInfo && (
                 <div className="mt-6 space-y-4">
-                  <div className="rounded-md border border-line-brand bg-peach-50 p-4">
+                  <div className="rounded-md border border-line-brand bg-surface-brand-subtle p-4">
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
                       <div className="flex flex-1 items-start gap-3">
                         <Banknote size={20} className="mt-0.5 shrink-0 text-fg-brand" />
@@ -572,17 +585,19 @@ export default function CheckoutPage(): React.JSX.Element {
                               ? 'โอนเงินผ่านธนาคาร'
                               : 'โอนเงินผ่านพร้อมเพย์'}
                           </p>
-                          <p className="mt-1 text-fg-muted">
+                          <p className="mt-1 text-fg">
                             โอนยอด <strong>{formatThb(order?.totalAmountThb ?? 0)}</strong>{' '}
                             ไปยังบัญชีด้านล่าง แล้วอัปโหลดสลิปเพื่อยืนยันการชำระเงิน
                           </p>
-                          <dl className="mt-3 space-y-1">
+                          {/* Account rows sit on bg-surface so the secondary
+                              label keeps 4.5:1 on the brand tint's parent. */}
+                          <dl className="mt-3 space-y-1 rounded-md bg-surface p-3">
                             <div className="flex gap-2">
-                              <dt className="text-fg-muted">ชื่อบัญชี:</dt>
+                              <dt className="text-fg-secondary">ชื่อบัญชี:</dt>
                               <dd className="font-medium text-fg">{manualInfo.accountName}</dd>
                             </div>
                             <div className="flex gap-2">
-                              <dt className="text-fg-muted">
+                              <dt className="text-fg-secondary">
                                 {manualInfo.accountType === 'bank'
                                   ? 'เลขบัญชี:'
                                   : 'เบอร์พร้อมเพย์ / เลขบัตร:'}
@@ -593,7 +608,7 @@ export default function CheckoutPage(): React.JSX.Element {
                             </div>
                             {manualInfo.accountType === 'bank' && manualInfo.bankName && (
                               <div className="flex gap-2">
-                                <dt className="text-fg-muted">ธนาคาร:</dt>
+                                <dt className="text-fg-secondary">ธนาคาร:</dt>
                                 <dd className="font-medium text-fg">{manualInfo.bankName}</dd>
                               </div>
                             )}
@@ -616,21 +631,24 @@ export default function CheckoutPage(): React.JSX.Element {
                     </div>
                   </div>
 
-                  {order && !slipConfirmed && paymentState?.status !== 'succeeded' && (
+                  {/* Kept mounted AFTER confirmation on purpose: the panel is what
+                      renders the delivered product + code, so gating it on
+                      !slipConfirmed unmounted the codes the instant they arrived. */}
+                  {order && paymentState?.status !== 'succeeded' && (
                     <SlipUploadPanel
                       orderId={order.id}
                       slipUploadToken={slipUploadToken}
                       slipVerifyEnabled={slipEnabled}
-                      onConfirmed={setSlipConfirmed}
+                      onConfirmed={handleSlipConfirmed}
                     />
                   )}
                   {slipConfirmed && (
                     <div
-                      className="rounded-md border border-jade-500/40 bg-jade-900/20 px-4 py-3 text-sm text-jade-200"
+                      className="rounded-md border border-jade-500/40 bg-jade-500/15 px-4 py-3 text-sm text-jade-700 dark:text-jade-200"
                       role="status"
                     >
                       {slipConfirmed === 'confirmed'
-                        ? '✓ ตรวจสลิปอัตโนมัติผ่าน — ยืนยันการชำระเงินเรียบร้อย กำลังส่งโค้ดทางอีเมล'
+                        ? '✓ ตรวจสลิปผ่าน — ชำระเงินเรียบร้อย โค้ดของคุณอยู่ด้านบน'
                         : '✓ ตรวจสลิปแล้ว — สินค้าบางรายการกำลังรอเติมโค้ด แอดมินจะจัดส่งให้เร็วที่สุด'}
                     </div>
                   )}
@@ -652,29 +670,29 @@ export default function CheckoutPage(): React.JSX.Element {
                     {/* Slip upload — ALWAYS available for pending PromptPay:
                         auto-verify first when SlipOK is on, otherwise the
                         slip goes straight to the admin for manual check. */}
-                    {order && !slipConfirmed && paymentState.status !== 'succeeded' && (
+                    {order && paymentState.status !== 'succeeded' && (
                       <SlipUploadPanel
                         orderId={order.id}
                         slipUploadToken={slipUploadToken}
                         slipVerifyEnabled={slipEnabled}
-                        onConfirmed={setSlipConfirmed}
+                        onConfirmed={handleSlipConfirmed}
                       />
                     )}
 
                     {slipConfirmed && (
                       <div
-                        className="mt-4 rounded-md border border-jade-500/40 bg-jade-900/20 px-4 py-3 text-sm text-jade-200"
+                        className="mt-4 rounded-md border border-jade-500/40 bg-jade-500/15 px-4 py-3 text-sm text-jade-700 dark:text-jade-200"
                         role="status"
                       >
                         {slipConfirmed === 'confirmed'
-                          ? '✓ ตรวจสลิปอัตโนมัติผ่าน — ยืนยันการชำระเงินเรียบร้อย กำลังส่งโค้ดทางอีเมล'
+                          ? '✓ ตรวจสลิปผ่าน — ชำระเงินเรียบร้อย โค้ดของคุณอยู่ด้านบน'
                           : '✓ ตรวจสลิปแล้ว — สินค้าบางรายการกำลังรอเติมโค้ด แอดมินจะจัดส่งให้เร็วที่สุด'}
                       </div>
                     )}
 
                     {/* Status messages */}
                     {paymentState.status === 'succeeded' && (
-                      <div className="mt-4 rounded-md border border-jade-500/40 bg-jade-900/20 px-4 py-3 text-sm text-jade-200">
+                      <div className="mt-4 rounded-md border border-jade-500/40 bg-jade-500/15 px-4 py-3 text-sm text-jade-700 dark:text-jade-200">
                         ✓ การชำระเงินสำเร็จ — กำลังดำเนินการส่งโค้ด
                       </div>
                     )}
@@ -697,12 +715,12 @@ export default function CheckoutPage(): React.JSX.Element {
               {/* Card payment placeholder */}
               {paymentMethod === 'card' && (
                 <div className="mt-6">
-                  <div className="rounded-md border border-line-brand bg-peach-50 px-4 py-6 text-center">
+                  <div className="rounded-md border border-line-brand bg-surface-brand-subtle px-4 py-6 text-center">
                     <Construction size={24} className="mx-auto mb-2 text-fg-brand" />
                     <p className="text-sm text-fg-brand">
                       ระบบชำระเงินด้วยบัตรเครดิตจะพร้อมใช้งานในเร็วๆ นี้
                     </p>
-                    <p className="mt-1 text-xs text-fg-placeholder">
+                    <p className="mt-1 text-xs text-fg">
                       ฿{(order?.totalAmountThb ?? 0).toLocaleString()} — รองรับ Visa, Mastercard
                       (3DS2)
                     </p>

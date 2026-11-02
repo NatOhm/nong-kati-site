@@ -12,6 +12,7 @@
  *  4. Admin fallback is reachable: a non-confirming verification pings the
  *     admin (Discord) and slip-upload (pure manual path) pings as well.
  */
+import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
@@ -29,6 +30,7 @@ const h = vi.hoisted(() => {
     },
     paymentAttempt: {
       findFirst: vi.fn(async (_args: Row): Promise<Row | null> => null),
+      create: vi.fn(async (_args: Row): Promise<Row> => ({ id: 'att-new' })),
       update: vi.fn(async (_args: Row): Promise<Row> => ({})),
     },
     productVariant: {
@@ -74,17 +76,21 @@ const h = vi.hoisted(() => {
   }
   const slipok = {
     isSlipVerificationEnabled: vi.fn(() => false),
-    verifySlip: vi.fn(async (_input: unknown): Promise<VerifyOutcome> => ({
-      ok: false,
-      code: 'NOT_CONFIGURED',
-    })),
+    verifySlip: vi.fn(
+      async (_input: unknown): Promise<VerifyOutcome> => ({
+        ok: false,
+        code: 'NOT_CONFIGURED',
+      }),
+    ),
   };
   const slip2go = {
     isSlip2GoEnabled: vi.fn(() => false),
-    verifySlip2Go: vi.fn(async (_input: unknown): Promise<VerifyOutcome> => ({
-      ok: false,
-      code: 'NOT_CONFIGURED',
-    })),
+    verifySlip2Go: vi.fn(
+      async (_input: unknown): Promise<VerifyOutcome> => ({
+        ok: false,
+        code: 'NOT_CONFIGURED',
+      }),
+    ),
   };
   const rate = {
     getClientIp: vi.fn(() => '203.0.113.9'),
@@ -94,16 +100,22 @@ const h = vi.hoisted(() => {
   // mocked here because the real module pulls React.cache at import time,
   // which does not exist in the vitest environment.
   const manualTransfer = {
-    getManualTransferInfo: vi.fn(async (): Promise<Row> => ({
-      enabled: true,
-      accountName: 'ร้านนกกะทา',
-      accountNumber: null,
-      accountType: 'bank',
-      bankName: null,
-      qrImageUrl: null,
-    })),
+    getManualTransferInfo: vi.fn(
+      async (): Promise<Row> => ({
+        enabled: true,
+        accountName: 'ร้านนกกะทา',
+        accountNumber: null,
+        accountType: 'bank',
+        bankName: null,
+        qrImageUrl: null,
+      }),
+    ),
   };
-  return { prisma, orders, fulfil, notify, slipSec, slipok, slip2go, rate, manualTransfer };
+  /** Delivered codes for the 200 body (client ask: show the product on the page). */
+  const codes = {
+    getDeliveredCodes: vi.fn(async (_orderId: string): Promise<Row[]> => []),
+  };
+  return { prisma, orders, fulfil, notify, slipSec, slipok, slip2go, rate, manualTransfer, codes };
 });
 
 vi.mock('@/lib/db', () => ({ prisma: h.prisma }));
@@ -111,6 +123,7 @@ vi.mock('@/api/orders', () => h.orders);
 vi.mock('@/lib/fulfilment', () => h.fulfil);
 vi.mock('@/lib/notify', () => h.notify);
 vi.mock('@/lib/slipSecurity', () => h.slipSec);
+vi.mock('@/lib/delivery/customerCodes', () => h.codes);
 vi.mock('@/lib/payment/slipok', () => h.slipok);
 vi.mock('@/lib/payment/slip2go', () => h.slip2go);
 vi.mock('@/lib/rateLimit', () => h.rate);
@@ -157,9 +170,7 @@ function postUpload(): NextRequest {
   const form = new FormData();
   form.set('orderId', ORDER.id);
   form.set('token', 'tok');
-  const bytes = new Uint8Array([
-    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4,
-  ]);
+  const bytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]);
   form.set('slip', new File([bytes], 'slip.png', { type: 'image/png' }));
   return new NextRequest('http://localhost/api/v1/payments/slip-upload', {
     method: 'POST',
@@ -188,6 +199,7 @@ beforeEach(() => {
     qrImageUrl: null,
   });
   h.fulfil.fulfilOrder.mockResolvedValue({ success: true });
+  h.codes.getDeliveredCodes.mockResolvedValue([]);
 });
 
 async function callVerify(): Promise<Response> {
@@ -214,6 +226,87 @@ describe('provider dispatch in POST /api/v1/payments/slip-verify', () => {
         data: expect.objectContaining({ slipVerifiedBy: 'slip2go:auto' }),
       }),
     );
+  });
+
+  it('creates the pending attempt when the manual-transfer checkout never made one', async () => {
+    // Production path: checkout shows the bank account and never calls
+    // /payments/initiate, the only other creator of a PaymentAttempt. Before
+    // this guard the bank said yes and the confirmation had nowhere to land
+    // (409 NO_PENDING_ATTEMPT), so every real slip fell back to manual review.
+    h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
+    h.slip2go.verifySlip2Go.mockResolvedValueOnce(slipOkSuccess);
+    h.prisma.paymentAttempt.findFirst.mockResolvedValue(null);
+
+    const res = await callVerify();
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { status: string }).status).toBe('confirmed');
+    expect(h.prisma.paymentAttempt.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        orderId: ORDER.id,
+        paymentMethod: 'promptpay',
+        gatewayName: 'slip2go',
+        status: 'pending',
+      }),
+      select: { id: true },
+    });
+    expect(h.prisma.paymentAttempt.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'att-new' },
+        data: expect.objectContaining({ slipVerifiedRef: 'SLIP-REF-1' }),
+      }),
+    );
+    expect(h.fulfil.fulfilOrder).toHaveBeenCalled();
+  });
+
+  it('returns the delivered product + code on the confirming response (no-store)', async () => {
+    // Client ask 2026-11-01: "can the product be shown on the webpage when
+    // payment transaction is correct and fulfil". The codes ride on the very
+    // request that proved the slip, so the payment screen needs no reload and
+    // no second endpoint — and it must never be cached.
+    h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
+    h.slip2go.verifySlip2Go.mockResolvedValueOnce(slipOkSuccess);
+    h.codes.getDeliveredCodes.mockResolvedValueOnce([
+      { code: 'M365-AAAA-BBBB', productName: 'Microsoft 365 30 วัน', denomination: 18 },
+    ]);
+
+    const res = await callVerify();
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      status: string;
+      confirmationUuid: string;
+      codes: Array<{ code: string; productName: string; denomination: number }>;
+    };
+    expect(body.status).toBe('confirmed');
+    expect(body.confirmationUuid).toBe(ORDER.confirmationUuid);
+    expect(body.codes).toEqual([
+      { code: 'M365-AAAA-BBBB', productName: 'Microsoft 365 30 วัน', denomination: 18 },
+    ]);
+    expect(res.headers.get('cache-control')).toContain('no-store');
+    // The ops card names the buyer (client ask 2026-11-01).
+    expect(h.notify.notifyPaymentConfirmed).toHaveBeenCalledWith(
+      expect.objectContaining({ orderNumber: ORDER.orderNumber, customerEmail: ORDER.customerEmail }),
+    );
+  });
+
+  it('answers a verified-but-unrecordable slip in Thai, never a bare machine code', async () => {
+    // The client's screenshot was `NO_PENDING_ATTEMPT` printed in red on the
+    // payment screen. If the attempt write ever fails again, the bank already
+    // confirmed the money — the answer must say that and reach the admin.
+    h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
+    h.slip2go.verifySlip2Go.mockResolvedValueOnce(slipOkSuccess);
+    h.prisma.paymentAttempt.findFirst.mockResolvedValueOnce(null);
+    h.prisma.paymentAttempt.create.mockRejectedValueOnce(new Error('db down'));
+
+    const res = await callVerify();
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { error: string; message: string; slipStored: boolean };
+    // The code stays in the body for logs/tests, but the sentence is Thai and
+    // says the payment was verified and a human will finish it.
+    expect(body.error).toBe('NO_PENDING_ATTEMPT');
+    expect(body.message).toContain('ธนาคารยืนยันการชำระเงิน');
+    expect(body.message).not.toContain('NO_PENDING_ATTEMPT');
+    expect(body.slipStored).toBe(true);
+    expect(h.notify.notifyPaymentPending).toHaveBeenCalled();
   });
 
   it('passes the store receiving account to Slip2Go for the receiver check', async () => {
@@ -406,7 +499,10 @@ describe('evidence + admin fallback', () => {
     expect(created.value.startsWith('data:image/png;base64,')).toBe(true);
     expect(h.prisma.order.update).toHaveBeenCalledWith({
       where: { id: ORDER.id },
-      data: { slipImageUrl: expect.stringContaining('/slip-download/'), slipUploadedAt: expect.any(Date) },
+      data: {
+        slipImageUrl: expect.stringContaining('/slip-download/'),
+        slipUploadedAt: expect.any(Date),
+      },
     });
 
     // Admin knows a slip is waiting for manual review.
@@ -526,7 +622,9 @@ describe('entry-point boundaries (adversarial pass, 30 ต.ค.)', () => {
       (r: NextRequest) => Promise<Response>
     >;
 
-    const res = await route['POST']!(postJson({ orderId: ORDER.id, token: 'tok', imageBase64: huge }));
+    const res = await route['POST']!(
+      postJson({ orderId: ORDER.id, token: 'tok', imageBase64: huge }),
+    );
     expect(res.status).toBe(413);
     expect(((await res.json()) as { error: string }).error).toBe('FILE_TOO_LARGE');
     // Never buffered into the evidence row, never forwarded upstream.
@@ -566,11 +664,159 @@ describe('entry-point boundaries (adversarial pass, 30 ต.ค.)', () => {
     try {
       const res = await callVerify();
       expect(res.status).toBe(200);
-      expect(warn).toHaveBeenCalledWith(
-        expect.stringContaining('receiver check skipped'),
-      );
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('receiver check skipped'));
     } finally {
       warn.mockRestore();
     }
+  });
+});
+
+/**
+ * Confirmation-transaction reliability (2026-11-01 live pass).
+ *
+ * A genuine ฿9 slip (order NK-2026-000183) was approved by Slip2Go and then
+ * lost to Prisma P2028 — "Transaction not found … old closed transaction" —
+ * because the confirmation `$transaction` ran on the 5s default on a cold
+ * worker. The customer got a 500 ("ส่งโค้ดไม่สำเร็จ") after the bank had said
+ * yes, and the order sat at pending_payment until someone re-posted the slip.
+ *
+ * Contract now: the transaction is sized for this path's real latency, a lost
+ * transaction is retried once automatically, and a delivery failure after
+ * approval is answered as verified-but-pending (parked for the team) instead
+ * of as a failure — while a second POST still answers ORDER_NOT_PAYABLE.
+ */
+describe('confirmation transaction budget + retry (live P2028, 2026-11-01)', () => {
+  const txSpy = (): ReturnType<typeof vi.fn> =>
+    h.prisma.$transaction as unknown as ReturnType<typeof vi.fn>;
+
+  const p2028 = (): Error =>
+    Object.assign(
+      new Error(
+        'Transaction not found. Transaction ID is invalid, refers to an old closed ' +
+          'transaction Prisma does not have information about anymore.',
+      ),
+      { code: 'P2028' },
+    );
+
+  beforeEach(() => {
+    // Restore the pass-through implementation a previous case may have spent.
+    txSpy().mockImplementation(async (fn: unknown) =>
+      (fn as (tx: unknown) => Promise<unknown>)(h.prisma),
+    );
+  });
+
+  it('sizes the transaction above the 5s default and retries once when it expires', async () => {
+    h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
+    h.slip2go.verifySlip2Go.mockResolvedValueOnce(slipOkSuccess);
+    txSpy().mockImplementationOnce(async () => {
+      throw p2028();
+    });
+
+    const res = await callVerify();
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { status: string }).status).toBe('confirmed');
+
+    // One automatic retry, with a budget this path can actually fit in.
+    expect(txSpy()).toHaveBeenCalledTimes(2);
+    expect(txSpy().mock.calls[0]![1]).toMatchObject({ timeout: 30000 });
+    // A retry after a rollback re-runs the guarded claim — never a second
+    // provider call and never a second delivery.
+    expect(h.slip2go.verifySlip2Go).toHaveBeenCalledTimes(1);
+    expect(h.fulfil.fulfilOrder).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops after one retry and parks the order instead of 5xx-ing the customer', async () => {
+    h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
+    h.slip2go.verifySlip2Go.mockResolvedValueOnce(slipOkSuccess);
+    txSpy()
+      .mockImplementationOnce(async () => {
+        throw p2028();
+      })
+      .mockImplementationOnce(async () => {
+        throw p2028();
+      });
+
+    const res = await callVerify();
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { status: string; paymentVerified: boolean };
+    expect(body.status).toBe('pending_manual_fulfilment');
+    expect(body.paymentVerified).toBe(true);
+    // Two confirmation attempts + the parking transaction. A third attempt
+    // would have hit the restored default and answered 'confirmed' — so this
+    // also proves the retry is bounded.
+    expect(txSpy()).toHaveBeenCalledTimes(3);
+    expect(h.prisma.order.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'pending_manual_fulfilment' }),
+      }),
+    );
+  });
+
+  it('a delivery failure after approval answers verified-but-pending, never "failed"', async () => {
+    h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
+    h.slip2go.verifySlip2Go.mockResolvedValueOnce(slipOkSuccess);
+    h.fulfil.fulfilOrder.mockResolvedValueOnce({ success: false, error: 'CATALOG_LINE_DETACHED' });
+
+    const res = await callVerify();
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      status: string;
+      message: string;
+      paymentVerified: boolean;
+    };
+    // SlipUploadPanel flips to its paid state on exactly these fields.
+    expect(body.status).toBe('pending_manual_fulfilment');
+    expect(body.paymentVerified).toBe(true);
+    expect(body.message).toContain('ตรวจสลิปผ่านแล้ว');
+    // The old wording claimed the charge as a whole had failed.
+    expect(body.message).not.toContain('ส่งโค้ดไม่สำเร็จ');
+  });
+
+  it('still refuses a second POST for a spent order — 409, no second delivery', async () => {
+    h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
+    h.slip2go.verifySlip2Go.mockResolvedValueOnce(slipOkSuccess);
+    // The first post already claimed the order.
+    h.orders.claimOrderForConfirmation.mockResolvedValueOnce(null);
+
+    const res = await callVerify();
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: string }).error).toBe('ORDER_NOT_PAYABLE');
+    expect(h.fulfil.fulfilOrder).not.toHaveBeenCalled();
+  });
+});
+
+describe('checkout page consumes the confirmed answer', () => {
+  // The panel shows the codes; the page only has to drop the cart and keep
+  // the paid state. Asserted at source level because the checkout page is a
+  // single 750-line client component with no render harness.
+  const page = readFileSync('src/app/checkout/page.tsx', 'utf8');
+
+  it('wires every slip panel to the paid handler, not the raw setState', () => {
+    expect(page).toContain('onConfirmed={handleSlipConfirmed}');
+    expect(page).not.toContain('onConfirmed={setSlipConfirmed}');
+  });
+
+  it('the paid handler clears the cart (the order is already paid)', () => {
+    const handler = /handleSlipConfirmed = useCallback\(([\s\S]{0,400}?)\]/.exec(page)?.[1] ?? '';
+    expect(handler).toContain('setSlipConfirmed(status)');
+    expect(handler).toContain('clearCart()');
+  });
+});
+
+describe('the confirmed panel stays on screen', () => {
+  // Regression: the checkout page rendered <SlipUploadPanel> behind
+  // `!slipConfirmed`, so the moment verification succeeded the panel — the
+  // only thing that shows the bought product and its code — unmounted, and
+  // the customer saw a green line where the code had been.
+  const page = readFileSync('src/app/checkout/page.tsx', 'utf8');
+
+  it('never gates the slip panel on !slipConfirmed', () => {
+    expect(page).not.toContain('order && !slipConfirmed && paymentState');
+    expect(page).not.toContain('order && !slipConfirmed &&');
+  });
+
+  it('still hides it once the QR flow reports success', () => {
+    expect(page).toContain("order && paymentState?.status !== 'succeeded'");
+    expect(page).toContain("order && paymentState.status !== 'succeeded'");
   });
 });
