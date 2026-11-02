@@ -272,18 +272,23 @@ const config: Config = {
       animation: {
         'glow-pulse': 'glow-pulse 3s cubic-bezier(0.4,0,0.2,1) infinite',
         shimmer: 'shimmer 1.5s linear infinite',
-        'page-enter': 'page-enter 300ms cubic-bezier(0.25,1,0.5,1)',
+        // Route/page entry is NOT defined here. It lives only in globals.css
+        // `.page-enter` (honors --animate-page-duration, keeps no retained
+        // transform). A second `animate-page-enter` utility used to shadow it
+        // with a different duration — one owner is the rule.
         'modal-enter': 'modal-enter 300ms cubic-bezier(0.25,1,0.5,1)',
         'modal-exit': 'modal-exit 250ms cubic-bezier(0.4, 0, 1, 1) both',
         'toast-enter': 'toast-enter 300ms cubic-bezier(0.25,1,0.5,1)',
         'toast-exit': 'toast-exit 250ms cubic-bezier(0.4, 0, 1, 1) both',
         'copy-bounce': 'copy-bounce 300ms cubic-bezier(0.34,1.56,0.64,1)',
         'squish-press': 'squish-press 450ms cubic-bezier(0.34,1.56,0.64,1)',
-        'reveal-up': 'reveal-up 550ms cubic-bezier(0, 0, 0.2, 1) both',
         'grass-sway': 'grass-sway 5s ease-in-out infinite',
         'hamster-peek': 'hamster-peek 3.5s cubic-bezier(0.34,1.56,0.64,1) infinite',
         'clay-bounce': 'clay-bounce 1.1s cubic-bezier(0.34,1.56,0.64,1) infinite',
-        'seed-pop': 'seed-pop 550ms cubic-bezier(0.34,1.56,0.64,1) both',
+        // No `both`: the end keyframe IS the element's natural state, and a
+        // retained transform/opacity here would leave a containing block on
+        // whatever it is applied to.
+        'seed-pop': 'seed-pop 550ms cubic-bezier(0.34,1.56,0.64,1)',
       },
       keyframes: {
         'glow-pulse': {
@@ -299,10 +304,6 @@ const config: Config = {
         shimmer: {
           '0%': { backgroundPosition: '-400px 0' },
           '100%': { backgroundPosition: '400px 0' },
-        },
-        'page-enter': {
-          from: { opacity: '0', transform: 'translateY(6px)' },
-          to: { opacity: '1', transform: 'translateY(0)' },
         },
         'modal-enter': {
           from: { opacity: '0', transform: 'scale(0.95) translateY(8px)' },
@@ -331,10 +332,6 @@ const config: Config = {
           '35%': { transform: 'scale(0.94, 0.9)' },
           '70%': { transform: 'scale(1.03, 1.05)' },
           '100%': { transform: 'scale(1)' },
-        },
-        'reveal-up': {
-          from: { opacity: '0', transform: 'translateY(24px) scale(0.98)' },
-          to: { opacity: '1', transform: 'translateY(0) scale(1)' },
         },
         'grass-sway': {
           '0%, 100%': { transform: 'rotate(-2deg)' },

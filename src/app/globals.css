@@ -232,9 +232,17 @@
   }
 
   /* 240ms ease-out state/page transition — put on route containers.
-     Duration honors the admin appearance setting via --animate-page-duration. */
+     THE single owner of route-entry motion: tailwind.config.ts defines no
+     `animate-page-enter` utility, so there is one place to get it right.
+     Duration honors the admin appearance setting via --animate-page-duration.
+
+     fill-mode is `backwards`, never `both`: keeping the final keyframe
+     (transform: translateY(0)) applied forever leaves a non-none transform
+     on this wrapper, which makes it the containing block for every
+     `position: fixed` descendant — the phone sticky buy bar was pinned to
+     this box instead of the viewport and scrolled off screen. */
   .page-enter {
-    animation: page-enter var(--animate-page-duration, 240ms) cubic-bezier(0, 0, 0.2, 1) both;
+    animation: page-enter var(--animate-page-duration, 240ms) cubic-bezier(0, 0, 0.2, 1) backwards;
   }
 }
 

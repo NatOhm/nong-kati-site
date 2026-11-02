@@ -21,7 +21,7 @@ export default async function RecommendedPage(): Promise<React.JSX.Element> {
   const featuredProducts = await getFeaturedProducts();
 
   return (
-    <div className="animate-page-enter">
+    <div className="page-enter">
       <Breadcrumb
         items={[
           { label: 'หน้าแรก', href: '/' },
