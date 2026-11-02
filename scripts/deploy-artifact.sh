@@ -130,10 +130,10 @@ cd httpdocs && rm -rf .next-stage && curl -fsSLk --max-time 180 -o deploy-bundle
 
  3. Verify: httpdocs/extract-check.txt — line 1 == BUILD_ID above, line 2 == $START_SHA,
     plus a -dirty suffix when the bundle came from an uncommitted tree (expected, not a
-    mismatch). Line 1 going stale = the CDN served a cached tarball; `.next.old` is the
+    mismatch). Line 1 going stale = the CDN served a cached tarball; .next.old is the
     on-disk rollback if the swap itself ever has to be undone.
     Node.js → Run Node.js commands (NOT a Scheduled Task — the task chroot has no node binary
-    at all; `find / -name node -type f` returns nothing there):
+    at all; find / -name node -type f returns nothing there):
       · deps changed (package.json)      →  npm ci --omit=dev
       · prisma/schema.prisma changed     →  npm run postinstall      (= prisma generate)
     The second one is REQUIRED whenever a schema change ships: the extracted bundle carries no

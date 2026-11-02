@@ -12,6 +12,7 @@
  * D3 verified before the swap, and the live `.next` is never wiped in place
  * D4 matches what stamp-git-sha.mjs writes: `<sha>-dirty` is legal, VERSION optional
  * D5 scripts/deploy-artifact.sh prints that same command
+ * D6 that printed summary stays literal (unquoted heredoc: a backtick runs)
  */
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -78,5 +79,13 @@ describe('Hostatom deploy one-liner', () => {
       .split('(-dirty)? ?$' + "'")
       .join('(-dirty)? ?' + BS + "$'");
     expect(step2Line(script), 'D5: the script prints a different command').toBe(expected);
+  });
+
+  it('D6: the printed summary has no backticks', () => {
+    // `cat <<SUMMARY` is UNQUOTED so `$RAW_URL` expands — which also means a
+    // backtick in that block is command substitution. One around `.next.old`
+    // ran it as a command and killed the handoff on the 1.1.2 dry run.
+    const summary = script.slice(script.indexOf('cat <<SUMMARY'), script.lastIndexOf('SUMMARY'));
+    expect(summary, 'D6: a backtick in the summary runs as a command').not.toContain('`');
   });
 });
