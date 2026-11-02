@@ -26,7 +26,11 @@ const FALLBACK: AnnouncementContent = {
  */
 export function AnnouncementBar(): React.JSX.Element | null {
   const [content, setContent] = useState<AnnouncementContent>(FALLBACK);
-  const [isVisible, setIsVisible] = useState(true);
+  // Only an explicit close hides the bar. It used to be "visible" state:
+  // a mount effect set it to false because the first render still holds the
+  // disabled FALLBACK (the admin value arrives a tick later), and nothing
+  // ever set it back — so an enabled announcement stayed invisible forever.
+  const [dismissed, setDismissed] = useState(false);
 
   // Pick up admin edits without a full page reload.
   useEffect(() => {
@@ -38,11 +42,7 @@ export function AnnouncementBar(): React.JSX.Element | null {
       .catch(() => {});
   }, []);
 
-  useEffect(() => {
-    if (!content.enabled) setIsVisible(false);
-  }, [content.enabled]);
-
-  if (!content.enabled || !isVisible) return null;
+  if (!content.enabled || dismissed) return null;
 
   return (
     <div className="relative bg-gradient-to-r from-peach-400 via-peach-300 to-peach-400 px-4 py-2">
@@ -65,7 +65,7 @@ export function AnnouncementBar(): React.JSX.Element | null {
         {/* Audit #8: close is a bare control at the screen edge — 44×44 hit
             area (icon unchanged). */}
         <button
-          onClick={() => setIsVisible(false)}
+          onClick={() => setDismissed(true)}
           className="absolute right-0.5 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full transition-colors hover:bg-clay-500/20 hover:text-fg"
           aria-label="ปิดประกาศ"
         >

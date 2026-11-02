@@ -14,6 +14,7 @@ import { MotionToggle } from './MotionToggle';
 import { ProfileMenu } from './ProfileMenu';
 import { useCustomerSession } from './useCustomerSession';
 import { AcornIcon, HamsterFace } from '@/components/ui/ClayIcons';
+import { useMascotUrl } from '@/providers/MascotProvider';
 import { useCart } from '@/hooks/useCart';
 import { useComboboxKeyboard } from '@/hooks/useComboboxKeyboard';
 
@@ -40,6 +41,10 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
   // Real session state — the support desk and profile links depend on it
   const sessionState = useCustomerSession();
   const isAuthenticated = sessionState === 'authed';
+  // Admin-uploaded brand mark (ตั้งค่า → ธีมและแอนิเมชัน). The logo used to be
+  // the hardcoded clay hamster even after an upload, so the one place a shop
+  // recognises itself never changed.
+  const mascotUrl = useMascotUrl();
   const { cart, updateQuantity, removeItem, itemCount } = useCart();
   const [searchFocused, setSearchFocused] = useState(false);
   /* a11y gate (duplicate-ID): listbox id is per-instance (useId). */
@@ -133,7 +138,20 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
               className="group flex min-h-[44px] shrink-0 items-center gap-2"
             >
               <span className="block rounded-full shadow-clay-sm transition-transform duration-interactive ease-spring group-hover:scale-110 group-active:scale-95">
-                <HamsterFace size={40} />
+                {mascotUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- admin upload served immutable from /api/v1/images
+                  <img
+                    src={mascotUrl}
+                    alt=""
+                    aria-hidden="true"
+                    width={40}
+                    height={40}
+                    style={{ width: 40, height: 40 }}
+                    className="rounded-full object-contain"
+                  />
+                ) : (
+                  <HamsterFace size={40} />
+                )}
               </span>
               <span className="font-display text-base font-bold leading-none text-fg-brand-strong sm:text-lg">
                 Nong-Kati
@@ -276,10 +294,15 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
             {/* Cart — opens cart drawer */}
             <CartIcon count={itemCount} onClick={() => setCartOpen(true)} />
 
-            {/* Notifications — popover (md+) */}
-            <div className="hidden md:block">
-              <NotificationsDropdown />
-            </div>
+            {/* Notifications — the ONLY home of the active coupon codes
+                (/(api/v1/notifications returns live coupons + promotions), so it
+                renders at every width. It used to be `hidden md:block`, which
+                meant a phone had no way to see a promo code at all — client
+                feedback 2026-11-01: "โค้ดส่วนลดมันอยู่ตรงไหนของมือถือ". The
+                panel is portaled and clamps itself to the viewport (see
+                AnchoredPopover), so a 320px bar is safe: menu + logo + cart +
+                bell measure ~310px. */}
+            <NotificationsDropdown />
 
             {/* Messenger — support contact (md+). The support desk lives inside
                 the logged-in area; guests are sent to login first and land back

@@ -22,6 +22,9 @@
  *       reintroduce the horizontal scroll the a11y audit removed.
  *  G4 — the right-hand action cluster stays `shrink-0` so it never gives up
  *       width and silently drops an affordance.
+ *  G7 — the notifications/coupon bell must not sit behind a `hidden …:`
+ *       wrapper: it is the only place phones can see an active coupon code
+ *       (client feedback 2026-11-01).
  */
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -231,5 +234,27 @@ describe('navbar layout gates', () => {
       'CatalogSearchBox kept its own boxRef.contains() outside-click test → clicks inside the portaled panel dismiss it',
     ).not.toMatch(/boxRef\.current\.contains/);
     expect(src, 'the popover must be handed an onClose handler').toMatch(/onClose=\{close\}/);
+  });
+
+  /**
+   * G7 — the coupon/promo entry is reachable at phone widths.
+   *
+   * Client feedback (2026-11-01): "โค้ดส่วนลดมันอยู่ตรงไหนของมือถือ". The bell
+   * is the ONLY place the storefront surfaces the active coupon codes
+   * (`/api/v1/notifications` → live coupons + promotions), and it sat inside
+   * `hidden md:block`, so a phone had no route to a promo code at all: not the
+   * header, not the sidebar, not the bottom taskbar. A `hidden …:` wrapper
+   * below `md` re-breaks exactly the discovery the customer reported, so it is
+   * a gate, not a style choice.
+   */
+  it('G7 — the notifications/coupon bell is not hidden on phones', () => {
+    const src = stripComments(source);
+    expect(src, 'the navbar no longer renders NotificationsDropdown').toContain(
+      '<NotificationsDropdown',
+    );
+    expect(
+      src,
+      'NotificationsDropdown is wrapped in a display-hidden, breakpoint-gated div again → phones lose the only path to the coupon codes',
+    ).not.toMatch(/<div[^>]*className="[^"]*\bhidden\b[^"]*"[^>]*>\s*<NotificationsDropdown/);
   });
 });
