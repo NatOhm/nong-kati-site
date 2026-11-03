@@ -3,6 +3,13 @@ import path from 'node:path';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  // JSX for tests uses the automatic runtime. The app's tsconfig says
+  // `"jsx": "preserve"` (Next/SWC compiles the real build), and esbuild reads
+  // that as "classic" — any component whose JSX was not already cached then
+  // throws "React is not defined" the moment a test renders it. Pinning the
+  // runtime here keeps rendered assertions (search page, settings sections)
+  // independent of module cache history.
+  esbuild: { jsx: 'automatic' },
   test: {
     // Route/unit tests run in node so Request/FormData match what Next.js
     // actually uses in production. DOM component tests opt into jsdom with a

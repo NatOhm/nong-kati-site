@@ -81,11 +81,23 @@ export default async function SearchPage({
   let products: Awaited<ReturnType<typeof getCatalogProducts>>['products'] = [];
   let total = 0;
   let categories: Awaited<ReturnType<typeof getCategoriesWithProductCounts>> = [];
+  // ?category= is only a filter if a chip can represent it. The chip row is
+  // this page's statement of "you are here", and 1.1.6 makes the navbar's
+  // /search entry inert whenever a slug is set — so an unknown slug used to
+  // leave the page with ZERO aria-current: a grid filtered to nothing, under a
+  // heading naming a category that does not exist, with nothing announcing
+  // where the visitor stands. Resolve the slug against the chip list and drop
+  // it when it matches nothing (1.1.7); the grid, heading, breadcrumb, chips
+  // and chrome all read this one value.
+  let categorySlug: string | undefined = category;
   let dbDown = false;
   try {
+    categories = await getCategoriesWithProductCounts();
+    categorySlug =
+      category && categories.some((c) => c.slug === category) ? category : undefined;
     const result = await getCatalogProducts(
       query,
-      category,
+      categorySlug,
       sort,
       page,
       limit,
@@ -93,20 +105,19 @@ export default async function SearchPage({
     );
     products = result.products;
     total = result.total;
-    categories = await getCategoriesWithProductCounts();
   } catch {
     // DB unavailable — audit #2: an outage must not masquerade as an empty
-    // store; the render below distinguishes the two states.
+    // store; the render below distinguishes the two states. A failed count
+    // query leaves no chips, so keep the requested slug for the heading.
     dbDown = true;
+    categories = [];
+    categorySlug = category;
   }
   const totalPages = Math.ceil(total / limit);
 
-  const sortUrl = (sortValue: CatalogSort) =>
-    buildUrl({ q: query || undefined, category: category || undefined, sort: sortValue });
-
   return (
     <>
-      <FacebookLayout searchCategory={category}>
+      <FacebookLayout searchCategory={categorySlug}>
         {/* The layout owns the single <main> landmark (audit #4). */}
         <div>
           <PageShell>
@@ -115,8 +126,8 @@ export default async function SearchPage({
               className="py-4"
               items={[
                 { label: 'หน้าหลัก', href: '/' },
-                category
-                  ? { label: `หมวดหมู่: ${category}`, href: `/category/${category}` }
+                categorySlug
+                  ? { label: `หมวดหมู่: ${categorySlug}`, href: `/category/${categorySlug}` }
                   : { label: query ? 'ค้นหาสินค้า' : 'สินค้าทั้งหมด' },
               ]}
             />
@@ -125,8 +136,8 @@ export default async function SearchPage({
             <h1 className="pb-4 pt-1 text-2xl font-bold text-fg md:text-[28px]">
               {query
                 ? `ผลการค้นหา "${query}"`
-                : category
-                  ? `หมวดหมู่: ${category}`
+                : categorySlug
+                  ? `หมวดหมู่: ${categorySlug}`
                   : 'สินค้าทั้งหมด'}
             </h1>
 
@@ -154,8 +165,9 @@ export default async function SearchPage({
                     <Link
                       href={buildUrl({
                         q: query || undefined,
-                        category: category || undefined,
-                        sort: sortParam,
+                        category: categorySlug,
+                        sort,
+                        available: availableOnly,
                       })}
                       className="inline-flex min-h-[40px] items-center rounded-full border border-line-brand bg-peach-50 px-3 py-1.5 text-sm font-medium text-fg-brand"
                       aria-pressed="true"
@@ -166,8 +178,8 @@ export default async function SearchPage({
                     <Link
                       href={buildUrl({
                         q: query || undefined,
-                        category: category || undefined,
-                        sort: sortParam,
+                        category: categorySlug,
+                        sort,
                         available: true,
                       })}
                       className="inline-flex min-h-[40px] items-center rounded-full border border-line px-3 py-1.5 text-sm text-fg-secondary transition-colors hover:border-line-brand hover:text-fg-brand"
@@ -190,10 +202,10 @@ export default async function SearchPage({
             <section className="pb-5">
               <div className="flex flex-wrap items-center gap-2">
                 <Link
-                  href={buildUrl({ q: query || undefined, sort: sortParam })}
-                  aria-current={!category ? 'page' : undefined}
+                  href={buildUrl({ q: query || undefined, sort, available: availableOnly })}
+                  aria-current={!categorySlug ? 'page' : undefined}
                   className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
-                    !category
+                    !categorySlug
                       ? 'border-peach-500 bg-peach-100 text-peach-800'
                       : 'border-line bg-surface text-fg-secondary hover:border-peach-400 hover:text-fg-brand'
                   }`}
@@ -201,14 +213,15 @@ export default async function SearchPage({
                   ทั้งหมด
                 </Link>
                 {categories.map((cat) => {
-                  const selected = category === cat.slug;
+                  const selected = categorySlug === cat.slug;
                   return (
                     <Link
                       key={cat.id}
                       href={buildUrl({
                         q: query || undefined,
                         category: cat.slug,
-                        sort: sortParam,
+                        sort,
+                        available: availableOnly,
                       })}
                       aria-current={selected ? 'page' : undefined}
                       className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${

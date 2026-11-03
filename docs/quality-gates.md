@@ -95,7 +95,7 @@
 | BS    | Build stamp ต้องบอกของจริง (audit #1, 27 ต.ค.) — `.next/GIT_SHA` มาจา working tree ไม่ใช่ HEAD (ของจริง: `/api/v1/version` บอก `dbe8acd` แต่เสิร์ฟโค้ด `b057e55` เพราะ build ก่อน commit) · tree รก = stamp `<sha>-dirty` + เตือนดัง ๆ แต่ยัง exit 0 (คนยังแก้ของอยู่ ห้ามบล็อก build) · untracked file ก็นับ dirty (route ใหม่ที่ยังไม่ commit ก็เข้า build ได้) · ไม่มี `.next/BUILD_ID` = exit 1 | `tests/build-stamp.test.ts` | `npm test` (vitest) | Unit Tests |
 | PCV   | Payment-surface contrast (1 พ.ย. 2569) — ลูกค้าแจ้ง "ฟอนต์กลืนกับพื้นการ์ดตอนจ่ายเงิน": หน้าจ่ายเงินใช้สีแบบติดธีมเดียว (`bg-peach-50`/`bg-peach-100` เป็นครีมเสมอ, `bg-jade-900/20` + `text-jade-200` เป็นเข้มเสมอ) แต่ `text-fg*` พลิกตามธีม → แถบวิธีชำระที่เลือกในโหมดมืด (ธีมเริ่มต้น) วัดได้ **1.00:1** คือมองไม่เห็น · P1/P2 สแกน `components/checkout`, `components/order`, `app/checkout` ห้ามมี fill/สีตัวอักษรแบบธีมเดียว (ต้องประกาศ `dark:` คู่ หรือใช้ `bg-surface-brand-subtle`) · P3 คำนวณคอนทราสต์จริงจาก `tokens.css` ทั้ง light/dark ต้อง ≥ 4.5 (fg บน brand-subtle, fg-secondary บน surface, jade บนชิป 15%) และมี negative control ยืนยันว่าคู่เดิม (ฟ้าครืมใต้ตัวอักษรสว่าง) ยังถูกตัดสินว่าตก | `tests/payment-contrast-gate.test.ts` | `npm test` (vitest) | Unit Tests |
 | RB    | Release badge — เวอร์ชันที่แอดมินเห็น ต้องเป็นของจริงทุกหน้า (29 ต.ค.) — `fetch('/api/v1/version')` มีที่เดียวใน `src/` หลัง module-level cache (ไม่งั้นทุก navigation ในแอดมินเรียกซ้ำ) · chip ต้องอยู่ใน top bar (ทุกหน้า) และ sidebar footer ทั้ง desktop rail กับ mobile drawer · dashboard card อ่านจาก hook เดียวกัน ไม่มี fetch ส่วนตัว · ข้อความ fail/ไม่มีข้อมูล + dirty warning + ปุ่มคัดลอก ต้องอยู่ครบ | `tests/release-badge.test.ts` | `npm test` (vitest) | Unit Tests |
-| SC    | หมวดหมู่ที่เลือกบน /search ประกาศ aria-current และ `สินค้าทั้งหมด` ไม่แย่งสถานะ (1.1.6) | `tests/search-category-chip.test.ts` | `npm test` (vitest) | Unit Tests |
+| SC    | หมวดหมู่ที่เลือกบน /search ประกาศ aria-current และ `สินค้าทั้งหมด` ไม่แย่งสถานะ (1.1.6) · ชิปทุกใบพา `?available=` ต่อ และ slug ที่ไม่มีจริงถือว่าไม่กรอง + render test นับ `aria-current` ได้ 1 (1.1.7) | `tests/search-category-chip.test.ts` | `npm test` (vitest) | Unit Tests |
 
 **วิธีรัน:**
 
@@ -991,7 +991,7 @@ slug ที่เป็น ASCII ไม่พังเพราะ `encodeURICom
 
 ---
 
-## หมวดหมู่ที่เลือกบน /search ต้องประกาศตัวเอง (3 พ.ย. 2569) — `tests/search-category-chip.test.ts`
+## หมวดหมู่ที่เลือกบน /search ต้องประกาศตัวเอง (3 พ.ย. 2569, ขยาย 1.1.7) — `tests/search-category-chip.test.ts`
 
 หน้า `/search?category=<slug>` คือปลายทางของทั้งการ์ดหมวดหมู่หน้าแรกและลิงก์ในเมนู 3 ขีด (ข้อ 1.1.5) ตอนตรวจของจริงบน production พบว่ากรองสินค้าถูกต้อง (19 ใบ) แต่ **ไม่มีชิปไหนมี `aria-current` เลย** ขณะที่ลิงก์ `สินค้าทั้งหมด` บน navbar ประกาศตัวเองว่าเป็นหน้าปัจจุบันทั้งที่พาไปคนละหน้า — คนที่ใช้ screen reader จึงได้ยินเหมือนยังอยู่หน้า "สินค้าทั้งหมด" และลูกค้าที่กดหมวดหมู่มาก็ไม่เห็นว่าตัวกรองติดอยู่ สไตล์ active (peach) มีอยู่แล้วแต่ไม่ได้ประกาศคู่กัน
 
@@ -1002,11 +1002,18 @@ slug ที่เป็น ASCII ไม่พังเพราะ `encodeURICom
 | C3 | ชิป "ทั้งหมด" เป็น current เฉพาะตอนที่ไม่มีตัวกรอง |
 | C4 | `/search` ส่ง `searchCategory` ให้ `FacebookLayout` แล้วส่งต่อ `FacebookNavbar` |
 | C5 | navbar ไม่ mark `/search` เป็น current เมื่อมี category อยู่ในผลลัพธ์ |
+| R1 | render จริงของหน้า: ผลลัพธ์ที่มีตัวกรองมี `aria-current="page"` **หนึ่งเดียว** และอยู่บนชิปของหมวดนั้น |
+| R2 | ทุก `href` ของชิปพา `?available=` (และ `sort=`) ต่อไป — กดเปลี่ยนหมวดแล้วตัวกรองไม่หลุด |
+| R3 | slug ที่ไม่มีจริง = ไม่กรอง: ยังมี current หนึ่งเดียว, ไม่ส่ง slug เข้า reader, ไม่บอก chrome ว่ามีตัวกรอง |
+
+1.1.7 ปิดสองรูที่เหลือในบริเวณเดียวกัน: (ก) `buildUrl` รู้จัก `available` แต่ทุกชิปเรียกโดยไม่ส่ง → กดหมวดตอนเปิด "เฉพาะที่มีของ" แล้วตัวกรองหายเงียบ ๆ (ตัวเรียงและตัวเปลี่ยนหน้าไม่เคยพลาด) (ข) `?category=` ที่ไม่มีจริงกรองจนว่าง **และ** ไม่มีอะไรเป็น current เลย (ไม่มีชิปไหนตรง และ navbar จะนิ่งเมื่อมี slug) ใต้หัวเรื่องที่บอกชื่อหมวดที่ไม่มีอยู่ — หน้าจึงแก้ slug ให้ตรงกับรายการชิปก่อน แล้วใช้ค่าเดียวทั้งกริด หัวเรื่อง breadcrumb ชิป และ chrome
 
 **พังได้จริง — ทดสอบด้วยการใส่มั๊กกลับ**
 
 - ลบ `aria-current={selected ? 'page' : undefined}` ออกจากชิปหมวด → C1 แดง
 - เอา `!searchCategory` ออกจาก `isActive` ของ navbar → C5 แดง
+- ลบ `available: availableOnly` ออกจาก `buildUrl` ของชิป → R2 แดง
+- ใช้ `category` ดิบแทน `categorySlug` (หรือลบการ resolve) → R3 แดง
 
 ---
 
