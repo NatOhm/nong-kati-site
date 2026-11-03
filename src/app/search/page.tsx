@@ -212,6 +212,16 @@ export default async function SearchPage({
                 >
                   ทั้งหมด
                 </Link>
+                {/* DB outage: no chips loaded, but ?category= still filters the
+                    page — name it, with no count to show. */}
+                {dbDown && categorySlug && (
+                  <span
+                    aria-current="page"
+                    className="rounded-full border border-peach-500 bg-peach-100 px-3 py-1.5 text-sm text-peach-800"
+                  >
+                    {categorySlug}
+                  </span>
+                )}
                 {categories.map((cat) => {
                   const selected = categorySlug === cat.slug;
                   return (

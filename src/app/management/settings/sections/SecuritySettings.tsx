@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Shield, Save, Key, Lock, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 import { adminFetch } from '@/lib/adminSession';
 import { safeJson } from '@/lib/json';
 
-import { SettingsSaver, Section, Field } from '../shared';
+import { useSettingsSaver, type RegisterSaver, Section, Field } from '../shared';
 import { ChangePassword } from './ChangePassword';
 
 // ─── Security Settings ────────────────────────────────────
@@ -34,7 +34,7 @@ export const PW_RULES = [
 export function SecuritySettings({
   registerSaver,
 }: {
-  registerSaver: (fn: SettingsSaver | null) => void;
+  registerSaver: RegisterSaver;
 }): React.JSX.Element {
   const [lockoutMaxAttempts, setLockoutMaxAttempts] = useState('5');
   const [lockoutMinutes, setLockoutMinutes] = useState('15');
@@ -83,8 +83,7 @@ export function SecuritySettings({
     };
   }, []);
 
-  const valuesRef = useRef({ lockoutMaxAttempts, lockoutMinutes, passwordMinLength, pwRules });
-  valuesRef.current = { lockoutMaxAttempts, lockoutMinutes, passwordMinLength, pwRules };
+  const valuesRef = useSettingsSaver(registerSaver, { lockoutMaxAttempts, lockoutMinutes, passwordMinLength, pwRules }, saveToApi);
 
   async function saveToApi(): Promise<void> {
     const v = valuesRef.current;
@@ -125,12 +124,6 @@ export function SecuritySettings({
       setSaving(false);
     }
   }
-
-  useEffect(() => {
-    registerSaver(saveToApi);
-    return () => registerSaver(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [registerSaver]);
 
   if (loading) {
     return (

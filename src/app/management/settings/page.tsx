@@ -6,7 +6,7 @@ import { CheckCircle2, Save } from 'lucide-react';
 import { AdminShell } from '@/components/layout/AdminShell';
 import { cn } from '@/utils/cn';
 
-import { TABS, type SettingsSaver, type SettingsTab } from './shared';
+import { TABS, type RegisterSaver, type SettingsSaver, type SettingsTab } from './shared';
 import { AnnouncementSettings } from './sections/AnnouncementSettings';
 import { AppearanceSettings } from './sections/AppearanceSettings';
 import { BannerSettings } from './sections/BannerSettings';
@@ -21,10 +21,11 @@ import { VatSettings } from './sections/VatSettings';
 export default function AdminSettingsPage(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<SettingsTab>('store');
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  // The active tab registers its real save here; null when the tab has no
-  // backend (payment/email/security/notifications are placeholders).
-  const saverRef = useRef<SettingsSaver | null>(null);
+  // Every visible panel registers its real save here (the payment tab renders
+  // two of them, so a single slot would silently drop one).
+  const saversRef = useRef(new Set<SettingsSaver>());
   const [canSave, setCanSave] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Deep link support (e.g. forced password change after first login).
   useEffect(() => {
@@ -32,20 +33,27 @@ export default function AdminSettingsPage(): React.JSX.Element {
     if (tab && TABS.some((t) => t.id === tab)) setActiveTab(tab as SettingsTab);
   }, []);
 
-  const registerSaver = useCallback((fn: SettingsSaver | null) => {
-    saverRef.current = fn;
-    setCanSave(fn !== null);
+  const registerSaver: RegisterSaver = useCallback((fn: SettingsSaver): (() => void) => {
+    saversRef.current.add(fn);
+    setCanSave(true);
+    return () => {
+      saversRef.current.delete(fn);
+      setCanSave(saversRef.current.size > 0);
+    };
   }, []);
 
   async function handleSave() {
-    const save = saverRef.current;
-    if (!save || saveState === 'saving') return;
+    const savers = [...saversRef.current];
+    if (savers.length === 0 || saveState === 'saving') return;
     setSaveState('saving');
+    setSaveError(null);
     try {
-      await save();
+      // Sequential: each panel writes its own endpoint, one request at a time.
+      for (const save of savers) await save();
       setSaveState('saved');
       setTimeout(() => setSaveState('idle'), 2000);
-    } catch {
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : null);
       setSaveState('error');
       setTimeout(() => setSaveState('idle'), 2500);
     }
@@ -79,6 +87,12 @@ export default function AdminSettingsPage(): React.JSX.Element {
             {saveState === 'idle' && 'บันทึกการตั้งค่า'}
           </button>
         </div>
+
+        {saveError && (
+          <p role="alert" className="text-sm text-fg-error">
+            บันทึกไม่สำเร็จ: {saveError}
+          </p>
+        )}
 
         <div className="flex gap-6">
           {/* Tab Navigation */}
@@ -114,7 +128,7 @@ export default function AdminSettingsPage(): React.JSX.Element {
             {activeTab === 'vat' && <VatSettings registerSaver={registerSaver} />}
             {activeTab === 'payment' && (
               <>
-                <ManualTransferSettings />
+                <ManualTransferSettings registerSaver={registerSaver} />
                 <PaymentSettings registerSaver={registerSaver} />
               </>
             )}

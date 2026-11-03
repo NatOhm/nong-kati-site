@@ -7,7 +7,7 @@ import { adminFetch } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
 import { safeJson } from '@/lib/json';
 
-import { Section, Field, ToggleSwitch } from '../shared';
+import { useSettingsSaver, type RegisterSaver, Section, Field, ToggleSwitch } from '../shared';
 
 // ─── Payment Settings ─────────────────────────────────────
 export interface ManualTransferForm {
@@ -24,7 +24,11 @@ export interface ManualTransferForm {
  * gateway is not implemented (review High #2). Persisted via
  * /api/v1/admin/settings/manual-transfer (SiteSetting 'manual-transfer').
  */
-export function ManualTransferSettings(): React.JSX.Element {
+export function ManualTransferSettings({
+  registerSaver,
+}: {
+  registerSaver: RegisterSaver;
+}): React.JSX.Element {
   const [form, setForm] = useState<ManualTransferForm>({
     enabled: false,
     accountType: 'promptpay',
@@ -102,7 +106,11 @@ export function ManualTransferSettings(): React.JSX.Element {
     setForm((f) => ({ ...f, [field]: value }));
   }
 
+  // The header buttons call this too, so read the latest form values.
+  const formRef = useSettingsSaver(registerSaver, form, saveToApi);
+
   async function saveToApi(): Promise<void> {
+    const form = formRef.current;
     setSaving(true);
     setError(null);
     try {
@@ -130,6 +138,8 @@ export function ManualTransferSettings(): React.JSX.Element {
       setTimeout(() => setSaved(false), 2000);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
+      // Rethrow so the header button can report the failure too.
+      throw e;
     } finally {
       setSaving(false);
     }
@@ -293,7 +303,11 @@ export function ManualTransferSettings(): React.JSX.Element {
       )}
       <div className="mt-4 flex justify-end">
         <button
-          onClick={() => void saveToApi()}
+          onClick={() => {
+            // The header button needs saveToApi to reject; here the panel's
+            // own error box already shows the reason.
+            void saveToApi().catch(() => {});
+          }}
           disabled={saving}
           className="flex items-center gap-2 rounded-lg bg-peach-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-peach-400 disabled:opacity-50"
         >

@@ -1,13 +1,28 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Store, CreditCard, Mail, Shield, Bell, Megaphone, Palette, Banknote, CheckCircle2, Copy, Image as ImageIcon } from 'lucide-react';
 
 import { cn } from '@/utils/cn';
 
-/** A tab's save implementation, registered with the page so the header
- *  button can trigger the active tab's real save. */
+/** A panel's real save, registered with the page so the header button can
+ *  trigger it. */
 export type SettingsSaver = () => Promise<void>;
+
+/** Registers a tab's real save with the page and returns its own
+ *  un-register function, so several panels can register at once. */
+export type RegisterSaver = (fn: SettingsSaver) => () => void;
+
+/** Registers `save` with the header button while keeping the values it reads
+ *  fresh — read `ref.current`, not the state, inside `save`. */
+export function useSettingsSaver<T>(registerSaver: RegisterSaver, values: T, save: () => Promise<void>) {
+  const valuesRef = useRef(values);
+  valuesRef.current = values;
+  const saveRef = useRef(save);
+  saveRef.current = save;
+  useEffect(() => registerSaver(() => saveRef.current()), [registerSaver]);
+  return valuesRef;
+}
 
 export type SettingsTab =
   | 'announcement'

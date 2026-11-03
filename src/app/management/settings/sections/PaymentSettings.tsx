@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { CreditCard, Save, Key, Smartphone, CheckCircle2, AlertTriangle, Copy } from 'lucide-react';
 
 import { adminFetch } from '@/lib/adminSession';
 import { safeJson } from '@/lib/json';
 
-import { SettingsSaver, Section, Field, ToggleSwitch, CopyButton } from '../shared';
+import { useSettingsSaver, type RegisterSaver, Section, Field, ToggleSwitch, CopyButton } from '../shared';
 import { Slip2GoProbeCard } from './Slip2GoProbeCard';
 
 // ─── Payment Gateway Settings — wired to SiteSetting('payment-gateway') ──
@@ -21,7 +21,7 @@ export interface PaymentGatewaySettings {
 export function PaymentSettings({
   registerSaver,
 }: {
-  registerSaver: (fn: SettingsSaver | null) => void;
+  registerSaver: RegisterSaver;
 }): React.JSX.Element {
   const [promptpayEnabled, setPromptpayEnabled] = useState(true);
   const [promptpayId, setPromptpayId] = useState('');
@@ -54,20 +54,13 @@ export function PaymentSettings({
     };
   }, []);
 
-  const valuesRef = useRef({
+  const valuesRef = useSettingsSaver(registerSaver, {
     promptpayEnabled,
     promptpayId,
     cardEnabled,
     omisePublicKey,
     omiseSecretKeyEnv,
-  });
-  valuesRef.current = {
-    promptpayEnabled,
-    promptpayId,
-    cardEnabled,
-    omisePublicKey,
-    omiseSecretKeyEnv,
-  };
+  }, saveToApi);
 
   async function saveToApi(): Promise<void> {
     const v = valuesRef.current;
@@ -106,12 +99,6 @@ export function PaymentSettings({
       setSaving(false);
     }
   }
-
-  useEffect(() => {
-    registerSaver(saveToApi);
-    return () => registerSaver(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [registerSaver]);
 
   if (loading) {
     return (

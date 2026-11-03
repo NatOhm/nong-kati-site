@@ -290,6 +290,9 @@ export interface PreviewOrderResult {
  * without any database writes. Used by the checkout page so displayed totals
  * and coupon eligibility match what order creation will persist.
  */
+/** Upper bound on one cart/preview payload. */
+export const MAX_CART_ITEMS = 50;
+
 export async function previewOrder(input: {
   customerEmail: string;
   customerId?: string | null;
@@ -300,6 +303,9 @@ export async function previewOrder(input: {
     throw new Error('INVALID_EMAIL');
   }
   if (!input.items || input.items.length === 0) throw new Error('CART_EMPTY');
+  // items is caller-controlled and every entry costs DB lookups; a real cart is
+  // a handful of lines. The route's own 60/min IP rule (middleware) is the other half.
+  if (input.items.length > MAX_CART_ITEMS) throw new Error('CART_TOO_LARGE');
 
   // Go through the shared resolver — same variant/tier/quantity/promotion/
   // coupon code path as createOrderInner, just without the write.

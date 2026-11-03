@@ -7,7 +7,7 @@ import { adminFetch } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
 import { safeJson } from '@/lib/json';
 
-import { SettingsSaver, Section, Field } from '../shared';
+import { useSettingsSaver, type RegisterSaver, Section, Field } from '../shared';
 
 // ─── Appearance (theme + animation speed) ────────────────
 
@@ -30,7 +30,7 @@ export const SPEED_OPTIONS: { value: string; label: string; desc: string }[] = [
 export function AppearanceSettings({
   registerSaver,
 }: {
-  registerSaver: (fn: SettingsSaver | null) => void;
+  registerSaver: RegisterSaver;
 }): React.JSX.Element {
   const [accent, setAccent] = useState('#F97316');
   const [speed, setSpeed] = useState('normal');
@@ -70,9 +70,7 @@ export function AppearanceSettings({
     };
   }, []);
 
-  // Latest values for the header-registered saver.
-  const valuesRef = useRef({ accent, speed });
-  valuesRef.current = { accent, speed };
+  const valuesRef = useSettingsSaver(registerSaver, { accent, speed }, saveToApi);
 
   async function saveToApi(): Promise<void> {
     const { accent: a, speed: s } = valuesRef.current;
@@ -86,13 +84,6 @@ export function AppearanceSettings({
       throw new Error(data.error ?? `HTTP ${res.status}`);
     }
   }
-
-  // Header save button drives this tab's real save.
-  useEffect(() => {
-    registerSaver(saveToApi);
-    return () => registerSaver(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [registerSaver]);
 
   async function handleSave() {
     setSaving(true);

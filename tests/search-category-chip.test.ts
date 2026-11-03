@@ -117,6 +117,7 @@ describe('search category landing state (source)', () => {
 const h = vi.hoisted(() => ({
   layoutCategory: 'unset' as string | undefined | 'unset',
   catalogCalls: [] as { query: string; category: string | undefined }[],
+  dbDown: false,
 }));
 
 const CATEGORIES = [
@@ -141,7 +142,10 @@ const PRODUCT = {
 };
 
 vi.mock('@/lib/data', () => ({
-  getCategoriesWithProductCounts: async () => CATEGORIES,
+  getCategoriesWithProductCounts: async () => {
+    if (h.dbDown) throw new Error('db down');
+    return CATEGORIES;
+  },
   getCatalogProducts: async (query: string, category: string | undefined) => {
     h.catalogCalls.push({ query, category });
     // Mirrors the real reader: an unknown slug matches nothing at all.
@@ -169,9 +173,11 @@ import SearchPage from '../src/app/search/page';
 
 async function render(
   params: Record<string, string>,
+  opts: { dbDown?: boolean } = {},
 ): Promise<{ html: string; layoutCategory: string | undefined; chipHrefs: string[] }> {
   h.layoutCategory = 'unset';
   h.catalogCalls = [];
+  h.dbDown = opts.dbDown === true;
   const html = renderToStaticMarkup(
     (await SearchPage({ searchParams: Promise.resolve(params) })) as React.ReactElement,
   );
@@ -247,5 +253,20 @@ describe('search filter state (render)', () => {
       );
       expect(href, `chip href lost the available filter: ${href}`).toContain('available=1');
     }
+  });
+
+  it('R4 — during a DB outage the requested filter is still announced as current', async () => {
+    const { html, layoutCategory } = await render(
+      { category: 'streaming-app', available: '1' },
+      { dbDown: true },
+    );
+
+    // No chips could be loaded, so the filter has no chip of its own: the page
+    // must still say where the visitor stands, and exactly once.
+    expect(ariaCurrentCount(html), 'outage landing must keep exactly one current element').toBe(1);
+    expect(html, 'the outage chip must name the requested category').toContain(
+      '>streaming-app</span>',
+    );
+    expect(layoutCategory, 'the chrome must still know the filter').toBe('streaming-app');
   });
 });

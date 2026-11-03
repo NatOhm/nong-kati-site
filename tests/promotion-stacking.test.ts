@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { resolveOrderPricing } from '@/lib/promotions';
+import { applyPromotionDiscount, resolveOrderPricing } from '@/lib/promotions';
 
 function pricingDb(
   withPromotion: boolean,
@@ -111,5 +111,28 @@ describe('automatic promotions and coupons', () => {
 
     expect(result.promotionResults.get('variant-1')?.promotion).toBeUndefined();
     expect(result.promotionResults.get('variant-1')?.effectivePriceThb).toBe(100);
+  });
+});
+
+// The formula used to exist in three copies (promotions.ts twice, data.ts once).
+// One copy that rounds differently would show one price on the card, another in
+// the cart and a third in the order.
+describe('applyPromotionDiscount — the single discount formula', () => {
+  it.each([
+    { price: 100, type: 'percent', value: 30, expected: 70 },
+    { price: 99, type: 'percent', value: 15, expected: 84.15 },
+    { price: 59.99, type: 'percent', value: 15, expected: 50.99 },
+    { price: 100, type: 'amount', value: 25, expected: 75 },
+    { price: 9.99, type: 'amount', value: 5, expected: 4.99 },
+    // A discount worth more than the price comes back <= 0; callers skip it.
+    { price: 100, type: 'amount', value: 100, expected: 0 },
+    { price: 100, type: 'amount', value: 150, expected: -50 },
+  ])('$price THB, $type $value → $expected', ({ price, type, value, expected }) => {
+    expect(applyPromotionDiscount(price, type, value)).toBe(expected);
+  });
+
+  it('treats anything that is not "percent" as a fixed THB amount', () => {
+    expect(applyPromotionDiscount(100, 'amount', 10)).toBe(90);
+    expect(applyPromotionDiscount(100, 'weird', 10)).toBe(90);
   });
 });

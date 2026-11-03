@@ -1,19 +1,19 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Banknote, Save, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 import { adminFetch } from '@/lib/adminSession';
 import { safeJson } from '@/lib/json';
 
-import { SettingsSaver, Section, ToggleSwitch } from '../shared';
+import { useSettingsSaver, type RegisterSaver, Section, ToggleSwitch } from '../shared';
 
 // ─── VAT Settings ────────────────────────────────────────
 
 export function VatSettings({
   registerSaver,
 }: {
-  registerSaver: (fn: SettingsSaver | null) => void;
+  registerSaver: RegisterSaver;
 }): React.JSX.Element {
   const [enabled, setEnabled] = useState(false);
   const [rate, setRate] = useState('7');
@@ -45,9 +45,7 @@ export function VatSettings({
     };
   }, []);
 
-  // Latest values for the header-registered saver.
-  const valuesRef = useRef({ enabled, rate });
-  valuesRef.current = { enabled, rate };
+  const valuesRef = useSettingsSaver(registerSaver, { enabled, rate }, saveToApi);
 
   async function saveToApi(): Promise<void> {
     const { enabled: e, rate: r } = valuesRef.current;
@@ -61,13 +59,6 @@ export function VatSettings({
       throw new Error(data.error ?? `HTTP ${res.status}`);
     }
   }
-
-  // Header save button drives this tab's real save.
-  useEffect(() => {
-    registerSaver(saveToApi);
-    return () => registerSaver(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [registerSaver]);
 
   async function handleSave() {
     setSaving(true);

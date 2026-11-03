@@ -10,7 +10,11 @@
  *  - the account loaded from the server is what gets saved back, untouched,
  *    so a save cannot blank the account the storefront shows;
  *  - an edit made in the form wins over that initial load;
- *  - a rejected save is visible to the admin and never says "saved".
+ *  - a rejected save is visible to the admin and never says "saved";
+ *  - the header save button (registered with the page) saves this panel.
+ *    The bug this replaced: the payment tab renders two panels and the page
+ *    kept ONE saver slot, so the header saved the other panel and reported
+ *    success while an edited bank account was silently lost.
  */
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
@@ -50,11 +54,18 @@ async function renderPanel(opts: { stored?: unknown; putResponse?: () => Respons
     return json(opts.stored ?? STORED);
   });
 
-  render(<ManualTransferSettings />);
+  const registerSaver = vi.fn((_fn: () => Promise<void>) => () => {});
+  render(<ManualTransferSettings registerSaver={registerSaver} />);
   const user = userEvent.setup();
 
   return {
     user,
+    /** The saver the panel handed to the page's header button. */
+    headerSave: (): (() => Promise<void>) => {
+      const call = registerSaver.mock.calls.at(-1);
+      if (!call) throw new Error('the panel never registered a saver');
+      return call[0];
+    },
     save: async (): Promise<void> => {
       const button = await screen.findByRole('button', { name: 'บันทึกข้อมูลโอนเงิน' });
       await user.click(button);
@@ -131,6 +142,29 @@ describe('manual-transfer panel — saving stays switched off until enabled', ()
 
     await user.click(toggle);
     expect(screen.getByPlaceholderText('000-0-00000-0')).toBeTruthy();
+  });
+});
+
+describe('manual-transfer panel — the header save button drives this panel', () => {
+  it('registers a saver that sends the edited account', async () => {
+    const { headerSave, user } = await renderPanel();
+    const number = await screen.findByPlaceholderText('000-0-00000-0');
+
+    await user.clear(number);
+    await user.type(number, '1991735786');
+    await headerSave()();
+
+    expect(savedBody()['accountNumber']).toBe('1991735786');
+    expect(savedBody()['accountName']).toBe('กนกนาถ โรจนวุฒิ');
+  });
+
+  it('rethrows a refused save so the header cannot report success', async () => {
+    const { headerSave } = await renderPanel({
+      putResponse: () => json({ error: 'INVALID_ACCOUNT_NUMBER' }, 400),
+    });
+    await screen.findByDisplayValue('199-1-73578-6');
+
+    await expect(headerSave()()).rejects.toThrow('INVALID_ACCOUNT_NUMBER');
   });
 });
 

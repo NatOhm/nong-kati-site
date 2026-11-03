@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Save, CheckCircle2, AlertTriangle, RefreshCw, Loader2 } from 'lucide-react';
 
 import { adminFetch } from '@/lib/adminSession';
@@ -8,7 +8,7 @@ import { cn } from '@/utils/cn';
 import { safeJson } from '@/lib/json';
 import type { SmtpProbeResult } from '@/lib/email/smtpProbe';
 
-import { SettingsSaver, Section, Field, ToggleSwitch } from '../shared';
+import { useSettingsSaver, type RegisterSaver, Section, Field, ToggleSwitch } from '../shared';
 
 // ─── Email Settings — wired to SiteSetting('email') ──────
 export interface EmailSettingsData {
@@ -38,7 +38,7 @@ export const EMAIL_TEMPLATES: {
 export function EmailSettings({
   registerSaver,
 }: {
-  registerSaver: (fn: SettingsSaver | null) => void;
+  registerSaver: RegisterSaver;
 }): React.JSX.Element {
   const [smtpHost, setSmtpHost] = useState('');
   const [smtpPort, setSmtpPort] = useState('587');
@@ -80,20 +80,13 @@ export function EmailSettings({
     };
   }, []);
 
-  const valuesRef = useRef({
+  const valuesRef = useSettingsSaver(registerSaver, {
     smtpHost,
     smtpPort,
     smtpUser,
     smtpPasswordEnv,
     templates,
-  });
-  valuesRef.current = {
-    smtpHost,
-    smtpPort,
-    smtpUser,
-    smtpPasswordEnv,
-    templates,
-  };
+  }, saveToApi);
 
   async function saveToApi(): Promise<void> {
     const v = valuesRef.current;
@@ -130,12 +123,6 @@ export function EmailSettings({
       setSaving(false);
     }
   }
-
-  useEffect(() => {
-    registerSaver(saveToApi);
-    return () => registerSaver(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [registerSaver]);
 
   // ── Test connection (SMTP probe) — uses the values TYPED in the form;
   // no save required. The route fills gaps from the saved settings.

@@ -705,6 +705,23 @@ describe('pricing persistence — seven-blocker coverage', () => {
     expect(pItem.couponDiscountThb).toBe(cItem.couponDiscountThb);
   });
 
+  it('rejects an oversized preview before touching the database', async () => {
+    const { prisma } = (await import('@/lib/db')) as unknown as {
+      prisma: { productVariant: { findMany: ReturnType<typeof vi.fn> } };
+    };
+    const { previewOrder } = await import('@/api/orders');
+    prisma.productVariant.findMany.mockClear();
+
+    // items is caller-controlled; 51 entries must cost nothing at all.
+    await expect(
+      previewOrder({
+        customerEmail: 'a@b.co',
+        items: Array.from({ length: 51 }, () => ({ variantId: 'v1', quantity: 1 })),
+      }),
+    ).rejects.toThrow('CART_TOO_LARGE');
+    expect(prisma.productVariant.findMany, 'the guard must run before any query').not.toHaveBeenCalled();
+  });
+
   // ── Blocker 5: VAT-disabled behavior ──
 
   it('returns zero VAT when no VAT site setting exists (VAT disabled)', async () => {

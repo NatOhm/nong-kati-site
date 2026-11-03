@@ -28,6 +28,20 @@ import {
 } from '@/lib/pricing';
 import { sellableStock } from '@/lib/stock';
 
+/** The one discount formula. Rounds to satang; a fixed-amount discount larger
+ *  than the price returns a value <= 0 and the caller skips the promotion —
+ *  anything that is not 'percent' is a fixed THB amount, matching the stored
+ *  discountType values. */
+export function applyPromotionDiscount(
+  price: number,
+  discountType: string,
+  discountValue: number,
+): number {
+  const discounted =
+    discountType === 'percent' ? price * (1 - discountValue / 100) : price - discountValue;
+  return Math.round(discounted * 100) / 100;
+}
+
 /** Immutable VAT configuration. */
 export interface VatConfig {
   enabled: boolean;
@@ -272,14 +286,8 @@ export async function getActivePromotionsForVariant(
     }
 
     const discountValue = Number(promo.discountValue);
-    let discountedPrice: number;
-
-    if (promo.discountType === 'percent') {
-      discountedPrice = Math.round(itemPrice * (1 - discountValue / 100) * 100) / 100;
-    } else {
-      discountedPrice = Math.round((itemPrice - discountValue) * 100) / 100;
-      if (discountedPrice <= 0) continue;
-    }
+    const discountedPrice = applyPromotionDiscount(itemPrice, promo.discountType, discountValue);
+    if (promo.discountType !== 'percent' && discountedPrice <= 0) continue;
 
     applicable.push({
       id: promo.id,
@@ -813,13 +821,8 @@ export async function resolveOrderPricing(
     for (const promo of applicable) {
       if (promo.minSpendThb !== null && grossSubtotal < promo.minSpendThb) continue;
       const discountValue = promo.discountValue;
-      let discountedPrice: number;
-      if (promo.discountType === 'percent') {
-        discountedPrice = Math.round(itemPrice * (1 - discountValue / 100) * 100) / 100;
-      } else {
-        discountedPrice = Math.round((itemPrice - discountValue) * 100) / 100;
-        if (discountedPrice <= 0) continue;
-      }
+      const discountedPrice = applyPromotionDiscount(itemPrice, promo.discountType, discountValue);
+      if (promo.discountType !== 'percent' && discountedPrice <= 0) continue;
       if (discountedPrice < bestPrice) {
         bestPrice = discountedPrice;
         bestPromotion = {

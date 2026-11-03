@@ -14,7 +14,7 @@ import {
 } from '@/lib/trustBadges';
 import { DEFAULT_OG_SHARE, parseOgShare, type OgShareSettings } from '@/lib/ogShareSettings';
 import { normalizeTier, tierPrice, type PriceTier } from '@/lib/pricing';
-import { getEligiblePromotions } from '@/lib/promotions';
+import { applyPromotionDiscount, getEligiblePromotions } from '@/lib/promotions';
 import { sellableStock } from '@/lib/stock';
 
 // ─── Tier-aware price resolution ──────────────────────
@@ -176,7 +176,11 @@ async function getCategoryImageMaps(): Promise<{
   return { firstImage, firstSlug };
 }
 
-export async function getCategoriesWithProductCounts(): Promise<
+/** Request-scoped cache: the search chips, the home tiles and the drawer all
+ *  ask for the same list inside one render. */
+export const getCategoriesWithProductCounts = cache(getCategoriesWithProductCountsUncached);
+
+async function getCategoriesWithProductCountsUncached(): Promise<
   (CategoryItem & { productCount: number })[]
 > {
   const cats = await prisma.category.findMany({
@@ -258,7 +262,10 @@ export async function getCategoryTree(): Promise<CategoryItem[]> {
   return buildCategoryTree(cats);
 }
 
-export async function getCategoryBySlug(slug: string): Promise<{
+/** Request-scoped cache: generateMetadata and the page resolve the same slug. */
+export const getCategoryBySlug = cache(getCategoryBySlugUncached);
+
+async function getCategoryBySlugUncached(slug: string): Promise<{
   category: CategoryItem;
   breadcrumb: { id: string; name: string; slug: string }[];
 } | null> {
@@ -361,10 +368,11 @@ async function decoratePromotionPrices(products: ProductItem[]): Promise<Product
       const candidates = applicable
         .map((promotion) => {
           const original = variant.effectivePrice;
-          const discounted =
-            promotion.discountType === 'percent'
-              ? Math.round(original * (1 - promotion.discountValue / 100) * 100) / 100
-              : Math.round((original - promotion.discountValue) * 100) / 100;
+          const discounted = applyPromotionDiscount(
+            original,
+            promotion.discountType,
+            promotion.discountValue,
+          );
           return { promotion, original, discounted };
         })
         .filter(

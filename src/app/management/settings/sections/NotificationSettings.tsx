@@ -7,14 +7,14 @@ import { adminFetch } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
 import { safeJson } from '@/lib/json';
 
-import { SettingsSaver, Section } from '../shared';
+import { type RegisterSaver, Section } from '../shared';
 import { INPUT_CLASS } from './ChangePassword';
 
 // ─── Notification Settings ────────────────────────────────
 export function NotificationSettings({
   registerSaver,
 }: {
-  registerSaver: (fn: SettingsSaver | null) => void;
+  registerSaver: RegisterSaver;
 }): React.JSX.Element {
   const [discordConfigured, setDiscordConfigured] = useState(false);
   const [threshold, setThreshold] = useState('5');
@@ -68,15 +68,14 @@ export function NotificationSettings({
       setSaved(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
+      // The header button is the only caller; it must not show "saved".
+      throw e;
     } finally {
       setSaving(false);
     }
   }, [threshold]);
 
-  useEffect(() => {
-    registerSaver(save);
-    return () => registerSaver(null);
-  }, [save, registerSaver]);
+  useEffect(() => registerSaver(save), [save, registerSaver]);
 
   async function runDiscordTest(): Promise<void> {
     setTesting(true);
