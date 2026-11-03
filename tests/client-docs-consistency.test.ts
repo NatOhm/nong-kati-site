@@ -65,7 +65,7 @@ const ALL_DOCS = [
 
 const SLIP_ADAPTER = path.join(ROOT, 'src', 'lib', 'payment', 'slip2go.ts');
 const OMISE_ADAPTER = path.join(ROOT, 'src', 'lib', 'payment', 'omise.ts');
-const SETTINGS_PAGE = path.join(ROOT, 'src', 'app', 'management', 'settings', 'page.tsx');
+const SETTINGS_DIR = path.join(ROOT, 'src', 'app', 'management', 'settings');
 
 type LedgerRow = { line: number; label: string; title: string; mark: string; detail: string };
 
@@ -142,7 +142,26 @@ const clip = (line: string): string => line.trim().slice(0, 150);
 
 const sources = readFileSync(SLIP_ADAPTER, 'utf8');
 const omiseSources = existsSync(OMISE_ADAPTER) ? readFileSync(OMISE_ADAPTER, 'utf8') : '';
-const settingsSources = existsSync(SETTINGS_PAGE) ? readFileSync(SETTINGS_PAGE, 'utf8') : '';
+/**
+ * The settings screen is a tab shell plus shared parts plus one file per
+ * section. Reading only page.tsx made S2 switch itself off when the mascot
+ * uploader moved into its own file, so read the whole tree.
+ */
+function readSettingsTree(): string {
+  if (!existsSync(SETTINGS_DIR)) return '';
+  let out = '';
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (entry.name.endsWith('.tsx') || entry.name.endsWith('.ts')) out += readFileSync(full, 'utf8');
+    }
+  };
+  walk(SETTINGS_DIR);
+  return out;
+}
+
+const settingsSources = readSettingsTree();
 
 /** How many app pages actually emit alternates.canonical right now. */
 function countCanonicalPages(): number {

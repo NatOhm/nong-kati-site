@@ -226,16 +226,22 @@ describe('the escape route stays open', () => {
 
   it('the settings page is reachable without a permission gate', () => {
     const settings = read('app/management/settings/page.tsx');
-    expect(settings).not.toMatch(/checkPermission/);
+    // The screen is split into a tab shell plus one file per section, so the
+    // panel itself is read from its own module. The import below keeps that
+    // honest: if the shell ever rendered a different SecuritySettings, this
+    // test would be reading an orphan.
+    const security = read('app/management/settings/sections/SecuritySettings.tsx');
+    expect(settings + security).not.toMatch(/checkPermission/);
     // The form must render inside the security tab, not behind a flag.
     expect(settings).toMatch(/activeTab === 'security' && <SecuritySettings/);
+    expect(settings).toMatch(/from '\.\/sections\/SecuritySettings'/);
     // The form must render in the rendered branch, i.e. after the loading
     // early-return — and that branch's .finally() clears loading even when
     // the security-settings fetch 403s, so a forced admin still reaches it.
-    const security = settings.slice(settings.indexOf('function SecuritySettings'));
+    expect(security).toMatch(/if \(loading\)/);
+    expect(security.slice(0, security.indexOf('if (loading)'))).toMatch(/\.finally\(\(\) => \{/);
     const rendered = security.slice(security.indexOf('if (loading)'));
     expect(rendered).toMatch(/<ChangePassword \/>/);
-    expect(security.slice(0, security.indexOf('if (loading)'))).toMatch(/\.finally\(\(\) => \{/);
   });
 });
 
