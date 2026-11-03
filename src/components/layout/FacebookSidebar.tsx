@@ -122,7 +122,12 @@ function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
       ? Array.from({ length: SKELETON_ROWS }, (): SidebarRow => ({ skeleton: true }))
       : (categories ?? []).map(
           (c): SidebarRow => ({
-            href: `/category/${c.slug}`,
+            // The listing page, not the category's tile page: a root category
+            // renders sub-app tiles (grouped), and the client asked the drawer
+            // to land on the product list with that category already selected
+            // (2026-11-02). /search expands the whole subtree, exactly like
+            // the chip row it opens onto.
+            href: `/search?category=${encodeURIComponent(c.slug)}`,
             label: c.name,
             color: 'text-fg-brand',
             iconName: c.icon ?? null,

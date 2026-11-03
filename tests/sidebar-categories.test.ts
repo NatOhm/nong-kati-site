@@ -25,7 +25,11 @@ describe('mobile drawer categories', () => {
   });
 
   it('builds each category href from the API response', () => {
-    expect(sidebar).toContain('href: `/category/${c.slug}`');
+    // Client report 2026-11-02 (second round): tapping a drawer category must
+    // open the product listing with that category selected. /category/<root>
+    // renders sub-app tiles instead, which is the "grouped" page they rejected.
+    expect(sidebar).toContain('href: `/search?category=${encodeURIComponent(c.slug)}`');
+    expect(sidebar, 'drawer sent to the grouped tile page again').not.toContain('/category/${c.slug}');
     expect(sidebar).toContain("fetch('/api/v1/categories')");
   });
 
