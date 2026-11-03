@@ -26,6 +26,10 @@
  * ghost `foo.test.ts`. Both extensions are matched now, so a rendered
  * component gate is inventoried like any other.
  *
+ * G5 closes the third way the table drifted: `pricing-persistence` held two
+ * rows with the same id and the same file, so the map read as two gates where
+ * there was one. G3 checks a row's shape, never whether the row repeats.
+ *
  * Deliberately NOT checked here: `e2e/*.spec.ts`. Those are documented
  * under E1–E5 and the browser-smoke job, several are driven only in CI
  * rather than `npm test`, and the vitest glob never sees them. Folding them
@@ -124,5 +128,22 @@ describe('docs/quality-gates.md ↔ tests/ inventory', () => {
   it('G4: the doc exists where the gate expects it (guards the guard)', () => {
     expect(existsSync(DOC)).toBe(true);
     expect(onDisk.length).toBeGreaterThan(0);
+  });
+
+  it('G5: one row per suite (no suite documented twice)', () => {
+    // pricing-persistence had two overview rows with the same id and the same
+    // file, so the table read as two gates where there was one. G3 checks the
+    // shape of a row, not whether the row is a duplicate.
+    const perRow = tableRows.map((l) => (l.match(FILE_RE) ?? [])[0]);
+    const seen = new Map<string, number>();
+    for (const f of perRow) if (f) seen.set(f, (seen.get(f) ?? 0) + 1);
+    const twice = [...seen].filter(([, n]) => n > 1).map(([f]) => f);
+    expect(
+      twice,
+      twice.length
+        ? `These suites have more than one overview row — merge them:\n` +
+            twice.map((f) => `  - tests/${f}`).join('\n')
+        : '',
+    ).toEqual([]);
   });
 });
