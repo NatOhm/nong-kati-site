@@ -12,12 +12,19 @@
  *
  * Two directions, because the doc can be wrong either way:
  *
- *   G1  every tests/*.test.ts must be referenced by the doc. A gate nobody
- *       documents is a gate nobody knows to run, and reads as an absence
- *       from the project's guarantees when it is actually present.
- *   G2  every tests/*.test.ts the doc claims must exist on disk. A renamed
+ *   G1  every tests/*.test.ts(x) must be referenced by the doc. A gate
+ *       nobody documents is a gate nobody knows to run, and reads as an
+ *       absence from the project's guarantees when it is actually present.
+ *   G2  every tests/*.test.ts(x) the doc claims must exist on disk. A renamed
  *       or deleted suite leaves a confident-looking entry pointing at
  *       nothing, which is worse than no entry.
+ *
+ * Render suites (`.test.tsx`, jsdom) were invisible to the first version of
+ * this gate, which scanned `.test.ts` only: six of them shipped, all six ran
+ * on every `vitest`, and none of them had to appear in the doc. They also
+ * could not be added honestly — the G2 regex read `foo.test.tsx` as the
+ * ghost `foo.test.ts`. Both extensions are matched now, so a rendered
+ * component gate is inventoried like any other.
  *
  * Deliberately NOT checked here: `e2e/*.spec.ts`. Those are documented
  * under E1–E5 and the browser-smoke job, several are driven only in CI
@@ -47,7 +54,7 @@ const DOC = path.join(ROOT, 'docs', 'quality-gates.md');
 const docText = readFileSync(DOC, 'utf8');
 const lines = docText.split('\n');
 
-const FILE_RE = /[A-Za-z0-9-]+\.test\.ts/g;
+const FILE_RE = /[A-Za-z0-9-]+\.test\.tsx?/g;
 
 /** Any mention at all — used for ghost detection (G2). */
 const mentioned = new Set(docText.match(FILE_RE) ?? []);
@@ -69,7 +76,7 @@ const documented = new Set(
 );
 
 const onDisk = readdirSync(TESTS_DIR)
-  .filter((f) => f.endsWith('.test.ts'))
+  .filter((f) => f.endsWith('.test.ts') || f.endsWith('.test.tsx'))
   .sort();
 
 const pipes = (l: string): number => (l.match(/\|/g) ?? []).length;

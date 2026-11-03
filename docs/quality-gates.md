@@ -31,7 +31,7 @@
 | D1    | Client-doc drift — 20 gates over 4 docs               | `tests/client-docs-consistency.test.ts` | `npm test` (vitest) | doc-consistency        |
 | F1    | E2E fixture images are real, complete, non-degenerate | `tests/test-fixture-images.test.ts` | `npm test` (vitest)  | Unit Tests             |
 | CF    | Client-feedback round 2 (out-of-stock, CSP blob:, Slip2Go) | `tests/client-feedback-fixes.test.ts` | `npm test` (vitest) | Unit Tests             |
-| Q1    | This inventory itself — every tests/ file is documented | `tests/quality-gates-coverage.test.ts` | `npm test` (vitest) | Unit Tests             |
+| Q1    | This inventory itself — every tests/ suite (`.test.ts` + `.test.tsx`) is documented, with no phantom entries | `tests/quality-gates-coverage.test.ts` | `npm test` (vitest) | Unit Tests             |
 | RF    | Admin refund — authz, validation, atomic Refund+void+audit | `tests/admin-refund.test.ts`       | `npm test` (vitest)  | Unit Tests             |
 | RL    | Customer resend-email cap (3/order/hour, no quota burn on a failed email match) | `tests/customer-resend-rate-limit.test.ts` | `npm test` (vitest) | Unit Tests |
 | AR    | Admin resend-email — error contract (EMAIL_SEND_FAILED, not a transport string) | `tests/admin-resend-email.test.ts` | `npm test` (vitest) | Unit Tests |
@@ -73,6 +73,12 @@
 | ON    | Order-number allocation — numbering จากเลขสูงสุดของปีปัจจุบัน (ไม่ใช่ `COUNT(*)`) เพราะ row ถูกลบไป 1 อัน = count ตามจริงไม่ทัน → insert ซ้ำ → Postgres abort tx → เดิม retry ใน tx เดิมได้ 25P02 ทุกครั้ง = checkout 500 ทุกลูกค้า | `tests/order-numbering.test.ts` | `npm test` (vitest) | Unit Tests |
 | BK    | Bulk account-paste — counter นับเท่ากับที่ route แยกจริง (CRLF / NBSP blank-run / บล็อกในบัญชีเดียว) และ raw error code ห้ามหลุดถึงจอ (NO_VARIANTS → ข้อความไทย) | `tests/bulk-stock-records.test.ts` | `npm test` (vitest) | Unit Tests |
 | VR    | Variant reconcile by id ใน PUT admin/products — สินค้าที่มี gift codes บันทึกได้ไม่ชน FK (ไม่มี deleteMany), ตัวเลือกไม่ถูกสร้างซ้ำทุกครั้งที่เซฟ, StockMove นับตาม variant id + `/search?category=` ค้นทั้ง subtree และ chip นับเฉพาะสินค้า active | `tests/product-variant-reconcile.test.ts` | `npm test` (vitest) | Unit Tests |
+| PMS   | การ์ดโอนเงินในขั้นชำระเงิน (render จริง) — การ์ดบัญชีร้าน/QR ขึ้นตามที่ตั้งค่า, ไม่มีบัญชี = ไม่มีการ์ด, wallet โผล่เฉพาะมียอด, กดเลือกวิธีจ่ายแล้ว `onChange` ยิงค่าถูก | `tests/PaymentMethodSelector.test.tsx` | `npm test` (vitest) | Unit Tests |
+| SUP   | แผงอัปสลิปหลังลูกค้าโอน (render จริง) — โหมดตรวจอัตโนมัติ + fallback ไปแอดมิน, นับ request จริงเพื่อไม่ให้อัปซ้ำเมื่อเซิร์ฟเวอร์เก็บภาพแล้ว, ห้ามโชว์รหัส error ดิบ, แสดงโค้ดที่ได้ทันทีเมื่อยืนยันผ่าน | `tests/SlipUploadPanel.test.tsx` | `npm test` (vitest) | Unit Tests |
+| AB    | แถบประกาศหน้าแรก — ขึ้นเมื่อแอดมินเปิด (ไม่ล็อกซ่อนค้างจาก render แรก) และไม่ขึ้นเมื่อปิด | `tests/announcement-bar.test.tsx` | `npm test` (vitest) | Unit Tests |
+| DFT   | `useDeleteFlow` — ลบที่ค้างต้อง timeout เป็นข้อความ retry และปลดล็อก dialog, reject ทางเน็ตได้ข้อความเดียวกัน, คำปฏิเสธจากเซิร์ฟเวอร์คงเลขออเดอร์ไว้โชว์ | `tests/delete-flow-timeout.test.tsx` | `npm test` (vitest) | Unit Tests |
+| PVT   | สวิตช์เปิด/ปิดแพ็กเกจในตัวแก้ไขสินค้า — กดแล้วพลิก และ PUT ส่ง `isActive: true` พร้อม variant id เดิม (แก้ในที่ ไม่ลบแล้วสร้างใหม่) | `tests/product-variant-toggle.test.tsx` | `npm test` (vitest) | Unit Tests |
+| MT    | แผงโอนเงินแมนนวล render จริง — บัญชีที่โหลดมาต้องถูกเซฟกลับครบทุกช่อง, ค่าที่แก้ในฟอร์มชนะค่าที่โหลด, เซฟที่ถูกปฏิเสธต้องเห็น error และห้ามขึ้น "บันทึกแล้ว" | `tests/manual-transfer-form.test.tsx` | `npm test` (vitest) | Unit Tests |
 | E1    | Disabled-state affordance (WCAG 1.4.1)                | `e2e/disabled-state.spec.ts`       | `npm run test:e2e`   | (local/preview)        |
 | E2    | No hardcoded white in dark mode                       | `e2e/no-hardcoded-white.spec.ts`   | `npm run test:e2e`   | (local/preview)        |
 | E3    | Duplicate DOM ids (ทั้งไซต์ผ่าน sitemap)              | `e2e/duplicate-ids.spec.ts`        | `npm run test:e2e`   | (local/preview)        |
@@ -1104,3 +1110,84 @@ production เสิร์ฟ canonical / `og:url` / ทุก `<loc>` ใน si
 - คืน `const rate = typeof b['rate'] === 'number' && b['rate'] > 0 ? b['rate'] : 7` และ `enabled = b['enabled'] === true` (พฤติกรรมเดิม) → V2/V3 แดง 10 เคส
 
 ---
+
+---
+
+## การ์ดโอนเงินในขั้นชำระเงิน (PMS) — `tests/PaymentMethodSelector.test.tsx`
+
+`PaymentMethodSelector` คือด่านสุดท้ายก่อนลูกค้าโอน: การ์ดบัญชีร้านและภาพ QR มาจาก `manualInfo` ที่ประกอบจาก `SiteSetting['manual-transfer']` ถ้าตั้งบัญชีไว้แต่การ์ดไม่ขึ้น ลูกค้าไม่รู้จะโอนไปไหน และถ้า QR ขึ้นทั้งที่ร้านปิดการแสดงภาพ ลูกค้าอาจสแกนจ่ายเข้าบัญชีที่ไม่ต้องการ ชุดนี้ render component จริงใน jsdom และอ่านสิ่งที่ลูกค้าเห็น
+
+| ตัว | บังคับว่า |
+|---|---|
+| P1 | ตั้งบัญชีร้านไว้ → การ์ดโอนเงินขึ้น พร้อมชื่อบัญชีและเลขบัญชีที่ตั้งไว้ |
+| P2 | `displayQr: true` → มีภาพ QR ของร้าน (aria-label "พร้อมเพย์ธนาคารไทยของร้าน") |
+| P3 | `displayQr: false` → ไม่มีภาพ QR แต่ยังเห็นชื่อบัญชีและเลขบัญชี |
+| P4 | ไม่ได้ตั้งบัญชี (`manualInfo` ไม่ส่งมา) → ไม่มีการ์ดและไม่มี QR เหลือแค่ตัวเลือก PromptPay ไม่พังทั้งบล็อก |
+| P5 | `walletBalanceThb: 0` → ไม่มีตัวเลือก "เครดิตในกระเป๋า" (ไม่เสนอทางที่ใช้ไม่ได้) |
+| P6 | ลูกค้าล็อกอินมีเครดิต 84 → มีตัวเลือกกระเป๋า และกดแล้ว `onChange('wallet')` |
+| P7 | จาก wallet กดกลับไป PromptPay → `onChange('promptpay')` ยังยิง (ไม่ถูกมองว่า "เลือกอยู่แล้ว" แล้วเงียบ) |
+
+## แผงอัปสลิปหลังลูกค้าโอน (SUP) — `tests/SlipUploadPanel.test.tsx`
+
+สองเคสจริงอยู่เบื้องหลังชุดนี้: หน้าจอลูกค้าขึ้น `NO_PENDING_ATTEMPT` สีแดง (รหัสเครื่องหลุดถึงจอ) และเคสที่เซิร์ฟเวอร์เก็บภาพสลิปไว้แล้วแต่แผงยังอัปซ้ำอีกรอบ เทสต์จึงนับจำนวน request จริงที่ออกไป ไม่ใช่แค่อ่านข้อความ
+
+| ตัว | บังคับว่า |
+|---|---|
+| SU1 | ตรวจไม่ผ่านแต่เซิร์ฟเวอร์เก็บภาพแล้ว (`slipStored: true`) → แสดงเหตุผลจากเซิร์ฟเวอร์ + บอกว่าแอดมินจะตรวจต่อ, ออก request เดียว (ไม่อัปซ้ำ), ไม่เรียก `onConfirmed` |
+| SU2 | ตรวจไม่ผ่านและยังไม่เก็บภาพ → อัปต่อเข้า `/api/v1/payments/slip-upload` (สองคำขอ) และแจ้งว่าแอดมินจะตรวจ |
+| SU3 | ตรวจผ่าน → ข้อความยืนยันขึ้น และ `onConfirmed('confirmed')` ถูกเรียกครั้งเดียว |
+| SU4 | ตรวจผ่านพร้อมโค้ด → แสดงชื่อสินค้าและโค้ดบนหน้านี้, ซ่อนปุ่มอัป, มีลิงก์ไป `/checkout/confirmation/<uuid>` |
+| SU5 | เซิร์ฟเวอร์ตอบ error code แต่ไม่มี `message` → ห้ามพิมพ์รหัสดิบลงจอ ต้องบอกให้ส่งให้แอดมิน |
+| SU6 | ปิดตรวจอัตโนมัติ (`slipVerifyEnabled: false`) → ยิง `/slip-upload` ตรง ๆ ไม่แตะ `slip-verify` |
+
+## แถบประกาศหน้าแรก (AB) — `tests/announcement-bar.test.tsx`
+
+เคสจริง 2 พ.ย. 2569: แอดมินเปิดประกาศแล้วแต่ไม่มีใครเห็น เพราะคอมโพเนนต์ล็อก `isVisible = false` ไว้ใน mount effect ตั้งแต่ render แรก (ตอนนั้นยังเป็นค่า fallback ที่ปิดอยู่) แล้วไม่มีอะไรตั้งกลับ เทสต์นี้จึงยืนยันทั้ง "ขึ้นเมื่อเปิด" และ "ไม่ขึ้นเมื่อปิด" — ขาดด้านหลังไป การแก้ให้ขึ้นตลอดก็จะผ่าน
+
+| ตัว | บังคับว่า |
+|---|---|
+| AB1 | ประกาศเปิด → ข้อความจาก `/api/v1/announcement` ขึ้นบนจอ พร้อมปุ่ม "ปิดประกาศ" |
+| AB2 | ประกาศปิด → ข้อความนั้นไม่โผล่บนจอเลย |
+
+## ลบที่ค้างไม่ทำให้ dialog ค้างทั้งหน้า (DFT) — `tests/delete-flow-timeout.test.tsx`
+
+`useDeleteFlow` ใช้ร่วมกับ dialog ยืนยันลบทุกหน้าแอดมิน ถ้า promise ที่ลบไม่เคย resolve ปุ่มและ dialog จะค้างจนต้องรีเฟรช ชุดนี้ทดสอบ hook ตรง ๆ ด้วย fake timer
+
+| ตัว | บังคับว่า |
+|---|---|
+| DF1 | ลบที่ค้าง (promise ไม่ resolve) → ครบ 15 วินาทีได้ข้อความ retry, `busy` กลับเป็น false, เป้าหมายยังอยู่, กดยกเลิกได้ (ระหว่างกำลังลบ กดยกเลิกไม่ปิด dialog) |
+| DF2 | promise reject (เน็ตขาด) → ข้อความเดียวกับ timeout ไม่ใช่ error ดิบ และไม่ปิด dialog |
+| DF3 | เซิร์ฟเวอร์ปฏิเสธพร้อมเลขออเดอร์ → เก็บ `reason` + `orderNumbers` ไว้ให้โชว์ และไม่เรียก `onSuccess`; สำเร็จ → ปิด dialog, เคลียร์ error, เรียก `onSuccess` ครั้งเดียว |
+
+## สวิตช์เปิด/ปิดแพ็กเกจในตัวแก้ไขสินค้า (PVT) — `tests/product-variant-toggle.test.tsx`
+
+แพ็กเกจที่ถูกปิดขายไว้ต้องเปิดกลับได้จาก drawer แก้ไขสินค้าโดยไม่ทำให้ตัวเลือกอื่นหรือรหัสโค้ดที่ผูกอยู่หายไป — การเซฟต้องเป็นการแก้ในที่ (ส่ง `id` เดิม) ไม่ใช่ลบแล้วสร้างใหม่ เทสต์เปิดหน้าสินค้าจริง (mock แค่ shell/dialog/api) แล้วดัก body ของ PUT
+
+| ตัว | บังคับว่า |
+|---|---|
+| PV1 | row ที่ `isActive: false` แสดงสวิตช์ "ปิด" (`aria-pressed="false"`) → กดแล้วพลิกเป็น "เปิด" และกดบันทึกแล้ว `PUT /api/v1/admin/products/p1` ส่ง `variants` หนึ่งตัวที่มี `id` เดิมและ `isActive: true` |
+
+## แผงโอนเงินแมนนวลที่แอดมินกดใช้จริง (MT) — `tests/manual-transfer-form.test.tsx`
+
+หลังแยกหน้าตั้งค่าออกเป็นไฟล์ละแผง (`src/app/management/settings/sections/`) แผงนี้ render ได้จริงใน jsdom แทนการสแกน source — ส่วนที่คุมว่า **ลูกค้าโอนเข้าบัญชีไหน** จึงทดสอบจากพฤติกรรม: โหลด → แก้ → กดปุ่มบันทึกของแผงเอง แล้วดู body ที่ออกไป และดูว่าจอพูดอะไรกับแอดมิน
+
+| ตัว | บังคับว่า |
+|---|---|
+| MT1 | บัญชีที่โหลดมาจาก GET ถูกเซฟกลับครบทุกช่อง (ชื่อ/เลขบัญชี/ธนาคาร/ประเภท/QR) — การเซฟต้องไม่ทำให้บัญชีที่หน้าร้านใช้อยู่กลายเป็นว่าง และขึ้น "บันทึกแล้ว" เมื่อสำเร็จ |
+| MT2 | เลขบัญชีที่แก้ในฟอร์มคือค่าที่ออกไป (ค่าที่โหลดมาตอน mount ไม่ทับสิ่งที่แอดมินพิมพ์) |
+| MT3 | สลับประเภทเป็นพร้อมเพย์แล้วเลขบัญชียังอยู่ใน payload |
+| MT4 | ตอนปิดใช้งาน ช่องบัญชีถูกซ่อน และเปิดสวิตช์แล้วโผล่ |
+| MT5 | PUT ที่ถูกปฏิเสธ (`INVALID_ACCOUNT_NUMBER`) ขึ้น error และปุ่มไม่ขึ้น "บันทึกแล้ว" |
+| MT6 | `INVALID_QR_IMAGE_URL` ถูกแปลเป็นข้อความไทยที่แอดมินรู้ว่าต้องทำอะไร |
+
+**พังได้จริง — ทดสอบด้วยการใส่มั๊กกลับ**
+
+- เปลี่ยน `accountNumber: form.accountNumber` เป็น `accountNumber: ''` ใน payload → MT1/MT2/MT3 แดง
+
+---
+
+## Inventory ที่ครอบ `.test.tsx` ด้วย (3 พ.ย. 2569) — `tests/quality-gates-coverage.test.ts`
+
+`docs/quality-gates.md` ฉบับก่อนสแกนแค่ `*.test.ts` ทำให้ `.test.tsx` (render จริงใน jsdom) ทั้งหกชุดที่รันทุกครั้งใน `npm test` ไม่ต้องปรากฏในเอกสารเลย และเขียนเพิ่มก็ไม่ได้ เพราะ regex ฝั่ง ghost เคยตัดนามสกุลทิ้งเหลือ `.ts` แล้วฟ้องว่าเป็นรายการผีทั้งที่ไฟล์นั้นมีอยู่จริง G1/G2 จึงจับทั้งสองนามสกุล และทุกชุดที่สแกนเห็นต้องมีทั้งแถวในตารางภาพรวมและหัวข้อของตัวเอง (การเอ่ยในเนื้อความอย่างเดียวไม่นับ — บทเรียนจาก draft แรกที่ปล่อย `password-reset` ผ่านด้วยการอ้างถึงครั้งเดียว)
+
+`e2e/*.spec.ts` ยังอยู่นอกการตรวจโดยเจตนา: เอกสารอธิบายด้วยแถว E1–E7 และ browser-smoke job, หลายตัวรันเฉพาะใน CI ไม่ใช่ `npm test`, และ vitest glob ไม่เคยเห็นไฟล์เหล่านั้น — regex ของ G1/G2 จึงไม่แตะ `.spec.ts` เลย (ถ้าแตะ จะกลายเป็น ghost ทันทีเพราะไฟล์ไม่ได้อยู่ใน `tests/`)
