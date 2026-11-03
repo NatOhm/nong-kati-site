@@ -106,7 +106,7 @@ export default async function SearchPage({
 
   return (
     <>
-      <FacebookLayout>
+      <FacebookLayout searchCategory={category}>
         {/* The layout owns the single <main> landmark (audit #4). */}
         <div>
           <PageShell>
@@ -179,11 +179,19 @@ export default async function SearchPage({
               )}
             </section>
 
-            {/* Category chips */}
+            {/* Category chips — the active filter must be both VISIBLE and
+                ANNOUNCED. Landing from the drawer (/search?category=<slug>)
+                used to filter the grid with no aria-current anywhere, so the
+                one-tap route read as an unfiltered catalog to assistive tech
+                while the navbar's สินค้าทั้งหมด link claimed to be the current
+                page. The peach classes are the visual half; aria-current is
+                the same state for screen readers — never one without the
+                other. */}
             <section className="pb-5">
               <div className="flex flex-wrap items-center gap-2">
                 <Link
                   href={buildUrl({ q: query || undefined, sort: sortParam })}
+                  aria-current={!category ? 'page' : undefined}
                   className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
                     !category
                       ? 'border-peach-500 bg-peach-100 text-peach-800'
@@ -192,19 +200,27 @@ export default async function SearchPage({
                 >
                   ทั้งหมด
                 </Link>
-                {categories.map((cat) => (
-                  <Link
-                    key={cat.id}
-                    href={buildUrl({ q: query || undefined, category: cat.slug, sort: sortParam })}
-                    className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
-                      category === cat.slug
-                        ? 'border-peach-500 bg-peach-100 text-peach-800'
-                        : 'border-line bg-surface text-fg-secondary hover:border-peach-400 hover:text-fg-brand'
-                    }`}
-                  >
-                    {cat.name} <span className="text-fg-muted">({cat.productCount})</span>
-                  </Link>
-                ))}
+                {categories.map((cat) => {
+                  const selected = category === cat.slug;
+                  return (
+                    <Link
+                      key={cat.id}
+                      href={buildUrl({
+                        q: query || undefined,
+                        category: cat.slug,
+                        sort: sortParam,
+                      })}
+                      aria-current={selected ? 'page' : undefined}
+                      className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                        selected
+                          ? 'border-peach-500 bg-peach-100 text-peach-800'
+                          : 'border-line bg-surface text-fg-secondary hover:border-peach-400 hover:text-fg-brand'
+                      }`}
+                    >
+                      {cat.name} <span className="text-fg-muted">({cat.productCount})</span>
+                    </Link>
+                  );
+                })}
               </div>
             </section>
 

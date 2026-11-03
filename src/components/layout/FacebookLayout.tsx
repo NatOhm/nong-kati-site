@@ -9,6 +9,12 @@ import { HamsterGrassScene } from '@/components/home/HamsterGrassScene';
 
 interface FacebookLayoutProps {
   children: React.ReactNode;
+  /**
+   * The active /search category filter, if the page is a filtered catalog
+   * view. Only /search passes it; the chrome needs it so สินค้าทั้งหมด does not
+   * advertise itself as the current page while the grid shows one category.
+   */
+  searchCategory?: string | undefined;
 }
 
 /**
@@ -21,7 +27,7 @@ interface FacebookLayoutProps {
  * render <AnnouncementBar initial={...}> server-side pass the DB value down
  * through context-free duplication (the bar ignores a second mount's fetch).
  */
-export function FacebookLayout({ children }: FacebookLayoutProps) {
+export function FacebookLayout({ children, searchCategory }: FacebookLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
@@ -43,7 +49,10 @@ export function FacebookLayout({ children }: FacebookLayoutProps) {
       <AnnouncementBar />
 
       {/* Top navigation */}
-      <FacebookNavbar onMenuToggle={() => setSidebarOpen(true)} />
+      <FacebookNavbar
+        onMenuToggle={() => setSidebarOpen(true)}
+        searchCategory={searchCategory}
+      />
 
       {/* Main content area with sidebar */}
       <div className="flex">

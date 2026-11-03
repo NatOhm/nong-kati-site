@@ -20,6 +20,13 @@ import { useComboboxKeyboard } from '@/hooks/useComboboxKeyboard';
 
 interface FacebookNavbarProps {
   onMenuToggle?: () => void;
+  /**
+   * The category filter in force on /search, when the current view is a
+   * filtered catalog. On /search?category=<slug> the สินค้าทั้งหมด entry leads
+   * to a different view than the one on screen, so it must not announce
+   * aria-current="page" — the selected chip owns that state (search/page.tsx).
+   */
+  searchCategory?: string | undefined;
 }
 
 interface SearchSuggestion {
@@ -36,7 +43,7 @@ const NAV_ITEMS = [
   { href: '/account/orders', label: 'คำสั่งซื้อ' },
 ];
 
-export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
+export function FacebookNavbar({ onMenuToggle, searchCategory }: FacebookNavbarProps) {
   const pathname = usePathname();
   // Real session state — the support desk and profile links depend on it
   const sessionState = useCustomerSession();
@@ -263,7 +270,8 @@ export function FacebookNavbar({ onMenuToggle }: FacebookNavbarProps) {
             {NAV_ITEMS.map((item) => {
               const isActive =
                 item.href === '/search'
-                  ? pathname === '/search' || pathname?.startsWith('/category/')
+                  ? (pathname === '/search' && !searchCategory) ||
+                    pathname?.startsWith('/category/')
                   : pathname === item.href || pathname?.startsWith(item.href + '/');
               return (
                 <Link
