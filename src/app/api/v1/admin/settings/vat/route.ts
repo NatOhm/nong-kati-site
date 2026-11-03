@@ -54,11 +54,17 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
   }
   const b = (body ?? {}) as Record<string, unknown>;
 
-  const enabled = b['enabled'] === true;
-  const rate = typeof b['rate'] === 'number' && b['rate'] > 0 ? b['rate'] : 7;
+  // Reject bad input instead of quietly substituting a default: a coerced 7%
+  // here is applied to every future order's total, so a client bug that sent
+  // "true"/"7" used to disable VAT, or restore it at 7%, with a 200 answer.
+  const enabled = b['enabled'];
+  if (typeof enabled !== 'boolean') {
+    return NextResponse.json({ error: 'INVALID_ENABLED' }, { status: 400 });
+  }
 
-  // Validate rate is reasonable (0.1% to 30%)
-  if (rate < 0.1 || rate > 30) {
+  // Validate rate is reasonable (0.1% to 30%).
+  const rate = b['rate'];
+  if (typeof rate !== 'number' || !Number.isFinite(rate) || rate < 0.1 || rate > 30) {
     return NextResponse.json({ error: 'INVALID_RATE' }, { status: 400 });
   }
 

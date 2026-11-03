@@ -49,6 +49,7 @@
 | PP    | Pricing persistence — coupon/VAT allocation, preview parity, promotion snapshots | `tests/pricing-persistence.test.ts` | `npm test` (vitest) | Unit Tests |
 | PS    | Promotion percent/fixed discounts, timing/scope/minimum-spend, and no coupon stacking; coupon-only checkout remains available | `tests/promotion-stacking.test.ts` | `npm test` (vitest) | Unit Tests |
 | VD    | VAT inclusive display, disabled state, configurable rate | `tests/vat-display.test.ts` | `npm test` (vitest) | Unit Tests |
+| VW    | VAT settings write path — ค่าที่ผิดต้องได้ 400 พร้อมชื่อ field ไม่ใช่ถูกแทนด้วย 7 เงียบ ๆ (ก่อน 3 พ.ย.: `rate` ที่ไม่ใช่เลขบวกกลายเป็น 7 และ `enabled` เป็น `=== true` → ส่ง `"true"`/`"7"` มาแล้ว VAT ถูกปิดหรือกลับมาเป็น 7% ด้วยสถานะ 200) | `tests/vat-settings.test.ts` | `npm test` (vitest) | Unit Tests |
 | RL2   | Rate-limit rule table — checkout reads (`orders/preview`, `orders/vat`) ต้องมี bucket ของตัวเอง 60/min ไม่ให้ share กับ rule สร้างออเดอร์ 10/min (มิฉะนั้น preview ที่ยิงทุกครั้งที่แก้ตะกร้าจะทำให้ `POST /orders` จริงโดน 429 กลาง checkout — คว่ำโดย Browser Smoke gate) + rule เฉพาะต้องอยู่ เหนือ rule รวม ในตาราง เพราะ prefix match เจอตัวแรกก่อน | `tests/rate-limit-rules.test.ts` | `npm test` (vitest) | Unit Tests |
 | FV    | Vendored webfonts — ห้าม import `next/font/google` ใน `src/` (build ต้องไม่ fetch ฟอนต์จาก CDN ตอน build — เคสจริง: next/font พังบน CI runner 2 ใน 3 builds จน Browser Smoke แดงทั้งที่โค้ดปกติ) · ทุก `url()` ใน `fonts.css` ต้องชี้ไฟล์ woff2 จริงใน `public/fonts/` (wOF2 magic ครบ — ไฟล์หาย = ข้อความไทยเป็นสี่เหลี่ยม) · ตัวแปร `--font-mitr`/`--font-noto-sans-thai-looped`/`--font-jetbrains-mono` ยังถูกนิยามใน `fonts.css` (เดิม next/font ฉีดผ่าน `<html>` className) | `tests/font-vendoring.test.ts` | `npm test` (vitest) | Unit Tests |
 | IU    | Admin image upload 5 MB byte limit, dimensions, and pixel-area limits | `tests/image-upload-validation.test.ts` | `npm test` (vitest) | Unit Tests |
@@ -1080,3 +1081,26 @@ production เสิร์ฟ canonical / `og:url` / ทุก `<loc>` ใน si
 - เปลี่ยน guard กลับเป็น `v.stock < qty` → SS4/SS5 แดง
 - ให้ `mapProduct` ส่ง `v.stock` ตรง ๆ (ไม่ผ่าน `sellableStock`) → SS1 แดงที่ระดับ helper
 - ตัด `_count` ออกจาก `getProductBySlug` → หน้าสินค้าโฆษณาสต็อกที่ส่งไม่ได้ (ไม่มีเทสต์ครอบหน้านี้ — กันด้วย SS1–SS7 ที่ resolver)
+
+---
+
+## VAT ที่เขียนลงฐานต้องมาจากค่าที่ถูกต้อง (3 พ.ย. 2569) — `tests/vat-settings.test.ts`
+
+ตัวเลขใน `SiteSetting['vat']` คูณทุกยอดออเดอร์ (`getVatConfig` แปลงเปอร์เซ็นต์เป็นเศษส่วนให้ `resolveOrderPricing`) แต่ route เดิม **แทนค่าที่ผิดด้วย 7 เงียบ ๆ**: `rate` ที่ไม่ใช่เลขบวกกลายเป็น 7 และ `enabled = b.enabled === true` แปลว่า client ที่ส่ง `"true"`/`"7"` มา (สตริง จากฟอร์ม หรือจาก serializer ที่เปลี่ยนชนิด) ได้ 200 กลับไปพร้อมเขียน `{enabled: false, rate: 7}` — VAT ถูกปิดทั้งร้าน หรือกลับมาเปิดที่ 7% โดยหน้าจอบอกว่า "บันทึกแล้ว" ไม่มีใครรู้จนยอดเงินเพี้ยน
+
+ตอนนี้ทุก field ที่ผิดชนิดตอบ 400 พร้อมชื่อ field และ **ไม่แตะฐานข้อมูล** ค่าเดิมที่ใช้คิดเงินจึงยังอยู่
+
+| ตัว | บังคับว่า |
+|---|---|
+| V1 | `{enabled: true, rate: 7}` → 200 และเขียนค่าตามที่ส่ง |
+| V2 | `rate` 0 / ติดลบ / 0.05 / 30.5 / สตริง / null / ไม่ส่งมา → 400 `INVALID_RATE` และไม่มีการเขียน |
+| V3 | `enabled` เป็นสตริง `"true"` / ตัวเลข 1 / null / ไม่ส่งมา / body ไม่ใช่ object → 400 `INVALID_ENABLED` และไม่มีการเขียน |
+| V4 | ขอบของช่วงที่ยอมรับ (0.1 และ 30) ผ่านทั้งคู่ |
+| V5 | ไม่มี token → 401 ทั้ง GET/PUT, role ที่ไม่มีสิทธิ์ (`order_manager`) → 403 และไม่มีการเขียน |
+| V6 | GET คืนค่าที่เก็บไว้, ไม่มี row/JSON พัง → `{enabled: false, rate: 7}` (ค่าเริ่มต้นของฝั่งอ่าน ไม่ใช่การเขียน) |
+
+**พังได้จริง — ทดสอบด้วยการใส่มั๊กกลับ**
+
+- คืน `const rate = typeof b['rate'] === 'number' && b['rate'] > 0 ? b['rate'] : 7` และ `enabled = b['enabled'] === true` (พฤติกรรมเดิม) → V2/V3 แดง 10 เคส
+
+---
