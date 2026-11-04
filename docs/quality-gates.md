@@ -102,6 +102,7 @@
 | PCV   | Payment-surface contrast (1 พ.ย. 2569) — ลูกค้าแจ้ง "ฟอนต์กลืนกับพื้นการ์ดตอนจ่ายเงิน": หน้าจ่ายเงินใช้สีแบบติดธีมเดียว (`bg-peach-50`/`bg-peach-100` เป็นครีมเสมอ, `bg-jade-900/20` + `text-jade-200` เป็นเข้มเสมอ) แต่ `text-fg*` พลิกตามธีม → แถบวิธีชำระที่เลือกในโหมดมืด (ธีมเริ่มต้น) วัดได้ **1.00:1** คือมองไม่เห็น · P1/P2 สแกน `components/checkout`, `components/order`, `app/checkout` ห้ามมี fill/สีตัวอักษรแบบธีมเดียว (ต้องประกาศ `dark:` คู่ หรือใช้ `bg-surface-brand-subtle`) · P3 คำนวณคอนทราสต์จริงจาก `tokens.css` ทั้ง light/dark ต้อง ≥ 4.5 (fg บน brand-subtle, fg-secondary บน surface, jade บนชิป 15%) และมี negative control ยืนยันว่าคู่เดิม (ฟ้าครืมใต้ตัวอักษรสว่าง) ยังถูกตัดสินว่าตก | `tests/payment-contrast-gate.test.ts` | `npm test` (vitest) | Unit Tests |
 | RB    | Release badge — เวอร์ชันที่แอดมินเห็น ต้องเป็นของจริงทุกหน้า (29 ต.ค.) — `fetch('/api/v1/version')` มีที่เดียวใน `src/` หลัง module-level cache (ไม่งั้นทุก navigation ในแอดมินเรียกซ้ำ) · chip ต้องอยู่ใน top bar (ทุกหน้า) และ sidebar footer ทั้ง desktop rail กับ mobile drawer · dashboard card อ่านจาก hook เดียวกัน ไม่มี fetch ส่วนตัว · ข้อความ fail/ไม่มีข้อมูล + dirty warning + ปุ่มคัดลอก ต้องอยู่ครบ | `tests/release-badge.test.ts` | `npm test` (vitest) | Unit Tests |
 | SC    | หมวดหมู่ที่เลือกบน /search ประกาศ aria-current และ `สินค้าทั้งหมด` ไม่แย่งสถานะ (1.1.6) · ชิปทุกใบพา `?available=` ต่อ และ slug ที่ไม่มีจริงถือว่าไม่กรอง + render test นับ `aria-current` ได้ 1 (1.1.7) | `tests/search-category-chip.test.ts` | `npm test` (vitest) | Unit Tests |
+| ME    | ประตูแอดมิน `/management` ต้องไม่ตอบ 404 (1.1.8) — มีหน้าทางเข้าจริงที่ redirect ไป `/management/login` ทางเดียว ไม่มี markup แอดมิน (ห้ามแฟลช dashboard ให้คนที่ยังไม่ล็อกอิน) และ `/management/login` ยังพา session ที่ยังดีไป dashboard ก่อนโชว์ฟอร์ม | `tests/management-entry.test.ts` | `npm test` (vitest) | Unit Tests |
 
 **วิธีรัน:**
 
@@ -1020,6 +1021,28 @@ slug ที่เป็น ASCII ไม่พังเพราะ `encodeURICom
 - เอา `!searchCategory` ออกจาก `isActive` ของ navbar → C5 แดง
 - ลบ `available: availableOnly` ออกจาก `buildUrl` ของชิป → R2 แดง
 - ใช้ `category` ดิบแทน `categorySlug` (หรือลบการ resolve) → R3 แดง
+
+---
+
+## ประตูแอดมิน `/management` ต้องเป็นประตู ไม่ใช่ 404 (4 พ.ย. 2569) — `tests/management-entry.test.ts`
+
+ตรวจ production รอบ 1.1.7 แล้วเจอว่า `/management/` → 308 → `/management` → **404**: มี `app/management/layout.tsx` กับทุก sub-route แต่ไม่มีหน้า root เลย ขณะที่สเปกเรียก URL นี้ว่าเป็นทางเข้าแอดมิน (02-user-flow "Entry: /management/ → redirect to /management/login/", 03-IA "/management/ … Admin Dashboard") — คนที่พิมพ์หรือบุ๊กมาร์กตามเอกสารจึงเจอหน้าตาย ในขณะที่ `/management/login` ใช้ได้ปกติ ไม่มีใครเห็นเพราะลิงก์ในแอปชี้ sub-route ทั้งหมด
+
+ทางแก้คือหน้า redirect ล้วน ๆ ซึ่งจะยังถูกอยู่ได้ก็ต่อเมื่อสามข้อนี้จริง จึงมีเทสต์คุมทุกข้อ:
+
+| ตัว | บังคับว่า |
+|---|---|
+| M1 | มีหน้า `/management` จริง (ไม่ใช่ 404 อีก) |
+| M2 | redirect ไป `/management/login` ทางเดียว — ไม่มีจุดหมายแอดมินที่สอง และไม่เรียก `router.push/replace` (การตัดสินสิทธิ์อยู่ที่ login ที่เดียว) |
+| M3 | ไม่มี markup แอดมินเลย (`'use client'` / JSX / component จาก `@/components/admin`) — หน้าที่ย้ายทางจะแฟลช dashboard ให้คนที่ยังไม่ล็อกอินไม่ได้ |
+| M4 | `/management/login` ยังเช็ค `/api/v1/auth/admin/me` แล้วพา session ที่ยังดีไป `/management/dashboard` — นี่คือเหตุผลที่ "หรือ dashboard เมื่อล็อกอินอยู่" จริงโดยไม่ต้องเขียนเช็คสิทธิ์ซ้ำ |
+
+**พังได้จริง — ทดสอบด้วยการใส่มั๊กกลับ**
+
+- ลบ `src/app/management/page.tsx` → M1 แดง (และ production กลับไป 404)
+- เปลี่ยน `redirect('/management/login')` เป็น `redirect('/management/dashboard')` → M2 แดง: คนที่ยังไม่ล็อกอินจะถูกส่งเข้า dashboard แล้วเด้งกลับ login
+- ใส่ `'use client'` หรือ `<div>` ลงในหน้า → M3 แดง
+- ลบการเช็ค `/me` ใน login เพื่อความเร็ว → M4 แดง (และ session ที่ยังดีจะเจอฟอร์มทุกครั้ง)
 
 ---
 

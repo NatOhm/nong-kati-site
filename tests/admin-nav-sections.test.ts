@@ -198,10 +198,14 @@ describe('admin nav — structure', () => {
     expect(ADMIN_NAV.map(hrefOf)).toEqual(wantedSections(ALL_SECTIONS));
   });
 
-  it('covers every admin page except login and dev-seed', () => {
+  it('covers every admin page except the entry door, login and dev-seed', () => {
     const pages = managementPages();
     const navHrefs = collectNavHrefs();
+    // /management is the entry redirect (added 1.1.8 — it used to 404). It is
+    // a door to /management/login, never a menu destination, so it belongs in
+    // this allowed list rather than in ADMIN_NAV.
     expect(pages.filter((p) => !navHrefs.includes(p))).toEqual([
+      '/management',
       '/management/dev-seed',
       '/management/login',
     ]);
