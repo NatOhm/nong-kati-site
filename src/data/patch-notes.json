@@ -1,5 +1,23 @@
 [
   {
+    "version": "1.1.13",
+    "date": "2026-11-05",
+    "dateLabel": "Nov 5, 2026",
+    "gitSha": "c9f08fd",
+    "buildId": "Yyc-JBjGfuh2D6Xjfz8YT",
+    "title": "A hold now expires on its own clock, deployed to production.",
+    "detail": "1.1.13 — a hold now expires on its own clock, deployed to production. Auditing 1.1.12 found order NK-2026-000190 still holding a unit 100 minutes after its 30-minute window: the GitHub schedule meant to tick every 10 minutes had run at 01:51Z and not since, and the previous day had four runs. A hold that waits for that tick is a hold of unknown length, so the hold query now filters order.createdAt > now − payment window, reading the same SiteSetting the sweep reads; the sweep still flips the row to expired. Live A/B on the 2-unit variant: under 1.1.12 the stale hold blocked a qty-2 order; after this deploy the same request created NK-2026-000191, and the next qty-1 request returned 409 OUT_OF_STOCK from the fresh hold. Live: 1.1.13 / #398 / Yyc-JBjGfuh2D6Xjfz8YT / c9f08fd, health database: ok."
+  },
+  {
+    "version": "1.1.12",
+    "date": "2026-11-05",
+    "dateLabel": "Nov 5, 2026",
+    "gitSha": "0359c45",
+    "buildId": "d18M2Uu2sTMnqp7_i96lj",
+    "title": "An expired order can still be paid, and the lookup cap now counts misses, deployed to production.",
+    "detail": "1.1.12 — an expired order can still be paid, and the lookup cap now counts misses, deployed to production. A customer who transferred at minute 29 and uploaded the slip at minute 31 got 409 from a shop already holding their money: the claim CAS and both slip guards demanded exactly pending_payment. All three now accept expired, and a unit that was resold meanwhile still parks as pending_manual_fulfilment (existing path, no new code). The per-email lookup bucket was peeked and consumed only on a match, so the guessing it exists to stop never spent it — it now counts every attempt at 10/15 min, which also lets ten junk requests lock one address's lookup for 15 minutes (that customer keeps the order link in their email). Also deletes 1,587 lines of never-imported modules — coupon/loyalty/category APIs, three service wrappers, the cart shell, mega menu, progress ring, CSV parser and a duplicate slug helper — plus the one test that kept the parser alive, and the stock-parser row/section it needed in docs/quality-gates.md. Live: 1.1.12 / #397 / d18M2Uu2sTMnqp7_i96lj / 0359c45; lookup 10×404 then 429; the checkout copy in the deployed chunk reads \"ประมาณ 30 นาที\" (the old \"สูงสุด\" is gone)."
+  },
+  {
     "version": "1.1.11",
     "date": "2026-11-05",
     "dateLabel": "Nov 5, 2026",
