@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.1.16",
+    "date": "2026-11-05",
+    "dateLabel": "Nov 5, 2026",
+    "gitSha": "de168e7",
+    "buildId": "C-hiNzGj4ALNiP-mK3I9T",
+    "title": "บันทึกแพตช์ speaks Thai and shows the newest build, deployed to production.",
+    "detail": "1.1.16 — บันทึกแพตช์ speaks Thai and shows the newest build, deployed to production. The page rendered one long English paragraph per release and its baked JSON stopped at 1.1.13, so the owner saw English and no sign of 1.1.14/1.1.15. Every release now has an authored Thai entry (src/data/patch-notes-th.json, keyed by BUILD_ID) split into ปัญหา / สิ่งที่เปลี่ยน / ตรวจสอบแล้ว / หมายเหตุ, dates read 5 พ.ย. 2569, and the live card carries the newest release's detail instead of only its title. That layer is hand-written, so P6/P7 make a missing (or orphaned) Thai entry a red build rather than English on a Thai panel. Verified on the served chunk page-47d1d3887e109a18.js (200, 56,667 bytes): สิ่งที่เปลี่ยน, ตรวจสอบแล้ว and the newest Thai titles are all present. Live: 1.1.16 / #405 / C-hiNzGj4ALNiP-mK3I9T / de168e7. The page cannot list its own row yet — a bundle is always baked before the row that describes it exists — so it names the running build and shows the previous release under a caption saying whose detail it is."
+  },
+  {
     "version": "1.1.15",
     "date": "2026-11-05",
     "dateLabel": "Nov 5, 2026",
