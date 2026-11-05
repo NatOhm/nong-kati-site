@@ -61,4 +61,23 @@ function planInjection(secrets, env) {
   return { entries, kept };
 }
 
-module.exports = { resolveInfisicalConfig, planInjection };
+/**
+ * Decide whether to mirror NK_CRON_SECRET to a file the Plesk scheduler can
+ * read. Plesk's 10-minute task runs outside this process, so it cannot see
+ * `process.env`; the task passes the header as
+ * `-H x-cron-token:$(cat tmp/cron-token)` instead of holding the secret in the
+ * task field, which the Plesk UI renders as plain text (docs/production-health-monitoring.md §3b).
+ *
+ * Absent or empty → nothing written, and the internal sweeps keep answering
+ * 401 (they are fail-closed by design).
+ *
+ * @param {Record<string, string | undefined>} env
+ * @returns {{ write: false } | { write: true, token: string }}
+ */
+function planCronTokenFile(env) {
+  const token = env.NK_CRON_SECRET;
+  if (!token) return { write: false };
+  return { write: true, token };
+}
+
+module.exports = { resolveInfisicalConfig, planInjection, planCronTokenFile };

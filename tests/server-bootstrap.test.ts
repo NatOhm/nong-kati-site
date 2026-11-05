@@ -30,9 +30,12 @@ type Config =
 type Plan = { entries: Array<[string, string | undefined]>; kept: number };
 
 const requireCjs = createRequire(import.meta.url);
+type TokenPlan = { write: false } | { write: true; token: string };
+
 const boot = requireCjs('../server-bootstrap.js') as {
   resolveInfisicalConfig: (env: Env) => Config;
   planInjection: (secrets: unknown[], env: Env) => Plan;
+  planCronTokenFile: (env: Env) => TokenPlan;
 };
 
 describe('resolveInfisicalConfig', () => {
@@ -115,5 +118,23 @@ describe('planInjection', () => {
 
   it('reports nothing to inject and nothing kept for an empty secret set', () => {
     expect(boot.planInjection([], {})).toEqual({ entries: [], kept: 0 });
+  });
+});
+
+describe('planCronTokenFile', () => {
+  // The Plesk sweeper task cats this file; if the server ever wrote it with an
+  // absent secret, the sweeps would answer 401 to a token of "undefined".
+  it('writes nothing when the secret is absent or empty', () => {
+    expect(boot.planCronTokenFile({})).toEqual({ write: false });
+    expect(boot.planCronTokenFile({ NK_CRON_SECRET: '' })).toEqual({
+      write: false,
+    });
+  });
+
+  it('hands back the exact secret string to mirror', () => {
+    expect(boot.planCronTokenFile({ NK_CRON_SECRET: 'abc123' })).toEqual({
+      write: true,
+      token: 'abc123',
+    });
   });
 });
