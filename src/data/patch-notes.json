@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.1.20",
+    "date": "2026-11-05",
+    "dateLabel": "Nov 5, 2026",
+    "gitSha": "f74f19a",
+    "buildId": "FHA2fnRGNumCb9HZRGy9Z",
+    "title": "Item 1 of the phone report: hand over the codes and the receipt.",
+    "detail": "1.1.20 — item 1 of the phone report: hand over the codes and the receipt. (a) Paying with credit redirected to the confirmation page, i.e. the codes were one navigation away; POST /pay-wallet now returns the codes it just fulfilled (authenticated, own order, no-store — the same sanctioned shape as slip-verify, recorded in customerCodes.ts) and checkout shows DeliveredCodesDialog immediately: every code verbatim, per-code copy, “คัดลอกทั้งหมด”, Escape/backdrop close, then “ไปที่คำสั่งซื้อ”. (b) An admin credit adjustment was invisible to the customer until they opened กระเป๋าเงิน; the PATCH route now emails them a receipt for both directions (creditAdjustmentTemplate), a mail failure is non-fatal and reported as emailed: false instead of failing a committed adjustment, and the admin modal shows the same summary with a copy button for pasting into LINE. Gates: tests/credit-adjustment-email.test.ts (E1–E4), tests/delivered-codes-dialog.test.tsx (P1–P3), and two new cases in tests/pay-wallet-notify.test.ts (codes in the 200, failed code read stays 200 with an empty list). The CopyButton gained a label prop and now uses it as its accessible name. Verified: /api/v1/version = 1.1.20 / #413 / FHA2fnRGNumCb9HZRGy9Z, health ok, /checkout 200, and the served checkout/page-b8eb443c826ee101.js + management/customers/page-48ba327f860a9e29.js contain the dialog and receipt strings. Live: 1.1.20."
+  },
+  {
     "version": "1.1.19",
     "date": "2026-11-05",
     "dateLabel": "Nov 5, 2026",
