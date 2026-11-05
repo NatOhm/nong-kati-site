@@ -87,6 +87,7 @@
 | SF    | Slip flow — auto-verify dispatch (Slip2Go→SlipOK fallback), เก็บหลักฐานสลิป before check, ping แอดมินเมื่อต้องตรวจเอง + entry-point boundaries (30 ต.ค.): bad token 403 ก่อนเรียก provider, order ไม่ payable 409, duplicate `200501`→422, JSON body เกิน 5 MB → 413, evidence write พัง = ยังตรวจต่อ + `slipStored:false`, ไม่ได้ตั้งบัญชีร้าน = warn "receiver check skipped" | `tests/slip-flow.test.ts` | `npm test` (vitest) | Unit Tests             |
 | RV    | Slip receiver enforcement (28 ต.ค.) — ยอดตรงแต่บัญชีผู้รับไม่ใช่ร้าน ห้าม auto-confirm/ปล่อยโค้ด: `checkReceiver` bank-side (`200401`→`RECEIVER_MISMATCH`) + local trailing-4 guard (ตอนนี้อยู่ใน `receiverPolicy.ts` ที่ route เรียกหลัง provider สำเร็จ), ออเดอร์ค้างจ่าย+สลิปอยู่คิวมือ · `slipVerifiedBy` บันทึก provider จริง (`slip2go:auto`/`slipok:auto`) ทั้ง confirm และ recovery path | `tests/slip2go-receiver.test.ts` | `npm test` (vitest) | Unit Tests             |
 | RCV   | Receiver policy ที่เดียว (30 ต.ค.) — `src/lib/payment/receiverPolicy.ts` เป็นเจ้าของกฎ "บัญชีไหนร้านรับ" (normalize digits + resolve บัญชีร้าน + เทียบ trailing-4): ร้านไม่ได้ตั้งค่า/หน้ากากสั้นกว่า 4 หลัก = ข้าม (fail-open ตามที่ออกแบบ) · ไม่ตรงชัดเจน = `RECEIVER_MISMATCH` เฉพาะ last-4 ใน detail (เลขเต็มห้ามเข้า log) | `tests/receiver-policy.test.ts` | `npm test` (vitest) | Unit Tests             |
+| SLIP-TX | การยืนยันสลิปต้องรอดจาก transaction หมดอายุ (5 พ.ย. 2569) — P2028 บนออเดอร์ NK-2026-000183 ทำให้ธนาคารตอบ OK แต่ลูกค้าได้ 500 และออเดอร์ค้าง `pending_payment` · ตอนนี้ 30s/10s + retry 1 ครั้ง และมี suite ที่ **จำลอง transaction หมดอายุจริง** (ทำงานบน draft แล้วทิ้ง ไม่ commit) โดยไม่แตะ timeout ของ production: R1 retry กู้ได้ → 200 `confirmed`, provider ถูกเรียกครั้งเดียว, attempt บันทึกครั้งเดียว; R2 retry หมด → 200 `pending_manual_fulfilment` (ไม่ใช่ 500) และ park ออเดอร์; R3 park พังด้วย → 500 `RECONCILIATION_REQUIRED` + reconciliation row และไม่มี state ค้าง; R4 error ที่ไม่ใช่ P2028/P2034 ต้องไม่ถูก retry | `tests/slip-verify-tx-retry.test.ts` | `npm test` (vitest) | Unit Tests |
 | VS    | Inventory shelf panel (21 ต.ค. 2569) — `POST /stock/bulk` รับ `variantId` pin ได้ (unknown variant = 400 ห้าม fallback เงียบ ๆ) + round-robin เดิมไม่เปลี่ยน · `GET /admin/inventory` คืน `variants[]` ครบทุกตัว (additive — field เดิมครบ) | `tests/inventory-variants-shelf.test.ts` | `npm test` (vitest) | Unit Tests |
 | BV    | Bulk-void + batchId correlation (22 ต.ค. 2569) — paste ทุก plan สร้าง batch + stamp ลง codes/StockMove/audit · `POST /stock/bulk-void` CAS เฉพาะ available, stock ไม่ติดลบ, idempotent, tx เดียว · `GET /admin/inventory` คืน `refId` (additive) ให้ chip ในตารางประวัติ | `tests/inventory-bulk-void.test.ts` | `npm test` (vitest) | Unit Tests |
 | DM    | Dashboard money scope — panel "รายได้เดือนนี้" ต้องเป็นยอดเดือนนี้ไม่ใช่ all-time · PromptPay share หาจาก method name (ไม่ใช่ `[0]` ที่ DB คืน wallet ก่อน) · store ว่าง = 0% ไม่ใช่ NaN% | `tests/dashboard-month-scope.test.ts` | `npm test` (vitest) | Unit Tests |
@@ -1306,6 +1307,21 @@ W1–W3 ข้างบนพิสูจน์แค่ "route ถามคำ�
 - **M4** เครดิตเดือนก่อน/ที่ยังไม่ completed ต้องไม่ถูกนับ (ไม่ใช่ 1250/1150)
 - **M5** ออเดอร์ completed ฿9000 ไปลง `spendThisMonthThb`/`lifetimeSpendThb` เท่านั้น
 - **พังได้จริง (5 พ.ย. 2569)** — คืนสูตรเดิม (`topups.filter(month).reduce(signed)`) แล้วรันชุดนี้: **ทั้ง 5 เทสต์แดง** ด้วย `expected 580 to be 750` (และ M3 `expected -10 to be 90`); คืนโค้ดเดิมแล้วเขียว 5/5
+
+## transaction หมดอายุกลางทาง — `tests/slip-verify-tx-retry.test.ts`
+
+ออเดอร์ NK-2026-000183 (1 พ.ย. 2569) คือเคสจริง: Slip2Go ตอบ `200200` (สลิปจริง ยอดตรง) แต่ transaction ยืนยันบน Prisma default 5 วินาทีหมดอายุกลางทาง (P2028) บน worker ที่เพิ่งตื่น → `500 FULFILMENT_FAILED` ทั้งที่เงินเข้าแล้ว และออเดอร์ยัง `pending_payment` รอหมดอายุ
+
+แก้ด้วย `timeout: 30_000` + `maxWait: 10_000` และ retry อัตโนมัติ **หนึ่งครั้ง** (`CONFIRM_TX_ATTEMPTS = 2`) — แต่ทั้งสองสาขาไม่เคยถูกพิสูจน์ เพราะเชื่อกันว่าต้องใช้สลิปจริงกับ DB จริง
+
+ไม่ต้องใช้สลิปจริง:สิ่งที่ถูกปลอมคือ **ขอบที่ช้า** (transaction) เท่านั้น
+
+- `$transaction` ปลอมทำงานของผู้เรียกบน draft ที่ถูกทิ้ง แล้วโยน error รูป P2028 — ตรงกับ semantics จริงที่ว่า "transaction ตายทั้งก้อน" (rollback) โดยค่า timeout ที่ส่งไปยัง Prisma ยังเป็น 30s/10s ของ production
+- **R1** รอบแรกหมดอายุ รอบสองสำเร็จ → `200 confirmed`, `verifySlip2Go` ถูกเรียก **ครั้งเดียว** (ไม่ตรวจ/ไม่ตัดเงินซ้ำ), มี attempt แถวเดียวที่ `succeeded`, claim/fulfil เกิดครั้งเดียว, ไม่มี reconciliation
+- **R2** หมดอายุทั้งสองรอบ → คำตอบคือ `200 pending_manual_fulfilment` พร้อม `paymentVerified: true` (ไม่ใช่ 500 ให้ลูกค้าที่โอนเงินแล้ว), ออเดอร์ถูก park ด้วย `DELIVERY_PENDING`, attempt บันทึกครั้งเดียว
+- **R3** ถ้า park ก็พัง → `500 RECONCILIATION_REQUIRED` เป็นคำตอบที่ซื่อสัตย์ **และ** มี reconciliation row ส่งถึงคน, ออเดอร์ยัง `pending_payment`, attempt ยัง `pending` ไม่มี claim ครึ่ง ๆ
+- **R4** error ที่ไม่ใช่ P2028/P2034 (เช่น exception ธรรมดาใน transaction) ต้อง **ไม่** ถูก retry — มีแค่ transaction ที่หายไปเท่านั้นที่รันซ้ำได้
+- **พังได้จริง (5 พ.ย. 2569)** — ตั้ง `CONFIRM_TX_ATTEMPTS = 1` → R1 แดง (`expected 'pending_manual_fulfilment' to be 'confirmed'`) และ R2 แดง; เอา parking transaction ออก → R2/R4 แดง (`expected 500 to be 200`); คืนโค้ดเดิม → 4/4 เขียว
 
 ## ใบกำกับภาษีเป็นสวิตช์ ไม่ใช่ฟีเจอร์ถาวร (5 พ.ย. 2569) — `tests/tax-invoice-setting.test.ts`, `tests/checkout-tax-invoice-gate.test.tsx`
 
