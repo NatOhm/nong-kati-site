@@ -219,25 +219,42 @@ Paying late is safe (v1.1.12 accepts a slip after expiry), so the honest
 summary is: **tidiness and a few late-day coupons, not money.** That is why
 there is no scheduler in the codebase for this.
 
-**If you want the sweeps to tick properly**, extend the §3a Plesk task rather
-than creating a second schedule — one `:10` ticker is enough, and the task
-field must contain **no double quotes**:
+**The sweeps now tick on their own — Plesk task 254** (`*/10 * * * *`, Active,
+`housekeeping sweeps (10 min)`), which calls `internal/orders/expire`,
+`internal/promotions/expire` and `internal/email-outbox/drain`. It is a
+*separate* task from the §3a pinger on purpose: editing the pinger would mean
+handling its ping URL, which is a credential.
 
 ```
-cd httpdocs && curl -fsSLk https://hc-ping.com/<uuid> && curl -fsSLk --max-time 30 -X POST -H x-cron-token:$(cat ../cron-token) https://nongkatistore.com/api/v1/internal/orders/expire && curl -fsSLk --max-time 30 -X POST -H x-cron-token:$(cat ../cron-token) https://nongkatistore.com/api/v1/internal/promotions/expire
+cd httpdocs && curl -fsSk --max-time 30 -K tmp/cron-curl.conf -X POST -o tmp/sweep-last.json https://nongkatistore.com/api/v1/internal/orders/expire && curl -fsSk --max-time 30 -K tmp/cron-curl.conf -X POST -o /dev/null https://nongkatistore.com/api/v1/internal/promotions/expire && curl -fsSk --max-time 30 -K tmp/cron-curl.conf -X POST -o /dev/null https://nongkatistore.com/api/v1/internal/email-outbox/drain
 ```
 
-`cron-token` sits **outside** the document root (the vhost root, readable as
-`../cron-token` from `httpdocs`) and holds `NK_CRON_SECRET` — the value lives in
-Infisical/Plesk env and cannot be copied into the command; a secret in that
-field is rendered as plain text in the task list, and this repo is public. So
-this step needs one human paste into the file, the same way the Infisical →
-Plesk env move does.
+**Why `-K` and not `-H`.** Measured on this server, 2026-11-05: Plesk's
+scheduler **kills any command containing `$`**. `-H x-cron-token:$(cat
+tmp/cron-token)` and a `T=$(cat …) && curl -H …$T …` both ended `error` in
+under a second with empty output, while the identical command without `$` ran.
+So the header cannot be built from a file in the shell at all. `server.js`
+writes `tmp/cron-curl.conf` — a curl config holding `header = "x-cron-token:
+…"`, mode 0600 — at boot, from the env it already injected from Infisical, and
+the task reads it with `-K`. No substitution, no quoting, no parser to fight.
 
-Verify it by the *effect*, not the toast: a `::`-free `Run Now` while Active is
-ticked should be followed by an order that is past its window flipping to
-`expired`, and the task list should show `0` failures. Untick **Active** if you
-only wanted a one-off.
+**Why a file and not the task field.** The task field is rendered as plain
+text in the task list, and this repo is public. `tmp/` is Passenger's restart
+directory, not the web root, and Plesk answers 403 for everything under it.
+Careful: that 403 is *path*-based, not existence-based — `/tmp/does-not-exist`
+also answers 403 — so it proves the file is not served, never that it exists.
+Confirm a real file by listing (`ls -l tmp/`) through the task.
+
+**What this does not fix.** `internal/settings/slip-retention` is daily and
+stays on the GitHub cron (`17 3 * * *`); GitHub still runs the whole workflow
+4–5 times a day, so its housekeeping step is now redundant rather than load
+bearing.
+
+**Verify by effect.** `tmp/sweep-last.json` holds the last orders sweep's
+counters (`scanned`, `expired`, `cutoff`, `timeoutMinutes`); `cutoff` advancing
+is proof an unattended fire happened, since Plesk does **not** log
+scheduler-initiated runs in `/smb/task/task-progress` (only Run Now attempts
+appear there).
 
 ---
 

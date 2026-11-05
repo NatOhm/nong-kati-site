@@ -9,9 +9,9 @@ below is what actually shipped the live build.
 > same flow spelled out manually; keep them as the fallback and as the explanation of what the
 > script does. This file predates the script.
 
-> **Current live build (Nov 5, 2026): `c9f08fd`, v1.1.13, BUILD_ID `Yyc-JBjGfuh2D6Xjfz8YT`.** Repo HEAD is
-> level with live after the 1.1.12 + 1.1.13 deploy (slip-after-expiry, lookup quota, 1,587 dead lines,
-> self-expiring holds). See the deploy log in
+> **Current live build (Nov 5, 2026): `a9c9472`, v1.1.15, BUILD_ID `Cvm6k6VOEzORNV_BiJ7QN`.** Repo HEAD is
+> level with live after four deploys (1.1.12 slip-after-expiry + lookup quota + 1,587 dead lines,
+> 1.1.13 self-expiring holds, 1.1.14/1.1.15 the Plesk-driven sweeps). See the deploy log in
 > [hostatom-live.md](hostatom-live.md) §5. Note that the `13bdf58..HEAD` range has **no `prisma/`
 > changes**, so no migration is needed, and the only `package.json` change is a build-time
 > `brace-expansion` override — the slow `npm ci` deps task can be skipped.
@@ -188,7 +188,7 @@ equal the Step-0 BUILD_ID exactly, the second the `git sha` the script printed. 
 there is correct, not a mismatch — it means the bundle was built from a tree with uncommitted
 changes (`stamp-git-sha.mjs`). A stale artifact is visible here even though its stamps were
 well-formed. (Last recorded live build, 2026-11-03:
-`Yyc-JBjGfuh2D6Xjfz8YT`, git SHA `c9f08fd…`, v1.1.13 / #398 — see the deploy log in
+`Cvm6k6VOEzORNV_BiJ7QN`, git SHA `a9c9472…`, v1.1.15 / #402 — see the deploy log in
 [hostatom-live.md](hostatom-live.md) §5; always trust the BUILD_ID the script just printed over
 that line.)
 
