@@ -158,10 +158,21 @@ describe('G1 · unpaid-order hold', () => {
     // hold the unit forever once the sweep flipped them.
     expect(groupBy).toHaveBeenCalledTimes(1);
     const args = groupBy.mock.calls[0]?.[0] as {
-      where: { order: { status: string }; variantId: { in: string[] } };
+      where: {
+        order: { status: string; createdAt?: { gt: Date } };
+        variantId: { in: string[] };
+      };
     };
-    expect(args.where.order).toEqual({ status: 'pending_payment' });
+    expect(args.where.order.status).toBe('pending_payment');
     expect(args.where.variantId.in).toEqual(['v1']);
+    // The hold must expire on its own clock, not on the sweep's: the GitHub
+    // cron has run hours apart, and without this filter a unit stayed held all
+    // morning. Default window is 30 minutes.
+    const cutoff = args.where.order.createdAt?.gt;
+    expect(cutoff).toBeInstanceOf(Date);
+    const ageMinutes = (Date.now() - (cutoff as Date).getTime()) / 60_000;
+    expect(ageMinutes).toBeGreaterThan(29);
+    expect(ageMinutes).toBeLessThan(31);
   });
 
   it('accepts the order once nothing is held (the expired row no longer matches)', async () => {

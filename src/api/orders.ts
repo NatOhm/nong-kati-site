@@ -35,6 +35,7 @@ import {
   resolveOrderPricing,
   checkCoupon,
 } from '@/lib/promotions';
+import { resolvePaymentTimeoutMinutes } from '@/lib/orderExpiry';
 import type { CouponCheck } from '@/lib/promotions';
 import { mintSlipUploadToken } from '@/lib/slipSecurity';
 
@@ -378,6 +379,12 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
 
   const variantIds = input.items.map((i) => i.variantId);
 
+  // A derived hold must expire on its own clock, not when the sweep next runs:
+  // the every-10-minute GitHub cron is throttled in practice (2026-11-05 audit
+  // saw runs hours apart), which left a unit held since morning. The same
+  // SiteSetting the sweep reads decides the window here, so they cannot drift.
+  const holdCutoff = new Date(Date.now() - (await resolvePaymentTimeoutMinutes()) * 60_000);
+
   // All authoritative reads and the write happen inside one Serializable
   // transaction so price, tier, VAT, promotion eligibility, coupon state,
   // and stock cannot change between calculation and persistence. The entire
@@ -394,7 +401,7 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
     try {
       const result = await prisma.$transaction(
         async (tx) => {
-          const result = await createOrderInner(input, tx);
+          const result = await createOrderInner(input, tx, holdCutoff);
           return result;
         },
         { isolationLevel: 'Serializable' },
@@ -434,6 +441,7 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
 async function createOrderInner(
   input: CreateOrderInput,
   tx: import('@prisma/client').Prisma.TransactionClient,
+  holdCutoff: Date,
 ): Promise<CreateOrderResult> {
   if (!input.tosAccepted) throw new Error('TOS_NOT_ACCEPTED');
   if (!input.customerEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.customerEmail)) {
@@ -462,20 +470,17 @@ async function createOrderInner(
   // cannot both read "no hold" and both insert. The resolver is also used by
   // the read-only preview, which stays optimistic — submit is authoritative.
   //
-  // No writes and no new table: the hold is derived, and the expiry sweep
-  // (src/lib/orderExpiry.ts) moves stale orders to `expired` after 30 minutes,
-  // which drops them out of this sum, so the hold releases itself.
-  //
-  // shortcut: release waits for that 10-minute cron tick, so a hold can last
-  // ~40 minutes and stops releasing entirely if the tick dies. Add
-  // `order: { createdAt: { gt: cutoff } }` here if the tick ever becomes
-  // unreliable.
+  // No writes and no new table: the hold is derived, and it releases itself two
+  // ways — the age filter below stops counting an order once it is older than
+  // the payment window, and the expiry sweep (src/lib/orderExpiry.ts) then flips
+  // the row to `expired`. The age filter is what makes the release independent
+  // of the cron actually running.
   const requestedVariantIds = [...resolved.quantityMap.keys()];
   const heldRows = await tx.orderItem.groupBy({
     by: ['variantId'],
     where: {
       variantId: { in: requestedVariantIds },
-      order: { status: 'pending_payment' },
+      order: { status: 'pending_payment', createdAt: { gt: holdCutoff } },
     },
     _sum: { quantity: true },
   });

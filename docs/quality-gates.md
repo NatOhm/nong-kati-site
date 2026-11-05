@@ -562,7 +562,7 @@ ffmpeg -hide_banner -loglevel error -y -ss 5.0 -i admin-walkthrough-th.mp4 -fram
 
 รีวิวหน้าร้านข้อ 2: checkout สร้างออเดอร์ `pending_payment` **จริง** ตั้งแต่กด "Continue" ก่อนลูกค้าจะยืนยันการจ่ายเงิน (`src/app/checkout/page.tsx` `handleContactSubmit` → `createOrder`) แต่ **ไม่มีโค้ดสักบรรทัดใน repo ที่หมดอายุมันได้** — `updateOrderStatus` (ปัจจุบันถูกลบแล้ว) เคยอนุญาต `pending_payment → expired` แต่ไม่มีผู้เรียกเลย และคิว inventory ที่ `mockQueue.ts` (ลบไปแล้ว) เคยเขียนไว้ว่า *"Reservation sweep (5min), expiry sweep (15min)"* มี `registerJobHandler` ที่ **ไม่เคยถูกเรียกที่ไหนเลย**
 
-หมายเหตุสำคัญ: ตั้งแต่ 1.1.11 ออเดอร์ `pending_payment` **ถือของจริง** (นับยอดที่ยังไม่จ่ายใน transaction เดียวกับการสร้างออเดอร์) และการ sweep ที่เปลี่ยนสถานะเป็น `expired` คือการคืนของโดยตัวมันเอง — ไม่มีการเขียน stock หรือตาราง reservation ใด ๆ ทั้งสิ้น (`createOrder` ตรวจเทียบ sellable, `src/lib/fulfilment.ts` หักตอนยืนยันการจ่าย) ไฟล์ mock reservation/delivery เดิมถูกลบแล้ว และเกตนี้ยืนยันว่า**ไม่** มีการแตะ stock จากฝั่ง sweep
+หมายเหตุสำคัญ: ตั้งแต่ 1.1.11 ออเดอร์ `pending_payment` **ถือของจริง** (นับยอดที่ยังไม่จ่ายใน transaction เดียวกับการสร้างออเดอร์) และ 1.1.13 เพิ่มเพดานอายุในคำขอนั้น การคืนของจึงเกิดสองทาง — อายุเกิน payment window แล้วหลุดจากผลรวมทันที และ sweep เปลี่ยนสถานะเป็น `expired` — ไม่มีการเขียน stock หรือตาราง reservation ใด ๆ ทั้งสิ้น (`createOrder` ตรวจเทียบ sellable, `src/lib/fulfilment.ts` หักตอนยืนยันการจ่าย) ไฟล์ mock reservation/delivery เดิมถูกลบแล้ว และเกตนี้ยืนยันว่า**ไม่** มีการแตะ stock จากฝั่ง sweep
 
 | ตัว | บังคับว่า |
 |---|---|
@@ -1245,6 +1245,7 @@ audit 5 พ.ย. 2569 เจอสองรูตรงขอบของเส�
 | OG4 | lookup จาก IP เดียวกันครั้งที่ 11 ภายใน 15 นาทีได้ 429 `RATE_LIMIT_EXCEEDED` พร้อม `Retry-After` |
 | OG5 | lookup ที่ไม่เจอออเดอร์ **กิน** โควตาอีเมล — พลาด 10 ครั้งจาก 10 IP (ให้ IP bucket ไม่ใช่ตัวชน) แล้วคำขอที่ 11 ของอีเมลเดิมได้ 429 ขณะที่อีเมลอื่นจาก IP ใหม่ยังได้ 200 |
 | OG6 | `claimOrderForConfirmation` รับทั้ง `pending_payment` และ `expired` ใน CAS เดียว — สลิปที่อัปโหลดหลังออเดอร์หมดอายุ 30 นาทียังยืนยันได้ และ `items: { some: {} }` ยังอยู่ใน `where` เดียวกัน |
+| OG7 | คำขอ hold มี `createdAt: { gt: cutoff }` โดย cutoff = ตอนนี้ − payment window (30 นาที default) — ของที่ถืออยู่จึงคืนเองตามนาฬิกา ไม่รอ cron (5 พ.ย. 2569: GitHub schedule รันห่างกันหลายชั่วโมง ไม่ใช่ทุก 10 นาที) |
 
 **พังได้จริง — ทดสอบด้วยการใส่มั๊กกลับ**
 
@@ -1253,5 +1254,6 @@ audit 5 พ.ย. 2569 เจอสองรูตรงขอบของเส�
 - คืน `increment: false` ให้ bucket อีเมล (นับเฉพาะตอน match) → OG5 แดง เพราะยิงพลาด 10 ครั้งแล้วคำขอจริงยังได้ 200
 - ลบ `checkRateLimit` ฝั่ง IP ใน route → OG4 ได้ 404 แทน 429
 - ตัด `'expired'` ออกจาก `status.in` ของ claim → OG6 แดง (และสลิปที่มาหลัง sweep จะถูกปฏิเสธอีกครั้ง ทั้งที่เงินโอนไปแล้ว)
+- ตัด `createdAt: { gt: holdCutoff }` ออกจาก `where` → OG7 แดง (ของจะถูกถือจนกว่า cron จะรัน ซึ่งวัดจริงได้หลายชั่วโมง)
 
 ---
