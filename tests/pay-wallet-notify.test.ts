@@ -22,7 +22,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const { prismaMock, notifyMock, fulfilMock, authMock, ordersMock } = vi.hoisted(() => {
+const { prismaMock, notifyMock, fulfilMock, authMock, ordersMock, codesMock } = vi.hoisted(() => {
   const prismaMock = {
     $transaction: vi.fn(),
     order: { findUnique: vi.fn(), update: vi.fn() },
@@ -42,7 +42,8 @@ const { prismaMock, notifyMock, fulfilMock, authMock, ordersMock } = vi.hoisted(
   };
   const authMock = { getCustomerFromToken: vi.fn() };
   const ordersMock = { claimOrderForConfirmation: vi.fn() };
-  return { prismaMock, notifyMock, fulfilMock, authMock, ordersMock };
+  const codesMock = { getDeliveredCodes: vi.fn() };
+  return { prismaMock, notifyMock, fulfilMock, authMock, ordersMock, codesMock };
 });
 
 vi.mock('@/lib/db', () => ({ prisma: prismaMock }));
@@ -50,6 +51,7 @@ vi.mock('@/lib/notify', () => notifyMock);
 vi.mock('@/lib/fulfilment', () => fulfilMock);
 vi.mock('@/api/customerAuth', () => authMock);
 vi.mock('@/api/orders', () => ordersMock);
+vi.mock('@/lib/delivery/customerCodes', () => codesMock);
 
 const ORDER = {
   id: 'ord-w1',
@@ -100,6 +102,9 @@ beforeEach(() => {
   fulfilMock.scheduleOutboxDrain.mockResolvedValue(undefined);
   prismaMock.orderItem.findMany.mockResolvedValue([{ variantId: 'var-1' }, { variantId: null }]);
   prismaMock.siteSetting.findUnique.mockResolvedValue(null);
+  codesMock.getDeliveredCodes.mockResolvedValue([
+    { code: 'GIFT-WALLET-1', productName: 'Netflix Gift Card', denomination: 300 },
+  ]);
 });
 
 afterEach(() => {
@@ -123,6 +128,34 @@ describe('A. pay-wallet notification wiring', () => {
     expect(notifyMock.notifyStockAlertsForVariants).toHaveBeenCalledTimes(1);
     // Detached line (null variantId) filtered — the helper takes real ids only.
     expect(notifyMock.notifyStockAlertsForVariants).toHaveBeenCalledWith(['var-1']);
+  });
+
+  it('returns the just-delivered codes with a no-store receipt', async () => {
+    // Client ask 2026-11-05: paying with credit should pop the codes up ready
+    // to copy, so the payment 200 carries them (same sanctioned shape as the
+    // slip-verify response — authenticated, own order, no-store).
+    const res = await call(post('nk_session=tok'));
+    const body = (await res.json()) as {
+      codes?: { code: string; productName: string; denomination: number }[];
+    };
+
+    expect(body.codes).toEqual([
+      { code: 'GIFT-WALLET-1', productName: 'Netflix Gift Card', denomination: 300 },
+    ]);
+    expect(res.headers.get('cache-control')).toContain('no-store');
+  });
+
+  it('a failed code read keeps the payment a 200 without a fake receipt', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    codesMock.getDeliveredCodes.mockRejectedValue(new Error('decrypt failed'));
+
+    const res = await call(post('nk_session=tok'));
+    const body = (await res.json()) as { success?: boolean; codes?: unknown[] };
+
+    expect(res.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.codes).toEqual([]);
+    expect(errSpy).toHaveBeenCalledWith('[pay-wallet] delivered-code read failed:', 'decrypt failed');
   });
 
   it('no session → 401, nothing claimed, nothing notified', async () => {

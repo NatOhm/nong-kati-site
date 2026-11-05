@@ -13,6 +13,10 @@ import { PromptPayQR } from '@/components/checkout/PromptPayQR';
 import { SlipUploadPanel } from '@/components/checkout/SlipUploadPanel';
 import { OrderSummaryPanel } from '@/components/checkout/OrderSummaryPanel';
 import { TrustBadgeRow } from '@/components/checkout/TrustBadgeRow';
+import {
+  DeliveredCodesDialog,
+  type DeliveredCode,
+} from '@/components/order/DeliveredCodesDialog';
 import { CartIcon } from '@/components/cart/CartIcon';
 import { useCart } from '@/hooks/useCart';
 import { apiCreateOrder, apiInitiatePayment, apiPollPayment, type Order } from '@/api/orderClient';
@@ -121,6 +125,12 @@ export default function CheckoutPage(): React.JSX.Element {
   const [walletBalanceThb, setWalletBalanceThb] = useState<number | null>(null);
   const [walletBusy, setWalletBusy] = useState(false);
   const [walletMsg, setWalletMsg] = useState<string | null>(null);
+  // Receipt dialog after a credit payment: codes in hand, no page hunt.
+  const [walletReceipt, setWalletReceipt] = useState<{
+    orderNumber: string;
+    orderUrl: string;
+    codes: DeliveredCode[];
+  } | null>(null);
 
   // Keep the displayed cart total on the same server pricing path as order
   // creation, including tier pricing, automatic promotions, coupons, and VAT.
@@ -372,11 +382,25 @@ export default function CheckoutPage(): React.JSX.Element {
       const body = await safeJson<{
         success?: boolean;
         code?: string;
+        orderNumber?: string;
+        codes?: DeliveredCode[];
         error?: { code?: string };
       }>(res);
       if (res.ok && body.success) {
         clearCart();
-        window.location.href = `/checkout/confirmation/${order.confirmationUuid}`;
+        const confirmationUrl = `/checkout/confirmation/${order.confirmationUuid}`;
+        // Show what they just bought instead of navigating away from it. If the
+        // server could not read the codes back (rare), fall through to the
+        // confirmation page rather than showing an empty dialog.
+        if (body.codes && body.codes.length > 0) {
+          setWalletReceipt({
+            orderNumber: body.orderNumber ?? order.orderNumber,
+            orderUrl: confirmationUrl,
+            codes: body.codes,
+          });
+          return;
+        }
+        window.location.href = confirmationUrl;
         return;
       }
       const code = body.error?.code ?? 'WALLET_PAY_FAILED';
@@ -497,6 +521,19 @@ export default function CheckoutPage(): React.JSX.Element {
       )}
 
       {/* Content */}
+      {walletReceipt && (
+        <DeliveredCodesDialog
+          orderNumber={walletReceipt.orderNumber}
+          orderUrl={walletReceipt.orderUrl}
+          codes={walletReceipt.codes}
+          onClose={() => {
+            const target = walletReceipt.orderUrl;
+            setWalletReceipt(null);
+            window.location.href = target;
+          }}
+        />
+      )}
+
       <div className="grid gap-8 pb-16 md:grid-cols-[1fr_360px]">
         {/* Main area */}
         <div>

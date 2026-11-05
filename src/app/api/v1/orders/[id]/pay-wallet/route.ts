@@ -5,6 +5,7 @@ import { getCustomerFromToken } from '@/api/customerAuth';
 import { claimOrderForConfirmation } from '@/api/orders';
 import { fulfilOrder, scheduleOutboxDrain } from '@/lib/fulfilment';
 import { notifyPaymentConfirmed, notifyStockAlertsForVariants } from '@/lib/notify';
+import { getDeliveredCodes } from '@/lib/delivery/customerCodes';
 
 export const dynamic = 'force-dynamic';
 
@@ -163,6 +164,21 @@ export async function POST(
     // contractually never-throwing, but the stock lookup below is a plain
     // query: one transient DB error used to turn a successful payment into a
     // reported failure. One guard for the whole post-commit block.
+    // Delivered codes for the receipt the checkout shows immediately (client
+    // ask 2026-11-05: after paying with credit the codes should pop up ready to
+    // copy). Same shape as the slip-verify exception: this is the request the
+    // customer already made to pay, it is authenticated, and the response is
+    // no-store — no new endpoint carries plaintext codes.
+    let codes: Awaited<ReturnType<typeof getDeliveredCodes>> = [];
+    try {
+      codes = await getDeliveredCodes(id);
+    } catch (err) {
+      console.error(
+        '[pay-wallet] delivered-code read failed:',
+        err instanceof Error ? err.message : err,
+      );
+    }
+
     try {
       // Audit #2: the unit committed — codes delivered, wallet debited, and the
       // code-delivery outbox row promised. Kick the delivery worker after the
@@ -195,7 +211,10 @@ export async function POST(
       );
     }
 
-    return NextResponse.json({ success: true, ...result });
+    return NextResponse.json(
+      { success: true, ...result, codes },
+      { headers: { 'cache-control': 'no-store' } },
+    );
   } catch (err) {
     // Transaction rolled back — balance, ledger, claim, codes all intact.
     const code = err instanceof Error ? err.message : 'WALLET_PAY_FAILED';

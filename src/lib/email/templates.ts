@@ -117,6 +117,71 @@ export function orderConfirmationTemplate(data: OrderConfirmationData): {
   };
 }
 
+export interface CreditAdjustmentData {
+  /** Signed baht: positive = credit added, negative = deducted. */
+  amountThb: number;
+  /** Balance after the adjustment. */
+  balanceThb: number;
+  /** Optional staff note, already trimmed by the caller. */
+  note?: string | undefined;
+}
+
+/**
+ * Wallet adjustment receipt — the customer's own record in their inbox
+ * (client ask 2026-11-05: "มีประวัติไว้ในเมลก็สะดวก"). Sent for both directions:
+ * a deduction is exactly the case a customer will want to point at later.
+ */
+export function creditAdjustmentTemplate(data: CreditAdjustmentData): {
+  subject: string;
+  html: string;
+  text: string;
+} {
+  const added = data.amountThb > 0;
+  const amountLabel = `${added ? '+' : '-'}${formatThb(Math.abs(data.amountThb))}`;
+  const noteLine = data.note?.trim()
+    ? `<p style="font-size: 14px; color: #555;">หมายเหตุ: ${data.note.trim()}</p>`
+    : '';
+
+  const text = [
+    added ? 'เพิ่มเครดิตในกระเป๋าของคุณ' : 'หักเครดิตจากกระเป๋าของคุณ',
+    `จำนวน: ${amountLabel}`,
+    `เครดิตคงเหลือ: ${formatThb(data.balanceThb)}`,
+    ...(data.note?.trim() ? [`หมายเหตุ: ${data.note.trim()}`] : []),
+    '',
+    'Nong-Kati — แอคดูหนัง ซีรีส์ ออนไลน์',
+  ].join('\n');
+
+  return {
+    subject: `${added ? 'เพิ่ม' : 'หัก'}เครดิต ${amountLabel} — Nong-Kati`,
+    text,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head><meta charset="utf-8"></head>
+      <body style="font-family: 'IBM Plex Sans Thai', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h1 style="color: #f0a020; text-align: center;">
+          ${added ? '✅ เพิ่มเครดิตในกระเป๋าของคุณ' : '➖ หักเครดิตจากกระเป๋าของคุณ'}
+        </h1>
+
+        <div style="background: #f8f8f8; padding: 16px; border-radius: 8px;">
+          <p style="margin: 6px 0; font-size: 18px; font-weight: bold;">${amountLabel}</p>
+          <p style="margin: 6px 0;">เครดิตคงเหลือ: <strong>${formatThb(data.balanceThb)}</strong></p>
+        </div>
+
+        ${noteLine}
+
+        <p style="font-size: 13px; color: #888;">
+          รายการนี้ถูกบันทึกในหน้าภระเป๋าของคุณแล้ว (ประวัติการเติมเงิน/การใช้จ่าย)
+        </p>
+        <p style="font-size: 12px; color: #888; text-align: center;">
+          Nong-Kati — แอคดูหนัง ซีรีส์ ออนไลน์
+        </p>
+      </body>
+      </html>
+    `,
+  };
+}
+
 /**
  * Manual fulfilment alert email — sent when code delivery fails.
  * 10-digital-code.md §9.1 — Admin alert for pending_manual_fulfilment.

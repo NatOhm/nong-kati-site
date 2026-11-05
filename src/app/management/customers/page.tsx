@@ -10,6 +10,7 @@ import { cn } from '@/utils/cn';
 import { formatThb } from '@/lib/pricing';
 import { withStatusColors } from '@/lib/orderStatus';
 import { safeJson } from '@/lib/json';
+import { CopyButton } from '@/components/order/CopyButton';
 
 /**
  * Admin Customers — real DB-backed list + detail + price-tier management
@@ -221,6 +222,12 @@ export default function AdminCustomersPage(): React.JSX.Element {
   const [creditAmount, setCreditAmount] = useState('');
   const [creditNote, setCreditNote] = useState('');
   const [creditBusy, setCreditBusy] = useState(false);
+  // Receipt shown right after an adjustment (client ask 2026-11-05: the result
+  // should pop up ready to copy — paste it into LINE — and the customer gets
+  // the same record by email).
+  const [creditReceipt, setCreditReceipt] = useState<{ text: string; emailed: boolean } | null>(
+    null,
+  );
 
   const handleCredit = async (customerId: string) => {
     const amount = Number(creditAmount);
@@ -240,7 +247,9 @@ export default function AdminCustomersPage(): React.JSX.Element {
           note: creditNote || undefined,
         }),
       });
-      const data = await safeJson<{ error?: string; balanceThb?: number }>(res);
+      const data = await safeJson<{ error?: string; balanceThb?: number; emailed?: boolean }>(
+        res,
+      );
       if (!res.ok) {
         setActionMessage(
           data.error === 'INSUFFICIENT_BALANCE'
@@ -249,9 +258,20 @@ export default function AdminCustomersPage(): React.JSX.Element {
         );
         return;
       }
-      setActionMessage(
-        `ปรับเครดิต ${formatThb(amount)} สำเร็จ — คงเหลือ ${formatThb(data.balanceThb ?? 0)}`,
-      );
+      const balance = data.balanceThb ?? 0;
+      setActionMessage(`ปรับเครดิต ${formatThb(amount)} สำเร็จ — คงเหลือ ${formatThb(balance)}`);
+      const signed = `${amount > 0 ? '+' : '-'}${formatThb(Math.abs(amount))}`;
+      setCreditReceipt({
+        emailed: data.emailed === true,
+        text: [
+          'Nong-Kati — แจ้งปรับเครดิต',
+          `ลูกค้า: ${selectedCustomer?.email ?? ''}`,
+          `รายการ: ${amount > 0 ? 'เพิ่มเครดิต' : 'หักเครดิต'} ${signed}`,
+          `เครดิตคงเหลือ: ${formatThb(balance)}`,
+          ...(creditNote.trim() ? [`หมายเหตุ: ${creditNote.trim()}`] : []),
+          `วันที่: ${new Date().toLocaleString('th-TH')}`,
+        ].join('\n'),
+      });
       setCreditAmount('');
       setCreditNote('');
       void handleSearch();
@@ -625,6 +645,48 @@ export default function AdminCustomersPage(): React.JSX.Element {
           </table>
         </div>
       </div>
+
+      {/* Credit receipt — copyable summary, plus the truth about the email. */}
+      {creditReceipt && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="สรุปการปรับเครดิต"
+            className="w-full max-w-md rounded-lg border border-line-subtle bg-surface-base p-5"
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-base font-bold text-fg">สรุปการปรับเครดิต</h2>
+              <button
+                type="button"
+                onClick={() => setCreditReceipt(null)}
+                aria-label="ปิด"
+                className="text-fg-placeholder hover:text-fg"
+              >
+                <XCircle size={20} />
+              </button>
+            </div>
+            <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap break-words rounded-lg bg-surface p-3 font-mono text-xs leading-relaxed text-fg-secondary">
+              {creditReceipt.text}
+            </pre>
+            <p className="mt-2 text-xs text-fg-muted">
+              {creditReceipt.emailed
+                ? 'ส่งอีเมลแจ้งลูกค้าแล้ว — ลูกค้ามีประวัติไว้ในกล่องจดหมาย'
+                : 'ยังส่งอีเมลไม่ได้ (ตรวจการตั้งค่าอีเมล) — คัดลอกสรุปนี้ส่งให้ลูกค้าแทน'}
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <CopyButton text={creditReceipt.text} />
+              <button
+                type="button"
+                onClick={() => setCreditReceipt(null)}
+                className="rounded-md border border-line px-3 py-1.5 text-sm text-fg-secondary hover:bg-surface"
+              >
+                ปิด
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AdminShell>
   );
 }

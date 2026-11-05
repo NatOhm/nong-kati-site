@@ -9,6 +9,8 @@ export interface CopyButtonProps {
   onCopied?: () => void;
   size?: 'sm' | 'md';
   className?: string;
+  /** Idle label; "คัดลอก" unless a caller needs "คัดลอกทั้งหมด". */
+  label?: string;
 }
 
 /**
@@ -21,6 +23,7 @@ export function CopyButton({
   onCopied,
   size = 'md',
   className,
+  label = 'คัดลอก',
 }: CopyButtonProps): React.JSX.Element {
   const [copied, setCopied] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -70,7 +73,7 @@ export function CopyButton({
         sizeClasses[size],
         className,
       )}
-      aria-label={copied ? 'คัดลอกแล้ว' : failed ? 'คัดลอกไม่สำเร็จ' : 'คัดลอกข้อมูลส่งมอบ'}
+      aria-label={copied ? 'คัดลอกแล้ว' : failed ? 'คัดลอกไม่สำเร็จ' : label}
       aria-live="polite"
     >
       {failed ? (
@@ -83,7 +86,7 @@ export function CopyButton({
       ) : (
         <>
           <Copy size={size === 'sm' ? 12 : 14} strokeWidth={1.5} />
-          <span>คัดลอก</span>
+          <span>{label}</span>
         </>
       )}
     </button>

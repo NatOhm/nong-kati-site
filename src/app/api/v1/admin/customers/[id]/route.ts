@@ -9,6 +9,8 @@ import { maskEmail } from '@/lib/rbac';
 import { checkPermission } from '@/lib/rbac';
 import { getAdminToken } from '@/lib/adminRequest';
 import { notifyTopUp } from '@/lib/notify';
+import { sendEmail } from '@/lib/email/resend';
+import { creditAdjustmentTemplate } from '@/lib/email/templates';
 
 export const dynamic = 'force-dynamic';
 
@@ -95,10 +97,40 @@ export async function PATCH(
         balanceAfterThb: result.balanceThb,
       });
     }
+    // The customer's own record (client ask: "มีประวัติไว้ในเมลก็สะดวก").
+    // Both directions are emailed — a deduction is exactly the row someone
+    // will want to point at later — and a mail failure must never undo or
+    // fail an adjustment that already committed. The response says whether
+    // the mail actually left, so the admin UI can stop claiming it did.
+    let emailed = false;
+    try {
+      const template = creditAdjustmentTemplate({
+        amountThb: result.amountThb,
+        balanceThb: result.balanceThb,
+        note: typeof b['note'] === 'string' ? b['note'] : undefined,
+      });
+      const sent = await sendEmail({
+        to: result.customerEmail,
+        subject: template.subject,
+        html: template.html,
+        text: template.text,
+      });
+      emailed = sent.success;
+      if (!sent.success) {
+        console.error('[admin-credit] adjustment email not sent:', sent.error);
+      }
+    } catch (err) {
+      console.error(
+        '[admin-credit] adjustment email threw:',
+        err instanceof Error ? err.message : err,
+      );
+    }
+
     return NextResponse.json({
       success: true,
       balanceThb: result.balanceThb,
       amountThb: result.amountThb,
+      emailed,
     });
   }
 

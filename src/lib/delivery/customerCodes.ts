@@ -9,8 +9,14 @@
  * render them without a reload. That is the request the customer already
  * made to prove the slip — same capability token (HMAC orderId:uuid), no new
  * endpoint, no code in a URL, and `Cache-Control: no-store` so nothing
- * caches or replays it. Any other JSON path returning plaintext codes is
- * still a defect.
+ * caches or replays it.
+ *
+ * Second sanctioned exception (2026-11-05): POST /api/v1/orders/[id]/pay-wallet
+ * returns the codes it just fulfilled, so the checkout can show the receipt
+ * immediately instead of only after a reload. Same reasoning — authenticated
+ * session, the customer's own order, no new endpoint, `no-store`.
+ *
+ * Any other JSON path returning plaintext codes is still a defect.
  *
  * Access model: confirmationUuid is treated as a bearer credential (the
  * guest purchase flow was built around it); this helper is only ever called
