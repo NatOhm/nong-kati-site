@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.1.21",
+    "date": "2026-11-06",
+    "dateLabel": "Nov 6, 2026",
+    "gitSha": "3cfd380",
+    "buildId": "r_NRF6xSkZl-ZMb0Svtph",
+    "title": "The credit receipt was invisible on the real page.",
+    "detail": "1.1.21 — the credit receipt was invisible on the real page. Driving /checkout at a 390x844 viewport against a local instance with its own Postgres proved the 1.1.20 dialog never appeared: a successful wallet payment calls clearCart(), so the next render takes the \"ตะกร้าว่างเปล่า\" branch, and the dialog was mounted only after that guard. The receipt element is now built once and rendered in BOTH branches (pinned by P4 in tests/delivered-codes-dialog.test.tsx, which reads the page source and asserts a render inside the empty-cart block). Same drive, same build: codes copy per-code and via คัดลอกทั้งหมด (clipboard bytes asserted), the used-code copy and its execCommand fallback on /account/codes, \"เติมเงินในเดือนนี้\" = ฿750.00 from 25 credits with purchases NOT subtracted and NOT truncated to the newest 20 ledger rows (the seeded month answers ฿580 that way), spend history listing a completed bank-paid order, profile top-ups free of wallet_spend, mobile account nav collapsed behind เมนูบัญชี with the last orders/codes row above a 56px taskbar, and the admin ใบกำกับภาษี switch off/on removing and restoring the checkout field, the account menu entry and dropping a stale requiresTaxInvoice: true. Admin credit +฿100 and deduction −฿50 each produced a real customer email: the mailer was pointed at a local stub via NK_RESEND_API_URL (unset in production) and two messages addressed to the seeded customer arrived with subjects เพิ่มเครดิต +฿100.00 / หักเครดิต -฿50.00. Also added: the route now logs the real cause of a pay-wallet 500 instead of only WALLET_PAY_FAILED. Gates: npm test 110 files / 1054 tests, tsc, eslint clean. Verified live: /api/v1/version = 1.1.21 / #415 / r_NRF6xSkZl-ZMb0Svtph, gitSha 3cfd380, health ok (uptime 4s — a real restart), /checkout 200, /api/v1/settings/tax-invoice = {\"enabled\":true}, and the served checkout/page-853d63fec62b4e3b.js renders the receipt element (dialog props orderNumber/orderUrl/codes) inside the empty-cart branch. VAT switch deliberately left ON. Not observed: the live dialog itself (that needs a real paid order in production)."
+  },
+  {
     "version": "1.1.20",
     "date": "2026-11-05",
     "dateLabel": "Nov 5, 2026",
