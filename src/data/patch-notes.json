@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.1.17",
+    "date": "2026-11-05",
+    "dateLabel": "Nov 5, 2026",
+    "gitSha": "1192ccd",
+    "buildId": "tc1POEvECsIkfAptXzBIG",
+    "title": "The newest card carries a real release's detail, and the page is proven to render, deployed to production.",
+    "detail": "1.1.17 — the newest card carries a real release's detail, and the page is proven to render, deployed to production. 1.1.16 verified itself by grepping the served chunk for Thai bytes, which proves the bundle carried them and nothing about whether the page showed them — and its own card still had no detail, because a bundle is always built before the row describing it exists. The card now falls back to the newest *logged* release in full (Thai title, summary, all four sections) under a caption naming it and its version, while the notice still says the running build has no row; tests/patch-notes-page.test.tsx (jsdom, D1–D3) mounts the real page with the committed JSON and asserts the four section labels, 5 พ.ย. 2569, the newest release's detail text, the unlogged fallback, and that exactly one history row is expanded — the running one. D3 also caught that matching rows by text is wrong (a rollback note names another build's ID), so it indexes by position. Verified on the live origin: /api/v1/version and /api/v1/health report 1.1.17 / #407 / tc1POEvECsIkfAptXzBIG, /management/patch-notes answers 200, and the served page-028f206af2badc65.js (200, 61,081 bytes) contains 1.1.16's Thai title, its first change line, the new caption, and both section labels. Live: 1.1.17."
+  },
+  {
     "version": "1.1.16",
     "date": "2026-11-05",
     "dateLabel": "Nov 5, 2026",
