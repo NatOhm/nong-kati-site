@@ -7,7 +7,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   LayoutDashboard,
   ShoppingBag,
@@ -62,11 +62,42 @@ function AccountLayoutInner({
   const pathname = usePathname();
   const { state, reload } = useCustomerProfile();
 
+  // Mobile: the sidebar is a 12-row list; leaving it open pushed every page's
+  // own content below the fold, so a phone saw the account menu stacked on top
+  // of the page (client report: "หน้าซ้อนกัน" at ดูประวัติคำสั่งซื้อ).
+  const [navOpen, setNavOpen] = useState(false);
+
+  // ใบกำกับภาษี is hidden while the store has it switched off (owner cannot
+  // issue them yet) — a nav row to an empty page is worse than no row.
+  const [taxInvoiceEnabled, setTaxInvoiceEnabled] = useState(true);
+
   useEffect(() => {
     if (state === 'guest' && !isPublicPage) {
       router.replace(`/account/login?next=${encodeURIComponent(pathname ?? '/account/dashboard')}`);
     }
   }, [state, router, pathname, isPublicPage]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/v1/settings/tax-invoice', { cache: 'no-store' })
+      .then((r) => (r.ok ? (r.json() as Promise<{ enabled?: boolean }>) : null))
+      .then((d) => {
+        if (!cancelled && d && typeof d.enabled === 'boolean') setTaxInvoiceEnabled(d.enabled);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Navigating away must not leave the menu covering the next page.
+  useEffect(() => {
+    setNavOpen(false);
+  }, [pathname]);
+
+  const navItems = taxInvoiceEnabled
+    ? NAV_ITEMS
+    : NAV_ITEMS.filter((item) => item.href !== '/account/invoices');
 
   const handleLogout = async (): Promise<void> => {
     await fetch('/api/v1/auth/logout', { method: 'POST' });
@@ -127,13 +158,30 @@ function AccountLayoutInner({
       >
         ข้ามไปยังเนื้อหาหลัก
       </a>
-      <div className="mx-auto max-w-6xl px-4 py-8">
+      {/* pb-24 on phones: the sitewide fixed taskbar is 56px tall and sits on
+          top of whatever scrolls under it (last orders/codes were unreadable). */}
+      <div className="mx-auto max-w-6xl px-4 pb-24 pt-8 lg:pb-8">
         <div className="flex flex-col gap-6 md:flex-row">
           {/* Sidebar */}
           <aside className="w-full shrink-0 md:w-56">
-            <nav className="sticky top-4">
+            <button
+              type="button"
+              onClick={() => setNavOpen((open) => !open)}
+              aria-expanded={navOpen}
+              aria-controls="account-nav"
+              className="mb-2 flex w-full items-center justify-between rounded-md border border-line bg-surface px-3 py-2.5 text-sm font-semibold text-fg-secondary md:hidden"
+            >
+              <span className="flex items-center gap-2">
+                <LayoutDashboard size={16} /> เมนูบัญชี
+              </span>
+              <span aria-hidden>{navOpen ? '▲' : '▼'}</span>
+            </button>
+            <nav
+              id="account-nav"
+              className={cn('sticky top-4', navOpen ? 'block' : 'hidden md:block')}
+            >
               <ul className="space-y-1">
-                {NAV_ITEMS.map((item) => {
+                {navItems.map((item) => {
                   const isActive = pathname?.startsWith(item.match ?? item.href);
                   const Icon = item.icon;
 

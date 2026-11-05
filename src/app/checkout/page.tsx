@@ -115,6 +115,9 @@ export default function CheckoutPage(): React.JSX.Element {
     vatEnabled: boolean;
     vatRate: number;
   } | null>(null);
+  // Store-wide ใบกำกับภาษี switch — default true so a failed probe never hides
+  // a request surface the store actually offers.
+  const [taxInvoiceEnabled, setTaxInvoiceEnabled] = useState(true);
   const [walletBalanceThb, setWalletBalanceThb] = useState<number | null>(null);
   const [walletBusy, setWalletBusy] = useState(false);
   const [walletMsg, setWalletMsg] = useState<string | null>(null);
@@ -144,6 +147,20 @@ export default function CheckoutPage(): React.JSX.Element {
       .catch(() => undefined);
     return () => controller.abort();
   }, [cart, couponApplied, contactData]);
+
+  // ใบกำกับภาษี availability — one public read, independent of the cart.
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/v1/settings/tax-invoice', { cache: 'no-store' })
+      .then((r) => (r.ok ? (r.json() as Promise<{ enabled?: boolean }>) : null))
+      .then((d) => {
+        if (!cancelled && d && typeof d.enabled === 'boolean') setTaxInvoiceEnabled(d.enabled);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Wallet balance — fetched once for logged-in customers (the wallet option
   // is hidden for guests; a 401 here just means no balance).
@@ -486,7 +503,11 @@ export default function CheckoutPage(): React.JSX.Element {
           {step === 1 && (
             <div className="rounded-md border border-line-subtle bg-surface p-6">
               <h2 className="mb-4 text-lg font-semibold text-fg">ข้อมูลการติดต่อ</h2>
-              <ContactForm onSubmit={handleContactSubmit} loading={loading} />
+              <ContactForm
+                onSubmit={handleContactSubmit}
+                loading={loading}
+                taxInvoiceEnabled={taxInvoiceEnabled}
+              />
 
               {/* Coupon code (คูปองส่วนลด) */}
               <div className="mt-6 border-t border-line-subtle pt-4">

@@ -19,6 +19,8 @@ export interface ContactFormData {
 export interface ContactFormProps {
   defaultValues?: Partial<ContactFormData>;
   readOnlyEmail?: boolean;
+  /** Store-wide switch (SiteSetting 'tax_invoice'); false hides the request UI. */
+  taxInvoiceEnabled?: boolean;
   onSubmit: (data: ContactFormData) => void;
   loading?: boolean;
 }
@@ -30,6 +32,7 @@ export interface ContactFormProps {
 export function ContactForm({
   defaultValues,
   readOnlyEmail = false,
+  taxInvoiceEnabled = true,
   onSubmit,
   loading = false,
 }: ContactFormProps): React.JSX.Element {
@@ -73,7 +76,7 @@ export function ContactForm({
       newErrors.tos = 'กรุณายอมรับเงื่อนไขการใช้งาน';
     }
 
-    if (requiresTaxInvoice) {
+    if (taxInvoiceEnabled && requiresTaxInvoice) {
       if (!taxInvoiceName.trim()) {
         newErrors.taxInvoiceName = 'กรุณากรอกชื่อหรือชื่อบริษัท';
       }
@@ -92,9 +95,10 @@ export function ContactForm({
       onSubmit({
         email,
         phone,
-        requiresTaxInvoice,
-        taxInvoiceName,
-        taxInvoiceTaxId,
+        // When the store cannot issue them, never send a request it must drop.
+        requiresTaxInvoice: taxInvoiceEnabled && requiresTaxInvoice,
+        taxInvoiceName: taxInvoiceEnabled ? taxInvoiceName : '',
+        taxInvoiceTaxId: taxInvoiceEnabled ? taxInvoiceTaxId : '',
         tosAccepted,
         marketingOptIn,
       });
@@ -147,23 +151,25 @@ export function ContactForm({
         />
       </div>
 
-      {/* Tax Invoice Toggle */}
-      <TaxInvoiceToggle
-        enabled={requiresTaxInvoice}
-        onToggle={setRequiresTaxInvoice}
-        value={{
-          name: taxInvoiceName,
-          taxId: taxInvoiceTaxId,
-        }}
-        onChange={(val) => {
-          setTaxInvoiceName(val.name);
-          setTaxInvoiceTaxId(val.taxId);
-        }}
-        errors={{
-          name: errors.taxInvoiceName,
-          taxId: errors.taxInvoiceTaxId,
-        }}
-      />
+      {/* Tax Invoice Toggle — hidden entirely while the store has it switched off */}
+      {taxInvoiceEnabled && (
+        <TaxInvoiceToggle
+          enabled={requiresTaxInvoice}
+          onToggle={setRequiresTaxInvoice}
+          value={{
+            name: taxInvoiceName,
+            taxId: taxInvoiceTaxId,
+          }}
+          onChange={(val) => {
+            setTaxInvoiceName(val.name);
+            setTaxInvoiceTaxId(val.taxId);
+          }}
+          errors={{
+            name: errors.taxInvoiceName,
+            taxId: errors.taxInvoiceTaxId,
+          }}
+        />
+      )}
 
       {/* Consent Checkboxes */}
       <div className="space-y-3">

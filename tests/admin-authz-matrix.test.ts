@@ -239,6 +239,14 @@ const ROUTE_COVERAGE: MatrixRow[] = [
     perm: 'settings:write',
     body: { enabled: true, rate: 7 },
   },
+  // ใบกำกับภาษี request switch (checkout / account nav read the public twin)
+  { method: 'GET', path: '/settings/tax-invoice', perm: 'settings:read' },
+  {
+    method: 'PUT',
+    path: '/settings/tax-invoice',
+    perm: 'settings:write',
+    body: { enabled: false },
+  },
   // SMTP connectivity probe for the email settings panel (no save, no send)
   { method: 'POST', path: '/settings/email-test', perm: 'settings:write', body: {} },
   // Discord webhook probe — sends ONE test embed, reports the outcome

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Banknote, Save, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Banknote, Save, CheckCircle2, AlertTriangle, FileText } from 'lucide-react';
 
 import { adminFetch } from '@/lib/adminSession';
 import { safeJson } from '@/lib/json';
@@ -17,6 +17,9 @@ export function VatSettings({
 }): React.JSX.Element {
   const [enabled, setEnabled] = useState(false);
   const [rate, setRate] = useState('7');
+  // ใบกำกับภาษี request surface (client ask: the owner cannot issue them yet,
+  // so it has to be switchable off instead of always offered at checkout).
+  const [taxInvoiceEnabled, setTaxInvoiceEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -40,15 +43,25 @@ export function VatSettings({
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
+    adminFetch('/api/v1/admin/settings/tax-invoice')
+      .then((r) => (r.ok ? (r.json() as Promise<{ enabled: boolean }>) : null))
+      .then((data) => {
+        if (!cancelled && data) setTaxInvoiceEnabled(data.enabled);
+      })
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const valuesRef = useSettingsSaver(registerSaver, { enabled, rate }, saveToApi);
+  const valuesRef = useSettingsSaver(
+    registerSaver,
+    { enabled, rate, taxInvoiceEnabled },
+    saveToApi,
+  );
 
   async function saveToApi(): Promise<void> {
-    const { enabled: e, rate: r } = valuesRef.current;
+    const { enabled: e, rate: r, taxInvoiceEnabled: ti } = valuesRef.current;
     const res = await adminFetch('/api/v1/admin/settings/vat', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -57,6 +70,18 @@ export function VatSettings({
     if (!res.ok) {
       const data = await safeJson<{ error?: string }>(res);
       throw new Error(data.error ?? `HTTP ${res.status}`);
+    }
+
+    // Separate switch, separate row: turning VAT off must never quietly
+    // re-open ใบกำกับภาษี (or the reverse).
+    const tiRes = await adminFetch('/api/v1/admin/settings/tax-invoice', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: ti }),
+    });
+    if (!tiRes.ok) {
+      const data = await safeJson<{ error?: string }>(tiRes);
+      throw new Error(data.error ?? `HTTP ${tiRes.status}`);
     }
   }
 
@@ -150,6 +175,30 @@ export function VatSettings({
                 </div>
               </div>
             )}
+          </div>
+
+          {/* ใบกำกับภาษี on/off — independent of VAT itself. */}
+          <div className="rounded-lg border border-line-subtle bg-surface p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-peach-500/15 text-peach-700">
+                  <FileText size={20} />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-fg">รับคำขอใบกำกับภาษี</p>
+                  <p className="text-xs text-fg-placeholder">
+                    ปิดไว้เมื่อยังออกใบกำกับภาษีไม่ได้ — ช่องขอใบกำกับภาษีที่หน้าชำระเงินและเมนู
+                    ใบกำกับภาษีของลูกค้าจะถูกซ่อน
+                  </p>
+                </div>
+              </div>
+              <ToggleSwitch enabled={taxInvoiceEnabled} onChange={setTaxInvoiceEnabled} />
+            </div>
+            <p className="mt-3 rounded-md bg-surface-elevated px-3 py-2 text-xs text-fg-muted">
+              {taxInvoiceEnabled
+                ? 'สถานะปัจจุบัน: เปิด — ลูกค้าขอใบกำกับภาษีตอนชำระเงินได้'
+                : 'สถานะปัจจุบัน: ปิด — ไม่มีคำขอใบกำกับภาษีใหม่ และหน้าลูกค้าไม่แสดงเมนูนี้'}
+            </p>
           </div>
 
           {error && (

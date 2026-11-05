@@ -15,11 +15,21 @@ import { cn } from '@/utils/cn';
  * แสดงสถานะว่ากำลังเตรียมระบบ ไม่หลอกผู้ใช้ว่ากดแล้วเติมได้.
  */
 
+interface SpendRow {
+  id: string;
+  orderNumber: string;
+  confirmationUuid: string;
+  amountThb: number;
+  itemCount: number;
+  createdAt: string;
+}
+
 interface WalletData {
   balanceThb: number;
   topupThisMonthThb: number;
   spendThisMonthThb: number;
   topups: { id: string; amountThb: number; method: string; status: string; createdAt: string }[];
+  spendHistory?: SpendRow[];
 }
 
 export default function WalletPage(): React.JSX.Element {
@@ -132,6 +142,44 @@ export default function WalletPage(): React.JSX.Element {
               </div>
             ))}
           </div>
+        )}
+      </div>
+
+      {/* Spending history — from completed ORDERS, so bank-transfer and slip
+          purchases appear here too (they never wrote a wallet ledger row). */}
+      <div className="clay-card p-5">
+        <h2 className="text-base font-bold text-fg">ประวัติการใช้จ่าย</h2>
+        {!data || (data.spendHistory ?? []).length === 0 ? (
+          <p className="py-8 text-center text-sm text-fg-muted">
+            ยังไม่มีการใช้จ่าย — คำสั่งซื้อที่ชำระสำเร็จจะแสดงที่นี่
+          </p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {(data.spendHistory ?? []).map((s) => (
+              <li key={s.id}>
+                <a
+                  href={`/orders/${s.confirmationUuid || s.id}`}
+                  className="flex items-center justify-between rounded-xl border border-line-subtle px-4 py-3 transition-colors hover:bg-surface"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-fg">{s.orderNumber}</p>
+                    <p className="text-xs text-fg-muted">
+                      {new Date(s.createdAt).toLocaleDateString('th-TH', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                      {' · '}
+                      {s.itemCount} ชิ้น
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-sm font-semibold text-fg-error">
+                    -{formatThb(s.amountThb)}
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
     </div>

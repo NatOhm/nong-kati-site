@@ -8,6 +8,7 @@ import { isOpnConfigured } from '@/lib/payment/omise';
 import { prisma } from '@/lib/db';
 import { applyRateLimit, checkRateLimit, getClientIp } from '@/lib/rateLimit';
 import { notifyNewOrder } from '@/lib/notify';
+import { getTaxInvoiceConfig } from '@/lib/taxInvoice';
 
 export const dynamic = 'force-dynamic';
 
@@ -122,6 +123,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
   }
 
+  // A stale tab (or a script) can still ask for a ใบกำกับภาษี after the store
+  // switched the request surface off. Drop the flag rather than store a
+  // promise the owner cannot keep — the order itself must still go through.
+  const taxInvoice = await getTaxInvoiceConfig();
+
   try {
     const result = await createOrder({
       // Client sends `email`/`phone` (orderClient.ts); accept the API-internal
@@ -137,7 +143,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       marketingOptIn: b['marketingOptIn'] === true,
       tosAccepted: b['tosAccepted'] === true,
       tosVersion: '1.0',
-      requiresTaxInvoice: b['requiresTaxInvoice'] === true,
+      requiresTaxInvoice: taxInvoice.enabled && b['requiresTaxInvoice'] === true,
       ...(typeof b['taxInvoiceName'] === 'string'
         ? { taxInvoiceName: b['taxInvoiceName'] as string }
         : {}),

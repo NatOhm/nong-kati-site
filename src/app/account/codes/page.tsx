@@ -7,8 +7,9 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Search, Copy, CheckCircle, Loader2 } from 'lucide-react';
+import { Search, Loader2 } from 'lucide-react';
 import { cn } from '@/utils/cn';
+import { CopyButton } from '@/components/order/CopyButton';
 
 interface CodeRow {
   id: string;
@@ -26,7 +27,6 @@ export default function AccountCodesPage(): React.JSX.Element {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const load = useCallback(async (): Promise<void> => {
     setLoading(true);
@@ -59,12 +59,6 @@ export default function AccountCodesPage(): React.JSX.Element {
         : codes,
     [codes, search],
   );
-
-  const handleCopy = async (code: string, id: string): Promise<void> => {
-    await navigator.clipboard.writeText(code);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
-  };
 
   return (
     <div className="space-y-6">
@@ -123,8 +117,8 @@ export default function AccountCodesPage(): React.JSX.Element {
                   : 'border-line-brand bg-surface-brand-subtle',
               )}
             >
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-fg-secondary">
                     {item.product} · ฿{item.denomination.toLocaleString('th-TH')}
                   </p>
@@ -133,7 +127,7 @@ export default function AccountCodesPage(): React.JSX.Element {
                       {item.code}
                     </pre>
                   ) : (
-                    <p className="mt-1 font-mono text-sm text-fg-brand">{item.code}</p>
+                    <p className="mt-1 break-all font-mono text-sm text-fg-brand">{item.code}</p>
                   )}
                   <p className="mt-1 text-xs text-fg-muted">
                     {item.orderNumber} · ได้รับ{' '}
@@ -142,25 +136,13 @@ export default function AccountCodesPage(): React.JSX.Element {
                       : '—'}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                {/* CopyButton, not navigator.clipboard directly: the raw API
+                    rejects in phone browsers / in-app webviews and the old
+                    button then did nothing at all (client report). Used codes
+                    stay copyable — people still need them for their records. */}
+                <div className="flex shrink-0 items-center gap-2">
                   {item.used && <span className="text-xs text-fg-muted">ใช้แล้ว</span>}
-                  {!item.used && (
-                    <button
-                      type="button"
-                      onClick={() => void handleCopy(item.code, item.id)}
-                      className="inline-flex items-center gap-1 rounded-md border border-line-subtle px-3 py-1.5 text-xs text-fg-muted hover:bg-surface"
-                    >
-                      {copiedId === item.id ? (
-                        <>
-                          <CheckCircle size={12} className="text-jade-600" /> คัดลอกแล้ว
-                        </>
-                      ) : (
-                        <>
-                          <Copy size={12} /> คัดลอก
-                        </>
-                      )}
-                    </button>
-                  )}
+                  <CopyButton text={item.code} size="sm" />
                 </div>
               </div>
             </div>

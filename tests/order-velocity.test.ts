@@ -53,7 +53,11 @@ vi.mock('@/lib/paymentChannels', () => ({
 vi.mock('@/lib/payment/omise', () => ({
   isOpnConfigured: vi.fn(async () => false),
 }));
-vi.mock('@/lib/db', () => ({ prisma: {} }));
+// The route now reads the ใบกำกับภาษี switch (SiteSetting 'tax_invoice') before
+// creating the order; no row = enabled, which is the behaviour these caps test.
+vi.mock('@/lib/db', () => ({
+  prisma: { siteSetting: { findUnique: vi.fn(async () => null) } },
+}));
 
 /** Unique suffix per run so the shared in-memory store never collides. */
 const RUN = Date.now().toString(36);

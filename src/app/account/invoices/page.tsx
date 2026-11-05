@@ -26,6 +26,21 @@ export default function AccountInvoicesPage(): React.JSX.Element {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  // Store-wide switch: requests can be closed while older invoices stay available.
+  const [available, setAvailable] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/v1/settings/tax-invoice', { cache: 'no-store' })
+      .then((r) => (r.ok ? (r.json() as Promise<{ enabled?: boolean }>) : null))
+      .then((d) => {
+        if (!cancelled && d && typeof d.enabled === 'boolean') setAvailable(d.enabled);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const load = useCallback(async (): Promise<void> => {
     setLoading(true);
@@ -72,6 +87,12 @@ export default function AccountInvoicesPage(): React.JSX.Element {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-fg">ใบกำกับภาษี</h1>
+
+      {!available && (
+        <p className="rounded-lg border border-line-subtle bg-surface-elevated px-3 py-2.5 text-sm text-fg-muted">
+          ร้านยังไม่เปิดรับคำขอใบกำกับภาษีใหม่ในขณะนี้ — ใบกำกับที่เคยออกให้แล้วยังดาวน์โหลดได้ตามปกติ
+        </p>
+      )}
 
       {error && (
         <p className="bg-error rounded-lg px-3 py-2 text-sm text-fg-error dark:bg-coral-900/20 dark:text-coral-300">
