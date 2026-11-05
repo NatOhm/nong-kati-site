@@ -52,6 +52,16 @@ function must<T>(value: T | undefined, what: string): T {
   return value;
 }
 
+/** Same contract as the page: `2026-11-05` → `5 พ.ย. 2569` (Buddhist year). */
+function expectedThaiDate(iso: string): string {
+  return new Intl.DateTimeFormat('th-TH', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(`${iso}T00:00:00Z`));
+}
+
 const NEWEST = must(NOTES[0], 'no logged builds');
 const NEWEST_TH = must(TH[NEWEST.buildId], `no Thai entry for ${NEWEST.buildId}`);
 
@@ -97,8 +107,10 @@ describe('patch notes page — renders the Thai release detail', () => {
     const card = liveCard();
 
     expect(within(card).getByText(NEWEST_TH.title)).toBeTruthy();
-    // 5 พ.ย. 2569 — Buddhist era, month abbreviated, not the log's "Nov 5, 2026".
-    expect(within(card).getByText('5 พ.ย. 2569')).toBeTruthy();
+    // `2026-11-05` → `5 พ.ย. 2569`: Buddhist era, month abbreviated, not the
+    // log's English "Nov 5, 2026". Derived from the newest row so a new deploy
+    // does not turn this gate into a stale hard-coded date.
+    expect(within(card).getByText(expectedThaiDate(NEWEST.date))).toBeTruthy();
     for (const label of LABELS) {
       expect(within(card).getByRole('heading', { name: label }), label).toBeTruthy();
     }

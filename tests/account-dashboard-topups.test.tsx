@@ -63,6 +63,22 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+/**
+ * The month the phone reported: 25 top-ups worth ฿750, with wallet purchases
+ * interleaved in the ledger the endpoint returns (newest 20 rows, signed).
+ */
+const MONTH_LEDGER = {
+  ...WALLET,
+  topupThisMonthThb: 750,
+  topups: Array.from({ length: 20 }, (_, i) => ({
+    id: `t${i + 1}`,
+    amountThb: i === 3 || i === 11 ? -300 : 30,
+    method: i === 3 || i === 11 ? 'wallet_spend' : 'bank_transfer',
+    status: 'completed',
+    createdAt: `2026-11-0${Math.min(5, 1 + (i % 5))}T02:00:00.000Z`,
+  })),
+};
+
 describe('โปรไฟล์ของฉัน — ประวัติการเติมเงิน', () => {
   it('H1/H2: only credits are listed, with a Thai method label', async () => {
     render(<ProfilePage />);
@@ -76,5 +92,20 @@ describe('โปรไฟล์ของฉัน — ประวัติก�
     // ...and the credit is shown as money in: once as the month total, once
     // in the history row.
     expect(screen.getAllByText('฿500.00')).toHaveLength(2);
+  });
+
+  it('H3: a ฿750 month lists only its credits — no purchase rows, no ledger keys', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify(MONTH_LEDGER), { status: 200 })),
+    );
+    render(<ProfilePage />);
+
+    await waitFor(() => expect(screen.getByText('฿750.00')).toBeTruthy());
+
+    // The page keeps five rows of money IN, all of them credits.
+    expect(screen.getAllByText('฿30.00')).toHaveLength(5);
+    expect(screen.queryByText(/wallet_spend/)).toBeNull();
+    expect(screen.queryByText(/-฿300\.00/)).toBeNull();
   });
 });
