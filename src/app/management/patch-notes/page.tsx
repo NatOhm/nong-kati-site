@@ -5,6 +5,7 @@ import { History, Rocket } from 'lucide-react';
 import { AdminShell } from '@/components/layout/AdminShell';
 import { useRelease } from '@/components/layout/ReleaseBadge';
 import patchNotes from '@/data/patch-notes.json';
+import patchNotesTh from '@/data/patch-notes-th.json';
 import { cn } from '@/utils/cn';
 
 /**
@@ -27,6 +28,16 @@ import { cn } from '@/utils/cn';
  * therefore always truthful, and if it has no log row yet the page says so
  * rather than claiming an older release is current.
  *
+ * 1.1.16 — Thai and structure. The deploy log stays the English audit trail
+ * (it is read by whoever deploys, next to commits and BUILD_IDs), and the Thai
+ * copy lives in src/data/patch-notes-th.json keyed by BUILD_ID. That file is
+ * authored, not derived, so it can drift — which is why `tests/patch-notes.test.ts`
+ * P5/P6 require one entry per logged build and no orphan keys: shipping a build
+ * without its Thai text breaks the build instead of the page. Each entry is
+ * split into ปัญหา / สิ่งที่เปลี่ยน / ตรวจสอบแล้ว / หมายเหตุ so a 400-word
+ * English paragraph becomes four short lists, and the live card now shows the
+ * newest release's detail too, not just its title.
+ *
  * Read-only by design: no mutations, and the history still renders when the
  * API is down (the card falls back to the newest recorded build).
  */
@@ -40,8 +51,40 @@ interface PatchNote {
   detail: string;
 }
 
+interface ThaiNote {
+  title: string;
+  summary?: string;
+  problem?: string;
+  change: string[];
+  proof?: string[];
+  note?: string;
+}
+
 const NOTES = patchNotes as PatchNote[];
 const NEWEST = NOTES[0];
+const TH = patchNotesTh as Record<string, ThaiNote>;
+
+const THAI_MONTHS = [
+  'ม.ค.',
+  'ก.พ.',
+  'มี.ค.',
+  'เม.ย.',
+  'พ.ค.',
+  'มิ.ย.',
+  'ก.ค.',
+  'ส.ค.',
+  'ก.ย.',
+  'ต.ค.',
+  'พ.ย.',
+  'ธ.ค.',
+];
+
+/** `2026-11-05` → `5 พ.ย. 2569`; falls back to the log's English label. */
+function thaiDate(iso: string, fallback: string): string {
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return fallback;
+  return `${Number(m[3])} ${THAI_MONTHS[Number(m[2]) - 1] ?? ''} ${Number(m[1]) + 543}`;
+}
 
 function VersionChip({ version }: { version: string | null }): React.JSX.Element {
   if (!version) {
@@ -69,6 +112,49 @@ function Meta({ buildId, gitSha }: { buildId: string; gitSha: string }): React.J
   );
 }
 
+/**
+ * One labelled block: a short Thai label and a bullet list.
+ *
+ * Lists rather than paragraphs on purpose — the deploy log writes each release
+ * as one long English paragraph, which is fine as an audit trail and hard to
+ * scan on a phone. `space-y-1` + `leading-relaxed` keeps 3–4 lines readable.
+ */
+function Block({ label, items }: { label: string; items?: string[] | undefined }): React.JSX.Element | null {
+  if (!items?.length) return null;
+  return (
+    <div>
+      <h4 className="text-xs font-semibold tracking-wide text-fg-muted">{label}</h4>
+      <ul className="mt-1 list-disc space-y-1 pl-5 text-sm leading-relaxed text-fg-secondary">
+        {items.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function Paragraph({ label, text }: { label: string; text?: string | undefined }): React.JSX.Element | null {
+  if (!text) return null;
+  return (
+    <div>
+      <h4 className="text-xs font-semibold tracking-wide text-fg-muted">{label}</h4>
+      <p className="mt-1 text-sm leading-relaxed text-fg-secondary">{text}</p>
+    </div>
+  );
+}
+
+/** The Thai body of one release, in a fixed order so every row scans the same. */
+function Detail({ note }: { note: ThaiNote }): React.JSX.Element {
+  return (
+    <div className="mt-3 space-y-3 border-t border-line-subtle pt-3">
+      <Paragraph label="ปัญหา" text={note.problem} />
+      <Block label="สิ่งที่เปลี่ยน" items={note.change} />
+      <Block label="ตรวจสอบแล้ว" items={note.proof} />
+      <Paragraph label="หมายเหตุ" text={note.note} />
+    </div>
+  );
+}
+
 export default function PatchNotesPage(): React.JSX.Element {
   const { release, failed } = useRelease();
   const live = release?.buildId
@@ -77,6 +163,8 @@ export default function PatchNotesPage(): React.JSX.Element {
 
   const logged = live ? NOTES.find((note) => note.buildId === live.buildId) : undefined;
   const unlogged = Boolean(live) && !logged;
+  const liveTh = live ? TH[live.buildId] : undefined;
+  const newestTh = NEWEST ? TH[NEWEST.buildId] : undefined;
 
   return (
     <AdminShell
@@ -111,20 +199,43 @@ export default function PatchNotesPage(): React.JSX.Element {
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <VersionChip version={live.version} />
                 <span className="text-sm text-fg-muted">
-                  {logged ? logged.dateLabel : 'ยังไม่มีบันทึกของ build นี้'}
+                  {logged ? thaiDate(logged.date, logged.dateLabel) : 'ยังไม่มีบันทึกของ build นี้'}
                 </span>
               </div>
+              {/* A build is always baked BEFORE its own log row can exist, so the
+                  card must never be empty on the newest release: when the row is
+                  missing it shows the previous release's detail under a caption
+                  that says whose detail it is. */}
               <p className="mt-2 text-base font-medium text-fg">
-                {logged ? logged.title : 'build นี้ยังไม่ถูกบันทึกในรายการด้านล่าง'}
+                {liveTh?.title ??
+                  logged?.title ??
+                  (newestTh?.title ? `ล่าสุดที่บันทึกไว้: ${newestTh.title}` : 'build นี้ยังไม่ถูกบันทึก')}
               </p>
-              <div className="mt-2">
+              {liveTh?.summary && (
+                <p className="mt-1 text-sm leading-relaxed text-fg-secondary">{liveTh.summary}</p>
+              )}
+              {liveTh && <Detail note={liveTh} />}
+              <div className="mt-3">
                 <Meta buildId={live.buildId} gitSha={live.gitSha} />
               </div>
               {unlogged && (
-                <p className="mt-3 rounded-md border border-line-subtle bg-bg p-3 text-sm text-fg-secondary">
-                  build ที่รันอยู่ ({live.version}) ยังไม่มีแถวในบันทึก deploy — รายละเอียดจะขึ้นใน
-                  รายการนี้เมื่ออัปเดตบันทึก รายการด้านล่างจึงเป็นของ build ก่อนหน้า
-                </p>
+                <>
+                  <p className="mt-3 rounded-md border border-line-subtle bg-bg p-3 text-sm text-fg-secondary">
+                    build ที่รันอยู่ ({live.version}) ยังไม่มีแถวในบันทึก deploy —
+                    รายละเอียดด้านล่างเป็นของ build ก่อนหน้า และจะเปลี่ยนเป็นของ build นี้เมื่ออัปเดต
+                    บันทึก
+                  </p>
+                  {newestTh && (
+                    <>
+                      {newestTh.summary && (
+                        <p className="mt-3 text-sm leading-relaxed text-fg-secondary">
+                          {newestTh.summary}
+                        </p>
+                      )}
+                      <Detail note={newestTh} />
+                    </>
+                  )}
+                </>
               )}
             </>
           ) : (
@@ -132,12 +243,18 @@ export default function PatchNotesPage(): React.JSX.Element {
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <VersionChip version={NEWEST?.version ?? null} />
                 <span className="text-sm text-fg-muted">
-                  บันทึกล่าสุด · {NEWEST?.dateLabel}
+                  บันทึกล่าสุด · {NEWEST ? thaiDate(NEWEST.date, NEWEST.dateLabel) : ''}
                 </span>
               </div>
-              <p className="mt-2 text-base font-medium text-fg">{NEWEST?.title}</p>
+              <p className="mt-2 text-base font-medium text-fg">
+                {newestTh?.title ?? NEWEST?.title}
+              </p>
+              {newestTh?.summary && (
+                <p className="mt-1 text-sm leading-relaxed text-fg-secondary">{newestTh.summary}</p>
+              )}
+              {newestTh && <Detail note={newestTh} />}
               {NEWEST && (
-                <div className="mt-2">
+                <div className="mt-3">
                   <Meta buildId={NEWEST.buildId} gitSha={NEWEST.gitSha} />
                 </div>
               )}
@@ -155,37 +272,50 @@ export default function PatchNotesPage(): React.JSX.Element {
             ประวัติทั้งหมด
           </h2>
           <ol className="space-y-3">
-            {NOTES.map((note) => (
-              <li
-                key={note.buildId}
-                className={cn(
-                  'rounded-md border border-line-subtle bg-surface p-4',
-                  note.buildId === live?.buildId && 'border-line-brand'
-                )}
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <VersionChip version={note.version} />
-                  <span className="text-sm text-fg-muted">{note.dateLabel}</span>
-                  {note.buildId === live?.buildId && (
-                    <span className="rounded-full bg-peach-500/15 px-2 py-0.5 text-xs font-medium text-peach-700">
-                      ใช้งานอยู่
-                    </span>
+            {NOTES.map((note) => {
+              const th = TH[note.buildId];
+              const isLive = note.buildId === live?.buildId;
+              return (
+                <li
+                  key={note.buildId}
+                  className={cn(
+                    'rounded-md border border-line-subtle bg-surface p-4',
+                    isLive && 'border-line-brand'
                   )}
-                </div>
-                <p className="mt-2 font-medium text-fg">{note.title}</p>
-                <div className="mt-1">
-                  <Meta buildId={note.buildId} gitSha={note.gitSha} />
-                </div>
-                <details className="mt-3" open={note.buildId === live?.buildId}>
-                  <summary className="cursor-pointer text-sm text-fg-secondary hover:text-fg">
-                    รายละเอียดที่เปลี่ยน
-                  </summary>
-                  <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-fg-secondary">
-                    {note.detail}
-                  </p>
-                </details>
-              </li>
-            ))}
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <VersionChip version={note.version} />
+                    <span className="text-sm text-fg-muted">
+                      {thaiDate(note.date, note.dateLabel)}
+                    </span>
+                    {isLive && (
+                      <span className="rounded-full bg-peach-500/15 px-2 py-0.5 text-xs font-medium text-peach-700">
+                        ใช้งานอยู่
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-2 font-medium text-fg">{th?.title ?? note.title}</p>
+                  {th?.summary && (
+                    <p className="mt-1 text-sm leading-relaxed text-fg-secondary">{th.summary}</p>
+                  )}
+                  <div className="mt-1">
+                    <Meta buildId={note.buildId} gitSha={note.gitSha} />
+                  </div>
+                  {th ? (
+                    <details className="mt-2" open={isLive}>
+                      <summary className="cursor-pointer text-sm font-medium text-fg-secondary hover:text-fg">
+                        รายละเอียด
+                      </summary>
+                      <Detail note={th} />
+                    </details>
+                  ) : (
+                    <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-fg-secondary">
+                      {note.detail}
+                    </p>
+                  )}
+                </li>
+              );
+            })}
           </ol>
         </section>
       </div>

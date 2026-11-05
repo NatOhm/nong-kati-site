@@ -12,6 +12,9 @@
  *   P2  newest-first, unique BUILD_IDs, nothing dated in the future,
  *   P3  every entry is complete: commit, BUILD_ID, ISO date, title, detail,
  *   P4  the page reads that JSON and the nav points at the route.
+ *   P5  rows that shipped no code stay out of the list,
+ *   P6  every logged build has Thai text (the authored layer, keyed by BUILD_ID),
+ *   P7  no Thai entry is an orphan and each one has a title + at least one change.
  *
  * The parsing side is deliberately tested against the *real* log, not a
  * fixture: the log is the owner of history, so a table the parser can no
@@ -39,6 +42,20 @@ const COMMITTED = JSON.parse(
   title: string;
   detail: string;
 }>;
+
+const THAI = JSON.parse(
+  readFileSync(path.join(ROOT, 'src', 'data', 'patch-notes-th.json'), 'utf8')
+) as Record<
+  string,
+  {
+    title: string;
+    summary?: string;
+    problem?: string;
+    change: string[];
+    proof?: string[];
+    note?: string;
+  }
+>;
 
 const PAGE = readFileSync(
   path.join(ROOT, 'src', 'app', 'management', 'patch-notes', 'page.tsx'),
@@ -101,5 +118,25 @@ describe('patch notes — generated from the deploy log', () => {
       .split(/\r?\n/)
       .filter((l) => l.startsWith('| ') && /\d{4}/.test(l) && !l.includes('---'));
     expect(tableRows.length).toBeGreaterThan(skipped);
+  });
+
+  it('P6: every logged build also has Thai text', () => {
+    // The Thai layer is authored, not derived, so it CAN drift — this is the
+    // gate that makes forgetting it a red build rather than an English row on a
+    // Thai panel. Coverage is by BUILD_ID, since that is what the page keys on.
+    const missing = COMMITTED.filter((note) => !THAI[note.buildId]).map((note) => note.buildId);
+    expect(missing).toEqual([]);
+  });
+
+  it('P7: no orphan Thai entries, and each carries a title plus real changes', () => {
+    const builds = new Set(COMMITTED.map((note) => note.buildId));
+    expect(Object.keys(THAI).filter((id) => !builds.has(id))).toEqual([]);
+    for (const [buildId, th] of Object.entries(THAI)) {
+      expect(th.title.trim().length, buildId).toBeGreaterThan(8);
+      expect(th.change.length, buildId).toBeGreaterThan(0);
+      for (const line of th.change) expect(line.trim().length, buildId).toBeGreaterThan(10);
+      // Thai script, not an English placeholder left behind.
+      expect(/[\u0E00-\u0E7F]/.test(th.title), buildId).toBe(true);
+    }
   });
 });

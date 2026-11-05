@@ -1026,6 +1026,8 @@ slug ที่เป็น ASCII ไม่พังเพราะ `encodeURICom
 | P4 | หน้าจริงอ่าน JSON นั้นและ map ทุกแถว, และ sidebar มี `/management/patch-notes` ด้วยสิทธิ์ `settings:read` |
 | P4b | การ์ดบนสุดถาม build ที่รันอยู่ผ่าน `useRelease()` (คำขอเดียวของทั้งหลังบ้าน — `tests/release-badge.test.ts` ห้าม fetch ตัวที่สอง) และบอกตรง ๆ เมื่อ build ที่รันอยู่ยังไม่มีแถวในบันทึก — เพราะ JSON ถูกฝังตอน build จึงมีของ release ก่อนหน้าเสมอ |
 | P5 | แถวที่ไม่ใช่ build (ล้าง DB, หมุน secret, repo hygiene) ไม่หลุดเข้ามาในรายการ |
+| P6 | ทุก build ที่บันทึกไว้มีข้อความไทยของตัวเองใน `src/data/patch-notes-th.json` (คีย์ด้วย `BUILD_ID`) — เลเยอร์ไทยเขียนมือ จึงต้องมีประตูบังคับ ไม่งั้น build ใหม่จะโชว์อังกฤษบนแผงไทย |
+| P7 | ไม่มีคีย์ไทยเกิน (orphan) ที่ไม่มี build รองรับ และทุกอันมีหัวข้อ + `change` อย่างน้อยหนึ่งบรรทัด และหัวข้อเป็นอักษรไทยจริง |
 
 **พังได้จริง — ทดสอบด้วยการใส่มั๊กกลับ**
 
@@ -1033,6 +1035,7 @@ slug ที่เป็น ASCII ไม่พังเพราะ `encodeURICom
 - ลบ `from '@/data/patch-notes.json'` ในหน้าแล้ว hardcode รายการ → P4 แดง
 - ใส่วันที่อนาคตในแถว → P2 แดง
 - ให้ parser รับแถวที่ commit หรือ `BUILD_ID` เป็น `—` → P3/P5 แดง
+- ลบ entry ไทยของ build หนึ่งออกจาก `patch-notes-th.json` → P6 แดง; ใส่คีย์ที่ไม่มี build → P7 แดง
 
 ---
 
