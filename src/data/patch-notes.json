@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.1.18",
+    "date": "2026-11-05",
+    "dateLabel": "Nov 5, 2026",
+    "gitSha": "1b19cf4",
+    "buildId": "6pjtmbKUY_y1evlG8AXcA",
+    "title": "Four phone-user reports, deployed to production.",
+    "detail": "1.1.18 — four phone-user reports, deployed to production. (1) /account/codes called navigator.clipboard.writeText directly: on phones and in-app webviews that rejects and the tap did nothing, with no message — it now uses the same CopyButton as the order page (Clipboard API → textarea + execCommand → visible failure), appears on used codes too, and stacks on narrow screens. (2) “เติมเงินในเดือนนี้” summed the 20 newest ledger rows including negative wallet_spend rows, so bank top-ups read as zero or negative; it now comes from topUpLog.aggregate over amountThb > 0 for the Bangkok month, and the wallet page gained ประวัติการใช้จ่าย built from completed orders, because bank/slip purchases never wrote a ledger row. (3) The account sidebar stayed expanded on phones — twelve nav rows above every page looked like two screens stacked at ดูประวัติคำสั่งซื้อ — so it collapses behind a เมนูบัญชี button below md, and the container reserves pb-24 for the fixed taskbar. (4) ใบกำกับภาษี is now a store-wide switch (SiteSetting('tax_invoice'), default on, admin toggle in the VAT tab): off hides the checkout request, drops a stale requiresTaxInvoice in the order API, removes the account nav row and captions the invoices page. New gates: tests/wallet-month-totals.test.ts, tests/tax-invoice-setting.test.ts, tests/checkout-tax-invoice-gate.test.tsx, tests/account-codes-copy.test.tsx; admin-authz-matrix gained both new endpoints and order-velocity had to learn the new SiteSetting read. Verified: /api/v1/version = 1.1.18 / #409 / 6pjtmbKUY_y1evlG8AXcA, /api/v1/health ok, /api/v1/settings/tax-invoice → {enabled:true} (default), /checkout and wallet 200, and the served account/codes/page-479b958e7e2dde10.js + account/layout-3525a2fed1de639f.js carry the copy messages and the เมนูบัญชี control. Live: 1.1.18."
+  },
+  {
     "version": "1.1.17",
     "date": "2026-11-05",
     "dateLabel": "Nov 5, 2026",
