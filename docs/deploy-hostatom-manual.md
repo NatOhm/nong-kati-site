@@ -9,7 +9,7 @@ below is what actually shipped the live build.
 > same flow spelled out manually; keep them as the fallback and as the explanation of what the
 > script does. This file predates the script.
 
-> **Current live build (Nov 5, 2026): `164677e`, v1.1.10, BUILD_ID `ANp_hPzY4PUJ9hbRpy0Iq`.** Repo HEAD is
+> **Current live build (Nov 5, 2026): `55b56ba`, v1.1.11, BUILD_ID `Of0v841HVtlWHuQNQx9lE`.** Repo HEAD is
 > **43 commits ahead of live**, and the gap includes real admin work (refund + resend controls) and
 > a security fix (coupon cap). Deploying closes it; see the deploy log in
 > [hostatom-live.md](hostatom-live.md) §5. Note that the `13bdf58..HEAD` range has **no `prisma/`
@@ -188,7 +188,7 @@ equal the Step-0 BUILD_ID exactly, the second the `git sha` the script printed. 
 there is correct, not a mismatch — it means the bundle was built from a tree with uncommitted
 changes (`stamp-git-sha.mjs`). A stale artifact is visible here even though its stamps were
 well-formed. (Last recorded live build, 2026-11-03:
-`ANp_hPzY4PUJ9hbRpy0Iq`, git SHA `164677e…`, v1.1.10 / #391 — see the deploy log in
+`Of0v841HVtlWHuQNQx9lE`, git SHA `55b56ba…`, v1.1.11 / #393 — see the deploy log in
 [hostatom-live.md](hostatom-live.md) §5; always trust the BUILD_ID the script just printed over
 that line.)
 

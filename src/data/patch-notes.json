@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.1.11",
+    "date": "2026-11-05",
+    "dateLabel": "Nov 5, 2026",
+    "gitSha": "55b56ba",
+    "buildId": "Of0v841HVtlWHuQNQx9lE",
+    "title": "The last code can no longer be sold twice, deployed to production.",
+    "detail": "1.1.11 — the last code can no longer be sold twice, deployed to production. The 5 Nov audit found the money path careful right up to its edges: an unpaid order held nothing (stock checked at creation, code taken at confirmation), so two customers could each buy the last unit, both transfer, and the second slip would verify against stock already gone — parked for a manual refund. createOrderInner now subtracts what pending_payment orders already hold, inside the same Serializable transaction as the insert, and the 30-minute sweep is the release (derived, no new column, no stock write). Live proof: with 2 units and 1 held, a second order for 2 returned 409 OUT_OF_STOCK and created nothing. Guest /orders/lookup, which hands back the UUID that opens a page of delivered codes, now has per-IP (10/15min) and per-email (5/15min, peeked so a stranger cannot spend a victim's quota) buckets — live: 10×404 then 429 RATE_LIMIT_EXCEEDED. Also deletes 696 lines of mock reservation/delivery code that production never ran. Live: 1.1.11 / #393 / Of0v841HVtlWHuQNQx9lE / 55b56ba, health database: ok."
+  },
+  {
     "version": "1.1.10",
     "date": "2026-11-05",
     "dateLabel": "Nov 5, 2026",
