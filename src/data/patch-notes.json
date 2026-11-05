@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.1.19",
+    "date": "2026-11-05",
+    "dateLabel": "Nov 5, 2026",
+    "gitSha": "2b82d71",
+    "buildId": "0tmPu5wv7I0t2NpeQr9xK",
+    "title": "Profile \"ประวัติการเติมเงิน\" no longer lists purchases.",
+    "detail": "1.1.19 — profile \"ประวัติการเติมเงิน\" no longer lists purchases. /api/v1/wallet returns the whole ledger and purchases are negative wallet_spend rows, so the dashboard's five newest rows showed a purchase as a top-up and printed the raw wallet_spend key. The card now keeps amountThb > 0 and labels admin_credit/bank_transfer in Thai. Same-day follow-up to 1.1.18 (the wallet report has two halves: the month total, fixed there, and this list). Verified: /api/v1/version = 1.1.19 / #411 / 0tmPu5wv7I0t2NpeQr9xK, health ok, /account/dashboard 200, served account/dashboard/page-be25829b4ca41bd8.js contains both new labels and no wallet_spend. Live: 1.1.19."
+  },
+  {
     "version": "1.1.18",
     "date": "2026-11-05",
     "dateLabel": "Nov 5, 2026",
