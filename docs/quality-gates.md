@@ -45,7 +45,6 @@
 | RH    | Restock-account how-to — every staff-facing claim pinned to the route/dialog/role matrix | `tests/admin-restock-howto.test.ts` | `npm test` (vitest) | Unit Tests |
 | EX    | Unpaid-order expiry sweep — CAS safety, batching, no stock side effects, cron-route gating | `tests/order-expiry-sweep.test.ts` | `npm test` (vitest) | Unit Tests |
 | CSO   | Stock-aware catalog — availability leads every sort, available-only filter, slice of one global order | `tests/catalog-stock-ordering.test.ts` | `npm test` (vitest) | Unit Tests |
-| SP    | Stock-text parsing — CRLF/LF, blank lines, Unicode/emoji, separators, multiline, invalid input | `tests/stock-parser.test.ts` | `npm test` (vitest) | Unit Tests |
 | PP    | Pricing persistence — coupon/VAT allocation, preview parity, promotion snapshots; seven-blocker coverage (VAT satang allocation across lines, snapshot sums reconcile to order totals) | `tests/pricing-persistence.test.ts` | `npm test` (vitest) | Unit Tests |
 | PS    | Promotion percent/fixed discounts, timing/scope/minimum-spend, and no coupon stacking; coupon-only checkout remains available | `tests/promotion-stacking.test.ts` | `npm test` (vitest) | Unit Tests |
 | VD    | VAT inclusive display, disabled state, configurable rate | `tests/vat-display.test.ts` | `npm test` (vitest) | Unit Tests |
@@ -563,7 +562,7 @@ ffmpeg -hide_banner -loglevel error -y -ss 5.0 -i admin-walkthrough-th.mp4 -fram
 
 รีวิวหน้าร้านข้อ 2: checkout สร้างออเดอร์ `pending_payment` **จริง** ตั้งแต่กด "Continue" ก่อนลูกค้าจะยืนยันการจ่ายเงิน (`src/app/checkout/page.tsx` `handleContactSubmit` → `createOrder`) แต่ **ไม่มีโค้ดสักบรรทัดใน repo ที่หมดอายุมันได้** — `updateOrderStatus` (ปัจจุบันถูกลบแล้ว) เคยอนุญาต `pending_payment → expired` แต่ไม่มีผู้เรียกเลย และคิว inventory ที่ `mockQueue.ts` (ลบไปแล้ว) เคยเขียนไว้ว่า *"Reservation sweep (5min), expiry sweep (15min)"* มี `registerJobHandler` ที่ **ไม่เคยถูกเรียกที่ไหนเลย**
 
-หมายเหตุสำคัญที่ตรวจเจอระหว่างลงมือ: รีวิวเดิมเสนอให้ "คืน stock reservation" ด้วย — **ทำไม่ได้และไม่จำเป็น**: `createOrder` แค่ *ตรวจ* สต๊อก (โยน `OUT_OF_STOCK`) ส่วนการหักสต๊อกจริงเกิดใน transaction ตอนยืนยันการจ่ายเงิน (`src/lib/fulfilment.ts`) ออเดอร์ที่หมดอายุจึง**ไม่ถือของไว้** ส่วน `releaseExpiredReservations` เดินบน `mockCodeStore` ในหน่วยความจำซึ่งว่างเปล่าตอน cold start บน serverless — เอามาเรียกจาก cron คือทำลายเพื่อไม่ได้อะไร เกตนี้จึงยืนยันว่า**ไม่** import มัน
+หมายเหตุสำคัญ: ตั้งแต่ 1.1.11 ออเดอร์ `pending_payment` **ถือของจริง** (นับยอดที่ยังไม่จ่ายใน transaction เดียวกับการสร้างออเดอร์) และการ sweep ที่เปลี่ยนสถานะเป็น `expired` คือการคืนของโดยตัวมันเอง — ไม่มีการเขียน stock หรือตาราง reservation ใด ๆ ทั้งสิ้น (`createOrder` ตรวจเทียบ sellable, `src/lib/fulfilment.ts` หักตอนยืนยันการจ่าย) ไฟล์ mock reservation/delivery เดิมถูกลบแล้ว และเกตนี้ยืนยันว่า**ไม่** มีการแตะ stock จากฝั่ง sweep
 
 | ตัว | บังคับว่า |
 |---|---|
@@ -586,19 +585,6 @@ ffmpeg -hide_banner -loglevel error -y -ss 5.0 -i admin-walkthrough-th.mp4 -fram
   - สต๊อกรวมจาก variants ที่ active เท่านั้น
 - **ที่มา:** review พบว่าการเรียงไม่เคยคำนึงสต๊อกเลย เพราะ query ไม่ fetch ฟิลด์ stock
 - **วิธีแก้เมื่อแดง:** ตรวจสอบว่า catalogOrderSelect มี stock ใน variants หรือไม่
-
-## การ parsed ข้อความสต๊อก (SP) — `tests/stock-parser.test.ts`
-
-- **กฎ:**
-  - รองรับทั้ง LF และ CRLF line endings (normalize ก่อน parse)
-  - รองรับ blank lines ภายใน multiline records (single blank = ส่วนหนึ่งของ record, 2+ consecutive blanks = แยก record)
-  - รองรับ Thai text และ emoji ใน content
-  - รองรับ comma, semicolon, tab separators
-  - รองรับ reference prefix เช่น `id:`, `ref:`, `order:`
-  - แจ้ง error ชัดเจนเมื่อ record ไม่สามารถ parse ได้
-  - Preview count ต้องตรงกับ saved count
-- **ที่มา:** client feedback เรื่อง parser แชร์สต๊อกไม่รับ formatted input 일부
-- **วิธีแก้เมื่อแดง:** ตรวจสอบว่า parseStockContent จัดการ line endings และ blank line logic ถูกต้องหรือไม่
 
 ## Stored accounts — `tests/admin-stored-accounts.test.ts`
 

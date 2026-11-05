@@ -6,8 +6,8 @@ export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/v1/categories — public category tree (roots with nested children,
- * each carrying its live product count). Documented in src/types/product.ts
- * and already rate-limited in lib/rateLimit.ts, but the route never existed.
+ * each carrying its live product count). Already rate-limited in
+ * lib/rateLimit.ts, but the route never existed.
  *
  * Added for the mobile drawer (client feedback 2026-11-02: "3 ขีดไม่ซิงก์
  * หมวดหมู่"): the drawer hardcoded four category links whose slugs (movie-series,
