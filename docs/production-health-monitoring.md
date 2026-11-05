@@ -196,6 +196,51 @@ kept: it is the only pinger with an independent vantage point.
 
 ---
 
+### 3b. The housekeeping sweeps (expiry, outbox drain) are NOT 10-minute
+
+The GitHub workflow also calls the internal sweep endpoints. It asks for
+`*/10 * * * *` and gets **4–5 runs a day, 3–5 hours apart** — measured
+2026-11-05 over 12 runs (`01:51Z`, `21:49Z`, `16:00Z`, `10:53Z`, `07:56Z`, …),
+every one of them green. GitHub treats `schedule` on a public repo as best
+effort; this repo is public. The endpoints are fine, the *cadence* is not.
+
+What the lag actually costs, checked one at a time rather than assumed:
+
+| Thing | Depends on the tick? |
+|---|---|
+| Stock held by an unpaid order | **No** — v1.1.13 filters holds by `createdAt`, so a hold expires on its own clock. This is why the audit ordered 1.1.13. |
+| Customer mail (codes, confirmations) | **No** — the outbox drains through `after()` on enqueue; the cron is recovery for a crash or provider outage. |
+| A `pending_payment` row reading "awaiting payment" | **Yes** — `NK-2026-000190` (created 04:31Z, window closed 05:01Z) still said so when read at 06:38Z. |
+| The order-expired notice | **Yes** — late by up to a tick. |
+| Expired promotions staying redeemable | **Yes** — up to a tick. |
+| Slip-evidence retention (30 days) | No, daily either way. |
+
+Paying late is safe (v1.1.12 accepts a slip after expiry), so the honest
+summary is: **tidiness and a few late-day coupons, not money.** That is why
+there is no scheduler in the codebase for this.
+
+**If you want the sweeps to tick properly**, extend the §3a Plesk task rather
+than creating a second schedule — one `:10` ticker is enough, and the task
+field must contain **no double quotes**:
+
+```
+cd httpdocs && curl -fsSLk https://hc-ping.com/<uuid> && curl -fsSLk --max-time 30 -X POST -H x-cron-token:$(cat ../cron-token) https://nongkatistore.com/api/v1/internal/orders/expire && curl -fsSLk --max-time 30 -X POST -H x-cron-token:$(cat ../cron-token) https://nongkatistore.com/api/v1/internal/promotions/expire
+```
+
+`cron-token` sits **outside** the document root (the vhost root, readable as
+`../cron-token` from `httpdocs`) and holds `NK_CRON_SECRET` — the value lives in
+Infisical/Plesk env and cannot be copied into the command; a secret in that
+field is rendered as plain text in the task list, and this repo is public. So
+this step needs one human paste into the file, the same way the Infisical →
+Plesk env move does.
+
+Verify it by the *effect*, not the toast: a `::`-free `Run Now` while Active is
+ticked should be followed by an order that is past its window flipping to
+`expired`, and the task list should show `0` failures. Untick **Active** if you
+only wanted a one-off.
+
+---
+
 ### Optional third-party uptime service
 
 [UptimeRobot](https://uptimerobot.com) (free tier) was evaluated as an external

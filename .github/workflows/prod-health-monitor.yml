@@ -17,18 +17,27 @@
 # docs/production-health-monitoring.md for the UptimeRobot/Healthchecks
 # options and why the built-in uptime checker cannot see restarts at all.
 #
-# EVERY 10 MINUTES, not 5: the only thing this can catch that a 30-minute
-# check would miss is "down for 10 minutes instead of 30", and GitHub
-# schedules on shared runners are already delayed by minutes under load.
+# ASKS FOR EVERY 10 MINUTES, not 5: the only thing this can catch that a
+# 30-minute check would miss is "down for 10 minutes instead of 30".
 # The idle-reap classifier compares against idleReapSeconds=180, which is
 # independent of this interval.
+#
+# WHAT IT ACTUALLY GETS (measured 2026-11-05, 12 runs): NOT 10 minutes. The
+# runs landed 4–5 times a day, 3–5 hours apart — 01:51Z, 21:49Z, 16:00Z,
+# 10:53Z, 07:56Z … GitHub throttles `schedule` on a public repo to "best
+# effort" and this repo is public. All runs were green, so the cron is not
+# broken; it is slow. Consequences are listed on the housekeeping step below.
+# For health checks the Plesk pinger in docs/production-health-monitoring.md
+# §3a is the real 10-minute watchdog; this job is the independent vantage
+# point and the dead-man's-switch ping.
 
 name: Production Health Monitor
 
 on:
   schedule:
-    # Every 10 minutes, 24/7. GitHub disables scheduled workflows on repos
-    # with 60 days of inactivity — the watchdog is only as alive as the repo.
+    # Asks for every 10 minutes, 24/7; lands hours apart (see the header).
+    # GitHub disables scheduled workflows on repos with 60 days of
+    # inactivity — the watchdog is only as alive as the repo.
     - cron: '*/10 * * * *'
     # Daily housekeeping tick: the 30-day slip-evidence retention sweep runs
     # once a day (03:17 UTC ≈ 10:17 ICT) instead of on every health tick.
@@ -127,9 +136,25 @@ jobs:
       # The internal sweep endpoints (orders/promotions expiry, email-outbox
       # drain, slip retention) are fail-closed and had NO caller anywhere —
       # audit finding 2 (2026-10-26). Shared hosting runs no daemon, so this
-      # always-on job is their scheduler. The 10-minute tick runs the sweeps,
+      # always-on job is their scheduler. The dated tick runs the sweeps,
       # the daily tick adds retention, workflow_dispatch runs everything; a
       # red health step above skips this one (no point sweeping a dead site).
+      #
+      # CADENCE IS HOURS, NOT 10 MINUTES (measured 2026-11-05). What that
+      # costs, checked one by one: holds no longer depend on it at all (v1.1.13
+      # filters them by `createdAt`), and customer mail does not either (the
+      # outbox drains through `after()` on enqueue; this call is recovery).
+      # What it does cost: a `pending_payment` row keeps saying "awaiting
+      # payment" until the next tick (NK-2026-000190's window closed 05:01Z
+      # and it still read unpaid at 06:38Z), its expiry notice is late, and an
+      # expired promotion stays redeemable for up to a tick. Paying late is safe —
+      # v1.1.12 accepts a slip after expiry — so the lag costs tidiness and a
+      # few late-day coupons, not money.
+      #
+      # To make the sweeps tick properly, add them to the Plesk task that
+      # already fires on `:10` (docs/production-health-monitoring.md §3b) —
+      # that needs NK_CRON_SECRET on the server side, out of band, because the
+      # Plesk task field renders plain text and this repo is public.
       #
       # NK_CRON_SECRET must match the server .env; until it is added as a
       # repo secret this step fails LOUDLY (silent disablement was the bug).
