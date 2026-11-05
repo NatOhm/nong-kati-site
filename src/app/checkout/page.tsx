@@ -447,6 +447,23 @@ export default function CheckoutPage(): React.JSX.Element {
     }
   }, []);
 
+  // Paid-with-credit receipt. Rendered by BOTH branches below: a successful
+  // wallet payment clears the cart, and the empty-cart screen is exactly the
+  // state the customer is in one render later — the dialog used to live only
+  // after the cart-has-items guard, so it never appeared at all.
+  const receiptDialog = walletReceipt ? (
+    <DeliveredCodesDialog
+      orderNumber={walletReceipt.orderNumber}
+      orderUrl={walletReceipt.orderUrl}
+      codes={walletReceipt.codes}
+      onClose={() => {
+        const target = walletReceipt.orderUrl;
+        setWalletReceipt(null);
+        window.location.href = target;
+      }}
+    />
+  ) : null;
+
   // Cart still hydrating (review 2026-09-26 #5): render a stable loading
   // shell — NEVER flash the contact form/stepper before we know the cart
   // state, which caused a layout jump and bogus form exposure on slow loads.
@@ -467,6 +484,7 @@ export default function CheckoutPage(): React.JSX.Element {
   if (!cart || cart.items.length === 0) {
     return (
       <PageShell>
+        {receiptDialog}
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <SiteMascot size={120} className="mascot-wave mb-6" />
           <h1 className="mb-4 text-2xl font-bold text-fg">ตะกร้าว่างเปล่า</h1>
@@ -521,18 +539,7 @@ export default function CheckoutPage(): React.JSX.Element {
       )}
 
       {/* Content */}
-      {walletReceipt && (
-        <DeliveredCodesDialog
-          orderNumber={walletReceipt.orderNumber}
-          orderUrl={walletReceipt.orderUrl}
-          codes={walletReceipt.codes}
-          onClose={() => {
-            const target = walletReceipt.orderUrl;
-            setWalletReceipt(null);
-            window.location.href = target;
-          }}
-        />
-      )}
+      {receiptDialog}
 
       <div className="grid gap-8 pb-16 md:grid-cols-[1fr_360px]">
         {/* Main area */}

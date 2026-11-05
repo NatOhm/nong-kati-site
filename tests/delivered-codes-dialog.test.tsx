@@ -7,6 +7,9 @@
  * exact bytes of a multi-line block, offer one copy for several codes, and close
  * on Escape (a keyboard user is focused inside it). Those are pinned here.
  */
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -88,5 +91,25 @@ describe('DeliveredCodesDialog', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'ปิด' }));
     expect(onClose).toHaveBeenCalledTimes(2);
+  });
+
+  /**
+   * P4: the page, not just the component. A wallet payment clears the cart, so
+   * the very next render of /checkout is the "ตะกร้าว่างเปล่า" screen — the
+   * receipt used to be mounted only past that guard and therefore never
+   * appeared after a real credit payment (found by driving the real UI).
+   */
+  it('P4: /checkout renders the receipt inside the empty-cart branch too', () => {
+    const src = readFileSync(path.join(process.cwd(), 'src/app/checkout/page.tsx'), 'utf8');
+    const guard = src.indexOf('if (!cart || cart.items.length === 0)');
+    expect(guard).toBeGreaterThan(-1);
+
+    // The block ends where the component's normal return starts.
+    const blockEnd = src.indexOf('\n  return (', guard);
+    expect(blockEnd).toBeGreaterThan(guard);
+
+    const uses = [...src.matchAll(/\{receiptDialog\}/g)].map((m) => m.index ?? -1);
+    expect(uses.length).toBeGreaterThanOrEqual(2); // empty-cart branch + normal page
+    expect(uses.some((i) => i > guard && i < blockEnd)).toBe(true);
   });
 });

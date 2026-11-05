@@ -21,6 +21,21 @@
 export const RESEND_API_KEY_VAR = 'NK_RESEND_API_KEY';
 export const RESEND_FROM_VAR = 'NK_RESEND_FROM_EMAIL';
 
+/**
+ * Provider endpoint override — unset in production, where the literal Resend
+ * URL is used. It exists so a local run can point the REAL mailer at a stub on
+ * loopback and assert the send happened (status code, addressed customer,
+ * message id) instead of only asserting a template string.
+ */
+export const RESEND_API_URL_VAR = 'NK_RESEND_API_URL';
+
+const DEFAULT_RESEND_ENDPOINT = 'https://api.resend.com/emails';
+
+export function resendEndpoint(): string {
+  const override = process.env[RESEND_API_URL_VAR];
+  return override && override.trim() !== '' ? override : DEFAULT_RESEND_ENDPOINT;
+}
+
 /** A key that can actually authenticate — the legacy `re_mock_key` cannot. */
 export function resendApiKey(): string | null {
   const key = process.env[RESEND_API_KEY_VAR];

@@ -4,6 +4,7 @@ import {
   isEmailDeliveryConfigured,
   missingEmailConfig,
   resendApiKey,
+  resendEndpoint,
 } from '@/lib/email/config';
 /**
  * Email Service — Resend HTTP integration.
@@ -16,6 +17,7 @@ import {
  * Env vars:
  *   NK_RESEND_API_KEY   (server-only; required — there is NO mock success)
  *   NK_RESEND_FROM_EMAIL (e.g. "orders@nong-kati.co.th"; required)
+ *   NK_RESEND_API_URL   (optional; stub endpoint for local runs — unset in prod)
  *
  * External audit #2 (2026-09-27): the old mock mode returned
  * `{ success: true, messageId: 'mock_...' }` whenever the API key was
@@ -44,7 +46,6 @@ export interface EmailResult {
   error?: string;
 }
 
-const RESEND_ENDPOINT = 'https://api.resend.com/emails';
 const REQUEST_TIMEOUT_MS = 10_000;
 
 /**
@@ -81,7 +82,7 @@ async function resendSend(options: EmailOptions & { idempotencyKey?: string }): 
 
   let res: Response;
   try {
-    res = await fetch(RESEND_ENDPOINT, {
+    res = await fetch(resendEndpoint(), {
       method: 'POST',
       headers,
       body: JSON.stringify({

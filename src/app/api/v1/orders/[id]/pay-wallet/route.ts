@@ -218,6 +218,10 @@ export async function POST(
   } catch (err) {
     // Transaction rolled back — balance, ledger, claim, codes all intact.
     const code = err instanceof Error ? err.message : 'WALLET_PAY_FAILED';
+    // The response is deliberately generic (WALLET_PAY_FAILED), so log the
+    // real cause once here — without it a 500 on this path is undiagnosable
+    // from the server side too.
+    console.error('[pay-wallet] payment failed:', code, err instanceof Error ? err.stack : '');
     // Review H3: a stock hole surfaces as a clean 409 — the customer's
     // balance is untouched (the transaction rolled back) and PromptPay
     // remains available in the UI.
