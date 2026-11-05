@@ -12,7 +12,6 @@ import { TrustBadgeRow } from '@/components/checkout/TrustBadgeRow';
 import { OrderStatusBadge } from '@/components/order/OrderStatusBadge';
 import { CodeBlock } from '@/components/order/CodeBlock';
 import { getOrderByConfirmationUuid } from '@/api/orders';
-import { getAvailableCodeCount } from '@/lib/delivery/reservation';
 import { getDeliveredCodes } from '@/lib/delivery/customerCodes';
 import { formatThb } from '@/lib/pricing';
 

@@ -670,6 +670,10 @@ export interface ResolvedOrderPricing {
   byId: Map<string, resolvedVariant>;
   tier: 'retail' | 'member' | 'dealer';
   quantityMap: Map<string, number>;
+  /** Units this variant could hand over right now (see sellableStock), per id.
+   *  createOrderInner subtracts units already held by unpaid orders from this,
+   *  so the rule itself stays in one place. */
+  sellableByVariant: Map<string, number>;
   itemInputs: Array<{
     variantId: string;
     productNameTh: string;
@@ -756,6 +760,14 @@ export async function resolveOrderPricing(
     quantityMap.set(item.variantId, existing + item.quantity);
   }
 
+  // Sellable units per variant, computed once. Both the check below and
+  // createOrderInner's unpaid-order hold read this map, so 'how many can we
+  // actually hand over' is min(stock, codes) in exactly one place.
+  const sellableByVariant = new Map<string, number>();
+  for (const v of byId.values()) {
+    sellableByVariant.set(v.id, sellableStock(v.stock, availableCodes.get(v.id) ?? 0));
+  }
+
   // Build normalized line inputs from aggregated quantities.
   const itemInputs = [...quantityMap.entries()].map(([variantId, qty]) => {
     const v = byId.get(variantId);
@@ -763,7 +775,7 @@ export async function resolveOrderPricing(
     if (!Number.isInteger(qty) || qty < 1 || qty > 50) {
       throw new Error('INVALID_QUANTITY');
     }
-    if (sellableStock(v.stock, availableCodes.get(v.id) ?? 0) < qty) {
+    if ((sellableByVariant.get(v.id) ?? 0) < qty) {
       throw new Error('OUT_OF_STOCK');
     }
     const unit = tierPrice(Number(v.price), tier, {
@@ -881,6 +893,7 @@ export async function resolveOrderPricing(
     byId: byId as unknown as Map<string, resolvedVariant>,
     tier,
     quantityMap,
+    sellableByVariant,
     itemInputs,
     vatConfig,
     eligiblePromotions,

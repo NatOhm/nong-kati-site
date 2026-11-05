@@ -45,6 +45,14 @@ export const RATE_LIMIT_RULES: RateLimitRule[] = [
   { route: '/api/v1/orders/vat', maxRequests: 60, windowMs: 60_000, keyBy: 'ip' },
   { route: '/api/v1/orders', maxRequests: 10, windowMs: 60_000, keyBy: 'ip' },
 
+  // Guest order lookup (email + order number → confirmationUuid). Order
+  // numbers are sequential and that UUID opens a page showing delivered
+  // codes, so this is a credential-minting endpoint and gets a tight bucket
+  // on both keys. The email bucket is PEEKED before the query and consumed
+  // only on a hit (see the route) so nobody can spend a victim's quota.
+  { route: '/api/v1/orders/lookup', maxRequests: 10, windowMs: 900_000, keyBy: 'ip' },
+  { route: '_order_lookup_email', maxRequests: 5, windowMs: 900_000, keyBy: 'email' },
+
   // Auth (per-IP; per-account brute force is additionally covered by the
   // DB lockout in adminLogin — 5 wrong passwords → 15-minute account lock).
   // NOTE: paths must match the real endpoints under /api/v1/auth/admin/*.

@@ -91,6 +91,8 @@ describe('OUT_OF_STOCK guard', () => {
             siteSetting: { findUnique: vi.fn(async () => null) },
             promotion: { findMany: vi.fn(async () => []) },
             giftCode: { groupBy: vi.fn(async () => []) },
+            // No unpaid order is holding stock unless a test says so.
+            orderItem: { groupBy: vi.fn(async () => []) },
             order: {
               count: vi.fn(async () => 0),
               create: vi.fn(),
@@ -168,6 +170,8 @@ describe('OUT_OF_STOCK guard', () => {
             giftCode: {
               groupBy: vi.fn(async () => [{ variantId: 'v1', _count: { _all: 3 } }]),
             },
+            // No unpaid order is holding stock in this fixture.
+            orderItem: { groupBy: vi.fn(async () => []) },
             order: {
               count: vi.fn(async () => 0),
               findMany: vi.fn(async () => []),

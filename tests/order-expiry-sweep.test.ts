@@ -19,15 +19,17 @@
  *     up" that predicate into a bare `id: { in }`, a paid order can be
  *     flipped to expired after the money arrived. That is the single most
  *     dangerous line in this feature, so it gets its own assertion.
- *  3. NO stock or code side effects: `createOrder` only *validates* stock;
- *     the debit happens in the fulfilment transaction at payment
- *     confirmation. `releaseExpiredReservations` walks an in-memory mock
- *     store that is empty on a serverless cold start, so wiring it into a
- *     cron route would be theatre — this suite asserts it is not wired.
+ *  3. NO stock or code side effects: `createOrder` validates against
+ *     sellable units and holds the ones unpaid orders already hold; the
+ *     debit happens in the fulfilment transaction at payment confirmation.
+ *     Flipping a row to `expired` therefore IS the release — there is no
+ *     reservation table to unwind, and this suite asserts the sweep writes
+ *     nothing else. The old in-memory reservation mock is deleted, and that
+ *     deletion is asserted so it cannot creep back as documentation.
  *  4. The route is gated exactly like its sibling email-outbox drain:
  *     503 when NK_CRON_SECRET is unset, 401 on a bad token.
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -61,7 +63,8 @@ const { prismaMock } = vi.hoisted(() => {
 
 vi.mock('@/lib/db', () => ({ prisma: prismaMock }));
 
-const SRC = join(process.cwd(), 'src');
+const ROOT = process.cwd();
+const SRC = join(ROOT, 'src');
 const read = (p: string): string => readFileSync(join(SRC, p), 'utf8');
 
 const NOW = new Date('2026-10-05T12:00:00.000Z');
@@ -243,13 +246,15 @@ describe('expireUnpaidOrders — no inventory side effects', () => {
     expect(code).not.toMatch(/mockQueue/);
   });
 
-  it('the reservation sweep it declines to call really is mock-only', () => {
-    // Guard against the premise rotting: if reservation.ts ever moves to a
-    // DB-backed store, this assertion fails and the "no stock side effects"
-    // reasoning above has to be revisited.
-    const src = read('lib/delivery/reservation.ts');
-    expect(src).toMatch(/mockCodeStore/);
-    expect(src).toMatch(/In production, this queries the order table/);
+  it('the in-memory reservation module is gone, not merely unused', () => {
+    // It used to be a `mockCodeStore` map that no production route called; it
+    // was deleted rather than left as documentation that reads like real
+    // reservation. If a reservation mechanism is ever added, it belongs in
+    // this sweep's reasoning and in src/api/orders.ts's unpaid-order hold —
+    // so this test forces that conversation.
+    expect(existsSync(join(ROOT, 'src/lib/delivery/reservation.ts'))).toBe(false);
+    expect(existsSync(join(ROOT, 'src/lib/delivery/codeDelivery.ts'))).toBe(false);
+    expect(existsSync(join(ROOT, 'src/api/payments.ts'))).toBe(false);
   });
 });
 

@@ -448,6 +448,39 @@ async function createOrderInner(
     tx,
   );
 
+  // ── Unpaid-order hold ───────────────────────────────────────────────────
+  // A `pending_payment` order does not take its code yet — the code is claimed
+  // at confirmation (src/lib/fulfilment.ts) — so without this check two
+  // customers could each create an order for the last unit, both transfer
+  // money, and the second one's slip would verify against stock that is
+  // already gone (the order then parks in pending_manual_fulfilment and needs
+  // a manual refund). Count what unpaid orders already hold and refuse the
+  // order that would oversell.
+  //
+  // Why here and not in the resolver: this must run inside the SAME
+  // Serializable transaction as the insert, so two concurrent checkouts
+  // cannot both read "no hold" and both insert. The resolver is also used by
+  // the read-only preview, which stays optimistic — submit is authoritative.
+  //
+  // No writes and no new table: the hold is derived, and the expiry sweep
+  // (src/lib/orderExpiry.ts) moves stale orders to `expired` after 30 minutes,
+  // which drops them out of this sum, so the hold releases itself.
+  const requestedVariantIds = [...resolved.quantityMap.keys()];
+  const heldRows = await tx.orderItem.groupBy({
+    by: ['variantId'],
+    where: {
+      variantId: { in: requestedVariantIds },
+      order: { status: 'pending_payment' },
+    },
+    _sum: { quantity: true },
+  });
+  const heldByVariant = new Map(heldRows.map((row) => [row.variantId, row._sum.quantity ?? 0]));
+  for (const [variantId, requested] of resolved.quantityMap) {
+    const sellable = resolved.sellableByVariant.get(variantId) ?? 0;
+    const held = heldByVariant.get(variantId) ?? 0;
+    if (sellable - held < requested) throw new Error('OUT_OF_STOCK');
+  }
+
   const pricing = calculateReconciledOrderPricing(
     [...resolved.quantityMap.entries()].map(([variantId, qty]) => {
       const item = resolved.itemInputs.find((i) => i.variantId === variantId)!;

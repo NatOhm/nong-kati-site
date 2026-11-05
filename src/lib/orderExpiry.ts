@@ -13,16 +13,15 @@
  * orders therefore accumulated indefinitely and the admin order list grew
  * a permanent tail of rows that will never be paid.
  *
- * WHY THIS TOUCHES NO STOCK: `createOrder` only *validates* stock
- * (`OUT_OF_STOCK` in `src/api/orders.ts`) — the debit happens in the
- * fulfilment transaction at payment confirmation
- * (`data: { stock: { decrement: needed } }`, `src/lib/fulfilment.ts`).
- * An expired unpaid order therefore holds no inventory to release.
- * `releaseExpiredReservations` in `src/lib/delivery/reservation.ts`
- * walks an in-memory `mockCodeStore` map, which is empty on a serverless
- * cold start; calling it from a cron route would be theatre, so it is
- * deliberately NOT wired in here. Its real replacement is the GiftCode
- * guard inside the fulfilment transaction.
+ * WHY THIS TOUCHES NO STOCK: no stock row and no gift code is written when an
+ * order is created. `createOrder` *validates* against sellable units and
+ * subtracts the units other unpaid orders already hold
+ * (`src/api/orders.ts`), and the real debit happens in the fulfilment
+ * transaction at payment confirmation
+ * (`data: { stock: { decrement: needed } }`, `src/lib/fulfilment.ts`). The
+ * hold is therefore derived from row status: this sweep flipping an order to
+ * `expired` is itself the release. Nothing else to undo here, which is why
+ * this route is a single `updateMany` and nothing more.
  *
  * WHY `updateMany` AND NOT a find-then-update guard: the old
  * `updateOrderStatus` helper (since deleted) was a findUnique-then-update

@@ -78,6 +78,11 @@ function makeTx(overrides: Record<string, unknown> = {}): TxMock {
         args.where.variantId.in.map((id) => ({ variantId: id, _count: { _all: 100 } })),
       ),
     },
+    // Units already held by other unpaid orders (createOrderInner subtracts
+    // them from the sellable count). No hold unless a test says so.
+    orderItem: {
+      groupBy: vi.fn(async () => [] as { variantId: string; _sum: { quantity: number | null } }[]),
+    },
     order: {
       count: vi.fn(async () => 0),
       create: vi.fn(),

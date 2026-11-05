@@ -27,7 +27,10 @@ function friendlyOrderError(err: unknown): string {
     case 'NO_PAYMENT_CHANNEL':
       return 'ช่องทางชำระเงินยังไม่เปิดให้ใช้งาน — ร้านปิดรับออเดอร์ชั่วคราว กรุณากลับมาใหม่ภายหลัง';
     case 'OUT_OF_STOCK':
-      return 'สินค้าบางรายการหมดสต๊อกพอดี — กรุณาลบรายการนั้นออกแล้วลองอีกครั้ง';
+      // Also true when another unpaid order is holding the last unit for up to
+      // 30 minutes (expiry releases it), so the copy must not say "sold out
+      // forever" — the same item can come back on its own.
+      return 'สินค้าบางรายการไม่พอขายแล้ว — อาจมีลูกค้าท่านอื่นถือไว้ชั่วคราว (สูงสุด 30 นาที) กรุณาลองใหม่ภายหลัง หรือลบรายการนั้นออก';
     case 'CART_EMPTY':
       return 'ตะกร้าว่างเปล่า กรุณาเพิ่มสินค้าก่อนดำเนินการชำระเงิน';
     case 'INVALID_EMAIL':
