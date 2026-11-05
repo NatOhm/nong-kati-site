@@ -26,7 +26,17 @@ const METHOD_LABEL: Record<string, string> = {
   promptpay: 'พร้อมเพย์',
   credit_card: 'บัตรเครดิต',
   manual: 'เจ้าหน้าที่ยืนยัน',
+  bank_transfer: 'โอนผ่านบัญชีธนาคาร',
+  admin_credit: 'แอดมินเติมเครดิต',
 };
+
+/**
+ * "ประวัติการเติมเงิน" lists money IN. The endpoint returns the whole wallet
+ * ledger (purchases are negative `wallet_spend` rows), so printing those here
+ * labelled a purchase as a top-up and showed the raw `wallet_spend` string when
+ * the label map missed it. Spending has its own list on /account/wallet.
+ */
+const isTopUp = (t: { amountThb: number }): boolean => t.amountThb > 0;
 
 export default function ProfilePage(): React.JSX.Element {
   const { state: sessionState } = useCustomerProfile();
@@ -79,13 +89,13 @@ export default function ProfilePage(): React.JSX.Element {
             ดูทั้งหมด
           </a>
         </div>
-        {!data || data.topups.length === 0 ? (
+        {!data || data.topups.filter(isTopUp).length === 0 ? (
           <p className="py-6 text-center text-sm text-fg-muted">
             ยังไม่มีรายการเติมเงิน — เมื่อเติมเงินแล้วจะแสดงที่นี่
           </p>
         ) : (
           <div className="space-y-2">
-            {data.topups.slice(0, 5).map((t) => (
+            {data.topups.filter(isTopUp).slice(0, 5).map((t) => (
               <div
                 key={t.id}
                 className="flex items-center justify-between rounded-xl border border-line-subtle px-4 py-3"
