@@ -1037,6 +1037,7 @@ slug ที่เป็น ASCII ไม่พังเพราะ `encodeURICom
 | P2 | เรียงใหม่→เก่าจริง, `BUILD_ID` ไม่ซ้ำ, ไม่มีวันที่อนาคต |
 | P3 | ทุกแถวค้น build กลับได้: commit 7–40 hex, `BUILD_ID`, วันที่ ISO, หัวข้อ, รายละเอียด, version เป็น semver เมื่อมี |
 | P4 | หน้าจริงอ่าน JSON นั้นและ map ทุกแถว, และ sidebar มี `/management/patch-notes` ด้วยสิทธิ์ `settings:read` |
+| P4b | การ์ดบนสุดถาม build ที่รันอยู่ผ่าน `useRelease()` (คำขอเดียวของทั้งหลังบ้าน — `tests/release-badge.test.ts` ห้าม fetch ตัวที่สอง) และบอกตรง ๆ เมื่อ build ที่รันอยู่ยังไม่มีแถวในบันทึก — เพราะ JSON ถูกฝังตอน build จึงมีของ release ก่อนหน้าเสมอ |
 | P5 | แถวที่ไม่ใช่ build (ล้าง DB, หมุน secret, repo hygiene) ไม่หลุดเข้ามาในรายการ |
 
 **พังได้จริง — ทดสอบด้วยการใส่มั๊กกลับ**

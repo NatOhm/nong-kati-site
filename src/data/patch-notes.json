@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.1.9",
+    "date": "2026-11-05",
+    "dateLabel": "Nov 5, 2026",
+    "gitSha": "dd145cc",
+    "buildId": "um9kUzepqJodcpCTAAy6U",
+    "title": "The panel can show what shipped, deployed to production.",
+    "detail": "1.1.9 — the panel can show what shipped, deployed to production. The owner was asking for release history every time, because the only record lived in this file. New page /management/patch-notes (การดูแลระบบ → บันทึกแพตช์, settings:read) lists every build that reached production — version, date, BUILD_ID, commit, what changed — and its data is generated, not copied: scripts/patch-notes.mjs (npm run patch-notes) parses this deploy-log table into src/data/patch-notes.json, so the page can only show what the runbook actually recorded, and rows that shipped no code (DB cleanups, secret rotations) stay out. tests/patch-notes.test.ts P1–P5 fails when the log is edited without regenerating — proven by inserting a fake Nov 5 row, watching P1 go red (expected [1.1.8…] to deeply equal [1.1.9…]), then restoring the log. Two parser defects surfaced during the build and were fixed before shipping: dates drifted one day back (local UTC+7 midnight → previous day in UTC) and titles lost their capital. Live: /api/v1/version → 1.1.9 / #390 / um9kUzepqJodcpCTAAy6U / dd145cc; the page renders 9 rows newest-first with the newest detail expanded."
+  },
+  {
     "version": "1.1.8",
     "date": "2026-11-04",
     "dateLabel": "Nov 4, 2026",

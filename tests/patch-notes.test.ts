@@ -82,6 +82,17 @@ describe('patch notes — generated from the deploy log', () => {
     expect(NAV).toMatch(/label: 'บันทึกแพตช์'[\s\S]{0,120}permission: 'settings:read'/);
   });
 
+  it('P4b: the top card asks the live build, so the list can never claim to be current', () => {
+    // The bundle is built before the release it is part of can be logged, so the
+    // JSON always describes the previous release. The card must read the live
+    // build — through the panel's single cached request, never its own fetch —
+    // and say so when the running build has no row yet.
+    expect(PAGE).toMatch(/useRelease\(\)/);
+    expect(PAGE).toMatch(/NOTES\.find\(\(note\) => note\.buildId === live\.buildId\)/);
+    expect(PAGE).toMatch(/unlogged/);
+    expect(PAGE).not.toMatch(/fetch\(/);
+  });
+
   it('P5: rows that shipped no code stay out of the list', () => {
     const log = readFileSync(path.join(ROOT, 'docs', 'hostatom-live.md'), 'utf8');
     // A DB cleanup / secret rotation row never has both a commit and a BUILD_ID.
