@@ -202,41 +202,46 @@ export default function PatchNotesPage(): React.JSX.Element {
                   {logged ? thaiDate(logged.date, logged.dateLabel) : 'ยังไม่มีบันทึกของ build นี้'}
                 </span>
               </div>
-              {/* A build is always baked BEFORE its own log row can exist, so the
-                  card must never be empty on the newest release: when the row is
-                  missing it shows the previous release's detail under a caption
-                  that says whose detail it is. */}
-              <p className="mt-2 text-base font-medium text-fg">
-                {liveTh?.title ??
-                  logged?.title ??
-                  (newestTh?.title ? `ล่าสุดที่บันทึกไว้: ${newestTh.title}` : 'build นี้ยังไม่ถูกบันทึก')}
-              </p>
-              {liveTh?.summary && (
-                <p className="mt-1 text-sm leading-relaxed text-fg-secondary">{liveTh.summary}</p>
+              {/* A bundle is always built BEFORE the row that describes it can be
+                  written (the row needs the BUILD_ID the build produces), so the
+                  card must stay useful on the newest release: when the running
+                  build has no row it shows the latest *logged* release in full,
+                  under a caption that names whose detail it is. The note stays
+                  because claiming an unlogged build's changes would be a guess. */}
+              {!unlogged && liveTh ? (
+                <>
+                  <p className="mt-2 text-base font-medium text-fg">{liveTh.title}</p>
+                  {liveTh.summary && (
+                    <p className="mt-1 text-sm leading-relaxed text-fg-secondary">
+                      {liveTh.summary}
+                    </p>
+                  )}
+                  <Detail note={liveTh} />
+                </>
+              ) : (
+                <>
+                  <p className="mt-3 rounded-md border border-line-subtle bg-bg p-3 text-sm text-fg-secondary">
+                    build ที่รันอยู่ (v{live.version}) ยังไม่มีแถวในบันทึก deploy —
+                    บันทึกจะอัปเดตหลังรอบ deploy ถัดไป
+                  </p>
+                  <p className="mt-3 text-xs font-semibold tracking-wide text-fg-muted">
+                    รายละเอียดของ build ล่าสุดที่บันทึกไว้
+                    {NEWEST?.version ? ` (v${NEWEST.version})` : ''}
+                  </p>
+                  <p className="mt-1 text-base font-medium text-fg">
+                    {newestTh?.title ?? NEWEST?.title ?? 'ยังไม่มีบันทึกในรายการ'}
+                  </p>
+                  {newestTh?.summary && (
+                    <p className="mt-1 text-sm leading-relaxed text-fg-secondary">
+                      {newestTh.summary}
+                    </p>
+                  )}
+                  {newestTh && <Detail note={newestTh} />}
+                </>
               )}
-              {liveTh && <Detail note={liveTh} />}
               <div className="mt-3">
                 <Meta buildId={live.buildId} gitSha={live.gitSha} />
               </div>
-              {unlogged && (
-                <>
-                  <p className="mt-3 rounded-md border border-line-subtle bg-bg p-3 text-sm text-fg-secondary">
-                    build ที่รันอยู่ ({live.version}) ยังไม่มีแถวในบันทึก deploy —
-                    รายละเอียดด้านล่างเป็นของ build ก่อนหน้า และจะเปลี่ยนเป็นของ build นี้เมื่ออัปเดต
-                    บันทึก
-                  </p>
-                  {newestTh && (
-                    <>
-                      {newestTh.summary && (
-                        <p className="mt-3 text-sm leading-relaxed text-fg-secondary">
-                          {newestTh.summary}
-                        </p>
-                      )}
-                      <Detail note={newestTh} />
-                    </>
-                  )}
-                </>
-              )}
             </>
           ) : (
             <>

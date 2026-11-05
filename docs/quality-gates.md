@@ -102,6 +102,7 @@
 | RB    | Release badge — เวอร์ชันที่แอดมินเห็น ต้องเป็นของจริงทุกหน้า (29 ต.ค.) — `fetch('/api/v1/version')` มีที่เดียวใน `src/` หลัง module-level cache (ไม่งั้นทุก navigation ในแอดมินเรียกซ้ำ) · chip ต้องอยู่ใน top bar (ทุกหน้า) และ sidebar footer ทั้ง desktop rail กับ mobile drawer · dashboard card อ่านจาก hook เดียวกัน ไม่มี fetch ส่วนตัว · ข้อความ fail/ไม่มีข้อมูล + dirty warning + ปุ่มคัดลอก ต้องอยู่ครบ | `tests/release-badge.test.ts` | `npm test` (vitest) | Unit Tests |
 | SC    | หมวดหมู่ที่เลือกบน /search ประกาศ aria-current และ `สินค้าทั้งหมด` ไม่แย่งสถานะ (1.1.6) · ชิปทุกใบพา `?available=` ต่อ และ slug ที่ไม่มีจริงถือว่าไม่กรอง + render test นับ `aria-current` ได้ 1 (1.1.7) | `tests/search-category-chip.test.ts` | `npm test` (vitest) | Unit Tests |
 | ME    | ประตูแอดมิน `/management` ต้องไม่ตอบ 404 (1.1.8) — มีหน้าทางเข้าจริงที่ redirect ไป `/management/login` ทางเดียว ไม่มี markup แอดมิน (ห้ามแฟลช dashboard ให้คนที่ยังไม่ล็อกอิน) และ `/management/login` ยังพา session ที่ยังดีไป dashboard ก่อนโชว์ฟอร์ม | `tests/management-entry.test.ts` | `npm test` (vitest) | Unit Tests |
+| PN-PAGE | หน้า บันทึกแพตช์ ต้อง **render** ภาษาไทยได้จริง ไม่ใช่แค่มีไบต์อยู่ใน chunk: mount หน้าจริงด้วยข้อมูลที่สร้างจาก log แล้วตรวจหัวข้อ ปัญหา / สิ่งที่เปลี่ยน / ตรวจสอบแล้ว / หมายเหตุ, วันที่แบบไทย (5 พ.ย. 2569), รายละเอียดของ build ล่าสุดบนการ์ดบนสุด (ทั้งกรณีที่ build ที่รันอยู่มีแถวและยังไม่มี), และประวัติเปิดเฉพาะแถวของ build ที่รันอยู่ | `tests/patch-notes-page.test.tsx` | `npm test` (vitest, jsdom) | Unit Tests |
 | PN    | หน้า `/management/patch-notes` ต้องตรงกับบันทึก deploy เสมอ (1.1.9) — JSON ที่หน้าใช้ถูกสร้างจากตารางใน `docs/hostatom-live.md` และเทสต์ fail ทันทีที่แก้ log แล้วลืมรัน `npm run patch-notes`; รายการเรียงใหม่→เก่า BUILD_ID ไม่ซ้ำ ไม่มีวันที่อนาคต ทุกแถวมี commit/BUILD_ID/วันที่/หัวข้อ/รายละเอียดครบ และแถวที่ไม่ใช่ build (cleanup, rotate secret) ไม่หลุดเข้ามา | `tests/patch-notes.test.ts` | `npm test` (vitest) | Unit Tests |
 | OG    | การกันขายเกินสต๊อก + lookup ที่กันการเดา (1.1.11) — ออเดอร์ `pending_payment` ต้องถูกนับเป็น "ถือของ" ตอนสร้างออเดอร์ใหม่ (inside transaction เดียวกับ insert) ยอดที่ขายได้ = `sellableStock` ลบของที่ออเดอร์ค้างถือ และตัวกรองต้องเป็น `status: 'pending_payment'` เท่านั้น (แถว `expired` ต้องหลุดจากยอดเองเมื่อ sweep 30 นาทีทำงาน) · `POST /api/v1/orders/lookup` ต้องมี bucket ต่อ IP (10/15 นาที) และต่ออีเมล (5/15 นาที) โดยอีเมลถูก **peek** ก่อนคิวรีและนับเฉพาะเมื่อเจอออเดอร์จริง — คนแปลกหน้าจึงเผาโควตาของเหยื่อด้วยคำขอผิด ๆ ไม่ได้ | `tests/order-guards.test.ts` | `npm test` (vitest) | Unit Tests |
 
@@ -1036,6 +1037,20 @@ slug ที่เป็น ASCII ไม่พังเพราะ `encodeURICom
 - ใส่วันที่อนาคตในแถว → P2 แดง
 - ให้ parser รับแถวที่ commit หรือ `BUILD_ID` เป็น `—` → P3/P5 แดง
 - ลบ entry ไทยของ build หนึ่งออกจาก `patch-notes-th.json` → P6 แดง; ใส่คีย์ที่ไม่มี build → P7 แดง
+
+---
+
+## หน้าบันทึกแพตช์ต้อง render ภาษาไทยได้จริง (5 พ.ย. 2569) — `tests/patch-notes-page.test.tsx`
+
+รอบ 1.1.16 ตรวจแต่ว่า "ข้อความไทยอยู่ในไฟล์ JS ที่ให้บริการ" — ซึ่งพิสูจน์ได้แค่ว่า build พาไป ไม่ได้พิสูจน์ว่าหน้าโชว์ และการ์ดบนสุดยังว่างรายละเอียดของ build ที่เพิ่ง deploy เพราะ bundle ถูกสร้างก่อนแถวบันทึกของตัวเองจะมีอยู่จริง ชุดนี้จึง mount `<PatchNotesPage />` ด้วย JSON ที่ commit ไว้ (ไม่ใช่ fixture) แล้วตรวจสิ่งที่เจ้าของร้านเห็น
+
+| ตัว | บังคับว่า |
+|---|---|
+| D1 | เมื่อ build ที่รันอยู่มีแถวแล้ว การ์ดบนสุดแสดงหัวข้อไทยของ build นั้นครบทั้งสี่หัวข้อ (ตามที่มีข้อมูล), วันที่แบบไทย `5 พ.ย. 2569`, และเนื้อรายละเอียดจริง และไม่มีการ์ดเตือน "ยังไม่มีแถว" |
+| D2 | กรณี build ที่รันอยู่ยังไม่มีแถว (สภาวะของทุกครั้งหลัง deploy) การ์ดยังแสดงคำเตือนอย่างชื่อสัตย์ **และ** แสดงรายละเอียดไทยของ build ล่าสุดที่บันทึกไว้ครบหัวข้อ |
+| D3 | ประวัติ render ทุก build ตามลำดับด้วยหัวข้อไทย และมี `details[open]` เดียวคือแถวของ build ที่รันอยู่ |
+
+**พังได้จริง** — ลบ `<Detail note={newestTh} />` ในสาขา fallback → D2 แดง; เปลี่ยน `open={isLive}` เป็น `open` → D3 แดง (เปิดหลายแถว); ถอด `THAI_MONTHS` → D1 แดง
 
 ---
 
