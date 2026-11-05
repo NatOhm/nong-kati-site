@@ -103,6 +103,7 @@
 | RB    | Release badge — เวอร์ชันที่แอดมินเห็น ต้องเป็นของจริงทุกหน้า (29 ต.ค.) — `fetch('/api/v1/version')` มีที่เดียวใน `src/` หลัง module-level cache (ไม่งั้นทุก navigation ในแอดมินเรียกซ้ำ) · chip ต้องอยู่ใน top bar (ทุกหน้า) และ sidebar footer ทั้ง desktop rail กับ mobile drawer · dashboard card อ่านจาก hook เดียวกัน ไม่มี fetch ส่วนตัว · ข้อความ fail/ไม่มีข้อมูล + dirty warning + ปุ่มคัดลอก ต้องอยู่ครบ | `tests/release-badge.test.ts` | `npm test` (vitest) | Unit Tests |
 | SC    | หมวดหมู่ที่เลือกบน /search ประกาศ aria-current และ `สินค้าทั้งหมด` ไม่แย่งสถานะ (1.1.6) · ชิปทุกใบพา `?available=` ต่อ และ slug ที่ไม่มีจริงถือว่าไม่กรอง + render test นับ `aria-current` ได้ 1 (1.1.7) | `tests/search-category-chip.test.ts` | `npm test` (vitest) | Unit Tests |
 | ME    | ประตูแอดมิน `/management` ต้องไม่ตอบ 404 (1.1.8) — มีหน้าทางเข้าจริงที่ redirect ไป `/management/login` ทางเดียว ไม่มี markup แอดมิน (ห้ามแฟลช dashboard ให้คนที่ยังไม่ล็อกอิน) และ `/management/login` ยังพา session ที่ยังดีไป dashboard ก่อนโชว์ฟอร์ม | `tests/management-entry.test.ts` | `npm test` (vitest) | Unit Tests |
+| PN    | หน้า `/management/patch-notes` ต้องตรงกับบันทึก deploy เสมอ (1.1.9) — JSON ที่หน้าใช้ถูกสร้างจากตารางใน `docs/hostatom-live.md` และเทสต์ fail ทันทีที่แก้ log แล้วลืมรัน `npm run patch-notes`; รายการเรียงใหม่→เก่า BUILD_ID ไม่ซ้ำ ไม่มีวันที่อนาคต ทุกแถวมี commit/BUILD_ID/วันที่/หัวข้อ/รายละเอียดครบ และแถวที่ไม่ใช่ build (cleanup, rotate secret) ไม่หลุดเข้ามา | `tests/patch-notes.test.ts` | `npm test` (vitest) | Unit Tests |
 
 **วิธีรัน:**
 
@@ -1021,6 +1022,29 @@ slug ที่เป็น ASCII ไม่พังเพราะ `encodeURICom
 - เอา `!searchCategory` ออกจาก `isActive` ของ navbar → C5 แดง
 - ลบ `available: availableOnly` ออกจาก `buildUrl` ของชิป → R2 แดง
 - ใช้ `category` ดิบแทน `categorySlug` (หรือลบการ resolve) → R3 แดง
+
+---
+
+## บันทึกแพตช์บนหลังบ้านต้องตรงกับสิ่งที่ขึ้น production (5 พ.ย. 2569) — `tests/patch-notes.test.ts`
+
+เจ้าของร้านขอเห็นประวัติว่าอะไรขึ้น production แล้วบ้างในหน้าแอดมิน แทนที่จะต้องถามทีละรอบ ประวัติชุดนี้มีเจ้าของอยู่แล้วคือตาราง deploy ใน `docs/hostatom-live.md` (วันที่ · commit · BUILD_ID · สิ่งที่เปลี่ยน) ซึ่ง runbook บังคับให้เขียนทุกครั้งที่ deploy — ถ้าทำรายการที่สองขึ้นมาเอง สองชุดจะไม่ตรงกันภายในสองรอบ
+
+จึงให้ `scripts/patch-notes.mjs` **สร้าง** `src/data/patch-notes.json` จากตารางนั้น (รันด้วย `npm run patch-notes`) และเทสต์นี้คือตัวกันไม่ให้ไฟล์ที่ commit ไว้เก่ากว่าบันทึก
+
+| ตัว | บังคับว่า |
+|---|---|
+| P1 | สร้างใหม่จาก log วันนี้ ต้องเท่ากับ JSON ที่ commit ไว้เป๊ะ — แก้ log แล้วลืมรันสคริปต์ = แดง |
+| P2 | เรียงใหม่→เก่าจริง, `BUILD_ID` ไม่ซ้ำ, ไม่มีวันที่อนาคต |
+| P3 | ทุกแถวค้น build กลับได้: commit 7–40 hex, `BUILD_ID`, วันที่ ISO, หัวข้อ, รายละเอียด, version เป็น semver เมื่อมี |
+| P4 | หน้าจริงอ่าน JSON นั้นและ map ทุกแถว, และ sidebar มี `/management/patch-notes` ด้วยสิทธิ์ `settings:read` |
+| P5 | แถวที่ไม่ใช่ build (ล้าง DB, หมุน secret, repo hygiene) ไม่หลุดเข้ามาในรายการ |
+
+**พังได้จริง — ทดสอบด้วยการใส่มั๊กกลับ**
+
+- แทรกแถว deploy ปลอมใน `docs/hostatom-live.md` โดยไม่รัน `npm run patch-notes` → P1 แดง (ทดสอบแล้วจริง: `expected [1.1.8…] to deeply equal [1.1.9…]` แล้วคืน log กลับ)
+- ลบ `from '@/data/patch-notes.json'` ในหน้าแล้ว hardcode รายการ → P4 แดง
+- ใส่วันที่อนาคตในแถว → P2 แดง
+- ให้ parser รับแถวที่ commit หรือ `BUILD_ID` เป็น `—` → P3/P5 แดง
 
 ---
 

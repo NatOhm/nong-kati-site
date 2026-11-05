@@ -1,0 +1,83 @@
+[
+  {
+    "version": "1.1.8",
+    "date": "2026-11-04",
+    "dateLabel": "Nov 4, 2026",
+    "gitSha": "d71dc88",
+    "buildId": "asv940_oIRI6rFKVRgObZ",
+    "title": "/management is a door again, deployed to production.",
+    "detail": "1.1.8 — /management is a door again, deployed to production. The audit on 1.1.7 found that /management/ answered 308 → /management and /management answered 404: app/management/ had layout.tsx and every sub-route but no root page, while the spec calls that URL the admin entry (02-user-flow \"Entry: /management/ → redirect to /management/login/\", 03-IA \"/management/ … Admin Dashboard\"). The fix is a redirect-only page to /management/login, which already owns the auth decision and hands a live session to the dashboard, so there is still exactly one gate. tests/admin-nav-sections.test.ts now lists /management with login and dev-seed as a deliberate non-menu page, and tests/management-entry.test.ts (M1–M4) holds the redirect, the absence of admin markup, and the login page's authenticated bounce. Live: /api/v1/version → 1.1.8 / #388 / asv940_oIRI6rFKVRgObZ / d71dc88, health database: ok with uptime 81 s. /management → 200 and lands on /management/login in a clean browser (email + password + remember + submit, x-robots-tag: noindex); /management/ still 308s into it; with a live admin session the same navigation ends on /management/dashboard, so \"entry, or dashboard when authenticated\" is proven both ways. Re-audit on the new build: guest /management/orders and /management/settings still return the empty shell (0 order numbers, 0 emails), guest admin APIs 401 with 405 on a wrong method, manual-info still enabled: true / 199-1-73578-6 / กนกนาถ โรจนวุฒิ, slip-verify still 403 INVALID_UPLOAD_TOKEN for missing / fake / plausible-64-char tokens, /orders/preview still rejects VARIANT_NOT_FOUND, INVALID_QUANTITY (-2, 1.5) and 51 items as CART_TOO_LARGE, security headers present with a CSP nonce, homepage 0 turbopack, product/search/checkout 200. Cleanup Run Now answered CLEANED with .next + .next.old in place; no rollback was needed."
+  },
+  {
+    "version": "1.1.7",
+    "date": "2026-11-03",
+    "dateLabel": "Nov 3, 2026",
+    "gitSha": "11f9929",
+    "buildId": "IfozWtRR1lZBnFJj_XUQg",
+    "title": "The payment tab can save its bank account again, deployed to production.",
+    "detail": "1.1.7 — the payment tab can save its bank account again, deployed to production. The header save kept ONE saver slot while the payment tab renders two panels, so PaymentSettings registered second and overwrote ManualTransferSettings — an edited receiver account never left the browser while the button reported success. Panels now register through useSettingsSaver and the page runs every registered saver; a refused save reports its reason. Also carries one shared applyPromotionDiscount (three copies had drifted apart), a MAX_CART_ITEMS = 50 guard on /orders/preview (the 60/min IP rule already covered flood; the caller-controlled array did not), cache() on the two category readers, and the search filter chip. Live: /api/v1/version → 1.1.7 / #386 / IfozWtRR1lZBnFJj_XUQg / 11f9929, health database: ok with uptime 24s (a real restart), products 200, homepage 0 turbopack, CSP/HSTS/X-Frame-Options/Referrer-Policy all present. Audit on the deployed build: 51 preview items → 400 CART_TOO_LARGE, 1 item → ฿50 and qty 2 → ฿100 (stock and price agree with the product page's เหลือ 2); Thai-slug product 200 in both percent-encoded and raw UTF-8 forms; search ?q=365 returns 2 cards with the query echoed in the heading; /category/workspace 200; cart totals 9×฿1 + ฿50 = ฿59; every guest call to /api/v1/admin/* answers 401 and POST on a GET-only admin route answers 405. Run Now with the canonical 653-char line (task id 250, deactivated, not saved); extract-check.txt and the tarball removed by a second Run Now that answered CLEANED, then the field restored to the deploy one-liner. Open: the settings-tab fix itself needs an admin login to exercise (not done here, the panel is behind auth); production reports vatEnabled: false, so VAT stays switched off; the cart drawer's entrance animation could not be watched because the browser tab was backgrounded (Chromium parks animations at currentTime 0 when visibilityState is hidden), so only its markup and totals were checked."
+  },
+  {
+    "version": "1.1.6",
+    "date": "2026-11-03",
+    "dateLabel": "Nov 3, 2026",
+    "gitSha": "09ca46a",
+    "buildId": "_QgNY5emZ375QBUAUW883",
+    "title": "The /search landing now announces its category filter.",
+    "detail": "1.1.6 — the /search landing now announces its category filter. Audited on 1.1.5: /search?category=streaming-app filtered the grid correctly but carried no aria-current on any chip, while the navbar's สินค้าทั้งหมด link announced itself as the current page despite pointing at a different view. Fix: the selected chip renders aria-current=\"page\" beside its existing peach active state (and ทั้งหมด is current only without a filter), and /search passes searchCategory through FacebookLayout into FacebookNavbar so the navbar entry stays inert while filtered. Guard tests/search-category-chip.test.ts (C1–C5) + a docs/quality-gates.md row/section (SC). Live proof on the new build: /search?category=streaming-app has exactly one aria-current=\"page\" — the streaming app (19) chip — with work space (3) / Chinese Miniseries (7) inactive and ทั้งหมด unmarked; each drawer destination (workspace 3, streaming-app 19, chinese-miniseries 7) returns 200 with its own chip active; unfiltered /search marks ทั้งหมด. Unchanged behaviours re-checked: product page เหลือ 2, the five preview-order cases (OUT_OF_STOCK at 0 codes, ฿50/฿100 for 2 stock/2 codes, qty3 rejected), /category/streaming-app 200."
+  },
+  {
+    "version": "1.1.5",
+    "date": "2026-11-03",
+    "dateLabel": "Nov 3, 2026",
+    "gitSha": "b68bbc6",
+    "buildId": "WGagTETnKgIY7F02yeydr",
+    "title": "Sellable-stock gate + one-tap drawer, deployed to production.",
+    "detail": "1.1.5 — sellable-stock gate + one-tap drawer, deployed to production. Carries 391c376 (the resolver now counts available GiftCode rows, so a variant sells min(stock, codes) and refuses OUT_OF_STOCK below the quantity; the product page shows the deliverable number) and f322dcd (drawer category rows point at /search?category=<slug> instead of /category/<slug>, so the client gets their one tap to a price; the grouped tile page and its ดูทั้งหมด entry points are untouched). Live: /api/v1/version → 1.1.5 / #377 / WGagTETnKgIY7F02yeydr / b68bbc6, health database: ok with uptime 4.5s (a real restart, not a stale process), products 200, homepage 0 turbopack. Audited on the deployed build: /search?category=streaming-app 19 cards all หมด (genuine — every streaming variant is 0 stock / 0 codes); microsoft-365-30-วัน-ytbr shows เหลือ 2 and previews ฿50 (qty 1) / ฿100 (qty 2); qty 3 and both 0-code variants answer OUT_OF_STOCK; drawer at 390px lists workspace / streaming-app / Chinese Miniseries with /search?category= hrefs and the grouped /category/streaming-app still 200. Open: production has no stock>0-with-0-codes variant, so that exact gate stays proven by unit tests only — proving it live needs seeded inventory."
+  },
+  {
+    "version": "1.1.4",
+    "date": "2026-11-02",
+    "dateLabel": "Nov 2, 2026",
+    "gitSha": "4e9dcbf",
+    "buildId": "hBw7TZNRpvt7qoI6MiulS",
+    "title": "Real public origin + honest drawer categories, deployed to production.",
+    "detail": "1.1.4 — real public origin + honest drawer categories, deployed to production. Carries 1.1.3 (a126c25, 46CiMm7RsXYLfD_rc-bNe) and the fixes stacked on it: (a) publicOrigin() now treats a loopback NEXT_PUBLIC_SITE_URL as unset and falls back to https://nongkatistore.com, so the origin inlined at build time can no longer ship localhost; (b) the drawer's category fetch no longer caches a 500 as an empty list, shows skeleton rows while in flight and retries on the next open. Live: /api/v1/version → 1.1.4 / #373 / 4e9dcbf, health database: ok; homepage and the Thai-slug product microsoft-365-30-วัน-ytbr 200; sitemap has 0 localhost and emits https://nongkatistore.com/product/microsoft-365-30-%E0%B8%A7…; that product's canonical and og:url match; robots.txt sitemap points at the real domain; drawer verified at 390px — forced 500 shows the \"โหลดหมวดหมู่ไม่สำเร็จ\" line with 0 dead links, closing and reopening refetches and renders the three real categories, a cached reopen fires 0 requests. Run Now with a pinned TARBID guard (5 s), extract-check.txt read then deleted; task left unsaved with the canonical 653-char line."
+  },
+  {
+    "version": null,
+    "date": "2026-10-04",
+    "dateLabel": "Oct 4, 2026",
+    "gitSha": "4c84ef9",
+    "buildId": "GDePvCSOq-CqxhH6HFX8j",
+    "title": "Version-endpoint fix + /search dropdown fix — deployed to production.",
+    "detail": "Version-endpoint fix + /search dropdown fix — deployed to production. Also carries the TOTP generator fix, navbar popover portals, and the credential-file ignore. Post-deploy, /api/v1/version returns a buildId read from .next/BUILD_ID on disk and it reports the real deployed build; gitSha still echoes the stale Infisical value (2ee2ae7) and is no longer the verification signal. deploy-rollback was repointed to the previous bundle (gUxcV6SEGUgIp6nFJf8hR) BEFORE the force-push, so rollback stayed available. Pre-publish secret scan: unpacked the bundle and searched every file for the literal values of NK_JWT_SECRET, NK_GIFT_CODE_ENCRYPTION_KEY, DATABASE_URL and DATABASE_DIRECT_URL (plus the postgres user and password substrings) — none present, no .env* staged. The 14 grep hits were variable NAMES (process.env[\"NK_GIFT_CODE_ENCRYPTION_KEY\"]), not values. Live verification: health healthy/database: ok with uptime 13s (confirming a real restart, not a stale process), /, /search, /management/login, /account/login, /api/v1/products all 200, 0 turbopack leaks. Browser-checked on the deployed build at 740x420: the search list is portaled, position: fixed, 691px — exactly the search bar's width and left edge, fully inside the viewport with all 6 options hit-testable (it previously hung 177px past the fold, stranding the last two); clicking the previously-unreachable last option navigates. All three navbar popovers re-checked for regression: portaled, fixed, zero clipping ancestors, fully visible (notifications 320x322 at top=60). Plesk: extract ran via Run Now with no task saved; extract-check.txt deleted; no probe*/restart-watch*/deploy-bundle residue in the docroot."
+  },
+  {
+    "version": null,
+    "date": "2026-10-04",
+    "dateLabel": "Oct 4, 2026",
+    "gitSha": "cbbe097",
+    "buildId": "gUxcV6SEGUgIp6nFJf8hR",
+    "title": "Navbar popover portals + TOTP base32 fix deployed; credential-dump files removed from the repo and .gitignore extended (this repo is public, so git add -A would have published NK_JWT_SECRET and NK_GIFT_CODE_ENCRYPTION_KEY).",
+    "detail": "Navbar popover portals + TOTP base32 fix deployed; credential-dump files removed from the repo and .gitignore extended (this repo is public, so git add -A would have published NK_JWT_SECRET and NK_GIFT_CODE_ENCRYPTION_KEY). Health healthy, 0 turbopack. This deploy's /api/v1/version reported gitSha: 2ee2ae7 — stale by three commits, which is what motivated the buildId fix in the row above."
+  },
+  {
+    "version": null,
+    "date": "2026-10-03",
+    "dateLabel": "Oct 3, 2026",
+    "gitSha": "2ee2ae7",
+    "buildId": "AooEcNd_FJ7wU4oVn3KeE",
+    "title": "Navbar layout fix — deployed to production.",
+    "detail": "Navbar layout fix — deployed to production. Fix: header nav links were crushed to one Thai glyph per line between ~768–1150px because the centre nav was a plain flex child with no shrink-0, so it absorbed the whole width deficit and Thai broke *between glyphs*. Added shrink-0 to nav + links, whitespace-nowrap, min-w-0/flex-1 on the search field, moved the nav breakpoint md: → xl: (1280px), and added the two missing drawer links (แนะนำ, รายการโปรด). 4 new gates in tests/navbar-layout-gates.test.ts; full suite 349 ✓. Live after deploy: nav links 41px single-line at 1280px, nav display:none below xl, search 224×21px at 768/900px, no horizontal overflow at any width; health database: ok, products 200, homepage 0 turbopack. Deploy was blocked for ~2 days by a Plesk quoting bug, not by the network — see deploy-hostatom-manual.md pitfalls. Infisical GIT_SHA was stale at 13bdf58 and has since been corrected to 2ee2ae7… (a human-edited Infisical value, not a code change); /api/v1/version now reports the live commit."
+  },
+  {
+    "version": null,
+    "date": "2026-10-01",
+    "dateLabel": "Oct 1, 2026",
+    "gitSha": "13bdf58",
+    "buildId": "s3L0ijro_1BuotgUhnbfv",
+    "title": "Client-feedback fixes: createOrder rejects zero-stock variants (HTTP 409 OUT_OF_STOCK, probed live), CSP img-src gained blob: so slip previews render on every bill, Slip2Go auto-verify live (NK_SLIP2GO_SECRET; SlipOK kept as fallback; GET /api/v1/payments/slip-verify → {\"enabled\":true}); +13 regression tests (tests/client-feedback-fixes.test.ts, full suite 276 ✓).",
+    "detail": "Client-feedback fixes: createOrder rejects zero-stock variants (HTTP 409 OUT_OF_STOCK, probed live), CSP img-src gained blob: so slip previews render on every bill, Slip2Go auto-verify live (NK_SLIP2GO_SECRET; SlipOK kept as fallback; GET /api/v1/payments/slip-verify → {\"enabled\":true}); +13 regression tests (tests/client-feedback-fixes.test.ts, full suite 276 ✓). Flow: scripts/deploy-artifact.sh → Plesk Run-Now (5 s, task not saved) → Restart App. Infisical: GIT_SHA → 13bdf58…, NK_SLIP2GO_SECRET added; all seven live checks green. Open: client must whitelist 147.50.254.11 in the Slip2Go dashboard (until then a verify call 401s with 401007 → the adapter falls back to the manual admin path) and should store the key in a password manager; delete httpdocs/extract-check.txt via File Manager."
+  }
+]
