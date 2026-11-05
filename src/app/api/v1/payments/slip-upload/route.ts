@@ -69,7 +69,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const order = await getOrderById(orderId);
   if (!order) return NextResponse.json({ error: 'ORDER_NOT_FOUND' }, { status: 404 });
-  if (order.status !== 'pending_payment') {
+  // `expired` still accepts a slip: the transfer may have left the customer's
+  // account before the 30-minute sweep, and that money is already gone.
+  if (order.status !== 'pending_payment' && order.status !== 'expired') {
     return NextResponse.json({ error: 'ORDER_NOT_PAYABLE' }, { status: 409 });
   }
 

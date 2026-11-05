@@ -465,6 +465,11 @@ async function createOrderInner(
   // No writes and no new table: the hold is derived, and the expiry sweep
   // (src/lib/orderExpiry.ts) moves stale orders to `expired` after 30 minutes,
   // which drops them out of this sum, so the hold releases itself.
+  //
+  // shortcut: release waits for that 10-minute cron tick, so a hold can last
+  // ~40 minutes and stops releasing entirely if the tick dies. Add
+  // `order: { createdAt: { gt: cutoff } }` here if the tick ever becomes
+  // unreliable.
   const requestedVariantIds = [...resolved.quantityMap.keys()];
   const heldRows = await tx.orderItem.groupBy({
     by: ['variantId'],
@@ -620,10 +625,14 @@ export async function claimOrderForConfirmation(
   // whole order back), so this only ever trips on rows written outside that
   // path. Refusing the claim keeps the order in `pending_payment` where an
   // operator can see and resolve it, instead of silently completing it.
+  // `expired` is payable too: a transfer made at minute 29 and uploaded at
+  // minute 31 is real money, and the sweep flipping the row does not unsend it.
+  // If the unit was resold meanwhile, fulfilment throws INSUFFICIENT_STOCK and
+  // the caller parks the order in pending_manual_fulfilment (refund/restock).
   const claimed = await db.order.updateMany({
     where: {
       id: orderId,
-      status: 'pending_payment',
+      status: { in: ['pending_payment', 'expired'] },
       items: { some: {} },
     },
     data: { status: 'payment_confirmed' },

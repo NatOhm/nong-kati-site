@@ -19,9 +19,14 @@
  * G2 · Guest lookup limiter (`src/app/api/v1/orders/lookup/route.ts`):
  *   The lookup returns the `confirmationUuid` that opens `/orders/<uuid>`,
  *   where delivered codes are printed, and order numbers are sequential — so
- *   unthrottled guessing was a code-harvesting path. Both buckets exist, and
- *   the email bucket must NOT be spendable by a stranger: failures are peeks,
- *   only a real match consumes it.
+ *   unthrottled guessing was a code-harvesting path. Both buckets must count
+ *   MISSES: a bucket consumed only on a match never fires during the guessing
+ *   it exists to stop (2026-11-05: the peek was removed for that reason).
+ *
+ * G3 · Expired orders stay payable (`claimOrderForConfirmation`):
+ *   A transfer made at minute 29 can be uploaded at minute 31, after the sweep
+ *   flipped the row to `expired`. Refusing the claim stranded money that had
+ *   already left the customer's account, so the CAS accepts both statuses.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
@@ -207,17 +212,53 @@ describe('G2 · guest lookup limiter', () => {
     expect(blocked.headers.get('Retry-After')).toBeTruthy();
   });
 
-  it('a failed lookup does not spend the email quota', async () => {
+  it('misses spend the per-email quota, so guessing an address is bounded', async () => {
     const route = await loadRoute();
-    const ip = '198.51.100.12';
-    // Eight misses: more than the email bucket's 5, under the IP bucket's 10.
-    for (let i = 0; i < 8; i += 1) {
-      const res = await route.POST(post(ip, `NK-2026-00080${i}`));
+    // Ten misses for one address, one per IP: the per-IP bucket (10/15 min)
+    // must not be the thing that fires — this proves the EMAIL bucket does.
+    for (let i = 0; i < 10; i += 1) {
+      const res = await route.POST(post(`198.51.100.${20 + i}`, `NK-2026-0007${i}`));
       expect(res.status).toBe(404);
     }
-    // The real order still gets through — a stranger cannot lock an address.
-    const ok = await route.POST(post(ip, 'NK-2026-000999'));
-    expect(ok.status).toBe(200);
-    expect(((await ok.json()) as { success: boolean }).success).toBe(true);
+    const blocked = await route.POST(post('198.51.100.40', 'NK-2026-000999'));
+    expect(blocked.status).toBe(429);
+    expect(((await blocked.json()) as { error: { code: string } }).error.code).toBe(
+      'RATE_LIMIT_EXCEEDED',
+    );
+    // A different address from a fresh IP is unaffected.
+    const other = new NextRequest('http://localhost/api/v1/orders/lookup', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-forwarded-for': '198.51.100.41' },
+      body: JSON.stringify({ email: 'someone-else@example.com', orderNumber: 'NK-2026-000999' }),
+    });
+    expect((await route.POST(other)).status).toBe(200);
+  });
+});
+
+describe('G3 · expired orders stay payable', () => {
+  async function loadClaim(): Promise<{
+    claim: (id: string) => Promise<unknown>;
+    updateMany: ReturnType<typeof vi.fn>;
+  }> {
+    const updateMany = vi.fn(async () => ({ count: 0 }));
+    vi.doMock('@/lib/db', () => ({ prisma: { order: { updateMany } } }));
+    vi.doMock('@/lib/slipSecurity', () => ({ mintSlipUploadToken: vi.fn(() => 'tok') }));
+    const { claimOrderForConfirmation } = (await import('@/api/orders')) as {
+      claimOrderForConfirmation: (id: string) => Promise<unknown>;
+    };
+    return { claim: claimOrderForConfirmation, updateMany };
+  }
+
+  it('claims a pending_payment OR expired order in one CAS', async () => {
+    const { claim, updateMany } = await loadClaim();
+    expect(await claim('o1')).toBeNull(); // count 0 → not claimed
+    const args = updateMany.mock.calls[0]?.[0] as {
+      where: { status: unknown; items: unknown };
+      data: unknown;
+    };
+    expect(args.where.status).toEqual({ in: ['pending_payment', 'expired'] });
+    // The itemless guard rides in the same CAS, not a separate read.
+    expect(args.where.items).toEqual({ some: {} });
+    expect(args.data).toEqual({ status: 'payment_confirmed' });
   });
 });

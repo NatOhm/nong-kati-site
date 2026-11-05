@@ -206,8 +206,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const order = await getOrderById(orderId);
   if (!order) return NextResponse.json({ error: 'ORDER_NOT_FOUND' }, { status: 404 });
-  if (order.status !== 'pending_payment') {
-    // Already confirmed/fulfilled/cancelled — nothing to verify.
+  if (order.status !== 'pending_payment' && order.status !== 'expired') {
+    // Already confirmed/fulfilled/cancelled — nothing to verify. `expired` is
+    // NOT in that set: a slip that arrives after the 30-minute sweep still
+    // represents money sent, and the claim in claimOrderForConfirmation accepts
+    // that status (a resold unit parks the order for manual fulfilment).
     return NextResponse.json({ error: 'ORDER_NOT_PAYABLE' }, { status: 409 });
   }
   const expected = Number(order.totalAmountThb);

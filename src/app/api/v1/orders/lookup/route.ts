@@ -16,10 +16,11 @@ export const dynamic = 'force-dynamic';
  * (`NK-2026-000183`), so unlimited guessing of (email, orderNumber) pairs is
  * the cheapest way to reach somebody else's codes. Two buckets:
  *   - per-IP, checked before any DB work (10 / 15 min);
- *   - per submitted email (5 / 15 min), PEEKED before the query and consumed
- *     only when an order actually matched. Counting failures would let a
- *     stranger spend a victim's email quota with junk requests — the same
- *     reason `orders/route.ts` peeks that bucket.
+ *   - per submitted email (10 / 15 min), counting EVERY attempt. The old
+ *     bucket was peeked and consumed only on a match, which meant misses —
+ *     i.e. the entire guessing attack — never spent it. Counting misses can
+ *     cost one customer 15 minutes of this page (they still have the order
+ *     link in their email); not counting them cost the cap entirely.
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const ip = getClientIp(req);
@@ -39,12 +40,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: { code: 'MISSING_FIELDS' } }, { status: 400 });
   }
 
-  // Trim + lowercase so `A@b.co` and `a@B.co` share one bucket (the same
-  // case-variant bypass the order-velocity email cap closes).
+  // Lowercase so `A@b.co` and `a@B.co` share one bucket (the same case-variant
+  // bypass the order-velocity email cap closes). Scoped by email, not by IP, so
+  // it still binds when the guesses are spread across many addresses.
   const emailKey = email.toLowerCase();
-  const emailLimit = await checkRateLimit('_order_lookup_email', emailKey, undefined, {
-    increment: false,
-  });
+  const emailLimit = await checkRateLimit('_order_lookup_email', emailKey);
   if (!emailLimit.allowed) return applyRateLimit('_order_lookup_email', emailKey, undefined);
 
   try {
@@ -52,8 +52,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     if (!result.success || !result.order) {
       return NextResponse.json({ error: { code: 'NOT_FOUND' } }, { status: 404 });
     }
-    // Only a real match spends the email quota.
-    await checkRateLimit('_order_lookup_email', emailKey);
     return NextResponse.json({
       success: true,
       order: { confirmationUuid: result.order.confirmationUuid },
