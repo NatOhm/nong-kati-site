@@ -80,4 +80,25 @@ function planCronTokenFile(env) {
   return { write: true, token };
 }
 
-module.exports = { resolveInfisicalConfig, planInjection, planCronTokenFile };
+/**
+ * Serialise the secret as a curl config entry, not as a bare token.
+ *
+ * Plesk's scheduler dies on a `$` inside the command field (measured
+ * 2026-11-05: `-H x-cron-token:$(cat tmp/cron-token)` and `T=$(cat …)` both
+ * ended the task in under a second with empty output, while the same command
+ * without `$` ran fine). So the task passes `-K tmp/cron-curl.conf` and curl
+ * reads the header from the file — no substitution, no quoting.
+ *
+ * @param {string} token
+ * @returns {string}
+ */
+function formatCronCurlConfig(token) {
+  return `header = "x-cron-token: ${token}"\n`;
+}
+
+module.exports = {
+  resolveInfisicalConfig,
+  planInjection,
+  planCronTokenFile,
+  formatCronCurlConfig,
+};

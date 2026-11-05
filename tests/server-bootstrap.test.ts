@@ -36,6 +36,7 @@ const boot = requireCjs('../server-bootstrap.js') as {
   resolveInfisicalConfig: (env: Env) => Config;
   planInjection: (secrets: unknown[], env: Env) => Plan;
   planCronTokenFile: (env: Env) => TokenPlan;
+  formatCronCurlConfig: (token: string) => string;
 };
 
 describe('resolveInfisicalConfig', () => {
@@ -136,5 +137,19 @@ describe('planCronTokenFile', () => {
       write: true,
       token: 'abc123',
     });
+  });
+});
+
+describe('formatCronCurlConfig', () => {
+  // Plesk's scheduler kills any command containing `$`, so the task cannot run
+  // `$(cat …)`; it passes `-K tmp/cron-curl.conf` and curl reads this line.
+  it('produces a curl config line curl can read with -K', () => {
+    expect(boot.formatCronCurlConfig('abc123')).toBe(
+      'header = "x-cron-token: abc123"\n',
+    );
+  });
+
+  it('keeps the header name stable — the routes accept x-cron-token', () => {
+    expect(boot.formatCronCurlConfig('t')).toContain('header = "x-cron-token: ');
   });
 });

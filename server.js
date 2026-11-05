@@ -31,6 +31,7 @@ const {
   resolveInfisicalConfig,
   planInjection,
   planCronTokenFile,
+  formatCronCurlConfig,
 } = require('./server-bootstrap');
 
 const dev = process.env.NODE_ENV !== 'production';
@@ -83,40 +84,43 @@ async function loadSecretsFromInfisical() {
 
 // ── Cron token hand-off (docs/production-health-monitoring.md §3b) ───────
 // The Plesk scheduler fires the internal sweeps from outside this process, so
-// it cannot read env. Mirror the shared secret to `tmp/cron-token` (mode 0600)
-// and let the task pass `-H x-cron-token:$(cat tmp/cron-token)` instead of
-// keeping the value in the task field, which Plesk renders as plain text.
+// it cannot read env, and its task field renders secrets as plain text — so
+// the header travels through a 0600 file the task passes as `-K`. It is a
+// curl CONFIG (`header = "x-cron-token: …"`), not a bare token: Plesk's
+// scheduler dies on a `$` in the command, so `-H …$(cat …)` is not usable
+// (measured 2026-11-05).
 //
-// `tmp/` is Passenger's restart directory, not the web root — verified 403
-// over HTTPS, so the file is never served. Exposure is the same disk the env
-// var already sits on, readable by the same vhost user; this adds no new
-// reader, it only spares a human from copying the secret between panels.
+// `tmp/` is Passenger's restart directory, not the web root: Plesk answers
+// 403 for anything under it, so the file is never served. Exposure is the
+// same disk the env var already sits on, readable by the same vhost user; it
+// adds no new reader, it only spares a human copying the secret between
+// panels.
 //
 // Not fatal on failure: without the file the sweeps keep answering 401, which
 // is what they do today with no scheduler at all.
-function writeCronTokenFile() {
+function writeCronCurlConfig() {
   const plan = planCronTokenFile(process.env);
   if (!plan.write) {
-    console.log('[cron-token] NK_CRON_SECRET absent — no token file written');
+    console.log('[cron-token] NK_CRON_SECRET absent — no curl config written');
     return;
   }
   const fs = require('fs');
-  const path = require('path').join(__dirname, 'tmp', 'cron-token');
+  const path = require('path').join(__dirname, 'tmp', 'cron-curl.conf');
   try {
     fs.mkdirSync(require('path').dirname(path), { recursive: true });
-    fs.writeFileSync(path, plan.token, { mode: 0o600 });
+    fs.writeFileSync(path, formatCronCurlConfig(plan.token), { mode: 0o600 });
     // mode only applies on creation; an existing file keeps its old bits.
     fs.chmodSync(path, 0o600);
-    console.log('[cron-token] wrote tmp/cron-token (0600) for the Plesk sweeper');
+    console.log('[cron-token] wrote tmp/cron-curl.conf (0600) for the Plesk sweeper');
   } catch (err) {
-    console.error('[cron-token] could not write token file:', err.message);
+    console.error('[cron-token] could not write curl config:', err.message);
   }
 }
 
 // ── Boot: secrets first, then the app ────────────────────────────────────
 loadSecretsFromInfisical()
   .then(() => {
-    writeCronTokenFile();
+    writeCronCurlConfig();
 
     const app = next({ dev, hostname, port });
     const handle = app.getRequestHandler();
