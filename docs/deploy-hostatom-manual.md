@@ -9,7 +9,7 @@ below is what actually shipped the live build.
 > same flow spelled out manually; keep them as the fallback and as the explanation of what the
 > script does. This file predates the script.
 
-> **Current live build (Nov 5, 2026): `a9c9472`, v1.1.15, BUILD_ID `Cvm6k6VOEzORNV_BiJ7QN`.** Repo HEAD is
+> **Current live build (Nov 6, 2026): `59b4bdf`, v1.1.21 #422, BUILD_ID `rS_MkGOOVNatg0a4oafAo`.** Repo HEAD is
 > level with live after four deploys (1.1.12 slip-after-expiry + lookup quota + 1,587 dead lines,
 > 1.1.13 self-expiring holds, 1.1.14/1.1.15 the Plesk-driven sweeps). See the deploy log in
 > [hostatom-live.md](hostatom-live.md) §5. Note that the `13bdf58..HEAD` range has **no `prisma/`
