@@ -2,7 +2,6 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Clock, Mail, FileText } from 'lucide-react';
 
-import { FacebookLayout } from '@/components/layout/FacebookLayout';
 import { SiteMascot } from '@/components/ui/SiteMascot';
 
 export const dynamic = 'force-dynamic';
@@ -10,6 +9,7 @@ import { PageShell } from '@/components/layout/PageShell';
 import { Breadcrumb } from '@/components/data-display/Breadcrumb';
 import { TrustBadgeRow } from '@/components/checkout/TrustBadgeRow';
 import { OrderStatusBadge } from '@/components/order/OrderStatusBadge';
+import { PendingOrderAutoRefresh } from '@/components/order/PendingOrderAutoRefresh';
 import { CodeBlock } from '@/components/order/CodeBlock';
 import { getOrderByConfirmationUuid } from '@/api/orders';
 import { getDeliveredCodes } from '@/lib/delivery/customerCodes';
@@ -36,179 +36,185 @@ export default async function ConfirmationPage({
   const isPendingManual = order.status === 'pending_manual_fulfilment';
 
   // Real delivered codes, decrypted server-side (finding #4).
-  const deliveredCodes = isCompleted ? await getDeliveredCodes(order.id) : [];
+  // Not gated on `completed`: an order parked for manual fulfilment has often
+  // already delivered most of its codes, and hiding them behind "กำลังดำเนินการ"
+  // is what made the customer wait for a code that was sitting right there.
+  const deliveredCodes = await getDeliveredCodes(order.id);
 
+  // Chrome lives in app/checkout/layout.tsx; a second FacebookLayout here
+  // stacked two announcement bars + navbars (same report as the order page).
   return (
     <>
-      <FacebookLayout>
-        <PageShell>
-          {/* Breadcrumb */}
-          <Breadcrumb
-            className="py-4"
-            items={[
-              { label: 'หน้าหลัก', href: '/' },
-              { label: 'ชำระเงิน', href: '/checkout' },
-              { label: 'ยืนยันคำสั่งซื้อ' },
-            ]}
-          />
+      <PageShell>
+        {/* Breadcrumb */}
+        <Breadcrumb
+          className="py-4"
+          items={[
+            { label: 'หน้าหลัก', href: '/' },
+            { label: 'ชำระเงิน', href: '/checkout' },
+            { label: 'ยืนยันคำสั่งซื้อ' },
+          ]}
+        />
 
-          <div className="mx-auto max-w-2xl pb-16">
-            {/* Order Status Header */}
-            <div className="mb-8 rounded-md border border-line-subtle bg-surface p-6 text-center">
-              <div className="mb-4 flex justify-center">
-                {isCompleted ? (
-                  <>
-                    {/* Celebrating hamster — one bounce, then still (§7 of the
+        <div className="mx-auto max-w-2xl pb-16">
+          {/* Order Status Header */}
+          <div className="mb-8 rounded-md border border-line-subtle bg-surface p-6 text-center">
+            <div className="mb-4 flex justify-center">
+              {isCompleted ? (
+                <>
+                  {/* Celebrating hamster — one bounce, then still (§7 of the
                         design doc): success earns the character moment. */}
-                    <SiteMascot size={96} className="mascot-celebrate" />
-                  </>
-                ) : (
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-surface-brand-subtle">
-                    <Clock size={28} className="text-fg-brand" />
-                  </div>
-                )}
-              </div>
-
-              <h1 className="mb-2 font-display text-2xl font-bold text-fg">
-                {isCompleted
-                  ? 'ชำระเงินสำเร็จ'
-                  : isPendingManual
-                    ? 'กำลังดำเนินการ'
-                    : 'รอการชำระเงิน'}
-              </h1>
-
-              <div className="mb-4">
-                <OrderStatusBadge status={order.status as any} />
-              </div>
-
-              <p className="text-sm text-fg-placeholder">
-                {isCompleted
-                  ? 'โค้ดของคุณพร้อมใช้งานแล้ว — ตรวจสอบอีเมลหรือดูด้านล่าง'
-                  : isPendingManual
-                    ? 'โค้ดจะถูกส่งภายใน 2 ชั่วโมง — ตรวจสอบสถานะได้ที่นี่'
-                    : 'คำสั่งซื้อของคุณถูกบันทึกไว้แล้ว — กรุณาดำเนินการชำระเงิน'}
-              </p>
-
-              {/* Order number */}
-              <div className="mt-6 rounded-md border border-line-subtle bg-surface px-4 py-3">
-                <p className="text-xs text-fg-placeholder">หมายเลขคำสั่งซื้อ</p>
-                <p className="font-mono text-lg font-bold text-fg-brand">{order.orderNumber}</p>
-              </div>
-            </div>
-
-            {/* Codes (if delivered) */}
-            {isCompleted && (
-              <div className="mb-6 rounded-md border border-jade-500/30 bg-jade-500/10 p-6">
-                <h2 className="mb-4 text-lg font-semibold text-jade-700 dark:text-jade-200">
-                  โค้ดของคุณ
-                </h2>
-                <p className="mb-4 text-sm text-fg-muted">
-                  โปรดนำโค้ดไปใช้ตามวิธีการใช้งานของแต่ละสินค้า
-                </p>
-
-                <div className="space-y-3">
-                  {deliveredCodes.map((delivered, idx) => (
-                    <CodeBlock
-                      key={`${delivered.code}-${idx}`}
-                      code={delivered.code}
-                      productName={delivered.productName}
-                      denomination={delivered.denomination}
-                    />
-                  ))}
-                  {deliveredCodes.length === 0 && (
-                    <div className="rounded-md border border-line-brand bg-surface p-4">
-                      <p className="font-mono text-sm text-fg-brand">
-                        โค้ดจะแสดงที่นี่ — รีเฟรชหน้านี้อีกครั้งในอีกสักครู่
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Order Details */}
-            <div className="rounded-md border border-line-subtle bg-surface p-6">
-              <h2 className="mb-4 text-lg font-semibold text-fg">รายละเอียดคำสั่งซื้อ</h2>
-
-              {/* Items */}
-              <div className="mb-4 space-y-3">
-                {order.items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center justify-between rounded-md border border-line-subtle bg-surface p-3"
-                  >
-                    <div>
-                      <p className="text-sm font-medium text-fg">{item.productNameTh}</p>
-                      <p className="text-xs text-fg-placeholder">
-                        {item.skuCode} × {item.quantity}
-                      </p>
-                    </div>
-                    <span className="text-sm font-medium text-fg-secondary">
-                      {formatThb(item.lineTotalThb)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Summary */}
-              <div className="border-t border-line-subtle pt-4">
-                <div className="flex items-center justify-between text-sm text-fg-muted">
-                  <span>ยอดรวม</span>
-                  <span>{formatThb(order.subtotalThb)}</span>
-                </div>
-                {order.vatEnabled && (
-                  <div className="flex items-center justify-between text-sm text-fg-muted">
-                    <span>VAT {(order.vatRate * 100).toLocaleString('th-TH')}% (รวมในราคา)</span>
-                    <span>{formatThb(order.vatAmountThb)}</span>
-                  </div>
-                )}
-                <div className="mt-2 flex items-center justify-between border-t border-line-subtle pt-2">
-                  <span className="font-bold text-fg">รวมทั้งสิ้น</span>
-                  <span className="text-lg font-bold text-fg-brand">
-                    {formatThb(order.totalAmountThb)}
-                  </span>
-                </div>
-              </div>
-
-              {/* Email */}
-              <div className="mt-4 flex items-center gap-2 text-sm text-fg-placeholder">
-                <Mail size={14} />
-                <span>อีเมล: {order.customerEmail}</span>
-              </div>
-
-              {order.requiresTaxInvoice && (
-                <div className="mt-2 flex items-center gap-2 text-sm text-fg-placeholder">
-                  <FileText size={14} />
-                  <span>ใบกำกับภาษีจะออกให้หลังชำระเงิน</span>
+                  <SiteMascot size={96} className="mascot-celebrate" />
+                </>
+              ) : (
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-surface-brand-subtle">
+                  <Clock size={28} className="text-fg-brand" />
                 </div>
               )}
             </div>
 
-            {/* Actions */}
-            <div className="mt-6 space-y-3">
-              {isPendingPayment && (
-                <Link
-                  href="/checkout"
-                  className="flex w-full items-center justify-center gap-2 rounded-md bg-peach-500 px-5 py-3 text-base font-semibold text-white shadow-clay-brand transition-colors hover:bg-peach-400"
-                >
-                  ดำเนินการชำระเงิน
-                </Link>
-              )}
+            <h1 className="mb-2 font-display text-2xl font-bold text-fg">
+              {isCompleted
+                ? 'ชำระเงินสำเร็จ'
+                : isPendingManual
+                  ? 'กำลังดำเนินการ'
+                  : 'รอการชำระเงิน'}
+            </h1>
 
-              <Link
-                href="/"
-                className="flex w-full items-center justify-center gap-2 rounded-md border border-line bg-surface px-5 py-3 text-base font-medium text-fg-secondary hover:border-clay-400 hover:text-fg"
-              >
-                <ArrowLeft size={16} />
-                กลับหน้าหลัก
-              </Link>
+            <div className="mb-4">
+              <OrderStatusBadge status={order.status as any} />
+            </div>
 
-              <TrustBadgeRow className="mt-4" />
+            <p className="text-sm text-fg-placeholder">
+              {isCompleted
+                ? 'โค้ดของคุณพร้อมใช้งานแล้ว — ตรวจสอบอีเมลหรือดูด้านล่าง'
+                : isPendingManual
+                  ? 'โค้ดจะถูกส่งภายใน 2 ชั่วโมง — ตรวจสอบสถานะได้ที่นี่'
+                  : 'คำสั่งซื้อของคุณถูกบันทึกไว้แล้ว — กรุณาดำเนินการชำระเงิน'}
+            </p>
+
+            {/* Order number */}
+            <div className="mt-6 rounded-md border border-line-subtle bg-surface px-4 py-3">
+              <p className="text-xs text-fg-placeholder">หมายเลขคำสั่งซื้อ</p>
+              <p className="font-mono text-lg font-bold text-fg-brand">{order.orderNumber}</p>
             </div>
           </div>
-        </PageShell>
-      </FacebookLayout>
 
+          {/* Codes (if delivered) */}
+          {(isCompleted || deliveredCodes.length > 0) && (
+            <div className="mb-6 rounded-md border border-jade-500/30 bg-jade-500/10 p-6">
+              <h2 className="mb-4 text-lg font-semibold text-jade-700 dark:text-jade-200">
+                โค้ดของคุณ
+              </h2>
+              <p className="mb-4 text-sm text-fg-muted">
+                โปรดนำโค้ดไปใช้ตามวิธีการใช้งานของแต่ละสินค้า
+              </p>
+
+              <div className="space-y-3">
+                {deliveredCodes.map((delivered, idx) => (
+                  <CodeBlock
+                    key={`${delivered.code}-${idx}`}
+                    code={delivered.code}
+                    productName={delivered.productName}
+                    denomination={delivered.denomination}
+                  />
+                ))}
+                {deliveredCodes.length === 0 && (
+                  <div className="rounded-md border border-line-brand bg-surface p-4">
+                    <p className="font-mono text-sm text-fg-brand">
+                      โค้ดจะแสดงที่นี่ — รีเฟรชหน้านี้อีกครั้งในอีกสักครู่
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Order Details */}
+          <div className="rounded-md border border-line-subtle bg-surface p-6">
+            <h2 className="mb-4 text-lg font-semibold text-fg">รายละเอียดคำสั่งซื้อ</h2>
+
+            {/* Items */}
+            <div className="mb-4 space-y-3">
+              {order.items.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between rounded-md border border-line-subtle bg-surface p-3"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-fg">{item.productNameTh}</p>
+                    <p className="text-xs text-fg-placeholder">
+                      {item.skuCode} × {item.quantity}
+                    </p>
+                  </div>
+                  <span className="text-sm font-medium text-fg-secondary">
+                    {formatThb(item.lineTotalThb)}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Summary */}
+            <div className="border-t border-line-subtle pt-4">
+              <div className="flex items-center justify-between text-sm text-fg-muted">
+                <span>ยอดรวม</span>
+                <span>{formatThb(order.subtotalThb)}</span>
+              </div>
+              {order.vatEnabled && (
+                <div className="flex items-center justify-between text-sm text-fg-muted">
+                  <span>VAT {(order.vatRate * 100).toLocaleString('th-TH')}% (รวมในราคา)</span>
+                  <span>{formatThb(order.vatAmountThb)}</span>
+                </div>
+              )}
+              <div className="mt-2 flex items-center justify-between border-t border-line-subtle pt-2">
+                <span className="font-bold text-fg">รวมทั้งสิ้น</span>
+                <span className="text-lg font-bold text-fg-brand">
+                  {formatThb(order.totalAmountThb)}
+                </span>
+              </div>
+            </div>
+
+            {/* Email */}
+            <div className="mt-4 flex items-center gap-2 text-sm text-fg-placeholder">
+              <Mail size={14} />
+              <span>อีเมล: {order.customerEmail}</span>
+            </div>
+
+            {order.requiresTaxInvoice && (
+              <div className="mt-2 flex items-center gap-2 text-sm text-fg-placeholder">
+                <FileText size={14} />
+                <span>ใบกำกับภาษีจะออกให้หลังชำระเงิน</span>
+              </div>
+            )}
+          </div>
+
+          {/* Still moving → re-render this server page so the codes below
+                appear by themselves instead of after a manual refresh. */}
+          {!isCompleted && <PendingOrderAutoRefresh status={order.status} />}
+
+          {/* Actions */}
+          <div className="mt-6 space-y-3">
+            {isPendingPayment && (
+              <Link
+                href="/checkout"
+                className="flex w-full items-center justify-center gap-2 rounded-md bg-peach-500 px-5 py-3 text-base font-semibold text-white shadow-clay-brand transition-colors hover:bg-peach-400"
+              >
+                ดำเนินการชำระเงิน
+              </Link>
+            )}
+
+            <Link
+              href="/"
+              className="flex w-full items-center justify-center gap-2 rounded-md border border-line bg-surface px-5 py-3 text-base font-medium text-fg-secondary hover:border-clay-400 hover:text-fg"
+            >
+              <ArrowLeft size={16} />
+              กลับหน้าหลัก
+            </Link>
+
+            <TrustBadgeRow className="mt-4" />
+          </div>
+        </div>
+      </PageShell>
     </>
   );
 }

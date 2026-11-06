@@ -32,7 +32,7 @@
  *        never re-created inside a page — that is what keeps them out of the
  *        animated route wrapper entirely.
  */
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -155,6 +155,29 @@ describe('G4 — fixed customer surfaces can escape any transformed ancestor', (
     const pages = ['src/app/page.tsx', 'src/app/recommended/page.tsx'];
     for (const page of pages) {
       expect(read(page)).not.toMatch(/<MobileBottomNav|<AnnouncementBar/);
+    }
+  });
+
+  it('storefront chrome has ONE owner per tree — no page re-renders its layout', () => {
+    // app/orders and app/checkout layouts already render <FacebookLayout>. The
+    // order detail and confirmation pages rendered it again, so the phone showed
+    // two announcement bars and two navbars stacked (client report 2026-11-06:
+    // "หน้าคำสั่งซื้อซ้อนกัน"). Walk every segment that owns the chrome and assert
+    // no page beneath it mounts a second one.
+    const segmentsWithChrome = ['src/app/orders', 'src/app/checkout'];
+    for (const segment of segmentsWithChrome) {
+      expect(read(`${segment}/layout.tsx`), `${segment} layout owns the chrome`).toMatch(
+        /<FacebookLayout/,
+      );
+      const pages = readdirSync(join(ROOT, segment), { recursive: true, encoding: 'utf8' })
+        .filter((f) => f.endsWith('page.tsx'))
+        .map((f) => `${segment}/${f.replaceAll('\\', '/')}`);
+      expect(pages.length, `${segment} has pages to check`).toBeGreaterThan(0);
+      for (const page of pages) {
+        expect(read(page), `${page} must not render a second <FacebookLayout>`).not.toMatch(
+          /<FacebookLayout/,
+        );
+      }
     }
   });
 });

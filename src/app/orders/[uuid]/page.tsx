@@ -2,8 +2,6 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Search } from 'lucide-react';
 
-import { FacebookLayout } from '@/components/layout/FacebookLayout';
-
 export const dynamic = 'force-dynamic';
 import { PageShell } from '@/components/layout/PageShell';
 import { Breadcrumb } from '@/components/data-display/Breadcrumb';
@@ -52,72 +50,72 @@ export default async function OrderDetailPage({
     orderStatus === 'payment_confirmed' ||
     orderStatus === 'pending_manual_fulfilment';
 
+  // The chrome comes from app/orders/layout.tsx. Rendering FacebookLayout
+  // here too stacked a second announcement bar + navbar on top of the first
+  // (client phone report 2026-11-06: "หน้าคำสั่งซื้อซ้อนกัน").
   return (
     <>
-      <FacebookLayout>
-        <PageShell maxWidth="prose">
-          <div className="py-8">
-            {/* Breadcrumb */}
-            <Breadcrumb
-              className="mb-6"
-              items={[
-                { label: 'หน้าหลัก', href: '/' },
-                { label: 'ค้นหาคำสั่งซื้อ', href: '/orders/lookup' },
-                { label: order.orderNumber },
-              ]}
-            />
+      <PageShell maxWidth="prose">
+        <div className="py-8">
+          {/* Breadcrumb */}
+          <Breadcrumb
+            className="mb-6"
+            items={[
+              { label: 'หน้าหลัก', href: '/' },
+              { label: 'ค้นหาคำสั่งซื้อ', href: '/orders/lookup' },
+              { label: order.orderNumber },
+            ]}
+          />
 
-            {/* Order Detail */}
-            <OrderDetailCard
-              order={{
-                id: order.id,
-                orderNumber: order.orderNumber,
-                status: orderStatus,
-                createdAt: order.createdAt,
-                items: order.items.map((item) => ({
-                  productNameTh: item.productNameTh,
-                  skuCode: item.skuCode,
-                  denominationThb: Number(item.denominationThb),
-                  quantity: item.quantity,
-                  lineTotalThb: Number(item.lineTotalThb),
-                })),
-                codes, // delivered codes decrypted above; empty until completed
-                subtotalThb: Number(order.subtotalThb),
-                vatAmountThb: Number(order.vatAmountThb),
-                vatEnabled: order.vatEnabled,
-                vatRate: order.vatRate,
-                totalAmountThb: Number(order.totalAmountThb),
-                customerEmail: order.customerEmail,
-              }}
-            />
+          {/* Order Detail */}
+          <OrderDetailCard
+            order={{
+              id: order.id,
+              orderNumber: order.orderNumber,
+              status: orderStatus,
+              createdAt: order.createdAt,
+              items: order.items.map((item) => ({
+                productNameTh: item.productNameTh,
+                skuCode: item.skuCode,
+                denominationThb: Number(item.denominationThb),
+                quantity: item.quantity,
+                lineTotalThb: Number(item.lineTotalThb),
+              })),
+              codes, // delivered codes decrypted above; empty until completed
+              subtotalThb: Number(order.subtotalThb),
+              vatAmountThb: Number(order.vatAmountThb),
+              vatEnabled: order.vatEnabled,
+              vatRate: order.vatRate,
+              totalAmountThb: Number(order.totalAmountThb),
+              customerEmail: order.customerEmail,
+            }}
+          />
 
-            {/* Silent auto-refresh while the order is still pending */}
-            {isPending && <PendingOrderAutoRefresh status={orderStatus} />}
+          {/* Silent auto-refresh while the order is still pending */}
+          {isPending && <PendingOrderAutoRefresh status={orderStatus} />}
 
-            {/* Actions */}
-            <div className="mt-6 space-y-3">
-              <Link
-                href="/orders/lookup"
-                className="flex w-full items-center justify-center gap-2 rounded-md border border-line bg-surface px-5 py-3 text-base font-medium text-fg-secondary hover:border-clay-400 hover:text-fg"
-              >
-                <Search size={16} />
-                ค้นหาคำสั่งซื้ออื่น
-              </Link>
+          {/* Actions */}
+          <div className="mt-6 space-y-3">
+            <Link
+              href="/orders/lookup"
+              className="flex w-full items-center justify-center gap-2 rounded-md border border-line bg-surface px-5 py-3 text-base font-medium text-fg-secondary hover:border-clay-400 hover:text-fg"
+            >
+              <Search size={16} />
+              ค้นหาคำสั่งซื้ออื่น
+            </Link>
 
-              <Link
-                href="/"
-                className="flex w-full items-center justify-center gap-2 rounded-md border border-line bg-surface px-5 py-3 text-base font-medium text-fg-secondary hover:border-clay-400 hover:text-fg"
-              >
-                <ArrowLeft size={16} />
-                กลับหน้าหลัก
-              </Link>
+            <Link
+              href="/"
+              className="flex w-full items-center justify-center gap-2 rounded-md border border-line bg-surface px-5 py-3 text-base font-medium text-fg-secondary hover:border-clay-400 hover:text-fg"
+            >
+              <ArrowLeft size={16} />
+              กลับหน้าหลัก
+            </Link>
 
-              <TrustBadgeRow className="mt-4" />
-            </div>
+            <TrustBadgeRow className="mt-4" />
           </div>
-        </PageShell>
-      </FacebookLayout>
-
+        </div>
+      </PageShell>
     </>
   );
 }
