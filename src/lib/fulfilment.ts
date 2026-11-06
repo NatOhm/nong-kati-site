@@ -187,14 +187,18 @@ export async function fulfilOrder(
         }
 
         // Decrement stock with a floor guard; stock may be stale vs codes.
+        // The clamp must be CONDITIONAL (audit 2026-11-06): the decrement and
+        // the floor are two separate statements, so an admin restock that
+        // commits in between (`stock: 10`) was overwritten by a blind write of
+        // 0 and the restock disappeared. Only clamp while the row is negative.
         const variant = await tx.productVariant.update({
           where: { id: item.variantId },
           data: { stock: { decrement: needed } },
           select: { stock: true },
         });
         if (variant.stock < 0) {
-          await tx.productVariant.update({
-            where: { id: item.variantId },
+          await tx.productVariant.updateMany({
+            where: { id: item.variantId, stock: { lt: 0 } },
             data: { stock: 0 },
           });
         }

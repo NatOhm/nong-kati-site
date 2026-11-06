@@ -47,16 +47,24 @@ process.env['GIFT_CODE_KEY'] ??= '0123456789abcdef0123456789abcdef0123456789abcd
  * Created inside vi.hoisted because vi.mock factories are hoisted above
  * module-level declarations.
  */
-const { prismaThrow, auditCreate } = vi.hoisted(() => {
+const { prismaThrow, auditCreate, authState } = vi.hoisted(() => {
+  /** Live account row as the DB would answer it — mutable for the revocation tests. */
+  const authState = {
+    status: 'active' as string,
+    sessionsInvalidBefore: null as Date | null,
+    /** Set to make the live role differ from the token's (a demotion). */
+    roleOverride: null as string | null,
+    mustChangePassword: false,
+  };
   const adminUser = {
     findUnique: vi.fn(async ({ where }: { where: { id: string } }) => {
       const m = /^admin-(.+)$/.exec(where.id);
       if (!m) return null;
       return {
-        role: m[1],
-        status: 'active',
-        sessionsInvalidBefore: null,
-        mustChangePassword: false,
+        role: authState.roleOverride ?? m[1],
+        status: authState.status,
+        sessionsInvalidBefore: authState.sessionsInvalidBefore,
+        mustChangePassword: authState.mustChangePassword,
       };
     }),
   };
@@ -71,7 +79,7 @@ const { prismaThrow, auditCreate } = vi.hoisted(() => {
   );
   const auditCreate = vi.fn<(input: unknown) => Promise<unknown>>();
   auditCreate.mockResolvedValue({});
-  return { prismaThrow, auditCreate };
+  return { prismaThrow, auditCreate, authState };
 });
 
 vi.mock('@/lib/db', () => ({ prisma: prismaThrow }));
@@ -95,6 +103,10 @@ vi.mock('@/lib/auditLog', () => ({
 beforeEach(() => {
   vi.clearAllMocks();
   auditCreate.mockResolvedValue({});
+  authState.status = 'active';
+  authState.sessionsInvalidBefore = null;
+  authState.roleOverride = null;
+  authState.mustChangePassword = false;
 });
 
 import { issueAdminJwt } from '@/lib/jwt';
@@ -521,6 +533,62 @@ describe('authorization matrix', () => {
         }
       }
       expect(failures).toEqual([]);
+    });
+  });
+
+  /**
+   * A token is not a permission slip for life (audit 2026-11-06).
+   *
+   * `verifyAdminJwt` re-reads the account on every request, so a deactivated
+   * staff member, a bumped session epoch or a demotion kills the token on the
+   * NEXT call instead of at its 15-minute expiry. An audit finding claimed the
+   * opposite (rbac.ts's stale "we assume active if JWT is valid" comment);
+   * these tests pin the real behaviour so a future "skip the DB read" edit
+   * cannot quietly bring the window back.
+   */
+  describe('a token whose account changed after issuance', () => {
+    async function freshSuperAdminToken(): Promise<string> {
+      return issueAdminJwt('admin-super_admin', 'super_admin@nong-kati.test', 'super_admin', [
+        ...ROLE_PERMISSIONS['super_admin'],
+      ]);
+    }
+
+    /** Every endpoint must refuse a revoked token; nothing may return 2xx. */
+    async function endpointsThatLetItThrough(token: string): Promise<string[]> {
+      const leaks: string[] = [];
+      for (const row of ROUTE_COVERAGE) {
+        const mod = mods[keyForPath(row.path)];
+        if (!mod || mod['__importError']) continue;
+        let status: number;
+        try {
+          status = (await callHandler(mod, row, token)).status;
+        } catch (err) {
+          leaks.push(`${row.method} ${row.path} → threw past the gate: ${String(err).slice(0, 120)}`);
+          continue;
+        }
+        if (status !== 401 && status !== 403) {
+          leaks.push(`${row.method} ${row.path} → ${status}, expected 401/403`);
+        }
+      }
+      return leaks;
+    }
+
+    it('deactivated account → every endpoint rejects', async () => {
+      const token = await freshSuperAdminToken();
+      authState.status = 'deactivated';
+      expect(await endpointsThatLetItThrough(token)).toEqual([]);
+    });
+
+    it('session epoch bumped after issuance → every endpoint rejects', async () => {
+      const token = await freshSuperAdminToken();
+      authState.sessionsInvalidBefore = new Date(Date.now() + 1_000);
+      expect(await endpointsThatLetItThrough(token)).toEqual([]);
+    });
+
+    it('role demoted after issuance → every endpoint rejects', async () => {
+      const token = await freshSuperAdminToken();
+      authState.roleOverride = 'support_agent';
+      expect(await endpointsThatLetItThrough(token)).toEqual([]);
     });
   });
 });

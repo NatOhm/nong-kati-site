@@ -33,9 +33,11 @@ export async function checkPermission(
     return { allowed: false, error: 'UNAUTHENTICATED' };
   }
 
-  // Check if role is active (not deactivated/locked)
-  // In production, this checks admin_users.status in DB
-  // For mock, we assume active if JWT is valid
+  // The account's live state (exists, active, session epoch, role) is NOT
+  // trusted from the token: `verifyAdminJwt` reads it and returns null, so a
+  // deactivated/demoted admin is rejected on their very next request instead
+  // of riding the token to its 15-minute expiry. Do not "optimise" that read
+  // away here — this file would then enforce a stale snapshot.
 
   // Check permission
   if (!payload.perms.includes(requiredPermission)) {
