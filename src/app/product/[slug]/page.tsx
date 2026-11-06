@@ -17,6 +17,7 @@ import { getProductBySlug, getProductWishCount, getMostWishedProducts } from '@/
 import { publicOrigin } from '@/lib/siteConfig';
 import { WishCounterBadge } from '@/components/product/WishCounterBadge';
 import { AlsoWished } from '@/components/product/AlsoWished';
+import { RecentlyViewedTracker } from '@/components/product/RecentlyViewedTracker';
 
 interface ProductPageProps {
   params: Promise<{ slug: string }>;
@@ -104,6 +105,15 @@ export default async function ProductPage({
 
   return (
     <>
+      <RecentlyViewedTracker
+        product={{
+          slug,
+          name: product.name,
+          imageUrl: product.imageUrl,
+          price: product.variants[0]?.price ?? 0,
+        }}
+      />
+
       <StructuredData
         type="product"
         data={{
