@@ -183,19 +183,22 @@ export const getCategoriesWithProductCounts = cache(getCategoriesWithProductCoun
 async function getCategoriesWithProductCountsUncached(): Promise<
   (CategoryItem & { productCount: number })[]
 > {
-  const cats = await prisma.category.findMany({
-    orderBy: { sortOrder: 'asc' },
-    // Count only sellable products: a chip counting hidden products can show
-    // (2) above a listing that correctly returns none.
-    include: { _count: { select: { products: { where: { isActive: true } } } } },
-  });
+  const [cats, { firstImage, firstSlug }] = await Promise.all([
+    prisma.category.findMany({
+      orderBy: { sortOrder: 'asc' },
+      // Count only sellable products: a chip counting hidden products can show
+      // (2) above a listing that correctly returns none.
+      include: { _count: { select: { products: { where: { isActive: true } } } } },
+    }),
+    // Representative product image per category (client mockup: app tiles lead
+    // with the artwork). First active product image in the subtree; parents
+    // inherit their first child's image. Independent of the category query, so
+    // it runs alongside it instead of paying a second round trip after it.
+    getCategoryImageMaps(),
+  ]);
   const ownCount = new Map(cats.map((c) => [c.id, c._count.products]));
   const countMap = new Map(cats.map((c) => [c.id, c._count.products]));
 
-  // Representative product image per category (client mockup: app tiles lead
-  // with the artwork). First active product image in the subtree; parents
-  // inherit their first child's image.
-  const { firstImage, firstSlug } = await getCategoryImageMaps();
   const resolveImage = (id: string): { img: string; slug: string } | null => {
     const own = firstImage.get(id);
     if (own) return { img: own, slug: firstSlug.get(id) ?? '' };
@@ -497,17 +500,20 @@ function orderCatalogKeys<T extends CatalogOrderKey>(keys: T[], sort: CatalogSor
 // ─── Product Queries ───────────────────────────────────
 
 export async function getFeaturedProducts(): Promise<ProductItem[]> {
-  const products = await prisma.product.findMany({
-    where: { isFeatured: true, isActive: true },
-    include: {
-      category: { select: { id: true, name: true, slug: true } },
-      variants: { orderBy: { sortOrder: 'asc' } },
-      aliases: true,
-    },
-    orderBy: { createdAt: 'desc' },
-  });
+  // Independent work, one round trip each — resolve the tier alongside the query.
+  const [products, tier] = await Promise.all([
+    prisma.product.findMany({
+      where: { isFeatured: true, isActive: true },
+      include: {
+        category: { select: { id: true, name: true, slug: true } },
+        variants: { orderBy: { sortOrder: 'asc' } },
+        aliases: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+    resolveTier(),
+  ]);
 
-  const tier = await resolveTier();
   return decoratePromotionPrices(products.map((p) => mapProduct(p, p.category, tier)));
 }
 
