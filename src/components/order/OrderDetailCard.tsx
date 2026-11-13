@@ -3,6 +3,7 @@
 import { Mail } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { formatThb } from '@/lib/pricing';
+import { formatOrderLineDetail } from '@/lib/orderLineLabel';
 import { CodeBlock } from './CodeBlock';
 import { OrderStatusBadge, type OrderStatus } from './OrderStatusBadge';
 
@@ -69,7 +70,7 @@ export function OrderDetailCard({
             <div>
               <p className="text-sm font-medium text-fg">{item.productNameTh}</p>
               <p className="text-xs text-fg-placeholder">
-                {item.skuCode} × {item.quantity}
+                {formatOrderLineDetail(item.skuCode, item.quantity)}
               </p>
             </div>
             <span className="text-sm font-medium text-fg-secondary">

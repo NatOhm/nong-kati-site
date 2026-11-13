@@ -7,6 +7,7 @@ import { AdminShell } from '@/components/layout/AdminShell';
 import { adminJson, adminFetch } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
 import { formatThb } from '@/lib/pricing';
+import { formatOrderLineDetail, orderLineOptionLabel } from '@/lib/orderLineLabel';
 import { paymentMethodLabel } from '@/lib/paymentMethods';
 import { withStatusColors } from '@/lib/orderStatus';
 
@@ -611,7 +612,11 @@ export default function AdminOrdersPage(): React.JSX.Element {
                           {line.codesCount} โค้ด · {line.deliveryStatus ?? '—'}
                         </span>
                       </div>
-                      <p className="text-xs text-fg-muted">{line.skuCode}</p>
+                      {orderLineOptionLabel(line.skuCode) && (
+                        <p className="text-xs text-fg-muted">
+                          แพ็กเกจ {orderLineOptionLabel(line.skuCode)}
+                        </p>
+                      )}
                       {codes.length > 0 ? (
                         <div className="mt-2 space-y-1">
                           {codes.map((c, idx) => (
@@ -695,7 +700,7 @@ export default function AdminOrdersPage(): React.JSX.Element {
                       <div>
                         <p className="text-fg">{item.productNameTh}</p>
                         <p className="text-xs text-fg-muted">
-                          {item.skuCode} × {item.quantity} ·{' '}
+                          {formatOrderLineDetail(item.skuCode, item.quantity)} ·{' '}
                           {item.deliveryStatus === 'delivered' ? (
                             <span className="text-jade-600">
                               ส่งแล้ว ({item.codesDelivered} โค้ด)

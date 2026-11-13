@@ -8,6 +8,7 @@ import { adminFetch } from '@/lib/adminSession';
 import { TIER_LABELS, type PriceTier } from '@/lib/pricing';
 import { cn } from '@/utils/cn';
 import { formatThb } from '@/lib/pricing';
+import { orderLineOptionLabel } from '@/lib/orderLineLabel';
 import { withStatusColors } from '@/lib/orderStatus';
 import { safeJson } from '@/lib/json';
 import { CopyButton } from '@/components/order/CopyButton';
@@ -507,7 +508,7 @@ export default function AdminCustomersPage(): React.JSX.Element {
                                 {order.items
                                   .map(
                                     (i) =>
-                                      `${i.productNameTh} ×${i.quantity} (${i.deliveryStatus ?? '—'})`,
+                                      `${i.productNameTh}${orderLineOptionLabel(i.skuCode) ? ` · แพ็กเกจ ${orderLineOptionLabel(i.skuCode)}` : ''} · จำนวน ${i.quantity} (${i.deliveryStatus ?? '—'})`,
                                   )
                                   .join(' · ')}
                               </p>

@@ -14,6 +14,7 @@ import { CodeBlock } from '@/components/order/CodeBlock';
 import { getOrderByConfirmationUuid } from '@/api/orders';
 import { getDeliveredCodes } from '@/lib/delivery/customerCodes';
 import { formatThb } from '@/lib/pricing';
+import { formatOrderLineDetail } from '@/lib/orderLineLabel';
 
 interface ConfirmationPageProps {
   params: Promise<{ uuid: string }>;
@@ -144,7 +145,7 @@ export default async function ConfirmationPage({
                   <div>
                     <p className="text-sm font-medium text-fg">{item.productNameTh}</p>
                     <p className="text-xs text-fg-placeholder">
-                      {item.skuCode} × {item.quantity}
+                      {formatOrderLineDetail(item.skuCode, item.quantity)}
                     </p>
                   </div>
                   <span className="text-sm font-medium text-fg-secondary">
