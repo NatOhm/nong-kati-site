@@ -32,11 +32,14 @@ type Plan = { entries: Array<[string, string | undefined]>; kept: number };
 const requireCjs = createRequire(import.meta.url);
 type TokenPlan = { write: false } | { write: true; token: string };
 
+type Proc = { on: (event: string, listener: (reason: unknown) => void) => unknown };
+
 const boot = requireCjs('../server-bootstrap.js') as {
   resolveInfisicalConfig: (env: Env) => Config;
   planInjection: (secrets: unknown[], env: Env) => Plan;
   planCronTokenFile: (env: Env) => TokenPlan;
   formatCronCurlConfig: (token: string) => string;
+  registerProcessGuards: (proc: Proc, log: (line: string) => void) => void;
 };
 
 describe('resolveInfisicalConfig', () => {
@@ -137,6 +140,29 @@ describe('planCronTokenFile', () => {
       write: true,
       token: 'abc123',
     });
+  });
+});
+
+describe('registerProcessGuards', () => {
+  // Node ≥15 exits the worker on an unhandled rejection; the guard must absorb
+  // it and leave a log line behind (audit 2026-11-13).
+  it('registers an unhandledRejection listener that logs and does not throw', () => {
+    const handlers = new Map<string, (reason: unknown) => void>();
+    const lines: string[] = [];
+    const proc: Proc = {
+      on: (event, listener) => handlers.set(event, listener),
+    };
+
+    boot.registerProcessGuards(proc, (line) => lines.push(line));
+
+    const handler = handlers.get('unhandledRejection');
+    expect(handler).toBeTypeOf('function');
+    expect(() => handler!(new Error('boom'))).not.toThrow();
+    expect(lines[0]).toContain('[unhandledRejection]');
+    expect(lines[0]).toContain('boom');
+
+    handler!('plain-string-reason');
+    expect(lines[1]).toContain('plain-string-reason');
   });
 });
 

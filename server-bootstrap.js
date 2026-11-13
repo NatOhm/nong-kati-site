@@ -96,9 +96,27 @@ function formatCronCurlConfig(token) {
   return `header = "x-cron-token: ${token}"\n`;
 }
 
+/**
+ * Install the process-level safety net for promise rejections nobody caught
+ * (audit finding, 2026-11-13). Node ≥15 exits the process on an unhandled
+ * rejection, so one fire-and-forget notification or a stray DB call could take
+ * the Passenger worker — and the whole storefront — down. Log and keep
+ * serving; the request that caused it already has its own try/catch.
+ *
+ * @param {{ on: (event: string, listener: (reason: unknown) => void) => unknown }} proc
+ * @param {(line: string) => void} log
+ */
+function registerProcessGuards(proc, log) {
+  proc.on('unhandledRejection', (reason) => {
+    const detail = reason instanceof Error ? reason.stack || reason.message : String(reason);
+    log(`[unhandledRejection] ${detail}`);
+  });
+}
+
 module.exports = {
   resolveInfisicalConfig,
   planInjection,
   planCronTokenFile,
   formatCronCurlConfig,
+  registerProcessGuards,
 };

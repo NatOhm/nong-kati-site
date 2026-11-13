@@ -32,7 +32,12 @@ const {
   planInjection,
   planCronTokenFile,
   formatCronCurlConfig,
+  registerProcessGuards,
 } = require('./server-bootstrap');
+
+// A promise nobody awaited used to kill the worker (Node exits on unhandled
+// rejection); log it and keep the storefront up.
+registerProcessGuards(process, (line) => console.error(line));
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';

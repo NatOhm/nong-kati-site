@@ -65,7 +65,11 @@ export async function POST(
         where: { id, status: 'pending' },
         data: {
           status: action === 'approve' ? 'completed' : 'failed',
-          ...(note ? { reference: note } : {}),
+          // `reference` already holds the transfer slip path
+          // (/api/v1/payments/slip-download/…); writing `note` over it erased
+          // the only evidence of the transfer the admin just checked. The
+          // admin table splits on '|' into slip + note, so append instead.
+          ...(note ? { reference: log.reference ? `${log.reference}|${note}` : note } : {}),
         },
       });
       if (moved.count !== 1) throw new Error('ALREADY_REVIEWED');
