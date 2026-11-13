@@ -46,15 +46,23 @@ export default function RegisterPage(): React.JSX.Element {
       const data = await res.json();
 
       if (res.ok && data.success) {
-        // Registered and auto-logged-in via session cookie
-        window.location.href = '/account/dashboard';
+        // New account whose mail could not be delivered is signed in directly.
+        if (data.autoLogin) {
+          window.location.href = '/account/dashboard';
+          return;
+        }
+        // Otherwise (and for an address that already had an account) the route
+        // answers identically and mails a sign-in link — the same screen for
+        // both, so the form cannot be used to test whether an email exists.
+        setSuccess(true);
+        setLoading(false);
         return;
       }
       setError(
-        data.error === 'EMAIL_ALREADY_EXISTS'
-          ? 'อีเมลนี้ถูกใช้งานแล้ว'
-          : data.error === 'PASSWORD_TOO_SHORT'
-            ? 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร'
+        data.error === 'PASSWORD_TOO_SHORT'
+          ? 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร'
+          : data.error === 'EMAIL_DELIVERY_UNAVAILABLE'
+            ? 'ระบบส่งอีเมลขัดข้องชั่วคราว — กรุณาลองอีกครั้งในภายหลัง'
             : 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง',
       );
     } catch {
@@ -69,9 +77,12 @@ export default function RegisterPage(): React.JSX.Element {
       <div className="flex min-h-[80vh] items-center justify-center px-4">
         <div className="w-full max-w-md text-center">
           <div className="mb-6 text-4xl">✉️</div>
-          <h1 className="mb-2 text-2xl font-bold text-fg">สมัครสมาชิกสำเร็จ</h1>
+          <h1 className="mb-2 text-2xl font-bold text-fg">ตรวจสอบอีเมลของคุณ</h1>
           <p className="mb-6 text-sm text-fg-placeholder">
-            เราได้ส่งลิงก์ยืนยันไปยังอีเมลของคุณแล้ว กรุณาคลิกลิงก์ในอีเมลเพื่อยืนยันบัญชี
+            ถ้าอีเมลนี้ยังไม่มีบัญชี เราได้สร้างบัญชีให้แล้ว —
+            และไม่ว่ากรณีใด เราได้ส่งลิงก์เข้าสู่ระบบไปที่อีเมลนี้ (ใช้ได้ 15 นาที)
+            <br />
+            หากเคยสมัครไว้ ลิงก์จะพาเข้าสู่บัญชีเดิมของคุณ
           </p>
           <Link
             href="/account/login"

@@ -47,6 +47,13 @@ const { magicEmail, resetEmail } = vi.hoisted(() => {
 vi.mock('@/lib/email/magicLinkEmail', () => magicEmail);
 vi.mock('@/lib/email/passwordResetEmail', () => resetEmail);
 
+// Registration: the two branches (new / already registered) must be
+// indistinguishable to the browser.
+const { authMock } = vi.hoisted(() => ({
+  authMock: { registerCustomer: vi.fn(), loginCustomer: vi.fn() },
+}));
+vi.mock('@/api/customerAuth', () => authMock);
+
 // Drain endpoint touches prisma for its counters; verifyAdminJwt (admin-JWT
 // drain path) hits adminUser — answer with an active super_admin row.
 vi.mock('@/lib/db', () => ({
@@ -172,6 +179,104 @@ describe('POST /api/v1/auth/forgot-password — delivery honesty (audit #2)', ()
     );
     expect(res.status).toBe(200);
     expect(resetEmail.sendPasswordResetEmail).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /api/v1/auth/register — no account enumeration', () => {
+  const routePath = '../src/app/api/v1/auth/register/route.ts';
+  const call = async (req: NextRequest): Promise<Response> => {
+    const route = (await import(routePath)) as Record<string, unknown>;
+    return (route['POST'] as (r: NextRequest) => Promise<Response>)(req);
+  };
+
+  beforeEach(() => {
+    magicMock.createMagicLinkToken.mockResolvedValue({ ...TOKEN_RESULT });
+    authMock.loginCustomer.mockResolvedValue({ success: false });
+  });
+
+  it('a new address and an already-registered address get identical responses and no session', async () => {
+    authMock.registerCustomer.mockResolvedValueOnce({
+      success: true,
+      data: { customerId: 'c-new', email: 'new@example.com' },
+    });
+    const fresh = await call(
+      post('http://localhost/api/v1/auth/register', {
+        email: 'new@example.com',
+        password: 'password123',
+      }),
+    );
+    const freshBody = await fresh.text();
+
+    authMock.registerCustomer.mockResolvedValueOnce({
+      success: false,
+      error: 'EMAIL_ALREADY_EXISTS',
+    });
+    const taken = await call(
+      post('http://localhost/api/v1/auth/register', {
+        email: 'taken@example.com',
+        password: 'password123',
+      }),
+    );
+    const takenBody = await taken.text();
+
+    expect(fresh.status).toBe(200);
+    expect(taken.status).toBe(200);
+    expect(takenBody).toBe(freshBody);
+    expect(taken.headers.get('set-cookie')).toBeNull();
+    expect(fresh.headers.get('set-cookie')).toBeNull();
+    expect(magicEmail.sendMagicLinkEmail).toHaveBeenCalledTimes(2);
+  });
+
+  it('validation failures are still reported', async () => {
+    authMock.registerCustomer.mockResolvedValue({ success: false, error: 'PASSWORD_TOO_SHORT' });
+    const res = await call(
+      post('http://localhost/api/v1/auth/register', { email: 'a@b.test', password: 'short' }),
+    );
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toBe('PASSWORD_TOO_SHORT');
+    expect(magicEmail.sendMagicLinkEmail).not.toHaveBeenCalled();
+  });
+
+  it('new account + mail outage: signs the customer in instead of stranding them', async () => {
+    authMock.registerCustomer.mockResolvedValue({
+      success: true,
+      data: { customerId: 'c-new', email: 'new@example.com' },
+    });
+    authMock.loginCustomer.mockResolvedValue({
+      success: true,
+      data: { accessToken: 'jwt', expiresIn: 900 },
+    });
+    magicEmail.sendMagicLinkEmail.mockResolvedValue({ ok: false, error: 'EMAIL_NOT_CONFIGURED' });
+
+    const res = await call(
+      post('http://localhost/api/v1/auth/register', {
+        email: 'new@example.com',
+        password: 'password123',
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { autoLogin: boolean }).autoLogin).toBe(true);
+    expect(res.headers.get('set-cookie')).toContain('nk_session=');
+  });
+
+  it('existing account + mail outage: 503, never a session', async () => {
+    authMock.registerCustomer.mockResolvedValue({
+      success: false,
+      error: 'EMAIL_ALREADY_EXISTS',
+    });
+    magicEmail.sendMagicLinkEmail.mockResolvedValue({ ok: false, error: 'EMAIL_NOT_CONFIGURED' });
+
+    const res = await call(
+      post('http://localhost/api/v1/auth/register', {
+        email: 'taken@example.com',
+        password: 'password123',
+      }),
+    );
+    expect(res.status).toBe(503);
+    expect(res.headers.get('set-cookie')).toBeNull();
+    expect(((await res.json()) as { error: string }).error).toBe(
+      'EMAIL_DELIVERY_UNAVAILABLE',
+    );
   });
 });
 
