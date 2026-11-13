@@ -286,7 +286,7 @@ export default function LoginPage(): React.JSX.Element {
                     revokes pre-reset sessions. */}
                 <a
                   href={`/account/forgot-password?next=${encodeURIComponent(safeNext(searchParams.get('next')))}`}
-                  className="text-sm text-fg-brand underline hover:no-underline"
+                  className="inline-flex min-h-[44px] items-center text-sm text-fg-brand underline hover:no-underline"
                 >
                   ลืมรหัสผ่าน?
                 </a>

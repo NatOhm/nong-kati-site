@@ -118,6 +118,7 @@ export function ContactForm({
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           readOnly={readOnlyEmail}
+          autoComplete="email"
           required
           aria-invalid={errors.email ? true : undefined}
           aria-describedby={errors.email ? emailErrorId : undefined}
@@ -146,6 +147,7 @@ export function ContactForm({
           type="tel"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
+          autoComplete="tel"
           placeholder="0812345678"
           className="w-full rounded-md border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-fg-placeholder focus:ring-2 focus:ring-peach-500"
         />

@@ -105,7 +105,7 @@ export function CartDrawer({
           </h2>
           <button
             onClick={requestClose}
-            className="rounded p-1 text-fg-placeholder transition-colors hover:bg-surface hover:text-fg-secondary"
+            className="flex h-11 w-11 items-center justify-center rounded-full text-fg-placeholder transition-colors hover:bg-surface hover:text-fg-secondary"
             aria-label="ปิดตะกร้า"
           >
             <X size={20} strokeWidth={1.5} />
@@ -113,7 +113,7 @@ export function CartDrawer({
         </div>
 
         {/* Items */}
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto overscroll-contain p-4">
           {items.length === 0 ? (
             <EmptyCart />
           ) : (

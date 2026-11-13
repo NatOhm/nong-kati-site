@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
 
 import { MascotProvider } from '@/providers/MascotProvider';
@@ -29,6 +29,18 @@ import './globals.css';
  * not correctness.
  */
 export const dynamic = 'force-dynamic';
+
+/**
+ * Android Chrome paints the address bar with theme-color; iOS Safari ignores it.
+ * Values follow --bg-base (tokens.css): peach-50 cream in light, clay-950 in
+ * dark. Keyed on the OS scheme — the in-app toggle cannot reach this meta.
+ */
+export const viewport: Viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#FFF7ED' },
+    { media: '(prefers-color-scheme: dark)', color: '#3A2A18' },
+  ],
+};
 
 // Rounded, friendly faces: Mitr for display, Noto Sans Thai Looped for UI body.
 //

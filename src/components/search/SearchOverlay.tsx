@@ -145,7 +145,7 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps): React.JS
         </button>
       </form>
 
-      <div className="flex-1 overflow-y-auto px-4 py-4">
+      <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4">
         {trimmed ? (
           suggestions.length > 0 ? (
             <div className="flex flex-col gap-1">

@@ -5,6 +5,10 @@ import type { Config } from 'tailwindcss';
 
 const config: Config = {
   content: ['./src/**/*.{ts,tsx}'],
+  // Touch devices have no hover-out: without this, a tap leaves the hover fill
+  // stuck on cards, nav items and buttons until something else is tapped
+  // (Android Chrome keeps :hover after a tap; iOS does it while scrolling).
+  future: { hoverOnlyWhenSupported: true },
   darkMode: ['selector', '[data-theme="dark"]'],
   theme: {
     extend: {
