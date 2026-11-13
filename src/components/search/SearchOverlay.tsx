@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Search } from 'lucide-react';
 
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { useOverlayDismiss, useScrollLock } from '@/hooks/useMobileOverlay';
 import { readRecentProducts, type RecentProduct } from '@/lib/recentlyViewed';
 import { formatThb } from '@/utils/format';
 
@@ -46,6 +47,10 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps): React.JS
   const [categories, setCategories] = useState<CategoryChip[]>([]);
   const [recent, setRecent] = useState<RecentProduct[]>([]);
   const sheetRef = useFocusTrap(isOpen);
+  // Back / swipe-back closes the sheet; the page behind it is frozen in place
+  // (iOS ignores overflow:hidden, so it needs position:fixed).
+  useOverlayDismiss(isOpen, onClose);
+  useScrollLock(isOpen);
 
   // Open/close: read recents, load chips once, lock the page behind the sheet.
   useEffect(() => {
@@ -56,7 +61,6 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps): React.JS
       return;
     }
     setRecent(readRecentProducts());
-    document.body.style.overflow = 'hidden';
     const onEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
@@ -68,7 +72,6 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps): React.JS
       .catch(() => setCategories([]));
     return () => {
       document.removeEventListener('keydown', onEsc);
-      document.body.style.overflow = '';
     };
   }, [isOpen, onClose]);
 

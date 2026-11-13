@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { X, ShoppingCart } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { useOverlayDismiss, useScrollLock } from '@/hooks/useMobileOverlay';
 import { useVatConfig } from '@/hooks/useVatConfig';
 import { CartItem } from './CartItem';
 import { CartSummary } from './CartSummary';
@@ -54,19 +55,18 @@ export function CartDrawer({
     setTimeout(onClose, 250);
   }, [closing, onClose]);
 
-  // Close on Escape + lock body scroll
+  // Hardware back / swipe-back dismisses the drawer instead of leaving the page.
+  useOverlayDismiss(isOpen, requestClose);
+  // Freeze the page behind it (position:fixed) — iOS ignores overflow:hidden.
+  useScrollLock(isOpen);
+
+  // Close on Escape
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') requestClose();
     };
-    if (isOpen) {
-      document.addEventListener('keydown', handleEsc);
-      document.body.style.overflow = 'hidden';
-    }
-    return () => {
-      document.removeEventListener('keydown', handleEsc);
-      document.body.style.overflow = '';
-    };
+    if (isOpen) document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
   }, [isOpen, requestClose]);
 
   if (!isOpen) return <></>;
