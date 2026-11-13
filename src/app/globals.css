@@ -728,3 +728,29 @@ body {
     font-size: 16px;
   }
 }
+
+/* ── Safari / iOS ─────────────────────────────────────────────────────────
+   1. iOS Safari ignores `background-attachment: fixed` (the warm glows scroll
+      with the page, and every scroll frame repaints the full-size image).
+      Phones and tablets scroll the backdrop instead; desktop keeps the
+      pinned glow.
+   2. iOS keeps the browser chrome inside the layout: 100vh is taller than the
+      visible area, so `h-screen`/`min-h-screen` shells (admin) leave their
+      last row under the URL bar. dvh tracks the visible viewport; Safari
+      without dvh support ignores the block and keeps vh.
+   Deliberately unlayered so they win over the utilities carrying the values. */
+@media (max-width: 1024px) {
+  body,
+  [data-theme='dark'] body {
+    background-attachment: scroll;
+  }
+}
+
+@supports (height: 100dvh) {
+  .h-screen {
+    height: 100dvh;
+  }
+  .min-h-screen {
+    min-height: 100dvh;
+  }
+}

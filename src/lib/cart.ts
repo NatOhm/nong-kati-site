@@ -6,6 +6,8 @@
  * use the same session key; cart is migrated to customer_id on login.
  */
 
+import { randomUUID } from '@/lib/uuid';
+
 export interface CartItemData {
   id: string;
   variantId: string;
@@ -59,7 +61,7 @@ export function getSessionKey(): string {
   const existing = localStorage.getItem(CART_STORAGE_KEY);
   if (existing) return existing;
 
-  const newKey = crypto.randomUUID();
+  const newKey = randomUUID();
   localStorage.setItem(CART_STORAGE_KEY, newKey);
   return newKey;
 }

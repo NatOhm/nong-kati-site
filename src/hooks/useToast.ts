@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 
 import type { ToastData, ToastType } from '@/components/feedback/Toast';
+import { randomUUID } from '@/lib/uuid';
 
 interface ToastOptions {
   message?: string;
@@ -29,7 +30,7 @@ function emit(): void {
 }
 
 function push(type: ToastType, title: string, options?: ToastOptions): void {
-  const id = crypto.randomUUID();
+  const id = randomUUID();
   const entry: ToastData = { id, type, title, duration: options?.duration ?? 4000 };
   if (options?.message) entry.message = options.message;
   if (options?.variant) entry.variant = options.variant;
