@@ -1,4 +1,22 @@
 {
+  "FX4LFLjGYJJRtyP8f96ys": {
+    "title": "เบลอหลังแถบเมนูกลับมาบน iPhone และหน้าจอไม่ล้นบน Safari",
+    "summary": "ตรวจทั้งร้านสำหรับคนใช้ Safari/iOS: คืน prefix ให้ backdrop-filter, กันแครช crypto.randomUUID บน iOS 15.0–15.3, หยุดใช้ background-attachment แบบ fixed บนมือถือ และใช้ dvh กับหน้าจอแอดมิน",
+    "problem": "การตรวจ Safari เจอสี่จุด: (1) ไฟล์ CSS ที่เว็บเสิร์ฟมี backdrop-filter แต่ไม่มี -webkit-backdrop-filter เลย เพราะไม่ได้ประกาศ browserslist ทำให้ autoprefixer คิดว่าเป้าหมายคือ Safari 18+ ผลคือ iPhone ที่ใช้ iOS 17 หรือเก่ากว่าเห็นแถบเมนูและฉากหลังหน้าต่างลอยเป็นสีทึบไม่เบลอ (2) การเพิ่มสินค้าลงตะกร้าครั้งแรกและทุกข้อความแจ้งเตือนเรียก crypto.randomUUID ซึ่งมีตั้งแต่ Safari 15.4 ทำให้ iPhone รุ่นเก่าแครชตอนกดหยิบสินค้า (3) iOS ไม่รองรับ background-attachment: fixed ทำให้แสงพื้นหลังเลื่อนตามหน้าและวาดใหม่ทุกเฟรม (4) หน้าแอดมินที่ใช้ h-screen/min-h-screen สูงกว่าเขตที่มองเห็นเพราะแถบที่อยู่ของ Safari อยู่ในการคำนวณ แถวล่างจึงถูกบัง",
+    "change": [
+      "ประกาศ browserslist เป็น defaults + Safari 15+ + iOS 15+ ทำให้ autoprefixer คืน -webkit-backdrop-filter ให้ทุก backdrop-blur (และ prefix อื่นที่ Safari เก่าต้องใช้)",
+      "เพิ่ม src/lib/uuid.ts: ใช้ crypto.randomUUID เมื่อมี และสร้าง UUID v4 จาก getRandomValues เมื่อไม่มี — ตะกร้าและ toast ใช้ตัวนี้",
+      "หน้าจอเล็กกว่า 1024px ใช้ background-attachment: scroll แทน fixed เพื่อไม่ให้พื้นหลังถูกวาดใหม่ตอนเลื่อน",
+      "เพิ่ม dvh ให้ .h-screen/.min-h-screen เมื่อเบราว์เซอร์รองรับ หน้าจอแอดมินจึงพอดีกับพื้นที่ที่มองเห็นจริง"
+    ],
+    "proof": [
+      "1.2.2 (#434) ขึ้นจริง: /api/v1/version คืน buildId FX4LFLjGYJJRtyP8f96ys และ gitSha c300088 ตรงกับบันทึกดีพลอย",
+      "/api/v1/health ตอบ healthy พร้อม checks.database ok หลังรีสตาร์ตจริง และหน้า /, /search, /category/streaming-app, /account/register, /api/v1/products ตอบ 200",
+      "CSS ที่เว็บเสิร์ฟตอนนี้มี -webkit-backdrop-filter 4 จุดคู่กับ backdrop-filter, มี background-attachment:scroll 1 จุด และ 100dvh 3 จุด (ก่อนดีพลอยมี prefix 0 จุด)",
+      "หน้าแรกบน production ไม่มีสตริง turbopack และก่อนดีพลอยผ่าน tsc, eslint และชุดเทสต์ 121 ไฟล์ 1,116 เทสต์"
+    ],
+    "note": "สองเรื่องที่พบแต่ยังไม่แก้เพราะต้องทดสอบบนเครื่องจริง: iOS Safari ไม่ล็อกการเลื่อนพื้นหลังด้วย body overflow (หน้าต่าง/ตะกร้าอาจไหลตามนิ้วได้) และการอัปโหลดสลิปจากคลังภาพ iPhone อาศัย iOS แปลง HEIC เป็น JPEG ให้ ซึ่งยังไม่ได้ยืนยันบนเครื่อง"
+  },
   "xYE9gmvf7N_lrf5sGXvMf": {
     "title": "สลิปยังอยู่หลังแอดมินตรวจสอบ และหน้าจอมือถือไม่ทับกันแล้ว",
     "summary": "ปิดสี่จุดที่เจอหลังอัป 1.2.0 — สลิปหายเมื่อใส่หมายเหตุ บรรทัดคำสั่งซื้อไม่บอกแพ็กเกจ แถบยินยอมคุกกี้ทับปุ่มเลือกแพ็กเกจ ลิงก์ Netflix ในฟุตเตอร์พัง และรูปกำพร้าค้างในที่เก็บ",
