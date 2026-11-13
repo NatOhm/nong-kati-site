@@ -1427,3 +1427,7 @@ W1–W3 ข้างบนพิสูจน์แค่ "route ถามคำ�
 - **H1–H5** เปิดแล้ว push 1 entry · back ที่ตกนอก entry ปิด overlay · ปิดจาก UI เก็บ entry คืน · ซ้อนสองชั้นถอยออกทีละชั้น · ไม่มี overlay แล้วไม่แตะ history เลย · **S1–S4** body ถูก freeze ที่ -scrollY และคืน style · คืน offset เดิมเป๊ะ · ซ้อนกันปลดล็อกครั้งเดียวตอนปิดตัวสุดท้าย · ปิดเพราะเปลี่ยนเส้นทางไม่คืน offset เก่า
 - **ทำไมต้องกัน** — ทั้งสองอย่างไม่มีอาการตอน build: history ที่ค้างทำให้ผู้ใช้ต้องกด back สองครั้งหรือหลุดออกจากหน้า และ scroll ที่ไม่ถูกคืนทำให้กลับมาแล้วหน้าอยู่คนละที่ — ตรวจด้วย unit test อย่างเดียวไม่พอ จึงมีสคริปต์ Playwright ขับ build จริงที่ 390×844 และ 360×800 ตรวจ URL/ลำดับ overlay/offset ด้วย
 - **พังได้จริง (13 พ.ย. 2569)** — ถอด `useOverlayDismiss` ออกจาก `CartDrawer` แล้วรันสคริปต์: back ปิดตะกร้าไม่สำเร็จและ URL เปลี่ยน · ถอด `useScrollLock` ออกแล้ววัด: `body.style.position` ไม่ใช่ `fixed` และ offset หลังปิดไม่ตรง
+
+## สรุป audit มือถือทั้งฉบับ (13 พ.ย. 2569)
+
+ภาพรวม iOS/Android ทุกข้อ — safe-area/`viewport-fit=cover`, touch targets, HEIC และรายการที่ต้องทดสอบบนเครื่องจริง — อยู่ใน [mobile-audit.md](./mobile-audit.md) ตารางนี้ยังเป็นเจ้าของ gate; เคสใหม่สองตัว (`audit round 5: ...`, `safe-area plumbing ...`) อยู่ใน `e2e/touch-targets.spec.ts` และรันด้วย `npm run test:e2e` (e2e ไม่อยู่ใน inventory ของ `npm test` ตามดีไซน์) โดย safe-area พิสูจน์ด้วยการตั้ง `--nk-safe-bottom: 34px` แล้ววัดว่า taskbar และ content spacer โตตาม 34px พร้อมกัน
