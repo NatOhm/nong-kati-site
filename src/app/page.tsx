@@ -271,11 +271,14 @@ export default async function HomePage(): Promise<React.JSX.Element> {
                       aria-hidden
                       className="pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/55 to-transparent"
                     />
-                    <h3 className="flex min-w-0 items-center gap-2 text-sm font-bold text-clay-900">
+                    <h3 className="flex min-w-0 flex-1 items-center gap-2 text-sm font-bold text-clay-900">
                       <span aria-hidden className="shrink-0 text-base">
                         {group.icon || '📁'}
                       </span>
-                      <span className="truncate">{group.name}</span>
+                      {/* Wraps instead of clipping: at 390px the count pill and
+                          "ดูทั้งหมด" leave ~97px, so "Chinese Miniseries" used to
+                          render as "Chinese Mi…". */}
+                      <span className="min-w-0 break-words leading-snug">{group.name}</span>
                       <span className="shrink-0 rounded-full bg-clay-100/80 px-2 py-0.5 text-xs font-semibold text-clay-800 dark:bg-clay-100">
                         {group.productCount ?? 0} รายการ
                       </span>

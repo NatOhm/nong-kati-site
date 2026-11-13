@@ -187,7 +187,11 @@ export default async function ProductPage({
               {/* Description under the banner (img 2) */}
               {product.description && (
                 <div className="max-w-none text-sm leading-relaxed text-fg-muted">
-                  <p>{product.description}</p>
+                  {/* Admin descriptions are multi-line (7 products carry
+                      newlines); without pre-line the browser collapsed them
+                      into one run-on sentence, e.g. the "1. … 2. …" redeem
+                      steps on YouTube Premium. */}
+                  <p className="whitespace-pre-line break-words">{product.description}</p>
                 </div>
               )}
 

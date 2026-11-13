@@ -9,7 +9,11 @@ const FOOTER_COLUMNS: Array<{ title: string; links: Array<{ label: string; href:
       { label: 'สินค้าทั้งหมด', href: '/search' },
       { label: 'สินค้าแนะนำ', href: '/recommended' },
       { label: 'รายการโปรด', href: '/account/wishlist' },
-      { label: 'Netflix', href: '/category/netflix' },
+      // App shortcuts, not categories: there is no /category/netflix (the
+      // category list is workspace / streaming-app / chinese-miniseries), so
+      // the hardcoded slug was the only 404 link on the site. Search always
+      // resolves, even when an app has no category.
+      { label: 'Netflix', href: '/search?q=Netflix' },
       { label: 'Spotify', href: '/category/spotify' },
     ],
   },

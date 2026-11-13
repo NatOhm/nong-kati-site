@@ -64,17 +64,6 @@ export function CookieConsentBanner(): React.JSX.Element | null {
     }
   }, [onManagement]);
 
-  // Audit #5: on mobile the consent banner sits above the bottom taskbar and
-  // together they cover ~18% of the first viewport. While consent is open the
-  // taskbar steps aside; MobileBottomNav listens for this event.
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    window.dispatchEvent(new CustomEvent('nk:consent-visible', { detail: visible }));
-    return () => {
-      window.dispatchEvent(new CustomEvent('nk:consent-visible', { detail: false }));
-    };
-  }, [visible]);
-
   const handleAcceptAll = () => {
     const consent: CookieConsent = {
       version: CONSENT_VERSION,
@@ -124,10 +113,12 @@ export function CookieConsentBanner(): React.JSX.Element | null {
   if (!visible || onManagement) return null;
 
   return (
-    <div className="fixed inset-x-0 bottom-[4.25rem] z-50 border border-line-subtle bg-surface-base px-3 py-3 shadow-clay-sm md:bottom-0 md:border-x-0 md:border-b-0 md:border-t md:px-6 md:py-4 lg:bottom-0">
-      {/* Mobile: compact two-row banner above the taskbar (audit #7) — copy
-          is one line with truncation-resistant short text so page CTAs stay
-          reachable before consent. */}
+    // Phones: the banner is IN FLOW at the top of the page (layout.tsx renders
+    // it before the providers), so it never floats over the buy box — the old
+    // fixed bar sat on top of the product's package chips on a 390px screen.
+    // Desktop keeps the docked bottom bar, where nothing interactive sits under
+    // it.
+    <div className="relative z-50 w-full border-b border-line-subtle bg-surface-base px-3 py-3 shadow-clay-sm md:fixed md:inset-x-0 md:bottom-0 md:border-x-0 md:border-b-0 md:border-t md:px-6 md:py-4">
       <div className="mx-auto max-w-4xl">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           {/* Icon + Text */}

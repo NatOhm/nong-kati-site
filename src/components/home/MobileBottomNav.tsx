@@ -41,16 +41,6 @@ export function MobileBottomNav() {
   // the desktop popover).
   useEffect(() => setAdminMenuOpen(false), [pathname]);
 
-  // Audit #5: while the cookie-consent banner is open it takes the mobile
-  // bottom dock — the taskbar hides so the two never cover ~18% of the
-  // first viewport together. CookieConsentBanner dispatches this event.
-  const [consentOpen, setConsentOpen] = useState(false);
-  useEffect(() => {
-    const onConsent = (e: Event) => setConsentOpen(Boolean((e as CustomEvent).detail));
-    window.addEventListener('nk:consent-visible', onConsent);
-    setConsentOpen(false);
-    return () => window.removeEventListener('nk:consent-visible', onConsent);
-  }, []);
   useEffect(() => {
     if (!adminMenuOpen) return;
     const onDoc = (e: MouseEvent) => {
@@ -64,7 +54,6 @@ export function MobileBottomNav() {
 
   // Sitewide taskbar except the admin panel (which has its own chrome).
   if (pathname?.startsWith('/management')) return null;
-  if (consentOpen) return null;
 
   const accountItem = {
     icon: PawIcon,

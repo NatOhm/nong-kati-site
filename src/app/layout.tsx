@@ -111,6 +111,9 @@ export default async function RootLayout({
             duplicate-ID gate's sanctioned source of literal gradient ids). */}
         <ClayIconDefs />
         <ThemeVars />
+        {/* Above the providers so the phone layout can render it in flow at the
+            top of the document (it must not float over the product buy box). */}
+        <CookieConsentBanner />
         <MascotProvider mascotUrl={(await getAppearance()).mascotUrl}>
           <ThemeProvider defaultTheme="light">
             <CustomerProfileProvider>
@@ -121,7 +124,6 @@ export default async function RootLayout({
               </CartProvider>
             </CustomerProfileProvider>
             <ToastMount />
-            <CookieConsentBanner />
           </ThemeProvider>
         </MascotProvider>
       </body>
