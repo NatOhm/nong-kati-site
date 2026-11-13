@@ -16,6 +16,8 @@
  *  5. magic-link / forgot-password answer 503 EMAIL_DELIVERY_UNAVAILABLE
  *     when delivery fails, and keep the uniform 200 otherwise.
  *  6. The internal drain endpoint is cron-secret/admin-JWT gated.
+ *  7. Codes are attributed per ORDER LINE: a product with two same-price
+ *     variants never shows one line's code on the other (review 2026-11-06).
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
@@ -447,5 +449,101 @@ describe('processDueEmails — delivery worker semantics', () => {
     const stats = await processDueEmails();
     expect(stats.processed).toBe(0);
     expect(resendMock.sendEmail).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Per-line attribution (review 2026-11-06).
+ *
+ * The email matched codes to a line by product name + denomination. That is
+ * ambiguous the moment one product carries two variants at the same price: the
+ * filter matched BOTH lines' codes for each line, so a line showing two codes
+ * rendered all four and the customer could not tell which code belonged to
+ * which purchase. fulfilOrder now stamps the order-item id on each delivered
+ * code and the template groups by it.
+ */
+describe('code delivery email — one code, one line', () => {
+  const TWO_LINES = {
+    id: 'ord-two-lines',
+    confirmationUuid: 'cu-two-lines',
+    orderNumber: 'NK-1002',
+    customerEmail: 'cust@test.local',
+    status: 'payment_confirmed',
+    subtotalThb: 400,
+    vatAmountThb: 28,
+    totalAmountThb: 428,
+    items: [
+      {
+        id: 'oi-a',
+        variantId: 'va',
+        quantity: 2,
+        productNameTh: 'Netflix 30 วัน',
+        denominationThb: 100,
+      },
+      {
+        id: 'oi-b',
+        variantId: 'vb',
+        quantity: 2,
+        productNameTh: 'Netflix 30 วัน',
+        denominationThb: 100,
+      },
+    ],
+  };
+
+  const CODES: Record<string, string[]> = {
+    va: ['CODE-A-1', 'CODE-A-2'],
+    vb: ['CODE-B-1', 'CODE-B-2'],
+  };
+
+  beforeEach(() => {
+    Object.assign(prismaMock, {
+      order: {
+        findUnique: vi.fn().mockResolvedValue(TWO_LINES),
+        update: vi.fn().mockResolvedValue({}),
+      },
+      giftCode: {
+        // Two available codes per variant — one line's worth each.
+        findMany: vi.fn(async ({ where }: { where: { variantId: string } }) =>
+          (CODES[where.variantId] ?? []).map((code, i) => {
+            const enc = encryptCode(code);
+            return {
+              id: `g-${where.variantId}-${i}`,
+              codeEncrypted: enc.ciphertext,
+              nonce: enc.nonce,
+            };
+          }),
+        ),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+      productVariant: { update: vi.fn().mockResolvedValue({ stock: 5 }) },
+      stockMove: { create: vi.fn().mockResolvedValue({}) },
+      orderItem: { update: vi.fn().mockResolvedValue({}) },
+    });
+  });
+
+  it('each line lists only its own two codes, and no code appears twice', async () => {
+    const result = await fulfilOrder('ord-two-lines');
+    expect(result.success).toBe(true);
+    expect(outbox).toHaveLength(1);
+    const html = outbox[0]!.html;
+    const occurrences = (needle: string) => html.split(needle).length - 1;
+
+    // Pre-fix both lines matched by name+price, so all four codes appeared on
+    // both lines — eight renderings of four codes. Exactly one each is the fix.
+    for (const code of [...CODES['va']!, ...CODES['vb']!]) {
+      expect(occurrences(code), code).toBe(1);
+    }
+    // Allocation order is line order: line A's codes, then line B's.
+    expect(html.indexOf('CODE-A-1')).toBeLessThan(html.indexOf('CODE-A-2'));
+    expect(html.indexOf('CODE-A-2')).toBeLessThan(html.indexOf('CODE-B-1'));
+
+    // The public result keeps its original three fields — the line id is
+    // internal and must not leak into API responses.
+    expect(result.codes).toEqual([
+      { code: 'CODE-A-1', productName: 'Netflix 30 วัน', denomination: 100 },
+      { code: 'CODE-A-2', productName: 'Netflix 30 วัน', denomination: 100 },
+      { code: 'CODE-B-1', productName: 'Netflix 30 วัน', denomination: 100 },
+      { code: 'CODE-B-2', productName: 'Netflix 30 วัน', denomination: 100 },
+    ]);
   });
 });

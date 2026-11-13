@@ -118,6 +118,7 @@ export function QuickViewModal({
             productNameTh: product.name,
             productNameEn: product.name,
             productSlug: product.slug,
+            variantLabel: selected.label !== 'default' ? selected.label : 'แพ็กเกจมาตรฐาน',
             thumbnailUrl: product.imageUrl ?? null,
             denominationThb: selected.effectivePrice,
             unitPriceThb: selected.promotion?.discountedPriceThb ?? selected.effectivePrice,

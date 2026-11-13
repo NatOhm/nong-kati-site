@@ -11,6 +11,7 @@ import { getOrderByNumber, getOrderById, type Order } from './orders';
 import { sendEmailWithRetry } from '@/lib/email/resend';
 import { orderConfirmationTemplate } from '@/lib/email/templates';
 import { checkRateLimit, type RateLimitRule } from '@/lib/rateLimit';
+import { siteUrl } from '@/lib/siteUrl';
 
 /** 3 resends per order per hour — the documented cap for 07-api.md §10. */
 const RESEND_LIMIT: RateLimitRule = {
@@ -106,8 +107,10 @@ export async function resendOrderEmail(
 export async function sendOrderConfirmationEmail(
   order: Order,
 ): Promise<{ success: boolean; error?: string }> {
-  const siteUrl = process.env['NEXT_PUBLIC_SITE_URL'] ?? 'http://localhost:3000';
-  const confirmationUrl = `${siteUrl}/orders/${order.confirmationUuid}`;
+  // One owner with the fulfilment email (lib/siteUrl.ts). This used to append
+  // to a `?? 'http://localhost:3000'` fallback, so a production resend could
+  // mail the customer a link to their own machine.
+  const confirmationUrl = `${siteUrl()}/orders/${order.confirmationUuid}`;
 
   const template = orderConfirmationTemplate({
     orderNumber: order.orderNumber,

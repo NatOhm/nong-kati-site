@@ -15,6 +15,7 @@
 import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
+import { CONFIRM_TX_TIMEOUT_MS } from '@/lib/slipConfirmBudget';
 
 const h = vi.hoisted(() => {
   /** Loose shapes — the route under test only reads a few fields. */
@@ -582,7 +583,9 @@ describe('entry-point boundaries (adversarial pass, 30 ต.ค.)', () => {
 
   it('answers 409 for an order that is no longer payable, before touching a provider', async () => {
     h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
-    h.orders.getOrderById.mockResolvedValue({ ...ORDER, status: 'paid' });
+    // 'payment_confirmed' is a status production actually writes ('paid' is
+    // not — a mock with an impossible status proves nothing).
+    h.orders.getOrderById.mockResolvedValue({ ...ORDER, status: 'payment_confirmed' });
 
     const res = await callVerify();
     expect(res.status).toBe(409);
@@ -718,7 +721,7 @@ describe('confirmation transaction budget + retry (live P2028, 2026-11-01)', () 
 
     // One automatic retry, with a budget this path can actually fit in.
     expect(txSpy()).toHaveBeenCalledTimes(2);
-    expect(txSpy().mock.calls[0]![1]).toMatchObject({ timeout: 30000 });
+    expect(txSpy().mock.calls[0]![1]).toMatchObject({ timeout: CONFIRM_TX_TIMEOUT_MS });
     // A retry after a rollback re-runs the guarded claim — never a second
     // provider call and never a second delivery.
     expect(h.slip2go.verifySlip2Go).toHaveBeenCalledTimes(1);

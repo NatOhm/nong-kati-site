@@ -5,6 +5,7 @@ import { checkPermission } from '@/lib/rbac';
 import { getAdminToken } from '@/lib/adminRequest';
 import { writeAuditLog } from '@/lib/auditLog';
 import { notifyRefundIssued } from '@/lib/notify';
+import { recordWalletCredit } from '@/lib/walletCredit';
 
 export const dynamic = 'force-dynamic';
 
@@ -88,7 +89,14 @@ export async function POST(
     return fail('INVALID_BODY', 400);
   }
 
-  const gatewayRefundReference = String(body['gatewayRefundReference'] ?? '').trim();
+  // Client ask 2026-11-13: "คืนเป็นเครดิตได้ป้ะ" — a refund can instead land in
+  // the customer's wallet as store credit, which needs no gateway reference
+  // because no money leaves the shop. Gateway refunds stay record-only.
+  const refundToCredit = body['refundToCredit'] === true;
+
+  const gatewayRefundReference = refundToCredit
+    ? String(body['gatewayRefundReference'] ?? '').trim() || 'wallet-credit'
+    : String(body['gatewayRefundReference'] ?? '').trim();
   if (!gatewayRefundReference) return fail('GATEWAY_REF_REQUIRED', 400);
 
   const rawAmount = Number(body['refundAmountThb']);
@@ -105,7 +113,13 @@ export async function POST(
     const result = await runRefund(async (tx) => {
       const order = await tx.order.findUnique({
         where: { id },
-        select: { id: true, orderNumber: true, status: true, totalAmountThb: true },
+        select: {
+          id: true,
+          orderNumber: true,
+          status: true,
+          totalAmountThb: true,
+          customerId: true,
+        },
       });
       if (!order) throw new Error('ORDER_NOT_FOUND');
       if (order.status === 'refunded') throw new Error('ALREADY_REFUNDED');
@@ -113,6 +127,8 @@ export async function POST(
 
       const total = Number(order.totalAmountThb);
       if (rawAmount > total) throw new Error('REFUND_AMOUNT_EXCEEDS_ORDER');
+      // Credit can only go to a known customer wallet; a guest order has none.
+      if (refundToCredit && !order.customerId) throw new Error('NO_CUSTOMER_FOR_CREDIT');
 
       // Void BEFORE inserting the Refund row: codesVoidedCount is a column on
       // that row, so the count has to exist first.
@@ -142,6 +158,19 @@ export async function POST(
         },
       });
 
+      // Refund-as-credit: balance + ledger row in the SAME transaction as the
+      // Refund row and the order flip, so the customer's wallet history can
+      // never miss a refund that the order says happened.
+      let creditedWalletThb: number | null = null;
+      if (refundToCredit && order.customerId) {
+        creditedWalletThb = await recordWalletCredit(tx, {
+          customerId: order.customerId,
+          amountThb: rawAmount,
+          method: 'refund_credit',
+          reference: `คืนเงิน ${order.orderNumber}`,
+        });
+      }
+
       // Conditional update: the status guard and the write are one statement,
       // so a concurrent second refund cannot slip a completed → refunded move
       // past the read above.
@@ -166,11 +195,19 @@ export async function POST(
           refundAmountThb: rawAmount,
           reasonCategory,
           codesVoided,
+          refundToCredit,
+          ...(creditedWalletThb !== null ? { creditedWalletThb } : {}),
         },
         tx,
       });
 
-      return { refundId: refund.id, codesVoided, orderNumber: order.orderNumber };
+      return {
+        refundId: refund.id,
+        codesVoided,
+        orderNumber: order.orderNumber,
+        creditedWalletThb,
+        refundToCredit,
+      };
     });
 
     // AFTER commit, never inside the transaction: a hung webhook must not
@@ -191,6 +228,8 @@ export async function POST(
         refundId: result.refundId,
         status: 'refunded',
         codesVoided: result.codesVoided,
+        refundToCredit: result.refundToCredit,
+        creditedWalletThb: result.creditedWalletThb,
       },
     });
   } catch (err) {
@@ -206,6 +245,7 @@ export async function POST(
     if (isDuplicate) return fail('ALREADY_REFUNDED', 409);
 
     if (code === 'ORDER_NOT_FOUND') return fail(code, 404);
+    if (code === 'NO_CUSTOMER_FOR_CREDIT') return fail(code, 400);
     if (code === 'ALREADY_REFUNDED' || code === 'NOT_REFUNDABLE') return fail(code, 409);
     if (
       code === 'REFUND_AMOUNT_EXCEEDS_ORDER' ||

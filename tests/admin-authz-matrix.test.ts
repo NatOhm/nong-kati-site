@@ -313,6 +313,8 @@ const ROUTE_COVERAGE: MatrixRow[] = [
   { method: 'PATCH', path: '/tickets/tk-1', perm: 'tickets:write', body: {} },
   // topups
   { method: 'GET', path: '/topups', perm: 'topups:read' },
+  // Approving/rejecting a pending top-up credits a wallet → customers:write.
+  { method: 'POST', path: '/topups/[id]', perm: 'customers:write' },
   // upload
   { method: 'POST', path: '/upload', perm: 'products:write', body: {} },
   // variants

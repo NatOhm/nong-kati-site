@@ -7,9 +7,13 @@
  * - Passwords hashed with scrypt (N=16384) via lib/password.ts; never stored
  *   or logged in plaintext. Verification is timing-safe.
  * - TOTP verified against the user's real base32 secret with ±1 step drift.
- * - Failed logins lock the account for 15 minutes after 5 consecutive
- *   failures (persisted per AdminUser row, survives restarts).
- * - Login failures are generic — no account enumeration.
+ * - Failed logins lock the account for the configured window (default: 5
+ *   consecutive failures → 15 minutes; both are tunable in Settings →
+ *   Security, so never restate the numbers as constants). Persisted per
+ *   AdminUser row.
+ * - Login failures are generic — no account enumeration. Account STATE
+ *   (deactivated, or locked with its retryAfter) is answered only after a
+ *   correct password; a wrong one always gets INVALID_CREDENTIALS.
  * - Refresh tokens are stored as SHA-256 hashes; logout revokes server-side.
  */
 
@@ -285,18 +289,6 @@ export async function adminLogin(
     return { success: false, error: 'INVALID_CREDENTIALS' };
   }
 
-  if (user.status === 'deactivated') {
-    return { success: false, error: 'ACCOUNT_DEACTIVATED' };
-  }
-
-  if (user.lockedUntil && user.lockedUntil > new Date()) {
-    return {
-      success: false,
-      error: 'ACCOUNT_LOCKED',
-      retryAfter: Math.ceil((user.lockedUntil.getTime() - Date.now()) / 1000),
-    };
-  }
-
   const passwordOk = await verifyPassword(password, user.passwordHash);
   if (!passwordOk) {
     // Atomic increment with a CAS-style guard (review 2026-09-26): the old
@@ -333,6 +325,27 @@ export async function adminLogin(
       });
     }
     return { success: false, error: 'INVALID_CREDENTIALS' };
+  }
+
+  // Enumeration guard (review 2026-11-06): account STATE is answered only to
+  // someone who already proved the password. These two checks used to run
+  // BEFORE verifyPassword, so any stranger could learn "this address exists and
+  // is deactivated/locked" from one unauthenticated POST — an account oracle
+  // that also told an attacker which addresses are worth attacking. A wrong
+  // password now gets the same INVALID_CREDENTIALS everywhere; the failed
+  // attempt was already counted above (a locked row's predicate simply does not
+  // increment). verifyPassword now runs first on every path, so the response
+  // time is uniform too.
+  if (user.status === 'deactivated') {
+    return { success: false, error: 'ACCOUNT_DEACTIVATED' };
+  }
+
+  if (user.lockedUntil && user.lockedUntil > new Date()) {
+    return {
+      success: false,
+      error: 'ACCOUNT_LOCKED',
+      retryAfter: Math.ceil((user.lockedUntil.getTime() - Date.now()) / 1000),
+    };
   }
 
   // Review #6: an expired lockout must not linger — the lock window passed,

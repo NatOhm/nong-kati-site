@@ -73,23 +73,6 @@ export function getRolePermissions(role: AdminRole): Permission[] {
   return ROLE_PERMISSIONS[role] ?? [];
 }
 
-/**
- * Mask PII based on role.
- * 08-auth.md §7.4 — support_agent sees masked data only.
- */
-export function maskPII(data: Record<string, unknown>, role: AdminRole): Record<string, unknown> {
-  if (role !== 'support_agent') return data;
-
-  return {
-    ...data,
-    customer_email: maskEmail(data['customer_email'] as string),
-    customer_phone: maskPhone(data['customer_phone'] as string),
-    ip_address: undefined,
-    payment_attempts: undefined,
-    codes: undefined,
-  };
-}
-
 /** Mask an email for limited-visibility roles: u***@domain (exported for
  * permission-based response shaping in the admin order routes). */
 export function maskEmail(email: string): string {

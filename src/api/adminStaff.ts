@@ -296,7 +296,7 @@ export async function adminResetStaffPassword(
   return { tempPassword };
 }
 
-/** Unlock a locked account (clears the 15-min lockout + counters). */
+/** Unlock a locked account (clears the configured lock window + counters). */
 export async function adminUnlockStaff(
   staffId: string,
   adminId: string,

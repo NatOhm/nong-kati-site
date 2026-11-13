@@ -29,6 +29,10 @@ export const RATE_LIMIT_RULES: RateLimitRule[] = [
   // Cart
   { route: '/api/v1/cart', maxRequests: 60, windowMs: 60_000, keyBy: 'ip' },
 
+  // Wallet (balance + top-up requests). Slip uploads are the expensive path;
+  // the endpoint also caps pending requests per customer.
+  { route: '/api/v1/wallet', maxRequests: 30, windowMs: 60_000, keyBy: 'ip' },
+
   // Checkout / Orders
   // The checkout READS fire alongside order creation and must not share its
   // strict bucket: the pricing-preview POST goes out on every cart/coupon
@@ -54,7 +58,9 @@ export const RATE_LIMIT_RULES: RateLimitRule[] = [
   { route: '_order_lookup_email', maxRequests: 10, windowMs: 900_000, keyBy: 'email' },
 
   // Auth (per-IP; per-account brute force is additionally covered by the
-  // DB lockout in adminLogin — 5 wrong passwords → 15-minute account lock).
+  // DB lockout in adminLogin — N consecutive wrong passwords → an account lock
+  // for the window in Settings → Security; defaults are 5 and 15 minutes, but
+  // both are configurable, so never read this as a fixed 5/15).
   // NOTE: paths must match the real endpoints under /api/v1/auth/admin/*.
   { route: '/api/v1/auth/login', maxRequests: 20, windowMs: 900_000, keyBy: 'ip' }, // customer login
   { route: '/api/v1/auth/register', maxRequests: 20, windowMs: 900_000, keyBy: 'ip' },

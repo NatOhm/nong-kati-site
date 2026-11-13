@@ -138,8 +138,12 @@ vi.mock('@/lib/paymentReconciliation', () => ({ recordPaymentReconciliation: h.r
 
 import { POST } from '@/app/api/v1/payments/slip-verify/route';
 
-const CONFIRM_TIMEOUT_MS = 30_000;
-const PARK_TIMEOUT_MS = 10_000;
+// Imported, not re-typed: the assertion must fail if the handler's real budget
+// changes (review 2026-11-06).
+import {
+  CONFIRM_TX_TIMEOUT_MS as CONFIRM_TIMEOUT_MS,
+  PARK_TX_TIMEOUT_MS as PARK_TIMEOUT_MS,
+} from '@/lib/slipConfirmBudget';
 
 const ORDER = {
   id: 'ord-tx',

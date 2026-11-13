@@ -14,25 +14,8 @@
  * (10-digital-code.md §12).
  */
 
-/**
- * Canonical site origin for links sent to customers (emails, schema).
- * Production review HIGH-1: the old `?? 'http://localhost:3000'` fallback
- * produced localhost links in production mail when NEXT_PUBLIC_SITE_URL was
- * unset. Non-production keeps the dev default; production FAILS CLOSED —
- * a missing site URL must break loudly at build/deploy, not quietly link
- * customers to http://localhost:3000.
- */
-export function siteUrl(): string {
-  const configured = process.env['NEXT_PUBLIC_SITE_URL'];
-  if (configured && configured.length > 0) return configured.replace(/\/+$/, '');
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error(
-      'NEXT_PUBLIC_SITE_URL is required in production (customer-facing links would point at localhost)',
-    );
-  }
-  return 'http://localhost:3000';
-}
 import { prisma } from '@/lib/db';
+import { siteUrl } from '@/lib/siteUrl';
 import { decryptCode } from '@/lib/crypto/giftCode';
 import { enqueueEmail, scheduleOutboxDrain } from '@/lib/email/outbox';
 import { orderConfirmationTemplate } from '@/lib/email/templates';
@@ -60,7 +43,12 @@ export async function enqueueCodeDeliveryEmail(
     confirmationUuid: string;
     orderNumber: string;
     customerEmail: string;
-    items: Array<{ productNameTh: string; denominationThb: unknown; quantity: number }>;
+    items: Array<{
+      id: string;
+      productNameTh: string;
+      denominationThb: unknown;
+      quantity: number;
+    }>;
     subtotalThb: unknown;
     vatAmountThb: unknown;
     vatEnabled?: boolean;
@@ -70,19 +58,36 @@ export async function enqueueCodeDeliveryEmail(
   /** Plaintext codes allocated by the fulfilment transaction — the whole
    * point of this email (production review HIGH-1: the payload used to drop
    * them, so customers paid and received nothing by mail). */
-  delivered: { code: string; productName: string; denomination: number }[],
+  delivered: Array<{
+    /** The order line this code was allocated for (see DeliveredCode). */
+    orderItemId?: string;
+    code: string;
+    productName: string;
+    denomination: number;
+  }>,
 ): Promise<void> {
   // HIGH-1: the order page resolves by confirmationUuid, not by internal id —
   // the old /orders/<id> link 404'd for every customer.
   const confirmationUrl = `${siteUrl()}/orders/${order.confirmationUuid}`;
-  // Match allocated codes to their order line (product name + denomination)
-  // and render one code row per unit — every purchased code appears exactly
-  // once in the email.
+  // Attribute each code to the LINE it was allocated for (review 2026-11-06).
+  // Matching by product name + denomination mislabelled any product that has
+  // two variants at the same price: every line listed every code, so the mail
+  // showed the same code twice and a customer could not tell which line a code
+  // belonged to. The fulfilment transaction now stamps `orderItemId` on each
+  // delivered code, and that is the match.
+  //
+  // Callers that pass no ids (template-level tests) keep the old name+price
+  // match: without ids there is nothing better to use, and those callers
+  // render a single line.
+  const hasItemIds = delivered.every((d) => typeof d.orderItemId === 'string');
   const lines = order.items.map((item) => {
-    const mine = delivered.filter(
-      (d) =>
-        d.productName === item.productNameTh && d.denomination === Number(item.denominationThb),
-    );
+    const mine = hasItemIds
+      ? delivered.filter((d) => d.orderItemId === item.id)
+      : delivered.filter(
+          (d) =>
+            d.productName === item.productNameTh &&
+            d.denomination === Number(item.denominationThb),
+        );
     return {
       productNameTh: item.productNameTh,
       denomination: Number(item.denominationThb),
@@ -109,6 +114,14 @@ export async function enqueueCodeDeliveryEmail(
     html: template.html,
     tx,
   });
+}
+
+/** A delivered code as carried INSIDE the transaction, tied to its order line. */
+export interface DeliveredCode {
+  orderItemId: string;
+  code: string;
+  productName: string;
+  denomination: number;
 }
 
 export interface FulfilmentResult {
@@ -139,10 +152,8 @@ export async function fulfilOrder(
   if (order.status === 'completed') return { success: false, error: 'ALREADY_FULFILLED' };
 
   try {
-    const run = async (
-      tx: PrismaTx,
-    ): Promise<{ code: string; productName: string; denomination: number }[]> => {
-      const delivered: { code: string; productName: string; denomination: number }[] = [];
+    const run = async (tx: PrismaTx): Promise<DeliveredCode[]> => {
+      const delivered: DeliveredCode[] = [];
 
       for (const item of order.items) {
         const needed = item.quantity;
@@ -180,6 +191,7 @@ export async function fulfilOrder(
           });
           if (updated.count !== 1) throw new Error('INSUFFICIENT_STOCK'); // lost the race
           delivered.push({
+            orderItemId: item.id,
             code: decryptCode(c.codeEncrypted, c.nonce, c.keyVersion),
             productName: item.productNameTh,
             denomination: Number(item.denominationThb),
@@ -240,7 +252,17 @@ export async function fulfilOrder(
     // Standalone callers keep the original single-transaction behaviour;
     // a supplied tx (webhook path) joins the caller's transaction instead.
     const result = tx === prisma ? await prisma.$transaction((t) => run(t)) : await run(tx);
-    return { success: true, codes: result };
+    // The line id stays internal: `codes` is part of the API response and
+    // its shape is asserted by callers/tests, so strip it back to the
+    // original three fields.
+    return {
+      success: true,
+      codes: result.map(({ code, productName, denomination }) => ({
+        code,
+        productName,
+        denomination,
+      })),
+    };
   } catch (err) {
     const msg = err instanceof Error ? err.message : '';
     if (msg === 'INSUFFICIENT_STOCK') {

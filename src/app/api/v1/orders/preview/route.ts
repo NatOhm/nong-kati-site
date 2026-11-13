@@ -40,6 +40,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           }))
         : [],
       ...(typeof b['couponCode'] === 'string' ? { couponCode: b['couponCode'] as string } : {}),
+      // Cart price refresh: a deleted/out-of-stock line drops out instead of
+      // throwing, so the rest of the cart still gets today's prices.
+      ...(b['tolerant'] === true ? { tolerant: true } : {}),
     });
 
     return NextResponse.json(result, { status: 200 });

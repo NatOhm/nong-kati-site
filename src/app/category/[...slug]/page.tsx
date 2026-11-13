@@ -106,6 +106,17 @@ export default async function CategoryPage({
   let products: Awaited<ReturnType<typeof getProductsByCategory>>['products'] = [];
   let total = 0;
   let dbDown = false;
+
+  // The shell and the grid are independent queries (both keyed by the slug
+  // path), so start the grid now and await it after the shell. Sequential
+  // awaits cost two remote-MySQL round trips before first byte — the slow
+  // category page the client reported (2026-11-13). The promise is settled
+  // immediately so an unknown category (notFound below) leaves no unhandled
+  // rejection behind.
+  const productsPromise = getProductsByCategory(slugPath, page, PAGE_SIZE, sort, availableOnly)
+    .then((value) => ({ ok: true as const, value }))
+    .catch(() => ({ ok: false as const }));
+
   try {
     result = await getCategoryBySlug(slugPath);
   } catch {
@@ -131,17 +142,11 @@ export default async function CategoryPage({
     );
   }
   if (!result) notFound();
-  try {
-    const catResult = await getProductsByCategory(
-      slugPath,
-      page,
-      PAGE_SIZE,
-      sort,
-      availableOnly,
-    );
-    products = catResult.products;
-    total = catResult.total;
-  } catch {
+  const catResult = await productsPromise;
+  if (catResult.ok) {
+    products = catResult.value.products;
+    total = catResult.value.total;
+  } else {
     // Catalogue query failed — the category shell still renders; grid falls
     // back to its own empty state. The sort/pager controls are hidden in
     // this state for the same reason the search page hides them (audit #6):

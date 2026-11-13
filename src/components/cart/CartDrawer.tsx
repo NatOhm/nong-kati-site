@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { X, ShoppingCart } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { useVatConfig } from '@/hooks/useVatConfig';
 import { CartItem } from './CartItem';
 import { CartSummary } from './CartSummary';
 import { EmptyCart } from './EmptyCart';
@@ -35,24 +36,14 @@ export function CartDrawer({
 
   // Fade-out: keep mounted through the 250ms exit, then unmount for real.
   const [closing, setClosing] = useState(false);
-  const [vatConfig, setVatConfig] = useState({ enabled: false, rate: 0 });
+  // Shared across the page — this component used to fetch the same config
+  // again on every mount.
+  const vatConfig = useVatConfig();
   const subtotal = useMemo(
     () => items.reduce((sum, item) => sum + item.unitPriceThb * item.quantity, 0),
     [items],
   );
   const vat = calculateVatFromInclusive(subtotal, vatConfig);
-  useEffect(() => {
-    let cancelled = false;
-    fetch('/api/v1/orders/vat')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((config: { enabled?: boolean; rate?: number } | null) => {
-        if (!cancelled && config) {
-          setVatConfig({ enabled: config.enabled === true, rate: Number(config.rate) || 0 });
-        }
-      })
-      .catch(() => undefined);
-    return () => { cancelled = true; };
-  }, []);
   useEffect(() => {
     if (isOpen) setClosing(false);
   }, [isOpen]);

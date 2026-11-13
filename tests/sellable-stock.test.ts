@@ -14,6 +14,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { resolveOrderPricing } from '@/lib/promotions';
+import { mergeCartPrices } from '@/lib/cartRefresh';
 import { sellableStock } from '@/lib/stock';
 
 describe('sellableStock', () => {
@@ -100,5 +101,112 @@ describe('resolveOrderPricing — deliverable stock', () => {
     await expect(
       resolveOrderPricing({ items: [{ variantId: 'variant-1', quantity: 3 }] }, db),
     ).rejects.toThrow('OUT_OF_STOCK');
+  });
+});
+
+/**
+ * Cart refresh (client feedback 2026-11-13): a stored cart kept the price it
+ * was added at, so an admin price edit never reached it. The refresh asks the
+ * shared pricing resolver in tolerant mode — an out-of-stock or deleted line
+ * must not blank the whole price list.
+ */
+describe('resolveOrderPricing — cart-refresh mode', () => {
+  it('keeps resolving an out-of-stock line instead of throwing', async () => {
+    const db = pricingDb(10, 0);
+
+    const resolved = await resolveOrderPricing(
+      { items: [{ variantId: 'variant-1', quantity: 1 }] },
+      db,
+      { tolerateUnavailable: true },
+    );
+
+    expect(resolved.quantityMap.get('variant-1')).toBe(1);
+    expect(resolved.sellableByVariant.get('variant-1')).toBe(0);
+  });
+
+  it('drops a variant that no longer exists rather than failing the refresh', async () => {
+    const db = pricingDb(10, 5);
+
+    const resolved = await resolveOrderPricing(
+      {
+        items: [
+          { variantId: 'variant-1', quantity: 1 },
+          { variantId: 'deleted-variant', quantity: 1 },
+        ],
+      },
+      db,
+      { tolerateUnavailable: true },
+    );
+
+    expect([...resolved.quantityMap.keys()]).toEqual(['variant-1']);
+  });
+
+  it('still refuses a missing variant when the caller did not opt in', async () => {
+    const db = pricingDb(10, 5);
+
+    await expect(
+      resolveOrderPricing({ items: [{ variantId: 'deleted-variant', quantity: 1 }] }, db),
+    ).rejects.toThrow('VARIANT_NOT_FOUND');
+  });
+});
+
+describe('mergeCartPrices', () => {
+  const baseItem = {
+    id: 'cart-1',
+    variantId: 'variant-1',
+    skuCode: 'slug-variant-1',
+    productNameTh: 'Test product',
+    productNameEn: 'Test product',
+    productSlug: 'test',
+    thumbnailUrl: null,
+    denominationThb: 1,
+    unitPriceThb: 1,
+    vatAmountThb: 0,
+    quantity: 2,
+    lineTotalThb: 2,
+    inStock: true,
+    availableQuantity: 5,
+    maxQuantity: 5,
+  };
+
+  it('replaces the stored price with the current server price', () => {
+    const merged = mergeCartPrices([baseItem], [
+      { variantId: 'variant-1', unitPriceThb: 50, tierUnitPriceThb: 50, availableQuantity: 5 },
+    ]);
+
+    expect(merged[0]?.unitPriceThb).toBe(50);
+    expect(merged[0]?.lineTotalThb).toBe(100);
+    expect(merged[0]?.denominationThb).toBe(50);
+  });
+
+  it('carries the package label so variants are distinguishable', () => {
+    const merged = mergeCartPrices([baseItem], [
+      {
+        variantId: 'variant-1',
+        unitPriceThb: 50,
+        variantLabel: '1 เดือน',
+        availableQuantity: 5,
+      },
+    ]);
+
+    expect(merged[0]?.variantLabel).toBe('1 เดือน');
+  });
+
+  it('marks a line the server no longer returns as unavailable but keeps it', () => {
+    const merged = mergeCartPrices([baseItem], []);
+
+    expect(merged).toHaveLength(1);
+    expect(merged[0]?.inStock).toBe(false);
+    expect(merged[0]?.availableQuantity).toBe(0);
+    expect(merged[0]?.productNameTh).toBe('Test product');
+  });
+
+  it('returns the same array when nothing changed (no state churn)', () => {
+    const items = [baseItem];
+    const merged = mergeCartPrices(items, [
+      { variantId: 'variant-1', unitPriceThb: 1, tierUnitPriceThb: 1, availableQuantity: 5 },
+    ]);
+
+    expect(merged).toBe(items);
   });
 });

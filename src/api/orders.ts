@@ -282,6 +282,10 @@ export interface PreviewOrderResult {
     promotionName: string | null;
     promotionType: string | null;
     promotionValue: number | null;
+    /** Package label ("1 เดือน") — the cart needs it to tell variants apart. */
+    variantLabel: string;
+    /** Deliverable units right now, for the cart's stock/limit display. */
+    availableQuantity: number;
   }>;
 }
 
@@ -299,6 +303,8 @@ export async function previewOrder(input: {
   customerId?: string | null;
   items: { variantId: string; quantity: number }[];
   couponCode?: string;
+  /** Cart refresh: skip unavailable lines instead of failing the whole call. */
+  tolerant?: boolean;
 }): Promise<PreviewOrderResult> {
   if (input.customerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.customerEmail)) {
     throw new Error('INVALID_EMAIL');
@@ -313,6 +319,7 @@ export async function previewOrder(input: {
   const resolved = await resolveOrderPricing(
     { items: input.items, customerId: input.customerId, couponCode: input.couponCode },
     prisma,
+    input.tolerant === true ? { tolerateUnavailable: true } : {},
   );
 
   const pricing = calculateReconciledOrderPricing(
@@ -359,6 +366,8 @@ export async function previewOrder(input: {
       promotionName: s.promotionName,
       promotionType: s.promotionType,
       promotionValue: s.promotionValue,
+      variantLabel: resolved.byId.get(s.variantId)?.label ?? '',
+      availableQuantity: resolved.sellableByVariant.get(s.variantId) ?? 0,
     })),
   };
 }

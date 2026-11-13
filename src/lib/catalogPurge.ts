@@ -28,8 +28,9 @@
  * Guard policy (client-approved 2026-10-13 — "looser"):
  *  - Deleting a product that appears in HISTORICAL orders is ALLOWED.
  *  - We refuse only genuinely dangerous in-flight state:
- *      • a variant referenced by an order in pending_payment / paid /
- *        fulfilling (the sale is still being served); or
+ *      • a variant referenced by an order in pending_payment /
+ *        payment_confirmed / pending_manual_fulfilment (the sale is still
+ *        being served); or
  *      • a gift code currently reserved/delivered that has NO order to fall
  *        back on (we cannot prove what the customer paid for).
  *
@@ -38,8 +39,18 @@
 import { prisma } from '@/lib/db';
 import { writeAuditLog, type AuditTx } from '@/lib/auditLog';
 
-/** Order states where a still-referenced variant means a live, unfinished sale. */
-const LIVE_ORDER_STATUSES = ['pending_payment', 'paid', 'fulfilling'];
+/**
+ * Order states where a still-referenced variant means a live, unfinished sale.
+ *
+ * These must be the statuses this app actually WRITES: 'pending_payment'
+ * (checkout), 'payment_confirmed' (money in, codes not delivered yet) and
+ * 'pending_manual_fulfilment' (delivery failed, parked for an operator). The
+ * previous list carried 'paid' and 'fulfilling' — strings no code path ever
+ * writes — and omitted 'payment_confirmed', so a customer who had ALREADY paid
+ * did not block a purge of the variant they bought. A test mocking 'paid' hid
+ * exactly that (review 2026-11-06).
+ */
+const LIVE_ORDER_STATUSES = ['pending_payment', 'payment_confirmed', 'pending_manual_fulfilment'];
 
 export type PurgeActor = { sub: string; email: string };
 

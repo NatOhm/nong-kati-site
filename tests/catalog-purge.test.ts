@@ -315,7 +315,8 @@ describe('fulfilOrder — detached (purged) order line', () => {
     prismaMock.order.findUnique.mockResolvedValue({
       id: 'ord_1',
       orderNumber: 'NK-2026-000071',
-      status: 'paid',
+      // A real status: 'paid' is a string this app never writes.
+      status: 'payment_confirmed',
       items: [
         {
           id: 'oi_1',

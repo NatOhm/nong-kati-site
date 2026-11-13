@@ -570,27 +570,31 @@ export async function getProductsByCategory(
 }
 
 export async function getProductBySlug(slug: string): Promise<ProductItem | null> {
-  const p = await prisma.product.findUnique({
-    where: { slug, isActive: true },
-    include: {
-      category: { select: { id: true, name: true, slug: true } },
-      variants: {
-        where: { isActive: true },
-        orderBy: { sortOrder: 'asc' },
-        // Deliverable units, so the stock badge and quantity cap match what
-        // the pricing resolver accepts (a manual restock with no codes must
-        // not advertise stock).
-        include: { _count: { select: { giftCodes: { where: { status: 'available' } } } } },
+  // The product row and the request's price tier are independent — running
+  // them in parallel saves one remote-MySQL round trip (~200 ms) on every
+  // product page (client ask 2026-11-13: "ทำไงให้เว็บมันเปิดไว ๆ").
+  const [p, tier] = await Promise.all([
+    prisma.product.findUnique({
+      where: { slug, isActive: true },
+      include: {
+        category: { select: { id: true, name: true, slug: true } },
+        variants: {
+          where: { isActive: true },
+          orderBy: { sortOrder: 'asc' },
+          // Deliverable units, so the stock badge and quantity cap match what
+          // the pricing resolver accepts (a manual restock with no codes must
+          // not advertise stock).
+          include: { _count: { select: { giftCodes: { where: { status: 'available' } } } } },
+        },
+        aliases: true,
+        tags: { include: { tag: true } },
       },
-      aliases: true,
-      tags: { include: { tag: true } },
-    },
-  });
+    }),
+    resolveTier(),
+  ]);
 
   if (!p) return null;
-  return (
-    (await decoratePromotionPrices([mapProduct(p, p.category, await resolveTier())]))[0] ?? null
-  );
+  return (await decoratePromotionPrices([mapProduct(p, p.category, tier)]))[0] ?? null;
 }
 
 export async function getAllProductSlugs(): Promise<string[]> {

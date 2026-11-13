@@ -13,7 +13,7 @@
  * percent-encoded product URLs. A loopback value is now treated as unset, at
  * build time, so the wrong origin cannot ship at all.
  *
- * (Email links use the stricter fail-closed `siteUrl()` in lib/fulfilment.ts
+ * (Email links use the stricter fail-closed `siteUrl()` in lib/siteUrl.ts
  * instead — customer mail must never carry a guessed domain in production.)
  */
 const PRODUCTION_ORIGIN = 'https://nongkatistore.com';

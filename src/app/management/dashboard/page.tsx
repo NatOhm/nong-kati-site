@@ -23,6 +23,7 @@ import {
   Eye,
   ChevronRight,
   Activity,
+  RefreshCw,
 } from 'lucide-react';
 import { AdminShell } from '@/components/layout/AdminShell';
 import {
@@ -233,22 +234,47 @@ const EMPTY: DashboardData = {
 export default function AdminDashboardPage(): React.JSX.Element {
   const [data, setData] = useState<DashboardData>(EMPTY);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'today' | 'week' | 'month'>('today');
 
   const load = useCallback(async () => {
     try {
       const d = await adminJson<DashboardData>('/api/v1/admin/dashboard');
       setData(d);
+      setLastUpdated(Date.now());
     } catch {
       // keep zeros on failure — page still renders
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  // The numbers used to be fetched once per visit: a dashboard left open on a
+  // second monitor kept showing the morning's totals (client feedback
+  // 2026-11-13 — "ยังมีข้อมูลเก่า ๆ อยู่ป้ะ"). Poll once a minute while the tab
+  // is visible, and refresh immediately when it comes back into view.
+  useEffect(() => {
+    const tick = (): void => {
+      if (document.visibilityState === 'visible') void load();
+    };
+    const id = window.setInterval(tick, 60_000);
+    document.addEventListener('visibilitychange', tick);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener('visibilitychange', tick);
+    };
+  }, [load]);
+
+  const refresh = (): void => {
+    setRefreshing(true);
+    void load();
+  };
 
   const sales = data.sales;
   const revenue = data.revenue;
@@ -278,8 +304,27 @@ export default function AdminDashboardPage(): React.JSX.Element {
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
           <div className="min-w-0">
             <h1 className="text-2xl font-bold text-fg">แดชบอร์ด</h1>
-            <p className="mt-1 text-sm text-fg-placeholder">
-              ภาพรวมระบบ Nong-Kati · อัปเดตล่าสุด เมื่อสักครู่
+            <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-fg-placeholder">
+              <span>ภาพรวมระบบ Nong-Kati</span>
+              {lastUpdated !== null && (
+                <span>
+                  · อัปเดตล่าสุด{' '}
+                  {new Date(lastUpdated).toLocaleTimeString('th-TH', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false,
+                  })}
+                  น.
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={refresh}
+                disabled={refreshing}
+                className="inline-flex items-center gap-1 rounded-full border border-line-subtle px-2.5 py-0.5 text-xs font-medium text-fg-secondary hover:bg-surface-elevated disabled:opacity-60"
+              >
+                <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} /> รีเฟรช
+              </button>
             </p>
           </div>
           <div className="flex items-center gap-1 rounded-lg border border-line-subtle bg-surface p-1">

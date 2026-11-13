@@ -718,6 +718,7 @@ interface resolvedVariant {
 export async function resolveOrderPricing(
   input: ResolveOrderPricingInput,
   db: Prisma.TransactionClient | PrismaClient = prisma,
+  options: { tolerateUnavailable?: boolean } = {},
 ): Promise<ResolvedOrderPricing> {
   const variants = await db.productVariant.findMany({
     where: { id: { in: input.items.map((i) => i.variantId) }, isActive: true },
@@ -730,6 +731,14 @@ export async function resolveOrderPricing(
     v.memberPrice = v.memberPrice != null ? Number(v.memberPrice) : null;
     v.dealerPrice = v.dealerPrice != null ? Number(v.dealerPrice) : null;
   }
+
+  // Cart-refresh mode: the caller is re-pricing a *stored* cart, so a line
+  // whose variant was deleted or deactivated must drop out instead of failing
+  // the whole refresh (the cart shows it as unavailable). Checkout never uses
+  // this mode — order creation still requires every line to resolve.
+  const items = options.tolerateUnavailable
+    ? input.items.filter((i) => byId.has(i.variantId))
+    : input.items;
 
   // Deliverable units, not the staff-editable stock number. `stock` can be
   // raised by เติมสต็อก without uploading a single code, so checking it alone
@@ -755,7 +764,7 @@ export async function resolveOrderPricing(
   // Aggregate raw input once: combine duplicate variant IDs, validate the
   // combined quantity and stock against the aggregate.
   const quantityMap = new Map<string, number>();
-  for (const item of input.items) {
+  for (const item of items) {
     const existing = quantityMap.get(item.variantId) ?? 0;
     quantityMap.set(item.variantId, existing + item.quantity);
   }
@@ -775,7 +784,7 @@ export async function resolveOrderPricing(
     if (!Number.isInteger(qty) || qty < 1 || qty > 50) {
       throw new Error('INVALID_QUANTITY');
     }
-    if ((sellableByVariant.get(v.id) ?? 0) < qty) {
+    if ((sellableByVariant.get(v.id) ?? 0) < qty && !options.tolerateUnavailable) {
       throw new Error('OUT_OF_STOCK');
     }
     const unit = tierPrice(Number(v.price), tier, {

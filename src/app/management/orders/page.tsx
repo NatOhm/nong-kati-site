@@ -128,6 +128,8 @@ export default function AdminOrdersPage(): React.JSX.Element {
   const [refundCategory, setRefundCategory] = useState('other');
   const [refundDetail, setRefundDetail] = useState('');
   const [refundVoidCodes, setRefundVoidCodes] = useState(true);
+  // คืนเป็นเครดิตเข้ากระเป๋าลูกค้าแทนการคืนผ่านเกตเวย์ (client ask 2026-11-13).
+  const [refundToCredit, setRefundToCredit] = useState(false);
   /** Newest load() wins: its AbortController supersedes any in-flight one. */
   const loadAbortRef = useRef<AbortController | null>(null);
   /** Draft inputs vs applied filters — search runs on Enter/ค้นหา only. */
@@ -285,13 +287,16 @@ export default function AdminOrdersPage(): React.JSX.Element {
             reasonCategory: refundCategory,
             reasonDetail: refundDetail.trim() || undefined,
             voidCodes: refundVoidCodes,
+            refundToCredit,
           }),
         },
       );
       setActionMessage(
         `บันทึกการคืนเงินแล้ว — void โค้ด ${res.data.codesVoided} รายการ` +
-          (refundVoidCodes ? '' : ' (ไม่ได้ void โค้ด)'),
+          (refundVoidCodes ? '' : ' (ไม่ได้ void โค้ด)') +
+          (refundToCredit ? ' · เพิ่มเครดิตเข้ากระเป๋าลูกค้าแล้ว' : ''),
       );
+      setRefundToCredit(false);
       setRefundRef('');
       setRefundAmount('');
       setRefundDetail('');
@@ -308,8 +313,10 @@ export default function AdminOrdersPage(): React.JSX.Element {
               ? 'ยอดคืนเงินต้องเป็นตัวเลขมากกว่า 0'
               : msg.includes('ALREADY_REFUNDED')
                 ? 'ออเดอร์นี้คืนเงินไปแล้ว'
-                : msg.includes('NOT_REFUNDABLE')
-                  ? 'คืนเงินได้เฉพาะออเดอร์ที่ส่งมอบสำเร็จแล้วเท่านั้น'
+                : msg.includes('NO_CUSTOMER_FOR_CREDIT')
+                  ? 'ออเดอร์นี้ไม่มีบัญชีลูกค้า — คืนเป็นเครดิตไม่ได้'
+                  : msg.includes('NOT_REFUNDABLE')
+                    ? 'คืนเงินได้เฉพาะออเดอร์ที่ส่งมอบสำเร็จแล้วเท่านั้น'
                   : msg.includes('FORBIDDEN') || msg.includes('INSUFFICIENT_PERMISSIONS')
                     ? 'ไม่มีสิทธิ์คืนเงิน'
                     : 'บันทึกการคืนเงินไม่สำเร็จ กรุณาลองใหม่',
@@ -839,19 +846,36 @@ export default function AdminOrdersPage(): React.JSX.Element {
                   </div>
 
                   <div className="mt-3 space-y-3">
+                    <label className="flex items-start gap-2 rounded-md border border-line-subtle p-3 text-xs text-fg-secondary">
+                      <input
+                        type="checkbox"
+                        checked={refundToCredit}
+                        onChange={(e) => setRefundToCredit(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 accent-peach-600"
+                      />
+                      <span>
+                        <strong className="block text-fg">คืนเป็นเครดิตเข้ากระเป๋าลูกค้า</strong>
+                        ไม่ต้องคืนผ่านเกตเวย์ — ระบบจะเพิ่มเครดิตและบันทึกในประวัติการเดินเงินของลูกค้าให้เอง
+                      </span>
+                    </label>
+
                     <div>
                       <label
                         htmlFor="refund-gateway-ref"
                         className="mb-1 block text-xs font-medium text-fg-secondary"
                       >
-                        หมายเลขอ้างอิงจากเกตเวย์ (จำเป็น)
+                        {refundToCredit
+                          ? 'หมายเลขอ้างอิงจากเกตเวย์ (ไม่บังคับเมื่อคืนเป็นเครดิต)'
+                          : 'หมายเลขอ้างอิงจากเกตเวย์ (จำเป็น)'}
                       </label>
                       <input
                         id="refund-gateway-ref"
                         type="text"
                         value={refundRef}
                         onChange={(e) => setRefundRef(e.target.value)}
-                        placeholder="เช่น re_test_xxxxxxxxxx"
+                        placeholder={
+                          refundToCredit ? 'เว้นว่างได้' : 'เช่น re_test_xxxxxxxxxx'
+                        }
                         className="w-full rounded-md border border-line bg-surface px-3 py-2.5 font-mono text-sm text-fg focus:ring-2 focus:ring-peach-500"
                       />
                     </div>

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { checkPermission } from '@/lib/rbac';
 import { getAdminToken } from '@/lib/adminRequest';
+import { WALLET_METHOD_LABEL } from '@/lib/walletCredit';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,17 +13,12 @@ function bearer(req: NextRequest): string | null {
   return token;
 }
 
-const METHOD_TH: Record<string, string> = {
-  promptpay: 'พร้อมเพย์',
-  credit_card: 'บัตรเครดิต',
-  admin_credit: 'แอดมินเพิ่มเครดิต',
-  slip: 'สลิปโอนเงิน',
-  wallet_spend: 'ใช้เครดิตซื้อสินค้า',
-};
+const METHOD_TH: Record<string, string> = WALLET_METHOD_LABEL;
 
 /**
  * GET /api/v1/admin/topups — customer top-up history (topups:read).
- * Query: ?status=all|pending|completed|failed (default all), ?take=1-200.
+ * Query: ?status=all|pending|completed|failed (default all), ?type=all|credit|spend,
+ * ?take=1-200.
  * Joined with customer email/name so the queue shows who topped up.
  */
 export async function GET(req: NextRequest): Promise<NextResponse> {
@@ -35,8 +31,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   const url = new URL(req.url);
   const status = url.searchParams.get('status') ?? 'all';
+  // credit = money in (top-ups, admin grants, refunds), spend = wallet debits.
+  // Mixing them made the table read as "top-ups" while showing −฿1 purchase
+  // rows, and the lifetime total beside it looked unrelated to any row.
+  const type = url.searchParams.get('type') ?? 'all';
   const takeRaw = Number(url.searchParams.get('take') ?? '100');
   const take = Number.isFinite(takeRaw) ? Math.min(Math.max(Math.trunc(takeRaw), 1), 200) : 100;
+  const typeFilter =
+    type === 'credit' ? { amountThb: { gt: 0 } } : type === 'spend' ? { amountThb: { lt: 0 } } : {};
 
   // Review [High]: full identity requires customers:read:full. Roles with
   // only topups:read (support_agent) get masked emails and no full names.
@@ -45,7 +47,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     canSeeFullPii ? email : email.replace(/^(.).*(@.*)$/, (_m, a, b) => `${a}***${b as string}`);
 
   const logs = await prisma.topUpLog.findMany({
-    where: status === 'all' ? {} : { status },
+    where: { ...typeFilter, ...(status === 'all' ? {} : { status }) },
     orderBy: { createdAt: 'desc' },
     take,
     include: {
@@ -53,9 +55,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     },
   });
 
+  // The summary now follows the applied type filter, so the number beside the
+  // table always describes the rows being looked at.
   const [totals] = await Promise.all([
     prisma.topUpLog.aggregate({
-      where: { status: 'completed', amountThb: { gt: 0 } },
+      where: {
+        status: 'completed',
+        ...(type === 'spend' ? { amountThb: { lt: 0 } } : { amountThb: { gt: 0 } }),
+      },
       _sum: { amountThb: true },
       _count: true,
     }),
@@ -75,7 +82,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       status: t.status,
     })),
     summary: {
-      completedTotal: totals._sum.amountThb === null ? 0 : Number(totals._sum.amountThb),
+      completedTotal:
+        totals._sum.amountThb === null ? 0 : Math.abs(Number(totals._sum.amountThb)),
       completedCount: totals._count,
       pendingCount: pending,
     },

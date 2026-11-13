@@ -13,6 +13,10 @@ export interface CartItemData {
   productNameTh: string;
   productNameEn: string;
   productSlug: string;
+  /** Package label of the chosen variant (e.g. "1 เดือน"); without it the
+   *  cart showed three identical product rows with only the price differing
+   *  (client feedback 2026-11-13). */
+  variantLabel?: string;
   thumbnailUrl: string | null;
   denominationThb: number;
   unitPriceThb: number;

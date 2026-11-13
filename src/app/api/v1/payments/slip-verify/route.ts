@@ -11,6 +11,13 @@ import {
 import { fulfilOrder, scheduleOutboxDrain } from '@/lib/fulfilment';
 import { getDeliveredCodes } from '@/lib/delivery/customerCodes';
 import { recordPaymentReconciliation } from '@/lib/paymentReconciliation';
+import {
+  CONFIRM_TX_ATTEMPTS,
+  CONFIRM_TX_MAX_WAIT_MS,
+  CONFIRM_TX_RETRY_DELAY_MS,
+  CONFIRM_TX_TIMEOUT_MS,
+  PARK_TX_TIMEOUT_MS,
+} from '@/lib/slipConfirmBudget';
 import { getClientIp, checkRateLimit } from '@/lib/rateLimit';
 import { isSlip2GoEnabled, verifySlip2Go } from '@/lib/payment/slip2go';
 import { checkReceiverMatch, storeReceiverDigits } from '@/lib/payment/receiverPolicy';
@@ -21,30 +28,6 @@ export const dynamic = 'force-dynamic';
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // SlipOK accepts up to ~10MB; we cap tighter
 
-/**
- * Budget for the confirmation transaction (attempt → claim → fulfil → outbox).
- *
- * Prisma's interactive-transaction default is 5s, which this path does not
- * fit: on a cold Passenger worker the whole confirmation measured ~18.6s
- * end to end (order NK-2026-000183, 2026-11-01). The provider had already
- * answered OK, the transaction expired mid-flight (P2028) and the customer
- * got a 500 while the order stayed pending. Sized for that latency with
- * headroom; `maxWait` is the separate pool-acquisition budget a cold worker
- * also spends.
- */
-const CONFIRM_TX_TIMEOUT_MS = 30_000;
-const CONFIRM_TX_MAX_WAIT_MS = 10_000;
-/** The parking transaction only writes three rows — it needs far less. */
-const PARK_TX_TIMEOUT_MS = 10_000;
-/**
- * One automatic retry. P2028 (transaction expired/closed) and P2034 (write
- * conflict) both mean the transaction rolled back entirely, so running it
- * again cannot double-deliver: the pending→confirmed claim inside it is still
- * the only gate. A second POST of the same slip still answers
- * ORDER_NOT_PAYABLE — this is not a second delivery path.
- */
-const CONFIRM_TX_ATTEMPTS = 2;
-const CONFIRM_TX_RETRY_DELAY_MS = 250;
 
 function prismaErrorCode(e: unknown): string | null {
   const code = (e as { code?: unknown } | null)?.code;

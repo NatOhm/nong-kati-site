@@ -113,6 +113,36 @@ describe('GET /api/v1/wallet — เติมเงินในเดือน�
     });
   });
 
+  it('W4: a pending bank-transfer top-up stays visible and carries its slip flag', async () => {
+    authed();
+    prismaMock.topUpLog.findMany.mockResolvedValue([
+      {
+        id: 't9',
+        amountThb: '300.00',
+        method: 'bank_transfer',
+        status: 'pending',
+        reference: '/api/v1/payments/slip-download/abcdefabcdefabcdefabcdefabcdef12',
+        createdAt: new Date('2026-11-13T02:00:00.000Z'),
+      },
+    ]);
+
+    const res = await GET(request());
+    const body = (await res.json()) as {
+      topups: { status: string; hasSlip: boolean; method: string }[];
+    };
+
+    expect(res.status).toBe(200);
+    expect(body.topups[0]).toMatchObject({
+      status: 'pending',
+      hasSlip: true,
+      method: 'bank_transfer',
+    });
+    // The ledger query must not hide unapproved rows behind status:'completed'.
+    expect(prismaMock.topUpLog.findMany.mock.calls[0]?.[0]).toMatchObject({
+      where: { customerId: 'cust-1' },
+    });
+  });
+
   it('W3: no session cookie is a 401, never a zeroed wallet', async () => {
     const res = await GET(request(false));
     expect(res.status).toBe(401);

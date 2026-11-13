@@ -9,6 +9,7 @@ import {
   calculateCartSummary,
   getEmptyCart,
 } from '@/lib/cart';
+import { mergeCartPrices, type ServerPricedLine } from '@/lib/cartRefresh';
 
 /**
  * Cart state lives in ONE provider instance mounted at the root layout, so every
@@ -71,6 +72,11 @@ export function CartProvider({ children }: { children: React.ReactNode }): React
   const [cart, setCart] = useState<CartState | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const lastWrittenJsonRef = useRef<string | null>(null);
+  // Latest committed cart, readable from async callbacks without re-creating them.
+  const cartRef = useRef<CartState | null>(null);
+  // Price refresh is throttled: focus/visibility fire in bursts, and every
+  // refresh is a server round trip.
+  const lastRefreshRef = useRef(0);
 
   // Hydrate from localStorage on mount
   useEffect(() => {
@@ -85,6 +91,70 @@ export function CartProvider({ children }: { children: React.ReactNode }): React
     setCart(getEmptyCart());
     setIsLoaded(true);
   }, []);
+
+  // Keep the ref in step for refreshPrices (declared once, never re-created).
+  useEffect(() => {
+    cartRef.current = cart;
+  }, [cart]);
+
+  /**
+   * Re-price the stored cart against the server.
+   *
+   * Items live in localStorage with the price they had when they were added,
+   * so an admin price edit never reached an existing cart (client report:
+   * ฿1 → ฿50 stayed ฿1 in the drawer and the checkout summary). The preview
+   * endpoint is the same pricing resolver order creation uses, requested in
+   * tolerant mode so one unavailable line cannot blank the whole refresh.
+   */
+  const refreshPrices = useCallback(async () => {
+    const current = cartRef.current;
+    if (!current || current.items.length === 0) return;
+    if (Date.now() - lastRefreshRef.current < 15_000) return;
+    lastRefreshRef.current = Date.now();
+
+    let lines: ServerPricedLine[] | undefined;
+    try {
+      const res = await fetch('/api/v1/orders/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerEmail: '',
+          tolerant: true,
+          items: current.items.map((i) => ({ variantId: i.variantId, quantity: i.quantity })),
+        }),
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as { items?: ServerPricedLine[] };
+      lines = data.items;
+    } catch {
+      return;
+    }
+    if (!lines) return;
+
+    setCart((prev) => {
+      if (!prev) return prev;
+      const merged = mergeCartPrices(prev.items, lines);
+      if (merged === prev.items) return prev;
+      return { ...prev, items: merged, summary: calculateCartSummary(merged) };
+    });
+  }, []);
+
+  // Refresh once the stored cart is hydrated, and again when the tab is
+  // returned to (an admin may have changed prices while it sat in the
+  // background). Throttled inside refreshPrices.
+  useEffect(() => {
+    if (!isLoaded) return;
+    void refreshPrices();
+    const onVisible = (): void => {
+      if (document.visibilityState === 'visible') void refreshPrices();
+    };
+    window.addEventListener('focus', onVisible);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('focus', onVisible);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [isLoaded, refreshPrices]);
 
   // Persist to localStorage whenever the cart changes
   useEffect(() => {

@@ -186,12 +186,16 @@ describe('admin lockout after expiry (audit #3)', () => {
   });
 
   it('ACTIVE lock is rejected with retryAfter and no counter write', async () => {
+    // The password has to be CORRECT for this answer now: a wrong one gets the
+    // generic INVALID_CREDENTIALS (review 2026-11-06 — the state used to be
+    // revealed before the password was even checked).
+    const passwordHash = await hashPassword(PASSWORD);
     prismaMock.adminUser.findUnique.mockResolvedValue({
       id: 'admin-lock-2',
       email: 'active.admin@test.local',
       fullName: 'Active Lock',
       role: 'support_agent',
-      passwordHash: 'scrypt$16384$8$1$00$00',
+      passwordHash,
       status: 'locked',
       totpConfirmed: false,
       mustChangePassword: false,
@@ -205,6 +209,99 @@ describe('admin lockout after expiry (audit #3)', () => {
     expect(result.error).toBe('ACCOUNT_LOCKED');
     expect(result.retryAfter).toBeGreaterThan(0);
     expect(prismaMock.adminUser.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * No account oracle at login (review 2026-11-06).
+ *
+ * adminLogin used to answer ACCOUNT_DEACTIVATED / ACCOUNT_LOCKED *before*
+ * verifyPassword, so one unauthenticated POST told a stranger that an address
+ * exists and whether it is disabled or locked — a map of which accounts are
+ * worth attacking. The password is now checked first, and only a caller who
+ * already has it can tell those three states apart.
+ */
+describe('admin login reveals account state only after the password', () => {
+  const WRONG = 'definitely-the-wrong-password';
+
+  async function row(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'admin-oracle-1',
+      email: 'oracle.admin@test.local',
+      fullName: 'Oracle Admin',
+      role: 'super_admin',
+      passwordHash: await hashPassword(PASSWORD),
+      status: 'active',
+      totpConfirmed: false,
+      totpSecret: null,
+      mustChangePassword: false,
+      failedLoginAttempts: 0,
+      lockedUntil: null,
+      totpLockedUntil: null,
+      lastLoginAt: null,
+      ...overrides,
+    };
+  }
+
+  it('a WRONG password never mentions the account state (active / deactivated / locked)', async () => {
+    const variants = [
+      { name: 'active', overrides: {} },
+      { name: 'deactivated', overrides: { status: 'deactivated' } },
+      {
+        name: 'locked',
+        overrides: { status: 'locked', lockedUntil: new Date(Date.now() + 10 * 60_000) },
+      },
+    ];
+
+    for (const variant of variants) {
+      vi.clearAllMocks();
+      prismaMock.adminUser.findUnique.mockResolvedValue(await row(variant.overrides));
+
+      const result = await adminLogin('oracle.admin@test.local', WRONG);
+
+      expect(result.success, variant.name).toBe(false);
+      expect(result.error, variant.name).toBe('INVALID_CREDENTIALS');
+      // The whole payload, not just error: no ACCOUNT_* code may leak here.
+      expect(JSON.stringify(result), variant.name).not.toContain('ACCOUNT_');
+    }
+  });
+
+  it('the CORRECT password still gets the specific answers', async () => {
+    // active → a challenge for step 2
+    prismaMock.adminUser.findUnique.mockResolvedValue(await row());
+    const active = await adminLogin('oracle.admin@test.local', PASSWORD);
+    expect(active.success).toBe(true);
+    expect(active.requires2faSetup).toBe(true);
+    expect(active.challengeToken).toBeTruthy();
+
+    // deactivated → the real reason, now that the caller proved the password
+    vi.clearAllMocks();
+    prismaMock.adminUser.findUnique.mockResolvedValue(await row({ status: 'deactivated' }));
+    const deactivated = await adminLogin('oracle.admin@test.local', PASSWORD);
+    expect(deactivated.error).toBe('ACCOUNT_DEACTIVATED');
+
+    // locked → ACCOUNT_LOCKED with the remaining window
+    vi.clearAllMocks();
+    prismaMock.adminUser.findUnique.mockResolvedValue(
+      await row({ status: 'locked', lockedUntil: new Date(Date.now() + 10 * 60_000) }),
+    );
+    const locked = await adminLogin('oracle.admin@test.local', PASSWORD);
+    expect(locked.error).toBe('ACCOUNT_LOCKED');
+    expect(locked.retryAfter).toBeGreaterThan(0);
+  });
+
+  it('a locked account given the WRONG password is not pushed past its lock', async () => {
+    prismaMock.adminUser.findUnique.mockResolvedValue(
+      await row({ status: 'locked', lockedUntil: new Date(Date.now() + 10 * 60_000) }),
+    );
+
+    const result = await adminLogin('oracle.admin@test.local', WRONG);
+
+    expect(result.error).toBe('INVALID_CREDENTIALS');
+    // The increment predicate refuses a live lock, so the lock window stands.
+    const where = prismaMock.adminUser.updateMany.mock.calls[0]?.[0]?.where as CapturedWhere;
+    expect(expectsEligibleExpiredLock(where)).toBe(true);
+    expect(prismaMock.adminUser.update).not.toHaveBeenCalled();
   });
 });
 

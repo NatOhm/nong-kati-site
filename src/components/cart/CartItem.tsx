@@ -10,6 +10,7 @@ export interface CartItemProps {
     id: string;
     variantId: string;
     productNameTh: string;
+    variantLabel?: string;
     denominationThb: number;
     thumbnailUrl: string | null;
     unitPriceThb: number;
@@ -59,6 +60,12 @@ export function CartItem({ item, onUpdateQty, onRemove }: CartItemProps): React.
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="truncate text-sm font-medium text-fg">{item.productNameTh}</p>
+            {/* The package the customer actually picked. Without it a cart
+                holding three variants of one product read as three identical
+                rows (client feedback 2026-11-13). */}
+            {item.variantLabel && (
+              <p className="truncate text-xs text-fg-muted">{item.variantLabel}</p>
+            )}
             <p className="text-xs text-fg-placeholder">
               {item.originalUnitPriceThb && item.originalUnitPriceThb > item.unitPriceThb && (
                 <del className="mr-1">{formatThb(item.originalUnitPriceThb)}</del>

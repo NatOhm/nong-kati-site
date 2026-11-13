@@ -93,6 +93,8 @@ export function ProductDetailClient({
         productNameTh: productName,
         productNameEn: productName,
         productSlug,
+        variantLabel:
+          selectedVariant.label !== 'default' ? selectedVariant.label : 'แพ็กเกจมาตรฐาน',
         thumbnailUrl,
         denominationThb: selectedVariant.effectivePrice,
         unitPriceThb: selectedVariant.promotion?.discountedPriceThb ?? selectedVariant.effectivePrice,

@@ -13,6 +13,8 @@ import { AccountTabs } from '@/components/account/AccountTabs';
 import { useCustomerProfile } from '@/components/layout/CustomerProfileProvider';
 import { HamsterLoader } from '@/components/loading/HamsterLoader';
 import { formatThb } from '@/lib/pricing';
+import { WALLET_METHOD_LABEL } from '@/lib/walletCredit';
+import { cn } from '@/utils/cn';
 
 interface WalletData {
   balanceThb: number;
@@ -22,13 +24,13 @@ interface WalletData {
   topups: { id: string; amountThb: number; method: string; status: string; createdAt: string }[];
 }
 
-const METHOD_LABEL: Record<string, string> = {
-  promptpay: 'พร้อมเพย์',
-  credit_card: 'บัตรเครดิต',
-  manual: 'เจ้าหน้าที่ยืนยัน',
-  bank_transfer: 'โอนผ่านบัญชีธนาคาร',
-  admin_credit: 'แอดมินเติมเครดิต',
+const STATUS_BADGE: Record<string, { label: string; className: string }> = {
+  completed: { label: 'สำเร็จ', className: 'bg-jade-500/15 text-jade-700' },
+  pending: { label: 'รอตรวจสอบ', className: 'bg-topaz-400/20 text-peach-800' },
+  failed: { label: 'ไม่สำเร็จ', className: 'bg-coral-500/15 text-fg-error' },
 };
+
+const METHOD_LABEL: Record<string, string> = WALLET_METHOD_LABEL;
 
 /**
  * "ประวัติการเติมเงิน" lists money IN. The endpoint returns the whole wallet
@@ -112,8 +114,16 @@ export default function ProfilePage(): React.JSX.Element {
                     {METHOD_LABEL[t.method] ?? t.method}
                   </p>
                 </div>
-                <span className="rounded-full bg-jade-500/15 px-2.5 py-0.5 text-xs font-medium text-jade-700">
-                  สำเร็จ
+                <span
+                  className={cn(
+                    'rounded-full px-2.5 py-0.5 text-xs font-medium',
+                    (STATUS_BADGE[t.status] ?? {
+                      label: t.status,
+                      className: 'bg-surface text-fg-muted',
+                    }).className,
+                  )}
+                >
+                  {(STATUS_BADGE[t.status] ?? { label: t.status }).label}
                 </span>
               </div>
             ))}

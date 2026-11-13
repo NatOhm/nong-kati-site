@@ -3,8 +3,8 @@
 import { cn } from '@/utils/cn';
 import { formatThb } from '@/lib/pricing';
 import type { CartItemData } from '@/lib/cart';
-import { useEffect, useState } from 'react';
 import { calculateVatFromInclusive } from '@/lib/pricing';
+import { useVatConfig } from '@/hooks/useVatConfig';
 
 export interface OrderSummaryPanelProps {
   items: CartItemData[];
@@ -33,19 +33,9 @@ export function OrderSummaryPanel({
   collapsed = false,
   className,
 }: OrderSummaryPanelProps): React.JSX.Element {
-  const [vatConfig, setVatConfig] = useState({ enabled: false, rate: 0 });
-  useEffect(() => {
-    let cancelled = false;
-    fetch('/api/v1/orders/vat')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((config: { enabled?: boolean; rate?: number } | null) => {
-        if (!cancelled && config) {
-          setVatConfig({ enabled: config.enabled === true, rate: Number(config.rate) || 0 });
-        }
-      })
-      .catch(() => undefined);
-    return () => { cancelled = true; };
-  }, []);
+  // One shared request for the page (see hooks/useVatConfig) — the old local
+  // fetch duplicated it per mounted consumer.
+  const vatConfig = useVatConfig();
   // Display prices stay inclusive; VAT is informational and never added again.
   const calculatedSubtotal = items.reduce(
     (sum, i) => Math.round((sum + i.unitPriceThb * i.quantity) * 100) / 100,
@@ -96,6 +86,9 @@ export function OrderSummaryPanel({
             {/* Name + quantity */}
             <div className="min-w-0 flex-1">
               <p className="truncate text-xs text-fg">{item.productNameTh}</p>
+              {item.variantLabel && (
+                <p className="truncate text-[11px] text-fg-muted">{item.variantLabel}</p>
+              )}
               <p className="text-xs text-fg-placeholder">× {item.quantity}</p>
             </div>
 

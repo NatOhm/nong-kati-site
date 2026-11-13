@@ -32,8 +32,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         where: { id: session.id },
         select: { walletBalanceThb: true },
       }),
+      // Whole ledger for this customer, pending rows included: a bank-transfer
+      // top-up the admin has not approved yet must still be visible as
+      // "รอตรวจสอบ" instead of vanishing (client feedback 2026-11-13).
       prisma.topUpLog.findMany({
-        where: { customerId: session.id, status: 'completed' },
+        where: { customerId: session.id },
         orderBy: { createdAt: 'desc' },
         take: 20,
       }),
@@ -88,6 +91,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       amountThb: Number(t.amountThb),
       method: t.method,
       status: t.status,
+      // Slip route (if any) so a pending request can say a slip is attached.
+      hasSlip: Boolean(t.reference?.startsWith('/api/v1/payments/slip-download/')),
       createdAt: t.createdAt.toISOString(),
     })),
     spendHistory: spendHistory.map((o) => ({

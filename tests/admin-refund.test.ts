@@ -38,6 +38,9 @@ const { prismaMock, rbacMock, auditMock, adminRequestMock } = vi.hoisted(() => {
     },
     giftCode: { updateMany: vi.fn(async () => ({ count: 2 })) },
     refund: { create: vi.fn(async () => ({ id: 'rfnd_1' })) },
+    // Refund-as-credit path: balance increment + ledger row share the tx.
+    customer: { update: vi.fn(async () => ({ walletBalanceThb: '314.00' })) },
+    topUpLog: { create: vi.fn(async () => ({ id: 'tu_1' })) },
     // Interactive-tx shape: the mock passes ITSELF as the tx client.
     $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(prismaMock)),
   };
@@ -139,6 +142,54 @@ describe('POST /api/v1/admin/orders/[id]/refund', () => {
     expect(res.status).toBe(400);
     expect((await res.json()).error).toBe('REFUND_AMOUNT_EXCEEDS_ORDER');
     expect(prismaMock.refund.create).not.toHaveBeenCalled();
+  });
+
+  it('credits the customer wallet instead of the gateway when refundToCredit is set', async () => {
+    prismaMock.order.findUnique.mockResolvedValue({
+      id: 'ord-1',
+      orderNumber: 'NK-9001',
+      status: 'completed',
+      totalAmountThb: 214,
+      customerId: 'cust-1',
+    });
+    const res = await call({
+      refundAmountThb: 214,
+      refundToCredit: true,
+      reasonCategory: 'customer_request',
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: { refundToCredit: boolean; creditedWalletThb: number };
+    };
+    expect(body.data.refundToCredit).toBe(true);
+    expect(body.data.creditedWalletThb).toBe(314);
+    // No gateway reference was supplied — credit refunds do not need one.
+    const refundArgs = (
+      prismaMock.refund.create.mock.calls[0] as unknown as [
+        { data: { gatewayRefundReference: string; amountThb: number } },
+      ]
+    )[0];
+    expect(refundArgs).toMatchObject({
+      data: { gatewayRefundReference: 'wallet-credit', amountThb: 214 },
+    });
+    expect(prismaMock.customer.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'cust-1' },
+        data: { walletBalanceThb: { increment: 214 } },
+      }),
+    );
+    expect(prismaMock.topUpLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ method: 'refund_credit', status: 'completed' }),
+      }),
+    );
+  });
+
+  it('refuses a credit refund for an order with no customer wallet', async () => {
+    const res = await call({ refundAmountThb: 100, refundToCredit: true });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe('NO_CUSTOMER_FOR_CREDIT');
+    expect(prismaMock.customer.update).not.toHaveBeenCalled();
   });
 
   it('404s an unknown order', async () => {
