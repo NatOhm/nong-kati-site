@@ -239,7 +239,7 @@ export default async function HomePage(): Promise<React.JSX.Element> {
               <h2 className="text-lg font-bold text-fg">หมวดหมู่แอปทั้งหมด</h2>
               <Link
                 href="/search"
-                className="text-sm font-medium text-fg-brand-strong hover:text-fg-brand-strong"
+                className="-my-3 inline-flex min-h-[44px] items-center text-sm font-medium text-fg-brand-strong hover:text-fg-brand-strong"
               >
                 ดูทั้งหมด
               </Link>
@@ -285,7 +285,7 @@ export default async function HomePage(): Promise<React.JSX.Element> {
                     </h3>
                     <Link
                       href={`/category/${group.slug}`}
-                      className="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold text-peach-800 transition-colors hover:bg-clay-100/70 hover:text-peach-900 dark:text-clay-950 dark:hover:bg-clay-950/10 dark:hover:text-clay-950"
+                      className="-my-3.5 shrink-0 rounded-full px-2.5 py-3.5 text-xs font-semibold text-peach-800 transition-colors hover:bg-clay-100/70 hover:text-peach-900 dark:text-clay-950 dark:hover:bg-clay-950/10 dark:hover:text-clay-950"
                     >
                       ดูทั้งหมด →
                     </Link>
@@ -336,7 +336,7 @@ export default async function HomePage(): Promise<React.JSX.Element> {
                 <h2 className="text-lg font-bold text-fg">สินค้าแนะนำ</h2>
                 <Link
                   href="/recommended"
-                  className="text-sm font-medium text-fg-brand-strong hover:text-fg-brand-strong"
+                  className="-my-3 inline-flex min-h-[44px] items-center text-sm font-medium text-fg-brand-strong hover:text-fg-brand-strong"
                 >
                   ดูทั้งหมด →
                 </Link>

@@ -73,7 +73,7 @@ export function NotificationsDropdown(): React.JSX.Element {
         aria-haspopup="true"
         aria-expanded={open}
         aria-label={`การแจ้งเตือน (${unreadCount} ยังไม่ได้อ่าน)`}
-        className="relative flex h-10 w-10 items-center justify-center rounded-full text-fg-muted transition-colors hover:bg-clay-200 hover:text-fg-brand"
+        className="relative flex h-11 w-11 items-center justify-center rounded-full text-fg-muted transition-colors hover:bg-clay-200 hover:text-fg-brand"
       >
         <Bell size={20} strokeWidth={1.5} />
         {unreadCount > 0 && (

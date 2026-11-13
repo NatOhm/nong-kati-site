@@ -65,7 +65,16 @@ export function MobileBottomNav() {
 
   return (
     <>
-      <nav className="bg-surface-base/95 fixed bottom-0 left-0 right-0 z-50 border-t border-line-subtle backdrop-blur-md lg:hidden">
+      {/* Home indicator: the bar grows by the inset instead of putting the
+          labels under it. 0 on desktop/Android, so the 63px bar is unchanged. */}
+      <nav
+        className="bg-surface-base/95 fixed bottom-0 left-0 right-0 z-50 border-t border-line-subtle backdrop-blur-md lg:hidden"
+        style={{
+          paddingBottom: 'var(--nk-safe-bottom)',
+          paddingLeft: 'var(--nk-safe-left)',
+          paddingRight: 'var(--nk-safe-right)',
+        }}
+      >
         <div className="flex items-center justify-around px-2 py-1">
           {allItems.map((item) => {
             const isActive =

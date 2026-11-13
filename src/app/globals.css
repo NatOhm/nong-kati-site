@@ -5,6 +5,19 @@
 @tailwind utilities;
 
 @layer base {
+  /* Safe-area insets (viewport-fit=cover). Resolved by the browser from the
+     notch / home indicator; 0 on every non-notched viewport, so desktop and
+     Android are unaffected. Components pad with these variables instead of
+     calling env() inline, which also makes the plumbing testable: overriding
+     --nk-safe-bottom moves the taskbar, the content spacer and the sticky buy
+     bar together. */
+  :root {
+    --nk-safe-top: env(safe-area-inset-top, 0px);
+    --nk-safe-right: env(safe-area-inset-right, 0px);
+    --nk-safe-bottom: env(safe-area-inset-bottom, 0px);
+    --nk-safe-left: env(safe-area-inset-left, 0px);
+  }
+
   * {
     @apply border-clay-200;
   }
@@ -28,6 +41,10 @@
   }
 
   body {
+    /* Landscape notch: keep in-flow content out of the side unsafe areas.
+       Fixed chrome pads itself from the same variables. */
+    padding-left: var(--nk-safe-left);
+    padding-right: var(--nk-safe-right);
     background-color: var(--bg-base);
     /* Warm site backdrop: soft peach/oat/blush glows + a faint dot grain
        so large empty areas feel cozy, not flat. Static gradients only —

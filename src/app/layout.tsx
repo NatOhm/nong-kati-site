@@ -36,6 +36,11 @@ export const dynamic = 'force-dynamic';
  * dark. Keyed on the OS scheme — the in-app toggle cannot reach this meta.
  */
 export const viewport: Viewport = {
+  // Phones only: extend the page under the notch / home indicator so the fixed
+  // taskbar and the sticky buy bar can pad themselves with env(safe-area-inset-*).
+  // Without cover, Safari letterboxes the page above the home indicator and
+  // `env()` reports 0 — safe, but the taskbar floats on a cream strip.
+  viewportFit: 'cover',
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#FFF7ED' },
     { media: '(prefers-color-scheme: dark)', color: '#3A2A18' },

@@ -117,6 +117,11 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps): React.JS
       aria-modal="true"
       aria-label="ค้นหาสินค้า"
       className="fixed inset-0 z-[100] flex flex-col bg-surface-base"
+      style={{
+        paddingTop: 'var(--nk-safe-top)',
+        paddingLeft: 'var(--nk-safe-left)',
+        paddingRight: 'var(--nk-safe-right)',
+      }}
     >
       {/* Header: input + ยกเลิก */}
       <form
@@ -148,7 +153,10 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps): React.JS
         </button>
       </form>
 
-      <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4">
+      <div
+        className="flex-1 overflow-y-auto overscroll-contain px-4 py-4"
+        style={{ paddingBottom: 'calc(1rem + var(--nk-safe-bottom))' }}
+      >
         {trimmed ? (
           suggestions.length > 0 ? (
             <div className="flex flex-col gap-1">

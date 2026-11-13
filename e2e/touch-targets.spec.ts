@@ -165,6 +165,80 @@ test.describe('touch targets (390×844)', () => {
     await expect(taskbar).toBeHidden();
   });
 
+  test('audit round 5: breadcrumb, chips, availability filter and auth links are ≥44px', async ({
+    page,
+  }) => {
+    await withConsent(page);
+
+    // Search: breadcrumb home link (was 32px), category chips (35px) and the
+    // "เฉพาะที่มีของ" filter (40px).
+    await page.goto('/search?q=netflix');
+    const crumb = page.locator('nav[aria-label="Schema.org breadcrumb"] a').first();
+    await expect(crumb).toBeVisible();
+    expect((await crumb.boundingBox())!.height, 'breadcrumb link').toBeGreaterThanOrEqual(44);
+
+    const available = page.getByRole('link', { name: 'เฉพาะที่มีของ' }).first();
+    await expect(available).toBeVisible();
+    expect((await available.boundingBox())!.height, 'availability filter').toBeGreaterThanOrEqual(
+      44,
+    );
+
+    const chip = page.getByRole('link', { name: 'ทั้งหมด', exact: true }).first();
+    if (await chip.isVisible().catch(() => false)) {
+      expect((await chip.boundingBox())!.height, 'category chip').toBeGreaterThanOrEqual(44);
+    }
+
+    // Login: back button (36px), signup link (23px) and the magic-link button.
+    await page.goto('/account/login');
+    const back = page.getByRole('button', { name: 'กลับ', exact: true });
+    await expect(back).toBeVisible();
+    expect((await back.boundingBox())!.height, 'login back').toBeGreaterThanOrEqual(44);
+
+    const signup = page
+      .locator('p', { hasText: 'ยังไม่มีบัญชี?' })
+      .getByRole('link', { name: 'สมัครสมาชิก' });
+    await expect(signup).toBeVisible();
+    expect((await signup.boundingBox())!.height, 'signup link').toBeGreaterThanOrEqual(44);
+
+    const magic = page.getByRole('link', { name: /ลิงก์อีเมล/ });
+    await expect(magic).toBeVisible();
+    expect((await magic.boundingBox())!.height, 'magic-link button').toBeGreaterThanOrEqual(44);
+  });
+
+  test('safe-area plumbing pads fixed chrome on notched phones', async ({ page }) => {
+    await withConsent(page);
+    await page.goto('/');
+
+    // viewport-fit=cover is what makes iOS report non-zero env(safe-area-inset-*)
+    // and lets the taskbar paint under the home indicator instead of on a strip.
+    const meta = await page.locator('meta[name="viewport"]').getAttribute('content');
+    expect(meta).toContain('viewport-fit=cover');
+
+    const nav = page.locator('nav.fixed.bottom-0');
+    const main = page.locator('main#main-content');
+    const navBefore = (await nav.boundingBox())!.height;
+    const mainBefore = parseFloat(
+      await main.evaluate((el) => getComputedStyle(el).paddingBottom),
+    );
+
+    // Chromium has no notch, so the inset is 0 here. Drive the same custom
+    // property a notched browser would and assert every consumer follows it —
+    // this is the plumbing, not the physical inset itself.
+    await page.evaluate(() =>
+      document.documentElement.style.setProperty('--nk-safe-bottom', '34px'),
+    );
+    const navAfter = (await nav.boundingBox())!.height;
+    const mainAfter = parseFloat(
+      await main.evaluate((el) => getComputedStyle(el).paddingBottom),
+    );
+    expect(navAfter - navBefore, 'taskbar absorbs the home-indicator inset').toBeCloseTo(34, 0);
+    expect(mainAfter - mainBefore, 'content spacer clears the grown taskbar').toBeCloseTo(34, 0);
+    expect(await nav.evaluate((el) => getComputedStyle(el).paddingBottom)).toBe('34px');
+
+    await page.evaluate(() => document.documentElement.style.removeProperty('--nk-safe-bottom'));
+    expect((await nav.boundingBox())!.height).toBeCloseTo(navBefore, 0);
+  });
+
   test('touch targets hold in both themes', async ({ page }) => {
     await withConsent(page);
     await page.goto('/');

@@ -62,7 +62,7 @@ export function SearchToolbar({
 
   const arrowCls = (enabled: boolean) =>
     cn(
-      'inline-flex h-9 w-9 items-center justify-center rounded-md border transition-smart duration-fast',
+      'inline-flex h-11 w-11 items-center justify-center rounded-md border transition-smart duration-fast',
       enabled
         ? 'border-line-strong bg-surface-elevated text-fg hover:border-peach-400 hover:text-peach-800 active:scale-90'
         : 'cursor-not-allowed border-line bg-surface-sunken text-fg-placeholder opacity-50',
@@ -95,7 +95,7 @@ export function SearchToolbar({
                 onClick={() => setSortOpen((v) => !v)}
                 onBlur={() => setTimeout(() => setSortOpen(false), 120)}
                 className={cn(
-                  'inline-flex h-9 min-w-40 items-center justify-between gap-2 rounded-md border border-line-strong bg-surface-elevated px-3 text-sm font-medium text-fg transition-colors',
+                  'inline-flex h-11 min-w-40 items-center justify-between gap-2 rounded-md border border-line-strong bg-surface-elevated px-3 text-sm font-medium text-fg transition-colors',
                   'hover:border-peach-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-peach-500',
                 )}
               >
@@ -131,7 +131,7 @@ export function SearchToolbar({
                           });
                       }}
                       className={cn(
-                        'flex min-h-[40px] w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors duration-fast hover:bg-surface-sunken',
+                        'flex min-h-[44px] w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors duration-fast hover:bg-surface-sunken',
                         opt.value === currentSort
                           ? 'font-semibold text-fg-brand'
                           : 'text-fg-secondary',

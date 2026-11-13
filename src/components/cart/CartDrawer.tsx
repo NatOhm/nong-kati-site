@@ -98,7 +98,10 @@ export function CartDrawer({
         )}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-line-subtle px-4 py-3">
+        <div
+          className="flex items-center justify-between border-b border-line-subtle px-4 py-3"
+          style={{ paddingTop: 'calc(0.75rem + var(--nk-safe-top))' }}
+        >
           <h2 className="flex items-center gap-2 text-lg font-semibold text-fg">
             <ShoppingCart size={20} strokeWidth={1.5} />
             ตะกร้าสินค้า ({items.length})
@@ -139,7 +142,10 @@ export function CartDrawer({
 
         {/* Footer — Summary + Checkout */}
         {items.length > 0 && (
-          <div className="border-t border-line-subtle p-4">
+          <div
+            className="border-t border-line-subtle p-4"
+            style={{ paddingBottom: 'calc(1rem + var(--nk-safe-bottom))' }}
+          >
             <CartSummary
               subtotal={subtotal}
               vat={vat}
@@ -165,7 +171,7 @@ export function CartDrawer({
               </Link>
               <button
                 onClick={onClose}
-                className="w-full text-center text-sm text-fg-placeholder hover:text-fg-brand"
+                className="flex min-h-[44px] w-full items-center justify-center text-sm text-fg-placeholder hover:text-fg-brand"
               >
                 ช้อปปิ้งต่อ
               </button>

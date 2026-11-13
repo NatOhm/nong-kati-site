@@ -291,7 +291,13 @@ export function ProductDetailClient({
       {/* Sticky buy bar (phones only) — hidden once the real CTA is on screen,
           and parked above the fixed bottom taskbar. */}
       {showStickyCta && selectedVariant && selectedVariant.stock > 0 && (
-        <div className="fixed inset-x-0 bottom-16 z-40 border-t border-line-subtle bg-surface-base/95 px-4 py-2.5 backdrop-blur-md lg:hidden">
+        <div
+          className="fixed inset-x-0 bottom-[calc(4rem_+_var(--nk-safe-bottom))] z-40 border-t border-line-subtle bg-surface-base/95 px-4 py-2.5 backdrop-blur-md lg:hidden"
+          style={{
+            paddingLeft: 'calc(1rem + var(--nk-safe-left))',
+            paddingRight: 'calc(1rem + var(--nk-safe-right))',
+          }}
+        >
           <div className="flex items-center gap-3">
             <div className="min-w-0 flex-1">
               <p className="truncate text-xs text-fg-muted">{productName}</p>

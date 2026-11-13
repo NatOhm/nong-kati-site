@@ -20,7 +20,11 @@ export function Logo({ href = '/', className }: LogoProps): React.JSX.Element {
   if (href === null) return mark;
 
   return (
-    <Link href={href} aria-label="Nong-Kati — หน้าหลัก">
+    <Link
+      href={href}
+      aria-label="Nong-Kati — หน้าหลัก"
+      className="inline-flex min-h-[44px] items-center"
+    >
       {mark}
     </Link>
   );

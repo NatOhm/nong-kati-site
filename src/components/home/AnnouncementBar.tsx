@@ -55,7 +55,7 @@ export function AnnouncementBar(): React.JSX.Element | null {
               {' — '}
               <a
                 href={content.href}
-                className="inline-flex min-h-[32px] items-center font-bold underline hover:text-peach-800"
+                className="-my-3 inline-flex min-h-[44px] items-center font-bold underline hover:text-peach-800"
               >
                 กดซื้อเลย!
               </a>

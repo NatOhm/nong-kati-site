@@ -169,7 +169,7 @@ export default async function SearchPage({
                         sort,
                         available: availableOnly,
                       })}
-                      className="inline-flex min-h-[40px] items-center rounded-full border border-line-brand bg-peach-50 px-3 py-1.5 text-sm font-medium text-fg-brand"
+                      className="inline-flex min-h-[44px] items-center rounded-full border border-line-brand bg-peach-50 px-3 py-1.5 text-sm font-medium text-fg-brand"
                       aria-pressed="true"
                     >
                       ✓ เฉพาะที่มีของ
@@ -182,7 +182,7 @@ export default async function SearchPage({
                         sort,
                         available: true,
                       })}
-                      className="inline-flex min-h-[40px] items-center rounded-full border border-line px-3 py-1.5 text-sm text-fg-secondary transition-colors hover:border-line-brand hover:text-fg-brand"
+                      className="inline-flex min-h-[44px] items-center rounded-full border border-line px-3 py-1.5 text-sm text-fg-secondary transition-colors hover:border-line-brand hover:text-fg-brand"
                     >
                       เฉพาะที่มีของ
                     </Link>
@@ -204,7 +204,7 @@ export default async function SearchPage({
                 <Link
                   href={buildUrl({ q: query || undefined, sort, available: availableOnly })}
                   aria-current={!categorySlug ? 'page' : undefined}
-                  className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                  className={`inline-flex min-h-[44px] items-center rounded-full border px-3 text-sm transition-colors ${
                     !categorySlug
                       ? 'border-peach-500 bg-peach-100 text-peach-800'
                       : 'border-line bg-surface text-fg-secondary hover:border-peach-400 hover:text-fg-brand'
@@ -217,7 +217,7 @@ export default async function SearchPage({
                 {dbDown && categorySlug && (
                   <span
                     aria-current="page"
-                    className="rounded-full border border-peach-500 bg-peach-100 px-3 py-1.5 text-sm text-peach-800"
+                    className="inline-flex min-h-[44px] items-center rounded-full border border-peach-500 bg-peach-100 px-3 text-sm text-peach-800"
                   >
                     {categorySlug}
                   </span>
@@ -234,7 +234,7 @@ export default async function SearchPage({
                         available: availableOnly,
                       })}
                       aria-current={selected ? 'page' : undefined}
-                      className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                      className={`inline-flex min-h-[44px] items-center rounded-full border px-3 text-sm transition-colors ${
                         selected
                           ? 'border-peach-500 bg-peach-100 text-peach-800'
                           : 'border-line bg-surface text-fg-secondary hover:border-peach-400 hover:text-fg-brand'

@@ -235,7 +235,7 @@ export default function LoginPage(): React.JSX.Element {
         <button
           type="button"
           onClick={() => (window.history.length > 1 ? router.back() : router.push('/'))}
-          className="mb-4 inline-flex min-h-[36px] items-center gap-2 text-sm text-fg-placeholder transition-colors duration-200 hover:text-fg-brand"
+          className="mb-4 inline-flex min-h-[44px] items-center gap-2 text-sm text-fg-placeholder transition-colors duration-200 hover:text-fg-brand"
         >
           <ArrowLeft size={16} />
           กลับ
@@ -269,7 +269,7 @@ export default function LoginPage(): React.JSX.Element {
                   autoComplete="email"
                   aria-invalid={error ? true : undefined}
                   aria-describedby={error ? 'login-error' : undefined}
-                  className="w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-3 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand"
+                  className="min-h-[44px] w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-3 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand"
                   placeholder="your@email.com"
                 />
               </div>
@@ -305,7 +305,7 @@ export default function LoginPage(): React.JSX.Element {
                   autoComplete="current-password"
                   aria-invalid={error ? true : undefined}
                   aria-describedby={error ? 'login-error' : undefined}
-                  className="w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-10 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand"
+                  className="min-h-[44px] w-full rounded-md border border-line-subtle bg-surface py-2 pl-9 pr-10 text-sm text-fg placeholder:text-fg-muted focus:border-line-brand"
                   placeholder="••••••••"
                 />
                 <button
@@ -321,12 +321,12 @@ export default function LoginPage(): React.JSX.Element {
             </div>
 
             {/* Remember me */}
-            <label className="flex items-center gap-2">
+            <label className="flex min-h-[44px] items-center gap-2">
               <input
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="relative h-5 w-5 rounded before:absolute before:-inset-2.5 before:content-['']"
+                className="relative h-5 w-5 rounded before:absolute before:-inset-3 before:content-['']"
               />
               <span className="text-sm text-fg-placeholder">จดจำฉัน</span>
             </label>
@@ -347,7 +347,7 @@ export default function LoginPage(): React.JSX.Element {
             <button
               type="submit"
               disabled={loading || !email || !password}
-              className="flex w-full items-center justify-center gap-2 rounded-md bg-peach-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-peach-400 disabled:opacity-50"
+              className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-md bg-peach-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-peach-400 disabled:opacity-50"
             >
               <LogIn size={16} />
               {loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
@@ -367,7 +367,7 @@ export default function LoginPage(): React.JSX.Element {
                 {oauthProviders.includes('google') && (
                   <a
                     href={`/api/v1/auth/oauth/google?next=${encodeURIComponent(safeNext(searchParams.get('next')))}`}
-                    className="flex w-full items-center justify-center gap-2 rounded-md border border-line-subtle bg-surface px-4 py-2.5 text-sm font-medium text-fg transition-colors hover:bg-peach-50"
+                    className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-md border border-line-subtle bg-surface px-4 py-2.5 text-sm font-medium text-fg transition-colors hover:bg-peach-50"
                   >
                     <GoogleMark />
                     ดำเนินการต่อด้วย Google
@@ -376,7 +376,7 @@ export default function LoginPage(): React.JSX.Element {
                 {oauthProviders.includes('line') && (
                   <a
                     href={`/api/v1/auth/oauth/line?next=${encodeURIComponent(safeNext(searchParams.get('next')))}`}
-                    className="flex w-full items-center justify-center gap-2 rounded-md border border-line-subtle bg-surface px-4 py-2.5 text-sm font-medium text-fg transition-colors hover:bg-peach-50"
+                    className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-md border border-line-subtle bg-surface px-4 py-2.5 text-sm font-medium text-fg transition-colors hover:bg-peach-50"
                   >
                     <LineMark />
                     ดำเนินการต่อด้วย LINE
@@ -385,7 +385,7 @@ export default function LoginPage(): React.JSX.Element {
                 {oauthProviders.includes('facebook') && (
                   <a
                     href={`/api/v1/auth/oauth/facebook?next=${encodeURIComponent(safeNext(searchParams.get('next')))}`}
-                    className="flex w-full items-center justify-center gap-2 rounded-md border border-line-subtle bg-surface px-4 py-2.5 text-sm font-medium text-fg transition-colors hover:bg-peach-50"
+                    className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-md border border-line-subtle bg-surface px-4 py-2.5 text-sm font-medium text-fg transition-colors hover:bg-peach-50"
                   >
                     <FacebookMark />
                     ดำเนินการต่อด้วย Facebook
@@ -508,7 +508,7 @@ export default function LoginPage(): React.JSX.Element {
           </div>
           <a
             href={`/account/magic-link?next=${encodeURIComponent(safeNext(searchParams.get('next')))}`}
-            className="flex w-full items-center justify-center gap-2 rounded-md border border-line-subtle bg-surface px-4 py-2.5 text-sm font-medium text-fg transition-colors hover:bg-peach-50"
+            className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-md border border-line-subtle bg-surface px-4 py-2.5 text-sm font-medium text-fg transition-colors hover:bg-peach-50"
           >
             <Mail size={18} className="text-fg-brand" />
             เข้าสู่ระบบด้วยลิงก์อีเมล (ไม่ต้องใช้รหัสผ่าน)
@@ -518,7 +518,10 @@ export default function LoginPage(): React.JSX.Element {
         {/* Register link */}
         <p className="mt-4 text-center text-sm text-fg-placeholder">
           ยังไม่มีบัญชี?{' '}
-          <Link href="/account/register" className="text-fg-brand hover:text-fg-brand">
+          <Link
+            href="/account/register"
+            className="-my-2 inline-flex min-h-[44px] items-center text-fg-brand hover:text-fg-brand"
+          >
             สมัครสมาชิก
           </Link>
         </p>

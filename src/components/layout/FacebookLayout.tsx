@@ -67,7 +67,7 @@ export function FacebookLayout({ children, searchCategory }: FacebookLayoutProps
         <main
           id="main-content"
           tabIndex={-1}
-          className="relative min-w-0 flex-1 bg-surface-base pb-16 outline-none lg:pb-0"
+          className="relative min-w-0 flex-1 bg-surface-base pb-[calc(4rem_+_var(--nk-safe-bottom))] outline-none lg:pb-0"
         >
           <HamsterGrassScene />
           <div className="relative mx-auto max-w-[1440px]">
