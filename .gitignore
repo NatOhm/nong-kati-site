@@ -24,6 +24,8 @@ tmp/
 
 # Playwright artifacts
 test-results/
+# audit screenshots captured while chasing the phone findings (generated)
+docs/mobile-audit/
 playwright-report/
 artifacts/
 
