@@ -334,13 +334,17 @@ async function installStubs(page: Page, state: StubState): Promise<void> {
 /** Fill step 1 and land on the payment step. */
 async function startCheckout(page: Page): Promise<void> {
   await page.goto('/checkout');
-  await page.locator('input[id$="-email"]').fill(`e2e-${Date.now()}@nong-kati-test.local`);
-  await page.locator('input[id$="-phone"]').fill('0812345678');
-  await page.locator('input[id$="-tos"]').check();
-  await page.getByRole('button', { name: 'ดำเนินการต่อ' }).click();
-  await expect(page.getByRole('button', { name: 'เลือกไฟล์สลิป' })).toBeVisible({
-    timeout: 30_000,
-  });
+  // Retried because a cold WebKit start can deliver the first fill/click
+  // before hydration, leaving the wizard on step 1 with the fields filled.
+  await expect(async () => {
+    await page.locator('input[id$="-email"]').fill('e2e-checkout@nong-kati-test.local');
+    await page.locator('input[id$="-phone"]').fill('0812345678');
+    await page.locator('input[id$="-tos"]').check();
+    await page.getByRole('button', { name: 'ดำเนินการต่อ' }).click();
+    await expect(page.getByRole('button', { name: 'เลือกไฟล์สลิป' })).toBeVisible({
+      timeout: 8_000,
+    });
+  }).toPass({ timeout: 90_000 });
 }
 
 /** Upload the slip and let the (stubbed) bank answer confirm it. */

@@ -78,6 +78,9 @@ export const SCAN_CONTRAST_FN = /* js */ `
       // dot, or decorative fill — out of scope (non-text graphics fall under
       // 1.4.11's separate 3:1 rule, not this gate).
       if (!(el.textContent || '').trim()) continue;
+      /* aria-hidden decorative glyphs (emoji placeholders) carry no text for
+         WCAG 1.4.3 — the 1.1:1 🎮 on the empty product page was a false red. */
+      if (el.closest('[aria-hidden="true"]')) continue;
       if (el.offsetParent === null && getComputedStyle(el).position !== 'fixed') continue;
       if (el.namespaceURI && el.namespaceURI.indexOf('svg') > 0) continue;
       const s = getComputedStyle(el);

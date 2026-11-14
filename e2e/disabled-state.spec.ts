@@ -143,9 +143,14 @@ for (const theme of ['light', 'dark'] as const) {
       const disabledBefore = probe['disabled'];
       expect(disabledBefore, 'expected the submit to start disabled').toBeDefined();
 
-      await email.fill('kaem@example.com');
-      await order.fill('NK-2026-ABC123');
-      await expect(btn).toBeEnabled();
+      // Refill until React state is live: on a cold WebKit start the first
+      // fill can land before hydration, and hydration then resets the fields
+      // (submit stays disabled with both values on screen).
+      await expect(async () => {
+        await email.fill('kaem@example.com');
+        await order.fill('NK-2026-ABC123');
+        await expect(btn).toBeEnabled({ timeout: 2_000 });
+      }).toPass({ timeout: 20_000 });
       await waitForSubmitBgSettled(page, true);
       probe = await probeLookupSubmit(page);
       const enabledAfter = probe['enabled'];

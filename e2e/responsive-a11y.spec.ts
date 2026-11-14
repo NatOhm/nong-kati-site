@@ -173,6 +173,17 @@ test.describe('keyboard-only traversal', () => {
     );
   }
 
+  test.beforeEach(() => {
+    // Tab-key traversal is a desktop-browser path. iOS Safari and mobile
+    // Chrome have no Tab order (no focusable chrome without Full Keyboard
+    // Access), and WebKit's sequential navigation ignores off-screen skip
+    // links — the desktop Chromium project runs these three tests.
+    test.skip(
+      test.info().project.use.isMobile === true,
+      'no Tab-key navigation on mobile browsers',
+    );
+  });
+
   test('skip link is first, visible on focus, and jumps to <main>', async ({ page }) => {
     await page.goto('/');
 

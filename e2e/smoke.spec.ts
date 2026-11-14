@@ -170,7 +170,10 @@ test.describe('checkout flow creates an order', () => {
     // (real store), which CI never runs — visiting it 404s and the button below
     // never appears.
     await page.goto('/product/hbo-max-7-4k');
-    const addBtn = page.getByRole('button', { name: 'เพิ่มลงตะกร้า' });
+    // A phone renders the in-page CTA *and* the sticky buy bar; both are the
+    // real add path, so pick the in-page one explicitly instead of throwing a
+    // strict-mode violation.
+    const addBtn = page.getByRole('button', { name: 'เพิ่มลงตะกร้า' }).first();
     await expect(addBtn).toBeVisible({ timeout: 30_000 });
     await expect(addBtn).toBeEnabled();
     await addBtn.click();
@@ -396,7 +399,19 @@ test.describe('search suggestions are keyboard operable', () => {
     await page.goto('/');
     const term = await queryWithSuggestions(page);
     test.skip(term === null, 'catalog yielded no suggestion-bearing query');
-    const input = page.locator('nav input[role="combobox"]').first();
+    const navInput = page.locator('nav input[role="combobox"]').first();
+    // Phones hide the inline navbar combobox (width < lg) and open the
+    // full-screen search sheet instead — same feature, different surface.
+    if (!(await navInput.isVisible())) {
+      await page.getByRole('button', { name: 'เปิดค้นหา' }).click();
+      const overlay = page.getByRole('dialog', { name: 'ค้นหาสินค้า' });
+      await expect(overlay).toBeVisible();
+      await overlay.locator('input[type="search"]').fill(term!);
+      await expect(overlay.getByRole('link').first()).toBeVisible({ timeout: 20_000 });
+      return;
+    }
+
+    const input = navInput;
     await input.click();
     await input.fill(term!);
 

@@ -30,6 +30,22 @@ if (existsSync(envLocal)) process.loadEnvFile(envLocal);
  */
 const PORT = process.env['E2E_PORT'] ?? '4200';
 
+/**
+ * Every spec a customer can touch. These run on the iPhone-Safari and
+ * Android-Chrome profiles; the admin specs (management, refunds/resend, admin
+ * search) stay on desktop Chromium because the back office is a desktop
+ * surface. `purchase-flow` is an admin-operability walk (it logs into
+ * /management and confirms a payment) and keeps its desktop pass; its customer
+ * legs — checkout and the confirmation page — are covered on both phones by
+ * mobile-payment-flow.spec.ts.
+ */
+const CUSTOMER_SPEC =
+  /(smoke|contrast|landmarks|touch-targets|responsive-a11y|duplicate-ids|no-hardcoded-white|disabled-state|mobile-payment-flow|ios-safari)\.spec\.ts/;
+
+/** Specs whose subject only exists on a phone viewport. */
+const MOBILE_ONLY_SPEC =
+  /(smoke|contrast|touch-targets|duplicate-ids|no-hardcoded-white|disabled-state|mobile-payment-flow|ios-safari)\.spec\.ts/;
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: false,
@@ -47,23 +63,25 @@ export default defineConfig({
     navigationTimeout: 90_000,
   },
   projects: [
-    // Every other spec keeps its single Chromium pass.
+    // The back office is operated on a desktop, so the admin specs keep one
+    // Chromium pass; every customer-facing surface runs on both phone
+    // profiles below (the client reports that drove this work came from iOS
+    // Safari, and Android Chrome must not regress).
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
-      testIgnore: /mobile-payment-flow\.spec\.ts/,
+      // landmarks + responsive-a11y also run here: their keyboard assertions
+      // only mean anything with a hardware keyboard (skipped on the phones).
+      testIgnore: MOBILE_ONLY_SPEC,
     },
-    // The payment-flow proof runs on BOTH engines: the customer who reported
-    // the missing-code and duplicate-order bugs was on Safari, and the phone
-    // suite must not be Chromium-only.
     {
-      name: 'mobile-chromium',
-      testMatch: /mobile-payment-flow\.spec\.ts/,
+      name: 'android-chrome',
+      testMatch: CUSTOMER_SPEC,
       use: { ...devices['Pixel 7'] },
     },
     {
-      name: 'mobile-webkit',
-      testMatch: /mobile-payment-flow\.spec\.ts/,
+      name: 'iphone-safari',
+      testMatch: CUSTOMER_SPEC,
       use: { ...devices['iPhone 14'] },
     },
   ],
