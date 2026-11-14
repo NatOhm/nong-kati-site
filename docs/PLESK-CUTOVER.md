@@ -20,7 +20,7 @@ project are untouched, and this branch is not pushed.
 | One baseline migration, no Postgres history | `prisma/migrations/20261115000000_baseline/`; old 34 migrations in `prisma/migrations-archive-postgres/` |
 | `migrate deploy` builds the schema from empty | applied to a fresh `mariadb:10.11` → **39 tables** (38 models + `_prisma_migrations`) |
 | The ETL copies everything | `38 tables, 2576 rows, every count matches` on a pristine target |
-| The write paths work on MariaDB | `scripts/precutover-check.mjs` → **27/27** (last run 2026-11-14 on `:3307`) |
+| The write paths work on MariaDB | `scripts/precutover-check.mjs` → **31/31** (run against the `:3307` copy on build `d15dab0`) |
 | Gift codes decrypt after the move | 170 rows on the copy: **139 at `keyVersion 1`, 31 at `keyVersion 2`**, all decrypted with the current `NK_GIFT_CODE_ENCRYPTION_KEY` and each plaintext's SHA-256 equalled the stored `codeHash` |
 | Nightly backup tooling | `scripts/backup-mariadb.sh`, restore-verified (39 tables, matching counts), retention proven |
 
@@ -275,9 +275,10 @@ TARGET_DATABASE_URL="mysql://nk_app:DBPASS@127.0.0.1:3307/nong_kati" \
   node scripts/precutover-check.mjs
 ```
 
-**Checkpoint:** `RESULT: 27/27 checks passed`. It writes real rows, reads them back, restores
-inventory and deletes its own rows — it refuses to run against a Supabase host. If it is not
-27/27, go to **Rollback A**; production is still on Supabase.
+**Checkpoint:** `RESULT: 31/31 checks passed`. It writes real rows and real image files (into a
+throwaway `tmp/precutover-media`, never your media directory), reads them back, restores
+inventory and deletes its own rows — and refuses to run against a Supabase host. If it is not
+31/31, go to **Rollback A**; production is still on Supabase.
 
 ### Step 6 — switch (T−0)
 

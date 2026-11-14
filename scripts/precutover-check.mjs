@@ -18,6 +18,8 @@
  *   6. coupon         admin coupon create → order with it → coupon counted at confirmation
  *   7. wallet         customer order paid from walletBalanceThb (deduct + TopUpLog + fulfilment)
  *   8. slip           POST /api/v1/payments/slip-verify against a stubbed Slip2Go endpoint
+ *   9. images         POST /api/v1/admin/upload → GET /api/v1/images/:key, plus the orphan-file GC
+ *                     (boots the app with NK_MEDIA_DIR pointed at a throwaway tmp/ directory)
  *
  * Usage
  *   TARGET_DATABASE_URL="mysql://user:pass@host:3306/db" node scripts/precutover-check.mjs
@@ -240,6 +242,7 @@ function freePort(preferred) {
 let child = null;
 let BASE = '';
 async function startApp(port) {
+  await fs.promises.mkdir(MEDIA_DIR, { recursive: true });
   const env = {
     ...process.env,
     DATABASE_URL: TARGET,
@@ -247,6 +250,9 @@ async function startApp(port) {
     NODE_ENV: 'production',
     NK_SLIP2GO_BASE: `http://127.0.0.1:${stub.address().port}`,
     NK_SLIP2GO_SECRET: SLIP2GO_SECRET,
+    // A throwaway media directory: the check must not write into the developer's
+    // real image store, and it must be able to prove deletion.
+    NK_MEDIA_DIR: MEDIA_DIR,
   };
   child = spawn(process.execPath, [path.join(ROOT, 'node_modules', 'next', 'dist', 'bin', 'next'), 'start', '-p', String(port)], {
     cwd: ROOT,
@@ -336,6 +342,12 @@ async function pickFixtures() {
 
 // ── the paths ──────────────────────────────────────────────────────────────
 const state = { orders: [], codes: [], imageKeys: [], coupon: null, customer: null };
+// Throwaway media root for the image path; NK_MEDIA_DIR is pointed here at boot.
+const MEDIA_DIR = path.join(ROOT, 'tmp', 'precutover-media');
+// 1×1 PNG — small enough to be harmless, real enough to pass the upload's magic-byte
+// sniffing and IHDR dimension read.
+const TINY_PNG_B64 =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 
 async function pathProductSave(ctx) {
   console.log('\n1. admin product save');
@@ -561,6 +573,57 @@ async function pathCodes(ctx) {
   ctx.uploadedCodes = { ids: rows.map((r) => r.id), variantId: variant.id, count: payload.length };
 }
 
+async function pathImages(ctx) {
+  console.log('\n7. product images (disk store + orphan GC)');
+  const png = Buffer.from(TINY_PNG_B64, 'base64');
+  const upload = async () => {
+    const res = await api('POST', '/api/v1/admin/upload', {
+      body: { dataUrl: `data:image/png;base64,${TINY_PNG_B64}`, filename: 'precheck.png' },
+      token: ctx.token,
+    });
+    return res;
+  };
+
+  const first = await upload();
+  if (first.status !== 201) {
+    return fail('images', `upload HTTP ${first.status} ${JSON.stringify(first.json).slice(0, 200)}`);
+  }
+  const keyA = String(first.json.path ?? '').split('/').pop();
+  state.imageKeys.push(keyA);
+  check('images', first.json.storage === 'file', `upload stored on disk (${first.json.path})`);
+
+  // Served bytes must be the uploaded bytes, straight off the filesystem.
+  const served = await fetch(`${BASE}/api/v1/images/${keyA}`);
+  const body = Buffer.from(await served.arrayBuffer());
+  const same = createHash('sha256').update(body).digest('hex') === createHash('sha256').update(png).digest('hex');
+  check('images',
+    served.status === 200 && served.headers.get('content-type') === 'image/png' && same,
+    `GET /api/v1/images/${keyA} → ${served.status} ${served.headers.get('content-type')} ${body.length} B, bytes identical`);
+
+  // The whole point of the move: no database row behind the image any more.
+  const row = await prisma.siteSetting.findUnique({ where: { key: `image:${keyA}` } });
+  check('images', row === null, 'no SiteSetting row for the image — serving costs no database read');
+
+  // Orphan GC: backdate the first file past the 24h grace, then upload again; the
+  // sweep runs on upload, so A must disappear while the fresh B survives.
+  if (keyA) {
+    const old = new Date(Date.now() - 25 * 60 * 60 * 1000);
+    await fs.promises.utimes(path.join(MEDIA_DIR, keyA), old, old).catch(() => {});
+  }
+  await new Promise((r) => setTimeout(r, 10));
+  const second = await upload();
+  const keyB = String(second.json?.path ?? '').split('/').pop();
+  if (second.status !== 201) {
+    return fail('images', `second upload HTTP ${second.status} ${JSON.stringify(second.json).slice(0, 200)}`);
+  }
+  state.imageKeys.push(keyB);
+
+  const exists = (key) => fs.promises.stat(path.join(MEDIA_DIR, key)).then(() => true).catch(() => false);
+  const [aliveA, aliveB] = await Promise.all([exists(keyA), exists(keyB)]);
+  check('images', !aliveA && aliveB, `orphan GC removed ${keyA} and kept the fresh ${keyB}`,
+    `expected the old file gone and the new one present (A=${aliveA}, B=${aliveB})`);
+}
+
 // ── cleanup ────────────────────────────────────────────────────────────────
 async function cleanup(ctx) {
   if (KEEP) {
@@ -631,6 +694,11 @@ async function cleanup(ctx) {
   if (state.imageKeys.length > 0) {
     await quiet('uploaded images', () =>
       prisma.siteSetting.deleteMany({ where: { key: { in: state.imageKeys.map((k) => `image:${k}`) } } }));
+    await quiet('uploaded image files', async () => {
+      for (const key of state.imageKeys) {
+        await fs.promises.rm(path.join(MEDIA_DIR, key), { force: true });
+      }
+    });
   }
   if (ctx.originalProduct) {
     await quiet('product', () =>
@@ -664,6 +732,7 @@ try {
   await pathSlip(ctx);
   await pathVoid(ctx);
   await pathCodes(ctx);
+  await pathImages(ctx);
 
   // The storefront must still answer with real data after all that writing.
   const shop = await api('GET', '/api/v1/products');
