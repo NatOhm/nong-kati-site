@@ -135,10 +135,35 @@ Never `pg_dump`: it produces Postgres SQL. Write `scripts/migrate-supabase-to-ma
 - [x] Gift-code path proven end-to-end: 5 rows decrypted with
       `NK_GIFT_CODE_ENCRYPTION_KEY` and each plaintext's SHA-256 matched its stored
       `codeHash`, and the 2.68 MB image setting round-tripped intact.
-- [ ] Order/cart/checkout walk and a management save — not run in the rehearsal; the write
-      path through `Bytes`, `Decimal` and `DateTime` columns has no dedicated evidence yet.
+- [x] Write paths driven for real (not unit stubs) against the MariaDB copy through the
+      running app — cart, order, fulfilment, refund/void, admin product save, gift-code
+      upload + decrypt. See the next section for the numbers.
 
 **Done when:** the same numbers pass as on Postgres, and the code decrypts.
+
+### Write-path rehearsal (2026-11-15, MariaDB copy on :3307)
+
+Five paths, executed through `next start` on :3211 against the copy with a real super_admin
+access token, then read back with `mariadb` rather than trusted from the response:
+
+| Path | Evidence |
+| --- | --- |
+| Add to cart (product page, real browser) | `nk_cart:v2` localStorage = 1 × `cmvwbytfn00023h9ll4wu2gys` @฿129.90, label “เมลลูกค้า”; cart is client-side by design — `Cart`/`CartItem` tables have no writer |
+| Place order from that cart (`POST /api/v1/orders`) | `NK-2026-000216` `pending_payment`, `totalAmountThb` = `129.90` (cart 129.9), item name stored in Thai, `createdAt …28.306` with milliseconds |
+| Order void (`POST /api/v1/admin/orders/:id/refund`) | order `refunded`; `Refund.amountThb` `129.90`, `codesVoidedCount` 1; the delivered `GiftCode` row `voided` with `voidedAt` + reason; audit `refund_issued` written |
+| Admin product save (`PUT /api/v1/admin/products/:id`) | name and description persisted; variant price `129.9 → "129.90"` (Decimal(10,2)); `updatedAt` moved; Thai + emoji + `ẞ` round-trip byte-identically |
+| Gift-code upload + decrypt (`POST /api/v1/admin/stock/bulk`, `GET …/codes/:id/reveal`) | 2 codes written (`ciphertext` 40 B, `nonce` 12 B, `hash` 32 B in `VARBINARY(32)`), `StockMove` restock +2 → stock 6, reveal returned the exact 24-char plaintext that was pasted, reveal audited |
+
+Also proven on the same run: fulfilment (`verify-payment`) delivered codes inside one
+serialisable transaction and stamped `completedAt`; an image upload of 1.47 MB stored a
+1,961,642-char `SiteSetting.value` and served the identical bytes back — the case that forced
+`LONGTEXT` over `TEXT`.
+
+No provider-specific defect surfaced: `Decimal`, `DateTime(3)`, `Bytes`/`VARBINARY(32)`, Thai
+`utf8mb4` text and the 2.6 MB `LONGTEXT` blob all behaved. The only corruption in this session
+was in the rehearsal harness, not the app: reading rows through the `mariadb` client without
+`--default-character-set=utf8mb4` returns Thai as `?`, and the harness then wrote that back —
+so the helper now pins the charset.
 
 ### Phase 4 findings (MariaDB traps worth remembering)
 
