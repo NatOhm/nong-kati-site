@@ -59,6 +59,10 @@ fidelity, and the Postgres-only gates described in Phase 2.
 
 ## 4. Phases
 
+**Backup first:** `docs/db-backup-restore.md` records the full-database backup artifacts
+(`backups/db-full-*.dump` + counts + manifest + verify receipt), what they do and do not cover,
+and the exact restore commands. Take a fresh one immediately before Phase 6.
+
 ### Phase 0 — preflight (no production contact)
 
 - [x] Branch: `db/mariadb-port`, created from `6955e9b`.
