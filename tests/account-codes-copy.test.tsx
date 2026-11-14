@@ -14,10 +14,13 @@
  *   C3  when the Clipboard API works, the exact code string is written.
  */
 import React from 'react';
+import { NextRequest } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import AccountCodesPage from '@/app/account/codes/page';
+import { GET } from '@/app/api/v1/account/codes/route';
+import { prisma } from '@/lib/db';
 
 const CODES = [
   {
@@ -132,5 +135,44 @@ describe('โค้ดที่ซื้อ — คัดลอกได้ท�
     await waitFor(() =>
       expect(writeText).toHaveBeenCalledWith(must(CODES[0], 'first code').code),
     );
+  });
+});
+
+/* ── API mapping: delivered ≠ used (client report 2026-11-14) ────────────── */
+
+vi.mock('@/lib/db', () => ({ prisma: { giftCode: { findMany: vi.fn() } } }));
+vi.mock('@/api/customerAuth', () => ({
+  getCustomerFromToken: vi.fn(async () => ({ id: 'cust-e2e', email: 'e2e@example.com' })),
+}));
+vi.mock('@/lib/crypto/giftCode', () => ({ decryptCode: vi.fn(() => 'FRESH-CODE-AAAA') }));
+
+describe('GET /api/v1/account/codes — a completed order does not make its code "used"', () => {
+  it('reports used=false for a delivered code whose order already reached completed', async () => {
+    const findMany = vi.mocked(prisma.giftCode.findMany);
+    findMany.mockResolvedValue([
+      {
+        id: 'c1',
+        codeEncrypted: new Uint8Array(),
+        nonce: new Uint8Array(),
+        keyVersion: 1,
+        deliveredAt: new Date('2026-11-14T00:00:00.000Z'),
+        // The order is completed (= delivered). That must NOT become "used".
+        order: { orderNumber: 'NK-2026-000205' },
+        orderItem: { productNameTh: 'HBO Max 7 วัน', denominationThb: 100, quantity: 1 },
+      },
+    ] as never);
+
+    const res = await GET(
+      new NextRequest('http://localhost/api/v1/account/codes', {
+        headers: { cookie: 'nk_session=test-token' },
+      }),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      codes: { code: string; orderNumber: string; used: boolean }[];
+    };
+    expect(body.codes).toHaveLength(1);
+    expect(body.codes[0]!.orderNumber).toBe('NK-2026-000205');
+    expect(body.codes[0]!.used, 'delivered is not used').toBe(false);
   });
 });
