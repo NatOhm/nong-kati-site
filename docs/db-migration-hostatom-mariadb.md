@@ -189,8 +189,11 @@ so the helper now pins the charset.
 
 1. **`TEXT` is 64 KB.** 94 String columns needed `LONGTEXT`; `SiteSetting.value` holds 31
    base64 images, the largest 2.68 MB. This is also the likely cause of the Supabase egress
-   bill: any page that reads those settings pulls megabytes from the database. Moving the
-   images to files/R2 is a follow-up of its own.
+   bill: any page that reads those settings pulls megabytes from the database. **Fixed** before the
+   cutover: uploads write files (`src/lib/imageStore.ts`, `NK_MEDIA_DIR`) and
+   `scripts/extract-images-to-files.mjs` moved the existing rows — 31 rows / 34.4 MB out of a
+   46.2 MB `SiteSetting` table, leaving 10.1 MB (all payment slips). See
+   [PLESK-CUTOVER.md §3 Step 7b](PLESK-CUTOVER.md).
 2. **A table cannot satisfy its own foreign key** in one multi-row `INSERT` (MySQL has no
    deferrable constraints), so `Category` is written parents-first.
 3. **`@unique Bytes` → `LONGBLOB` + `USING HASH`** unique index rejects distinct values;

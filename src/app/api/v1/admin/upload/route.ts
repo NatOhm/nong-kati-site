@@ -5,6 +5,7 @@ import { checkPermission } from '@/lib/rbac';
 import { getAdminToken } from '@/lib/adminRequest';
 import { imageDimensions, isWithinImageLimits, isWithinImageSize, MAX_IMAGE_BYTES } from '@/lib/imageValidation';
 import { pruneOrphanImageRows } from '@/lib/imageCleanup';
+import { writeImage } from '@/lib/imageStore';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,9 +25,12 @@ function bearer(req: NextRequest): string | null {
 
 /**
  * POST /api/v1/admin/upload — persist a product image and return its public
- * path (products:write). The image is stored in the database (SiteSetting
- * row `image:<hash>`) and served from GET /api/v1/images/[key], so it works
- * on any host — serverless or Node — with no filesystem writes.
+ * path (products:write).
+ *
+ * The bytes go to the filesystem (`NK_MEDIA_DIR`, default `storage/media`) and
+ * are served by GET /api/v1/images/[key]. A host without a writable disk falls
+ * back to the old behaviour — a `SiteSetting` row `image:<key>` holding the
+ * data URL — so the endpoint keeps working on serverless too.
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const token = bearer(req);
@@ -88,13 +92,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'IMAGE_DIMENSIONS_TOO_LARGE', message: 'รูปภาพมีขนาดพิกเซลใหญ่เกินกำหนด กรุณาย่อรูปก่อนอัปโหลด', maxDimension: MAX_DIMENSION }, { status: 400 });
   }
 
-  const key = `image:${Date.now().toString(36)}-${bytes.length.toString(36)}-${ALLOWED_TYPES[mime]}`;
+  const storageKey = `${Date.now().toString(36)}-${bytes.length.toString(36)}-${ALLOWED_TYPES[mime]}`;
 
-  await prisma.siteSetting.upsert({
-    where: { key },
-    update: { value: dataUrl, updatedBy: check.payload?.sub ?? null },
-    create: { key, value: dataUrl, updatedBy: check.payload?.sub ?? null },
-  });
+  let storedOnDisk = true;
+  try {
+    await writeImage(storageKey, bytes);
+  } catch {
+    // Read-only or missing media directory (serverless, locked-down host):
+    // keep the previous database-backed behaviour rather than failing an upload.
+    storedOnDisk = false;
+    await prisma.siteSetting.upsert({
+      where: { key: `image:${storageKey}` },
+      update: { value: dataUrl, updatedBy: check.payload?.sub ?? null },
+      create: { key: `image:${storageKey}`, value: dataUrl, updatedBy: check.payload?.sub ?? null },
+    });
+  }
 
   // Replacing a product photo used to leave its old row behind forever; sweep
   // unreferenced rows while an admin is already waiting on this upload. Never
@@ -102,7 +114,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   await pruneOrphanImageRows(prisma).catch(() => undefined);
 
   return NextResponse.json(
-    { path: `/api/v1/images/${key.slice('image:'.length)}` },
+    { path: `/api/v1/images/${storageKey}`, storage: storedOnDisk ? 'file' : 'database' },
     { status: 201 },
   );
 }

@@ -154,6 +154,11 @@ Verified against the MariaDB copy: 4 runs with `RETENTION_COUNT=3` kept exactly 
 the oldest; the newest restored into an empty MariaDB with 39 tables and the same per-table
 counts; a wrong password exited 1 and left no file behind.
 
+⚠️ **Uploaded product images are no longer in the database.** They are files under
+`NK_MEDIA_DIR` (`/httpdocs/storage/media` on the server), so a database dump alone will restore a
+catalogue whose images 404. The nightly dump covers rows; Plesk's Backup Manager (files + database)
+is what covers the media directory. Restore both together.
+
 ## Taking a new backup (the Postgres source, before the cutover)
 
 ```bash

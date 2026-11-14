@@ -307,6 +307,41 @@ returns the build you just made.
   `TARGET_DATABASE_URL="mysql://nk_app:DBPASS@127.0.0.1:3307/nong_kati" node scripts/precutover-check.mjs`
   (through the tunnel; it cleans up after itself).
 
+### Step 7b — move the product images onto disk (egress)
+
+Until now every product photo was a `data:image/…;base64,…` string inside a `SiteSetting` row
+(`image:<key>`), so each photo view was a database read: on the copy, **31 rows / 34.4 MB**, the
+largest 2.68 MB. Uploads now write files, and the extraction script moves the existing rows:
+
+```bash
+# 1. extract from the server's database through the tunnel, into a local folder
+DATABASE_URL="mysql://nk_app:DBPASS@127.0.0.1:3307/nong_kati" \
+  node scripts/extract-images-to-files.mjs --out-dir=./tmp/media          # dry run
+DATABASE_URL="mysql://nk_app:DBPASS@127.0.0.1:3307/nong_kati" \
+  node scripts/extract-images-to-files.mjs --out-dir=./tmp/media --apply
+
+# 2. upload the files to the server (the docroot, where the app will look)
+scp -r ./tmp/media/* nongka@thsv93.hostatom.com:httpdocs/storage/media/
+```
+
+**Checkpoints:** the dry run reports every row decoded and verified; `--apply` then prints
+`rows deleted: 31` and re-running it says `nothing to do`; `SELECT COUNT(*) FROM SiteSetting
+WHERE key LIKE 'image:%'` is **0** while `slip:` rows are untouched (they stay in the database —
+private evidence, covered by the retention job).
+
+Why the files go up by `scp` instead of running the script on the server: the Plesk chroot has no
+`node` on PATH, and the app reads whatever `NK_MEDIA_DIR` names — so the extractor runs where
+Node exists and only bytes travel.
+
+3. Set `NK_MEDIA_DIR=/httpdocs/storage/media` in the panel, **Restart App**, then load a product
+   page and an image URL directly:
+   ```bash
+   curl -s -o /dev/null -w '%{http_code} %{content_type} %{size_download}\n' \
+     https://nongkatistore.com/api/v1/images/<key>-png
+   ```
+   `200 image/png` with the file's size. The route reads disk first and only falls back to a
+   legacy row, so nothing breaks if a row is missed.
+
 ### Step 8 — leave it soaking
 
 Supabase stays untouched and paused only after the soak (§5). Do not delete it.
@@ -354,6 +389,7 @@ The Supabase project is not paused or deleted until §5, so rollback is minutes,
 | Gift codes reveal/deliver | Admin reveal; one real purchase | plaintext appears, no `unable to authenticate data` |
 | Money is exact | Spot-check a wallet debit and a refund against the order total | satang-exact |
 | Nothing still reads Supabase | Supabase dashboard → Usage: egress should be **flat/near-zero** | proves the cutover is complete |
+| Images are not touching the database | `SELECT COUNT(*) FROM SiteSetting WHERE key LIKE 'image:%'` = 0, and `storage/media` holds the files | egress per page view drops by up to 34 MB of row reads |
 | Nightly dumps exist | `ls -lh /var/backups/nong-kati` | a new dump per day, retention holding at 14 |
 
 Then, and only then:
@@ -454,6 +490,7 @@ agent cannot read that project, so **?** rows are unverified, not missing.
 | `NK_SLIP2GO_SECRET` | `src/lib/payment/slip2go.ts` | bearer secret; absent ⇒ `isSlip2GoConfigured()` is false and the SlipOK path is used instead — with neither configured, slips are checked by hand | **I** |
 | `NK_SLIP2GO_BASE` | `slip2go.ts` | unset ⇒ `https://connect.slip2go.com` | **?** (leave unset) |
 | `NK_SLIP_TOKEN_SECRET` | slip status tokens | unset ⇒ reuses `NK_JWT_SECRET` | **?** (optional) |
+| `NK_MEDIA_DIR` | `src/lib/imageStore.ts` (uploads + `GET /api/v1/images/[key]`) | absolute path for uploaded images; unset ⇒ `<cwd>/storage/media`. Set it to `/httpdocs/storage/media` so a deploy (which rewrites the docroot) cannot shadow it | **new** — add at cutover |
 | `NK_RESEND_API_KEY` | `src/lib/email/config.ts` | `re_…`; absent ⇒ outbox rows stay failed, no customer email | **?** |
 | `NK_RESEND_FROM_EMAIL` | `src/lib/email/config.ts` | a verified sender on the Resend domain | **?** |
 | `NK_RESEND_API_URL` | `src/lib/email/config.ts` | override only; leave unset | **?** (optional) |

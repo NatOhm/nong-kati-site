@@ -64,3 +64,6 @@ deploy-bundle.tar.gz
 /*-state*.js
 /.vitest/
 /*.zip
+
+# Runtime image store (uploads land here; NK_MEDIA_DIR in production)
+/storage/
