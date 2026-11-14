@@ -1426,6 +1426,7 @@ W1–W3 ข้างบนพิสูจน์แค่ "route ถามคำ�
 - **ปัญหาจริง** — `POST /api/v1/admin/upload` เขียน `SiteSetting` row `image:<key>` เป็น data URL และ `GET /api/v1/images/[key]` decode ทุกครั้ง · บน copy มี 31 row = 34.4 MB (ใหญ่สุด 2.68 MB) จากทั้งหมด 46.2 MB ของตาราง SiteSetting · ทุก page view ที่มีรูปคือ egress ก้อนโตจาก DB
 - **ตอนนี้** — `src/lib/imageStore.ts` เขียนไฟล์แบบ atomic (`.partial` แล้ว rename) ใต้ `NK_MEDIA_DIR` (ค่าเริ่มต้น `<cwd>/storage/media`) · `GET /api/v1/images/[key]` อ่านดิสก์ก่อนและไม่แตะ DB เลยเมื่อไฟล์มีอยู่ · ถ้าไม่มีไฟล์จึงค่อย fallback ไป row เดิม, ปฏิเสธ `slip:` ด้วย 403 เหมือนเดิม · upload ยังเขียน DB ให้เฉพาะ host ที่เขียนดิสก์ไม่ได้ · `scripts/extract-images-to-files.mjs` ย้าย row เก่าโดย verify SHA-256 จากไฟล์ก่อนลบ (dry-run เป็นค่าเริ่มต้น)
 - **F1–F4** ไฟล์ที่เขียนแล้วอ่านกลับได้ไบต์ตรงกันและ MIME มาจาก suffix ของ key · route เสิร์ฟจากดิสก์โดยไม่เรียก prisma เลย · ไฟล์หาย/ยังไม่ย้ายต้องตกไปใช้ row เดิม · สลิปไม่โผล่ทาง route สาธารณะ และ key ที่มี `..`/`/` ถูกปฏิเสธ
+- **ขยะบนดิสก์** — การย้ายไปไฟล์ทำให้ตัวเก็บกวาดเดิม (ซึ่งลบเฉพาะ row) ไม่มีอะไรให้ทำ: `pruneOrphanImageFiles` ลบไฟล์ที่ไม่มี Product/setting อ้างถึงและเก่ากว่า 24 ชม. โดยไม่แตะไฟล์ชื่อที่ไม่ใช่ key (เช่น `.partial`) — เทสต์อยู่ใน `tests/image-orphan-cleanup.test.ts` ชุดเดียวกัน
 - **ทำไมต้องกัน** — รูปหายแล้วหน้าเว็บยัง 200 แต่เป็นช่องว่าง: ถ้า route เผลอเรียก DB ก่อน ต้นทุน egress จะกลับมาเงียบ ๆ และถ้าไม่มี fallback รูปรุ่นเก่าจะ 404 ทันทีที่ deploy
 
 ## ปุ่มย้อนกลับปิด overlay และล็อกการเลื่อนแบบ iOS (13 พ.ย. 2569) — `tests/mobile-overlay.test.tsx`

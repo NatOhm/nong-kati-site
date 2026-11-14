@@ -9,9 +9,16 @@
  * points at (logo/banner), and rows younger than 24h (the admin flow uploads
  * before saving the product). Everything else is deleted.
  */
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
-import { IMAGE_ORPHAN_MIN_AGE_MS, pruneOrphanImageRows } from '@/lib/imageCleanup';
+import {
+  IMAGE_ORPHAN_MIN_AGE_MS,
+  pruneOrphanImageFiles,
+  pruneOrphanImageRows,
+} from '@/lib/imageCleanup';
 
 type PruneClient = Parameters<typeof pruneOrphanImageRows>[0];
 
@@ -89,5 +96,57 @@ describe('pruneOrphanImageRows', () => {
     const { client: c, deleteMany } = client([old('image:logo')], [], ['image:logo']);
     expect((await pruneOrphanImageRows(c, NOW)).deleted).toBe(0);
     expect(deleteMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('pruneOrphanImageFiles', () => {
+  it('deletes only old, unreferenced files and leaves everything else alone', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'nk-media-gc-'));
+    const oldDate = new Date(NOW.getTime() - IMAGE_ORPHAN_MIN_AGE_MS - 60_000);
+    const write = async (name: string, body: string, mtime: Date) => {
+      const file = path.join(dir, name);
+      await fs.writeFile(file, body);
+      await fs.utimes(file, mtime, mtime);
+      return file;
+    };
+
+    const keptProduct = await write('kept-product', 'referenced', oldDate);
+    const keptFresh = await write('fresh', 'just uploaded', NOW);
+    const orphan = await write('orphan-old', 'nobody wants me', oldDate);
+    const notAKey = await write('notes.txt', 'operator note', oldDate);
+    const partial = await write('.orphan-old.partial', 'half written', oldDate);
+
+    const { client: c } = client(
+      [],
+      ['/api/v1/images/kept-product'],
+      ['/api/v1/images/kept-setting'],
+    );
+    const result = await pruneOrphanImageFiles(c, dir, NOW);
+
+    expect(result).toEqual({ scanned: 3, deleted: 1, freedBytes: 'nobody wants me'.length });
+    await expect(fs.stat(orphan)).rejects.toThrow();
+    for (const survivor of [keptProduct, keptFresh, notAKey, partial]) {
+      await expect(fs.stat(survivor)).resolves.toBeTruthy();
+    }
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+
+  it('reports zeros when the media directory does not exist yet', async () => {
+    const { client: c } = client([]);
+    const missing = path.join(os.tmpdir(), `nk-media-missing-${Date.now()}`);
+    expect(await pruneOrphanImageFiles(c, missing, NOW)).toEqual({ scanned: 0, deleted: 0, freedBytes: 0 });
+  });
+
+  it('keeps a file a setting still points at, even when it is old', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'nk-media-gc-'));
+    const file = path.join(dir, 'logo-key');
+    await fs.writeFile(file, 'logo');
+    const old = new Date(NOW.getTime() - IMAGE_ORPHAN_MIN_AGE_MS - 60_000);
+    await fs.utimes(file, old, old);
+
+    const { client: c } = client([], [], ['image:logo-key']);
+    expect((await pruneOrphanImageFiles(c, dir, NOW)).deleted).toBe(0);
+    await expect(fs.stat(file)).resolves.toBeTruthy();
+    await fs.rm(dir, { recursive: true, force: true });
   });
 });

@@ -4,7 +4,7 @@ import { prisma } from '@/lib/db';
 import { checkPermission } from '@/lib/rbac';
 import { getAdminToken } from '@/lib/adminRequest';
 import { imageDimensions, isWithinImageLimits, isWithinImageSize, MAX_IMAGE_BYTES } from '@/lib/imageValidation';
-import { pruneOrphanImageRows } from '@/lib/imageCleanup';
+import { pruneOrphanImages } from '@/lib/imageCleanup';
 import { writeImage } from '@/lib/imageStore';
 
 export const dynamic = 'force-dynamic';
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // Replacing a product photo used to leave its old row behind forever; sweep
   // unreferenced rows while an admin is already waiting on this upload. Never
   // fail the upload over it — the new image is stored and useful either way.
-  await pruneOrphanImageRows(prisma).catch(() => undefined);
+  await pruneOrphanImages(prisma).catch(() => undefined);
 
   return NextResponse.json(
     { path: `/api/v1/images/${storageKey}`, storage: storedOnDisk ? 'file' : 'database' },
