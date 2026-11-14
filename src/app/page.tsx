@@ -99,6 +99,19 @@ export default async function HomePage(): Promise<React.JSX.Element> {
   // would never see one — the grouping existed only in the database.
   const { groups: appGroups, looseApps } = splitAppGroups(categories);
 
+  // Hero v2: a price anchor is the one thing the old hero never said, and it
+  // needs no extra query — the featured variants are already awaited above.
+  const heroPrices = featuredProducts.flatMap((p) => p.variants.map((v) => v.effectivePrice));
+  const heroPrice = heroPrices.length > 0 ? Math.min(...heroPrices) : null;
+
+  // Hero tiles: illustrated apps only — an emoji-only tile next to the
+  // headline reads as a bullet, not as merchandise. First group's children
+  // win (they are the shop's headline apps), loose apps fill in when the
+  // catalogue has no groups yet.
+  const heroApps = (appGroups.length > 0 ? appGroups.flatMap((g) => g.children) : looseApps)
+    .filter((c) => Boolean(c.imageUrl))
+    .slice(0, 3);
+
   return (
     <>
       <StructuredData
@@ -114,33 +127,78 @@ export default async function HomePage(): Promise<React.JSX.Element> {
         {/* Hero carousel — admin-managed promo banners (hidden until configured) */}
         {heroSlides.length > 0 && <HeroCarousel slides={heroSlides} />}
 
-        {/* Announcement board — the headline framed as a notice board (client ask).
-            Audit #9: tightened vertical rhythm on mobile so the category/app
-            grid enters the first viewport (pt-8→pt-4, py-5→py-3 on mobile). */}
-        <section className="px-4 pt-4 md:px-8 md:pt-8">
-          <div className="mx-auto max-w-3xl rounded-2xl border-2 border-dashed border-peach-300 bg-peach-50 px-4 py-3 text-center shadow-clay-sm sm:px-6 sm:py-5 dark:border-peach-700/60 dark:bg-peach-900/20">
-            {/* Hamster mascot waving at the headline — the site mascot, so an
-                admin-uploaded mascot replaces it here as well as in the logo. */}
-            <SiteMascot
-              size={84}
-              className="mascot-wave mx-auto mb-1 block w-fit drop-shadow-[0_3px_5px_rgba(147,107,73,0.28)]"
-            />
-            {/* Site-wide h1 (landmark spec): the notice-board headline is the
-                page's main heading — p→h1 keeps the identical clay styling. */}
-            <h1 className="font-display text-xl font-bold leading-snug text-fg-brand-strong sm:text-2xl">
-              แอคดูหนัง ซีรีส์ ส่งถึงอีเมลหลังยืนยันการชำระเงิน
-            </h1>
-            {/* clay-700 lands exactly 4.50 on the peach-50 card — use clay-800
-                for headroom (7.11). Dark keeps the muted token. */}
-            <p className="mt-1.5 text-sm text-clay-800 dark:text-fg-muted">
-              โอนเงินแล้วอัปโหลดสลิป ทีมงานยืนยันและส่งโค้ดให้ทันที
-            </p>
-            <Link
-              href="/search"
-              className="transition-smart mt-4 inline-flex min-h-[48px] w-full items-center justify-center rounded-full bg-peach-500 px-8 py-2.5 text-sm font-semibold text-white shadow-clay-brand hover:bg-peach-400 hover:shadow-clay-lg active:scale-95 active:shadow-clay-press sm:w-auto"
-            >
-              เลือกซื้อสินค้า
-            </Link>
+        {/* Hero v2 — the notice board plus what is actually on sale.
+            The award-winning e-commerce heroes we benchmarked (Bucks Sauce,
+            Serotoninn — both SOTD 2026) put merchandise in the first screen;
+            ours sold the checkout flow and showed no product at all. So from
+            md up the section runs two columns: the announcement card on the
+            left, the three illustrated app tiles on the right.
+            The tiles stay out of the phone's first screen on purpose — mobile
+            keeps the audit #9 promise that the category grid enters the first
+            viewport, and gets the price anchor instead.
+            This band is the page's only tonal break: the whole page used to be
+            one `rgb(255,247,237)` from top to bottom. `bg-peach-100` is a real
+            background-color underlay (the contrast scanner follows
+            background-color only), the gradient paints over it. */}
+        <section className="bg-peach-100 bg-gradient-to-b from-peach-100 via-peach-50 to-surface px-3 pt-4 pb-6 md:px-8 md:pt-8 dark:bg-clay-900 dark:from-clay-900 dark:via-clay-900 dark:to-surface">
+          <div className="mx-auto grid max-w-5xl gap-4 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] md:items-center md:gap-6">
+            <div className="rounded-2xl border-2 border-dashed border-peach-300 bg-peach-50 px-4 py-3 text-center shadow-clay-sm sm:px-6 sm:py-5 md:text-left dark:border-peach-700/60 dark:bg-peach-900/20">
+              {/* Mascot — 56px on phones so the headline, the price and the CTA
+                  all sit inside the first screen. The `!` classes beat
+                  SiteMascot's inline width/height (it pins the size inline on
+                  purpose, see its comment); 84px returns from sm up.
+                  An admin-uploaded mascot replaces it here as well as the logo. */}
+              <SiteMascot
+                size={56}
+                className="mascot-wave mx-auto mb-1 block w-fit !h-14 !w-14 drop-shadow-[0_3px_5px_rgba(147,107,73,0.28)] sm:!h-[84px] sm:!w-[84px] md:mx-0"
+              />
+              {/* Site-wide h1 (landmark spec): the notice-board headline is the
+                  page's main heading — p→h1 keeps the identical clay styling. */}
+              <h1 className="font-display text-xl font-bold leading-snug text-fg-brand-strong sm:text-2xl">
+                แอคดูหนัง ซีรีส์ ส่งถึงอีเมลหลังยืนยันการชำระเงิน
+              </h1>
+              {/* clay-700 lands exactly 4.50 on the peach-50 card — use clay-800
+                  for headroom (7.11). Dark keeps the muted token. */}
+              <p className="mt-1.5 text-sm text-clay-800 dark:text-fg-muted">
+                โอนเงินแล้วอัปโหลดสลิป ทีมงานยืนยันและส่งโค้ดให้ทันที
+              </p>
+              {/* Price + delivery promise. Brand-strong (the h1's token, which
+                  already passes the dark scan) — a peach ramp colour here read
+                  1.5:1 against the dark band because the scanner resolves the
+                  base class, not `dark:text-*`. */}
+              {heroPrice !== null && (
+                <p className="mt-2 text-sm font-semibold text-fg-brand-strong">
+                  เริ่ม ฿{heroPrice.toLocaleString('th-TH')} · ส่งโค้ดถึงอีเมลในไม่กี่นาที
+                </p>
+              )}
+              <Link
+                href="/search"
+                className="transition-smart mt-4 inline-flex min-h-[48px] w-full items-center justify-center rounded-full bg-peach-500 px-8 py-2.5 text-sm font-semibold text-white shadow-clay-brand hover:bg-peach-400 hover:shadow-clay-lg active:scale-95 active:shadow-clay-press sm:w-auto"
+              >
+                เลือกซื้อสินค้า
+              </Link>
+            </div>
+
+            {heroApps.length > 0 && (
+              <div className="hidden md:block">
+                <p className="mb-2 text-xs font-semibold text-clay-800 dark:text-fg-muted">
+                  แอปยอดนิยม
+                </p>
+                <div className="grid grid-cols-3 gap-3">
+                  {heroApps.map((cat) => (
+                    <AppTile
+                      key={cat.id}
+                      name={cat.name}
+                      slug={cat.slug}
+                      icon={cat.icon}
+                      imageUrl={cat.imageUrl}
+                      productSlug={cat.productSlug}
+                      productCount={cat.productCount}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </section>
 
