@@ -38,7 +38,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       nonce: true,
       keyVersion: true,
       deliveredAt: true,
-      order: { select: { orderNumber: true, status: true } },
+      order: { select: { orderNumber: true } },
       orderItem: {
         select: { productNameTh: true, denominationThb: true, quantity: true },
       },
@@ -57,7 +57,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       denomination: Number(row.orderItem?.denominationThb ?? 0),
       orderNumber: row.order?.orderNumber ?? '',
       deliveredAt: row.deliveredAt?.toISOString() ?? null,
-      used: row.order?.status === 'completed',
+      // The store cannot know whether a gift code was redeemed outside it —
+      // an order reaching `completed` means "delivered", not "used". Deriving
+      // this from the order status dimmed every fresh code and printed
+      // ใช้แล้ว on it, so two cards of the same app looked alike and both
+      // looked spent (client report 2026-11-14).
+      used: false,
     })),
   });
 }
