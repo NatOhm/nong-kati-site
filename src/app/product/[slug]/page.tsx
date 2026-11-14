@@ -169,7 +169,9 @@ export default async function ProductPage({
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center">
-                      <span className="text-6xl opacity-40">🎮</span>
+                      <span className="text-6xl opacity-40" aria-hidden="true">
+                        🎮
+                      </span>
                     </div>
                   )}
                 </div>

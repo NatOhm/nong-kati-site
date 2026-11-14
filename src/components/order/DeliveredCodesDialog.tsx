@@ -57,8 +57,11 @@ export function DeliveredCodesDialog({
   const allCodes = codes.map((c) => c.code).join('\n');
 
   return (
+    // iOS: the sheet is anchored to the bottom edge, so it has to clear the
+    // home indicator (env() is 0 on Android/desktop, so nothing moves there).
     <div
       className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 p-4 sm:items-center"
+      style={{ paddingBottom: 'calc(1rem + var(--nk-safe-bottom))' }}
       onClick={(e) => {
         // Backdrop tap closes; taps inside the panel must not.
         if (e.target === e.currentTarget) onClose();
@@ -69,6 +72,11 @@ export function DeliveredCodesDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-xl border border-line-subtle bg-surface-base p-5 shadow-clay"
+        // 85dvh, not 85vh: with Safari's URL bar expanded, 85vh is taller than
+        // the visible area and the copy button sat under the toolbar. Inline
+        // style is the fallback-safe form: engines without dvh drop the
+        // declaration and the vh class above still applies.
+        style={{ maxHeight: '85dvh' }}
       >
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>

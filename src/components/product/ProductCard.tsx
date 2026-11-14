@@ -94,7 +94,9 @@ export function ProductCard({
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-peach-100 to-clay-200">
-                <span className="text-4xl opacity-40">🎮</span>
+                <span className="text-4xl opacity-40" aria-hidden="true">
+                  🎮
+                </span>
               </div>
             )}
             {/* Stock badge overlay */}
@@ -210,7 +212,9 @@ export function ProductCard({
           ) : (
             <Link
               href={`/product/${slug}`}
-              className="clay-btn inline-flex h-11 min-h-[44px] w-full items-center justify-center rounded-full bg-surface-sunken text-sm font-semibold text-fg-muted shadow-none"
+              // fg-muted (clay-700) is only 4.29:1 on --bg-sunken (#FEF3C7);
+              // clay-800 is 6.78:1 and clay-200 keeps the same job in dark.
+              className="clay-btn inline-flex h-11 min-h-[44px] w-full items-center justify-center rounded-full bg-surface-sunken text-sm font-semibold text-clay-800 shadow-none dark:text-clay-200"
             >
               ดูสินค้า
             </Link>

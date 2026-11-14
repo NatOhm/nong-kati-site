@@ -10,6 +10,7 @@ import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { Settings, ShieldCheck } from 'lucide-react';
 import { cn } from '@/utils/cn';
+import { safeSetItem } from '@/lib/storage';
 
 const CONSENT_KEY = 'nk_cookie_consent';
 const CONSENT_VERSION = '1.0';
@@ -39,7 +40,9 @@ export function getStoredConsent(): CookieConsent | null {
 
 export function storeConsent(consent: CookieConsent): void {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(CONSENT_KEY, JSON.stringify(consent));
+  // Private-mode storage throws on write; an unguarded throw here escaped the
+  // click handler straight into the error boundary.
+  safeSetItem(CONSENT_KEY, JSON.stringify(consent));
 }
 
 // ─── Component ───────────────────────────────────────────

@@ -41,10 +41,11 @@ export const viewport: Viewport = {
   // Without cover, Safari letterboxes the page above the home indicator and
   // `env()` reports 0 — safe, but the taskbar floats on a cream strip.
   viewportFit: 'cover',
-  // Android Chrome: shrink the layout viewport when the keyboard opens so
-  // fixed bars and the focused field are not left under it. iOS ignores this
-  // (it shrinks the visual viewport instead) and keeps its native behaviour.
-  interactiveWidget: 'resizes-content',
+  // NB: `interactiveWidget` is intentionally NOT declared here. It is a
+  // Chromium-only viewport key — Safari logs "not recognized and ignored" and
+  // then gets none of the behaviour it implies, so declaring it made the
+  // keyboard story look solved on iOS when it was not. Chromium still gets it
+  // from /theme-init.js, which adds it only for Chromium user agents.
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#FFF7ED' },
     { media: '(prefers-color-scheme: dark)', color: '#3A2A18' },
@@ -131,6 +132,19 @@ export default async function RootLayout({
         />
       </head>
       <body className="text-thai font-ui">
+        {/* ONE skip link for the whole product, rendered before every piece of
+            chrome — including the storage-gated consent banner, which used to
+            be the first Tab stop on a phone and pushed the skip link into
+            second place (landmark gate, iPhone + Android runs 2026-11-14). */}
+        <a
+          href="#main-content"
+          // Off-screen rather than sr-only (clip:rect(0,0,0,0)): both WebKit
+          // and Chromium skipped the clipped anchor in sequential focus
+          // navigation, so the first Tab landed on the menu button instead.
+          className="absolute -top-24 left-4 z-[100] rounded-md bg-peach-700 px-4 py-2.5 text-sm font-semibold text-white shadow-clay transition-[top] focus:top-4"
+        >
+          ข้ามไปยังเนื้อหาหลัก
+        </a>
         <RouteProgress />
         {/* Shared SVG paint-server defs (one document-wide registry — the
             duplicate-ID gate's sanctioned source of literal gradient ids). */}

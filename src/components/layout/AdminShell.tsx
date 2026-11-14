@@ -120,7 +120,13 @@ export function AdminShell({
         />
 
         {/* Page content */}
-        <main className={cn('flex-1 overflow-y-auto p-6', className)}>{children}</main>
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className={cn('flex-1 overflow-y-auto p-6 outline-none', className)}
+        >
+          {children}
+        </main>
       </div>
     </div>
   );

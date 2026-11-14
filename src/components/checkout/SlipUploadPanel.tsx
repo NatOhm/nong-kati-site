@@ -57,8 +57,13 @@ export function SlipUploadPanel({
   const [ticket, setTicket] = useState<SlipTicket | null>(null);
 
   function pick(f: File | null): void {
+    // Cancelling the iOS photo picker fires change with no file — nothing to do.
     if (!f) return;
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(f.type)) {
+    // iOS Photos hands over HEIC (or an empty MIME type) even when the picker
+    // was opened for an image; rejecting those told iPhone users their own
+    // screenshot was "not an image". Anything that is not explicitly a
+    // non-image is accepted and the server still validates the bytes.
+    if (f.type && !f.type.startsWith('image/')) {
       setResult({ ok: false, message: 'รองรับเฉพาะไฟล์ภาพ JPG/PNG/WebP' });
       return;
     }
@@ -282,7 +287,10 @@ export function SlipUploadPanel({
           <input
             ref={inputRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp"
+            // image/* (not a fixed list): iOS only offers the Photos library
+            // for image/* and converts HEIC itself; a narrow list hides the
+            // library behind "Take Photo".
+            accept="image/*"
             className="hidden"
             onChange={(e) => pick(e.target.files?.[0] ?? null)}
           />

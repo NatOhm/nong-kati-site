@@ -7,6 +7,7 @@
  */
 
 import { randomUUID } from '@/lib/uuid';
+import { safeGetItem, safeRemoveItem, safeSetItem } from '@/lib/storage';
 
 export interface CartItemData {
   id: string;
@@ -55,15 +56,21 @@ const CART_EXPIRY_HOURS = 24;
 /**
  * Generate or retrieve the session key (UUID) from localStorage.
  */
+/** In-memory session key for browsers where storage throws (iOS Private Mode). */
+let volatileSessionKey: string | null = null;
+
 export function getSessionKey(): string {
   if (typeof window === 'undefined') return '';
 
-  const existing = localStorage.getItem(CART_STORAGE_KEY);
+  const existing = safeGetItem(CART_STORAGE_KEY);
   if (existing) return existing;
 
   const newKey = randomUUID();
-  localStorage.setItem(CART_STORAGE_KEY, newKey);
-  return newKey;
+  // If the write is refused the cart still works for this page view — it just
+  // cannot survive a reload. Throwing here blanked the whole storefront.
+  if (safeSetItem(CART_STORAGE_KEY, newKey)) return newKey;
+  volatileSessionKey ??= newKey;
+  return volatileSessionKey;
 }
 
 /**
@@ -71,7 +78,7 @@ export function getSessionKey(): string {
  */
 export function clearSessionKey(): void {
   if (typeof window === 'undefined') return;
-  localStorage.removeItem(CART_STORAGE_KEY);
+  safeRemoveItem(CART_STORAGE_KEY);
 }
 
 /**

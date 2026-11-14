@@ -39,12 +39,8 @@ export function FacebookLayout({ children, searchCategory }: FacebookLayoutProps
           never useful to a touch user. Keyboard Tab still reveals it
           (focus-visible matches), and it now renders `fixed` below the sticky
           navbar at any scroll depth instead of covering the logo at top-left. */}
-      <a
-        href="#main-content"
-        className="sr-only focus-visible:not-sr-only focus-visible:fixed focus-visible:left-4 focus-visible:top-20 focus-visible:z-[100] focus-visible:rounded-md focus-visible:bg-peach-700 focus-visible:px-4 focus-visible:py-2.5 focus-visible:text-sm focus-visible:font-semibold focus-visible:text-white focus-visible:shadow-clay"
-      >
-        ข้ามไปยังเนื้อหาหลัก
-      </a>
+      {/* The skip link lives in app/layout.tsx now — it has to precede the
+          consent banner, which is rendered before this shell. */}
       {/* Announcement strip — admin-editable via /management/settings */}
       <AnnouncementBar />
 

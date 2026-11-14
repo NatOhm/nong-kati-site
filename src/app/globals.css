@@ -53,6 +53,12 @@
   summary {
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
+    /* iOS long-press on a tappable card/button popped the Callout menu and
+       selected the label instead of activating the tap. Text that must stay
+       copyable (codes, order numbers) opts back in with .select-text. */
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
   }
 
   html {

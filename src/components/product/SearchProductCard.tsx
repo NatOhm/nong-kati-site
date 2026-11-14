@@ -92,7 +92,9 @@ export function SearchProductCard({
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center">
-              <span className="text-4xl opacity-30">🎮</span>
+              <span className="text-4xl opacity-30" aria-hidden="true">
+                🎮
+              </span>
             </div>
           )}
           {/* Stock badge left, wishlist heart right — reference layout */}

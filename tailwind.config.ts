@@ -12,6 +12,16 @@ const config: Config = {
   darkMode: ['selector', '[data-theme="dark"]'],
   theme: {
     extend: {
+      /* `bg-error` / `border-error` were referenced by the alert components but
+         had no utility — the alerts painted no background at all, so the pale
+         dark-mode error text sat on the cream card (1.86:1 measured on the
+         iPhone profile). Bind both to their semantic tokens. */
+      backgroundColor: {
+        error: 'var(--bg-error)',
+      },
+      borderColor: {
+        error: 'var(--border-error)',
+      },
       colors: {
         clay: {
           50: '#FAFAF9',

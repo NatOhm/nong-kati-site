@@ -190,7 +190,9 @@ export function QuickViewModal({
 // eslint-disable-next-line @next/next/no-img-element -- admin-upload/data-URL source: served immutable via /api/v1/images or inline QR; next/image optimizer has no remote pattern for these hosts
                   <img src={product.imageUrl} alt="" className="h-full w-full object-cover" />
                 ) : (
-                  <span className="text-2xl opacity-40">🎮</span>
+                  <span className="text-2xl opacity-40" aria-hidden="true">
+                    🎮
+                  </span>
                 )}
               </div>
               <div>
