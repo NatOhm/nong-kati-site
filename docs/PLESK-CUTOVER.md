@@ -92,7 +92,9 @@ DATABASE_DIRECT_URL="mysql://nk_app:DBPASS@localhost:3306/nong_kati"
 
 - `mysql://`, not `postgresql://` — a leftover `postgresql://` makes every query fail.
 - **No `?schema=store`.** On Postgres that selected a schema; on MariaDB the database *is* the
-  schema, and Prisma rejects the parameter on MySQL.
+  schema. Tested: Prisma **silently ignores** the parameter on MySQL (`migrate status` reports
+  `MySQL database "ci" at "127.0.0.1:3307"` and succeeds) — so a URL copied from the Postgres
+  days will not fail loudly, it just carries a lie. Drop it.
 - `?connection_limit=5` is accepted and harmless (Prisma pools per process; with one Passenger
   process it changes nothing). Omit it unless you are tuning.
 - Same-host Plesk MariaDB ⇒ host `localhost`, port `3306`, plain TCP. There is no pooler and no
