@@ -32,8 +32,10 @@ sha256sum backups/db-full-2026-11-14T20-36-47.dump   # compare with the manifest
 
 ## What the backup covers
 
-- **All eight schemas**: `public`, `auth`, `extensions`, `graphql`, `graphql_public`,
-  `realtime`, `storage`, `vault` — DDL (tables, indexes, constraints, sequences) and rows.
+- **All nine schemas**: `public`, `auth`, `extensions`, `graphql`, `graphql_public`,
+  `pgbouncer`, `realtime`, `storage`, `vault` — DDL (tables, indexes, constraints, sequences)
+  and rows. Schemas that hold no tables (`extensions`, `graphql`, `graphql_public`,
+  `pgbouncer`) are still in the dump; only the five with tables appear in `counts.json`.
 - **77 tables, 2857 rows**, of which 31 tables hold data. That includes the Prisma migration
   bookkeeping (`public._prisma_migrations`, 36 rows) — the history that
   `prisma migrate deploy` compares against — plus Supabase's own bookkeeping tables
