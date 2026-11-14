@@ -319,6 +319,11 @@ export default function CheckoutPage(): React.JSX.Element {
         if (status.status === 'succeeded') {
           clearInterval(interval);
           setPaymentState((prev) => (prev ? { ...prev, status: 'succeeded' } : null));
+          // The order is paid: drop it from the cart before navigating away, or
+          // the confirmation page (and every later visit) still shows a cart
+          // badge for an item already bought. Slip and credit payments already
+          // clear it; the QR path navigated straight out and left it behind.
+          clearCart();
           // Redirect to confirmation
           if (status.confirmationUuid) {
             window.location.href = `/checkout/confirmation/${status.confirmationUuid}`;
@@ -331,7 +336,7 @@ export default function CheckoutPage(): React.JSX.Element {
 
     // Stop polling after 15 minutes (QR expiry)
     setTimeout(() => clearInterval(interval), 15 * 60 * 1000);
-  }, []);
+  }, [clearCart]);
 
   // Initiate payment
   const handleInitiatePayment = useCallback(

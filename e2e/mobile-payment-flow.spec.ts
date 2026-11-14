@@ -50,9 +50,16 @@ function cartItem() {
   };
 }
 
-/** Seed the persisted cart before any app script runs. */
+const SEED_ITEM = cartItem();
+
+/**
+ * Seed the persisted cart before any app script runs — ONCE per context.
+ * A paid checkout writes an EMPTY cart; re-seeding on every navigation would
+ * hide exactly the state this spec has to observe.
+ */
 async function seedCart(page: Page): Promise<void> {
   await page.addInitScript((item) => {
+    if (localStorage.getItem('nk_cart:v2')) return;
     const sessionKey = 'e2e-mobile-session';
     localStorage.setItem('nk_cart_session', sessionKey);
     localStorage.setItem(
@@ -71,7 +78,41 @@ async function seedCart(page: Page): Promise<void> {
         expiresAt: null,
       }),
     );
-  }, cartItem());
+  }, SEED_ITEM);
+}
+
+/** Put the cart back for a second purchase in the same browser context. */
+async function reseedCart(page: Page): Promise<void> {
+  await page.evaluate((item) => {
+    const sessionKey = 'e2e-mobile-session';
+    localStorage.setItem('nk_cart_session', sessionKey);
+    localStorage.setItem(
+      'nk_cart:v2',
+      JSON.stringify({
+        cartId: null,
+        sessionKey,
+        items: [item],
+        summary: {
+          subtotalThb: 100,
+          vatAmountThb: 0,
+          totalAmountThb: 100,
+          itemCount: 1,
+          discountAmountThb: 0,
+        },
+        expiresAt: null,
+      }),
+    );
+  }, SEED_ITEM);
+}
+
+/** Lines left in the persisted cart. */
+async function cartLineCount(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const raw = localStorage.getItem('nk_cart:v2');
+    if (!raw) return 0;
+    const parsed = JSON.parse(raw) as { items?: unknown[] };
+    return Array.isArray(parsed.items) ? parsed.items.length : 0;
+  });
 }
 
 interface StubOrder {
@@ -444,7 +485,8 @@ for (const device of VIEWPORTS) {
       await assertReachable(code);
       await assertReachable(page.getByRole('link', { name: /ดูรายละเอียดคำสั่งซื้อ/ }));
 
-      // 5) The cart badge really is empty (the guard change is not hiding a live cart).
+      // 5) The cart really is empty (the guard change is not hiding a live cart).
+      expect(await cartLineCount(page), 'the paid line must leave the cart').toBe(0);
       await expect(page.getByText('ตะกร้าว่างเปล่า')).toHaveCount(0);
     });
 
@@ -469,6 +511,7 @@ for (const device of VIEWPORTS) {
       // The cart was cleared by the payment; the codes must not be replaced by
       // the empty-cart screen behind the dialog.
       await expect(page.getByText('ตะกร้าว่างเปล่า')).toHaveCount(0);
+      expect(await cartLineCount(page), 'the paid line must leave the cart').toBe(0);
 
       // Code reachable inside the dialog's scroll container on this viewport.
       await assertReachable(dialog.getByText(order.code));
@@ -518,6 +561,7 @@ for (const device of VIEWPORTS) {
       );
       expect(matched, 'the confirmation page must show a real delivered code').toBe(true);
       await expect(page.getByText('ตะกร้าว่างเปล่า')).toHaveCount(0);
+      expect(await cartLineCount(page), 'the QR-paid line must leave the cart').toBe(0);
 
       // ...and that code is reachable on this phone screen (not under the
       // fixed bottom navigation, not cut off).
@@ -551,7 +595,9 @@ for (const device of VIEWPORTS) {
       await expect(codeBox(page, first.code)).toBeVisible({ timeout: 30_000 });
       await expect(page.getByText(`โค้ดของคุณ · ${first.orderNumber}`)).toBeVisible();
 
-      // Second purchase of the SAME product (cart is re-seeded on navigation).
+      // Second purchase of the SAME product (the cart was emptied by the
+      // payment, so put it back deliberately).
+      await reseedCart(page);
       await page.goto('/checkout');
       await startCheckout(page);
       const second = state.orders[1]!;
