@@ -23,7 +23,7 @@ import { CSRF_COOKIE_NAME, generateCsrfToken } from '@/lib/adminCsrf';
 
 const isDev = process.env.NODE_ENV === 'development';
 
-function buildCsp(nonce: string | undefined): string {
+function buildCsp(nonce: string | undefined, secure: boolean): string {
   const evalRule = isDev ? " 'unsafe-eval'" : '';
   // Nonce policy in production; unsafe-inline otherwise (dev + escape hatch).
   const inlineScriptRule = nonce && !isDev ? ` 'nonce-${nonce}'` : " 'unsafe-inline'";
@@ -39,12 +39,16 @@ function buildCsp(nonce: string | undefined): string {
     "base-uri 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
-    'upgrade-insecure-requests',
+    // Only on an https origin: on a plain-http preview this rewrites every
+    // asset URL to https, which is how Safari ends up with an unstyled page
+    // from a local/unsigned build (WebKit honours it; Chromium exempts
+    // localhost).
+    ...(secure ? ['upgrade-insecure-requests'] : []),
   ].join('; ');
 }
 
-function buildReportCsp(nonce: string | undefined): string {
-  return `${buildCsp(nonce)}; report-uri /api/v1/csp-report`;
+function buildReportCsp(nonce: string | undefined, secure: boolean): string {
+  return `${buildCsp(nonce, secure)}; report-uri /api/v1/csp-report`;
 }
 
 // ─── Route Groups ───────────────────────────────────────
@@ -78,10 +82,19 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   // ─── CSP mode + nonce ────────────────────────────────
   const reportOnly = process.env['NK_CSP_REPORT_ONLY'] === 'true';
   const escapeHatch = process.env['NK_CSP_UNSAFE_INLINE'] === 'true';
+  // HSTS and `upgrade-insecure-requests` are https-only signals. Emitting them
+  // on a plain-http origin made Safari upgrade every asset to https:// on the
+  // same port and fail the SSL handshake (Chromium exempts localhost, so only
+  // Safari showed it), leaving the page unstyled and unhydrated.
+  const isSecureRequest =
+    request.nextUrl.protocol === 'https:' ||
+    request.headers.get('x-forwarded-proto') === 'https';
   const enforceNonce = !isDev && !escapeHatch;
   const nonce = enforceNonce ? btoa(crypto.randomUUID()) : undefined;
   const cspHeader = reportOnly ? 'Content-Security-Policy-Report-Only' : 'Content-Security-Policy';
-  const cspValue = reportOnly ? buildReportCsp(nonce) : buildCsp(nonce);
+  const cspValue = reportOnly
+    ? buildReportCsp(nonce, isSecureRequest)
+    : buildCsp(nonce, isSecureRequest);
 
   // Request headers carrying the nonce: Next.js reads the CSP from here and
   // applies the nonce to its own inline bootstrap scripts automatically.
@@ -115,7 +128,12 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   // ─── Core Security Headers (all routes) ───────────
   response.headers.set(cspHeader, cspValue);
   if (nonce) response.headers.set('x-nonce', nonce);
-  response.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
+  if (isSecureRequest) {
+    response.headers.set(
+      'Strict-Transport-Security',
+      'max-age=63072000; includeSubDomains; preload',
+    );
+  }
   response.headers.set('X-Frame-Options', 'DENY');
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');

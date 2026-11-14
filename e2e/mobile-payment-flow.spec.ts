@@ -650,3 +650,23 @@ for (const device of VIEWPORTS) {
     });
   });
 }
+
+/**
+ * Safari-only blocker found while running this suite in WebKit: the middleware
+ * sent HSTS (and `upgrade-insecure-requests`) even over plain HTTP, so WebKit
+ * upgraded every asset to https:// on the same origin and the page arrived
+ * unstyled and unhydrated. Chromium exempts localhost from HSTS, which is why
+ * a Chromium-only suite never saw it. HSTS is an https-only signal.
+ */
+test('plain-http responses do not advertise HSTS or upgrade-insecure-requests', async ({
+  request,
+  baseURL,
+}) => {
+  test.skip(!(baseURL ?? '').startsWith('http://'), 'target is not a plain-http origin');
+  const res = await request.get('/checkout');
+  expect(res.status()).toBe(200);
+  expect(res.headers()['strict-transport-security']).toBeUndefined();
+  expect(res.headers()['content-security-policy'] ?? '').not.toContain(
+    'upgrade-insecure-requests',
+  );
+});

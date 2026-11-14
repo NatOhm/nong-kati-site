@@ -46,5 +46,25 @@ export default defineConfig({
     actionTimeout: 20_000,
     navigationTimeout: 90_000,
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    // Every other spec keeps its single Chromium pass.
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+      testIgnore: /mobile-payment-flow\.spec\.ts/,
+    },
+    // The payment-flow proof runs on BOTH engines: the customer who reported
+    // the missing-code and duplicate-order bugs was on Safari, and the phone
+    // suite must not be Chromium-only.
+    {
+      name: 'mobile-chromium',
+      testMatch: /mobile-payment-flow\.spec\.ts/,
+      use: { ...devices['Pixel 7'] },
+    },
+    {
+      name: 'mobile-webkit',
+      testMatch: /mobile-payment-flow\.spec\.ts/,
+      use: { ...devices['iPhone 14'] },
+    },
+  ],
 });
