@@ -5,6 +5,10 @@ MariaDB 10.11 copy of production. Phases 5–8 (provision, cutover, verify, reti
 window. **Owner:** shop maintainer. **Target window:** one working day plus a ~30 min cutover
 at low traffic (recommend 02:00–03:00 ICT).
 
+**Executing it:** [PLESK-CUTOVER.md](PLESK-CUTOVER.md) is the authoritative, copy-pasteable
+runbook for Phases 5–8 (provisioning, the secret checklist incl. the gift-code key, the ordered
+window, rollback, and the soak). This file stays the plan and the evidence.
+
 **Why now:** Supabase emailed on 13 Nov 2026 that org *NatOhm's Org*
 (`cdfcvazyoltgqnprnqoy`) exceeded its free-plan quota — egress is over the 5 GB allowance
 (the mail names 5.5 GB). Usage continues as a one-time grace, but the **Fair Use Policy
@@ -198,6 +202,9 @@ so the helper now pins the charset.
 
 ### Phase 5 — provision on Hostatom
 
+Exact steps, grants, password rules, connection-string shapes and where the values go:
+**[PLESK-CUTOVER.md §1–2](PLESK-CUTOVER.md)**.
+
 **Blocked on the maintainer's go-ahead** — this creates a production database and writes a
 secret, so it runs only inside the agreed window.
 
@@ -254,6 +261,8 @@ until Phase 8, so this is a two-minute revert.
 - [ ] Compare 5 spot rows (a recent order, a product, a coupon) between Supabase and MariaDB.
 
 ### Phase 8 — retire Supabase, then housekeeping
+
+The soak checklist and the pause step are in **[PLESK-CUTOVER.md §5](PLESK-CUTOVER.md)**.
 
 - [ ] Run clean for 7–14 days, then **pause** the Supabase project (pausing stops egress and
       is what actually answers the quota email). Delete only after that. Keep the
