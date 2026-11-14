@@ -1,4 +1,28 @@
 {
+  "ZOptAHxrWCPUpaPYJc2L0": {
+    "title": "ตรวจทั้งเส้นทางลูกค้าบน iPhone (Safari) และ Android แล้วแก้จุดที่เจอจริง",
+    "summary": "เปิด Playwright ให้ทุกหน้าจอที่ลูกค้าใช้รันบน iPhone 14 (WebKit) และ Pixel 7 (Chromium) แล้วแก้บั๊ก Safari ที่เจอ: HSTS ทำให้ Safari อัปเกรดไฟล์ทั้งหมดจนเว็บไม่มีสไตล์, แถบล่างถูกแถบที่อยู่บัง, คีย์บอร์ดทับช่องกรอก, อัปโหลดสลิปจาก Photos, long-press บนการ์ด, ตะกร้าหายในโหมดส่วนตัว และ viewport meta ซ้ำ",
+    "problem": "ฟีดแบ็คจากลูกค้าที่ใช้ Safari ตรวจแล้วเจอสาเหตุจริงหลายข้อ: (1) ฝั่งเซิร์ฟเวอร์ส่ง HSTS มาพร้อม response แบบ http ด้วย Safari จึงบังคับให้ทุก asset ถูกโหลดผ่าน https แล้วล้มทั้งชุด หน้าเว็บเลยขึ้นมาแบบไม่มีสไตล์และกดปุ่มไม่ได้ (2) แถบเมนูล่างแบบ fixed ถูกซ่อนใต้แถบที่อยู่ของ Safari ที่หด/ขยายตัว เพราะจัดความสูงด้วย vh (3) ช่องกรอกที่อยู่ต่ำในหน้าโดนคีย์บอร์ดทับ และช่องที่ตัวอักษรเล็กกว่า 16px ทำให้ iOS ซูมหน้าเอง (4) ปุ่มอัปโหลดสลิปไม่มี accept แบบ image/* ทำให้เลือกจากคลังรูปบน iPhone ไม่ได้ และการกดยกเลิกในตัวเลือกไฟล์ทำให้แผงพัง (5) การ์ดสินค้าและปุ่มติด long-press callout ของ iOS ทำให้แตะไม่ทะลุ (6) localStorage ที่ throw ในโหมดส่วนตัวทำให้ตะกร้าหาย (7) ประกาศ interactive-widget ซึ่งเป็นคีย์ของ Chromium ไว้ใน viewport ทำให้ Safari เตือนและเข้าใจผิดว่าจัดการคีย์บอร์ดแล้ว อีกทั้งยังเกิด viewport meta ซ้ำหลัง hydration บน Android",
+    "change": [
+      "ส่ง HSTS และ upgrade-insecure-requests เฉพาะ request ที่เป็น https เท่านั้น",
+      "แถบล่างที่ fix ไว้ ขนาดด้วย dvh และเว้น safe-area ครบทั้งแถบเมนู แผง และ dialog โค้ดที่ส่งมอบ",
+      "ช่องกรอกทุกช่องมี font-size อย่างน้อย 16px และเมื่อโฟกัสช่องล่างสุดของฟอร์ม หน้าจะเลื่อนให้เห็น",
+      "อัปโหลดสลิปใช้ accept=\"image/*\" และตัวจัดการไฟล์ทนการกดยกเลิกโดยไม่ทำให้แผงหาย",
+      "ปิด -webkit-touch-callout และ user-select บนลิงก์/ปุ่ม แต่ปล่อยให้ข้อความทั่วไปคัดลอกได้",
+      "ห่อการอ่าน/เขียน localStorage และ sessionStorage ด้วยตัวช่วยที่คืนค่า null แทนการ throw พร้อมเก็บตะกร้าไว้ในหน่วยความจำระหว่าง session",
+      "interactive-widget ถูกเติมเฉพาะ Chrome บน Android และลบ viewport meta ที่ซ้ำออก เหลือแท็กเดียว",
+      "ลิงก์ข้ามไปเนื้อหาหลักย้ายไปอยู่ตัวแรกของ body และเลื่อนออกนอกจอแทนการ clip เพื่อให้เป็น Tab แรกจริง",
+      "ประกาศ utility bg-error/border-error ให้มีจริง (เดิมไม่มี background เลย ทำให้ข้อความ error โหมดมืดได้คอนทราสต์ 1.86:1) และให้ตัวตรวจคอนทราสต์ข้ามอิโมจิที่ aria-hidden",
+      "สคริปต์ seed แคตตาล็อกสร้าง gift code จริง เพราะสต็อกที่นับคือจำนวนโค้ดที่พร้อมใช้ ไม่ใช่คอลัมน์ stock"
+    ],
+    "proof": [
+      "npx playwright test --project=iphone-safari --project=android-chrome → 198 passed, 0 failed",
+      "npx playwright test --project=chromium → 38 passed (รวม management, order-refund-resend, admin-search-history-reveal, purchase-flow)",
+      "npx tsc --noEmit, npm run lint และ npm test (1126 passed) ผ่านทั้งหมด",
+      "บน production: /api/v1/version = ZOptAHxrWCPUpaPYJc2L0 / c2c8dd3 / #453, health database ok, ทุกหน้าหลัก 200, ไม่มี turbopack, viewport meta มีแท็กเดียว"
+    ],
+    "note": "ยังต้องทดสอบบนเครื่องจริงสำหรับสิ่งที่ emulation พิสูจน์ไม่ได้: safe-area ของรอยบากและแถบ home indicator, พฤติกรรมแถบที่อยู่ที่หดตัว, คีย์บอร์ดบนจอ และการเลือกไฟล์ HEIC จาก Photos ส่วน Playwright ไม่ได้รันกับ production โดยตั้งใจ เพราะชุด smoke/การชำระเงินจะสร้างออเดอร์จริงและตัดโค้ดจริง"
+  },
   "FX4LFLjGYJJRtyP8f96ys": {
     "title": "เบลอหลังแถบเมนูกลับมาบน iPhone และหน้าจอไม่ล้นบน Safari",
     "summary": "ตรวจทั้งร้านสำหรับคนใช้ Safari/iOS: คืน prefix ให้ backdrop-filter, กันแครช crypto.randomUUID บน iOS 15.0–15.3, หยุดใช้ background-attachment แบบ fixed บนมือถือ และใช้ dvh กับหน้าจอแอดมิน",
