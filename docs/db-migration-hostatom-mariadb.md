@@ -137,14 +137,27 @@ Never `pg_dump`: it produces Postgres SQL. Write `scripts/migrate-supabase-to-ma
       `codeHash`, and the 2.68 MB image setting round-tripped intact.
 - [x] Write paths driven for real (not unit stubs) against the MariaDB copy through the
       running app — cart, order, fulfilment, refund/void, admin product save, gift-code
-      upload + decrypt. See the next section for the numbers.
+      upload + decrypt, plus coupon redemption, wallet payment and slip verification. This is
+      now a committed, repeatable gate: `scripts/precutover-check.mjs` (see below).
 
 **Done when:** the same numbers pass as on Postgres, and the code decrypts.
 
-### Write-path rehearsal (2026-11-15, MariaDB copy on :3307)
+### Pre-cutover check (`scripts/precutover-check.mjs`)
 
-Five paths, executed through `next start` on :3211 against the copy with a real super_admin
-access token, then read back with `mariadb` rather than trusted from the response:
+```bash
+TARGET_DATABASE_URL="mysql://…/nong_kati" node scripts/precutover-check.mjs
+```
+
+It derives its fixtures from the target database (an active super_admin, a variant with stock
+and codes, the store's receiving account), boots the real app on a free port with that database,
+drives every path over HTTP, reads the rows back with Prisma, restores the inventory and deletes
+its own test rows, and exits non-zero on any mismatch. Last run against the MariaDB copy:
+**27/27 checks passed**, three consecutive runs left the copy's numbers identical
+(49 available codes / 167 total / 220 orders).
+
+It refuses to run against a Supabase host, because it writes real rows.
+
+Individual paths, read back from the database rather than trusted from the response:
 
 | Path | Evidence |
 | --- | --- |
@@ -152,7 +165,10 @@ access token, then read back with `mariadb` rather than trusted from the respons
 | Place order from that cart (`POST /api/v1/orders`) | `NK-2026-000216` `pending_payment`, `totalAmountThb` = `129.90` (cart 129.9), item name stored in Thai, `createdAt …28.306` with milliseconds |
 | Order void (`POST /api/v1/admin/orders/:id/refund`) | order `refunded`; `Refund.amountThb` `129.90`, `codesVoidedCount` 1; the delivered `GiftCode` row `voided` with `voidedAt` + reason; audit `refund_issued` written |
 | Admin product save (`PUT /api/v1/admin/products/:id`) | name and description persisted; variant price `129.9 → "129.90"` (Decimal(10,2)); `updatedAt` moved; Thai + emoji + `ẞ` round-trip byte-identically |
-| Gift-code upload + decrypt (`POST /api/v1/admin/stock/bulk`, `GET …/codes/:id/reveal`) | 2 codes written (`ciphertext` 40 B, `nonce` 12 B, `hash` 32 B in `VARBINARY(32)`), `StockMove` restock +2 → stock 6, reveal returned the exact 24-char plaintext that was pasted, reveal audited |
+| Gift-code upload + decrypt (`POST /api/v1/admin/stock/bulk`, `GET …/codes/:id/reveal`) | 2 codes written (`ciphertext` 40–43 B, `nonce` 12 B, `hash` 32 B in `VARBINARY(32)`), `StockMove` restock +2 → stock 6, reveal returned the exact plaintext that was pasted, reveal audited |
+| Coupon redemption (admin coupon → order → confirm) | discount ฿116.91 on a ฿1,299.00 line, `total = subtotal − discount` exact, `CouponRedemption` row at confirmation, `coupon.usageCount` 1 |
+| Wallet payment (`POST /orders/:id/pay-wallet`) | balance ฿389.70 → ฿272.79 (spent ฿116.91, Decimal exact), `TopUpLog` spend row −116.91 `completed`, order completed, code delivered |
+| Slip verification (`POST /payments/slip-verify`, Slip2Go stubbed at the network edge) | order completed, 2 codes delivered, `PaymentAttempt.slipVerifiedRef` recorded; receiver policy, amount check and fulfilment all ran as real code |
 
 Also proven on the same run: fulfilment (`verify-payment`) delivered codes inside one
 serialisable transaction and stamped `completedAt`; an image upload of 1.47 MB stored a
@@ -208,6 +224,9 @@ until Phase 8, so this is a two-minute revert.
 
 ### Phase 7 — verification
 
+- [ ] `TARGET_DATABASE_URL=… node scripts/precutover-check.mjs` → 27/27 against the **production**
+      MariaDB (this is the automated version of the bullets below; they stay as the human
+      sanity pass on live traffic).
 - [ ] `/api/v1/version` returns the expected `BUILD_ID`; `/api/v1/health` `database: ok`.
 - [ ] `/`, `/search`, `/account/login`, `/api/v1/products` → 200; homepage renders the
       category grid and featured products (data really is there).
