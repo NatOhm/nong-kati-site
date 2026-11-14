@@ -219,6 +219,23 @@ secret, so it runs only inside the agreed window.
 5. [ ] Start the app; watch `/api/v1/health` → `database: ok`.
 6. [ ] Verify (Phase 7) before touching anything else.
 
+**Dry run executed 2026-11-14 21:43** on a pristine MariaDB 10.11 container, in exactly this
+order — the sequence works end to end:
+
+```bash
+# fresh target
+docker run -d --name nk-mariadb -e MARIADB_ROOT_PASSWORD=… -e MARIADB_DATABASE=… \
+  -p 3307:3306 mariadb:10.11
+DATABASE_URL="mysql://…" DATABASE_DIRECT_URL="mysql://…" npx prisma migrate deploy   # baseline applied
+TARGET_DATABASE_URL="mysql://…" node scripts/migrate-supabase-to-mariadb.mjs         # 38 tables, 2576 rows, all counts match
+DATABASE_URL="mysql://…" npm run build                                              # compiled
+TARGET_DATABASE_URL="mysql://…" node scripts/precutover-check.mjs                     # 27/27
+```
+
+After the check removed its own rows the copy matched the ETL exactly: `Order` 216,
+`GiftCode` 170 (56 available), `Customer` 54, `Coupon` 1, `PaymentAttempt` 28, `Product` 31, and
+no `PRECHECK*` leftovers.
+
 **Rollback:** restore the two Supabase env values and Restart App. Supabase is untouched
 until Phase 8, so this is a two-minute revert.
 
