@@ -328,13 +328,7 @@ describe('build diagnostics (HIGH-4)', () => {
     prismaMock.$queryRawUnsafe.mockImplementation(async (query: unknown) => {
       const sql = typeof query === 'string' ? query : String(query);
       if (sql.includes('_prisma_migrations')) {
-        return [{ migration_name: '20260927200000_rls_baseline', finished_at: new Date() }];
-      }
-      if (sql.includes('pg_tables')) {
-        return [
-          { tablename: 'Order', rowsecurity: true },
-          { tablename: 'Customer', rowsecurity: true },
-        ];
+        return [{ migration_name: '20261115000000_baseline', finished_at: new Date() }];
       }
       return [];
     });
@@ -355,37 +349,15 @@ describe('build diagnostics (HIGH-4)', () => {
       expect(res.status).toBe(200);
       const body = (await res.json()) as {
         migrationVersion: string | null;
-        rls: { enabled: boolean; missing: string[] };
         dbError: string | null;
       };
-      expect(body.migrationVersion).toBe('20260927200000_rls_baseline');
-      expect(body.rls.enabled).toBe(true);
-      expect(body.rls.missing).toEqual([]);
+      expect(body.migrationVersion).toBe('20261115000000_baseline');
       expect(body.dbError).toBeNull();
     } finally {
       delete process.env['NK_INTERNAL_TOKEN'];
     }
   });
 
-  it('reports RLS drift as enabled:false with the offending tables', async () => {
-    prismaMock.$queryRawUnsafe.mockImplementation(async (query: unknown) => {
-      const sql = typeof query === 'string' ? query : String(query);
-      if (sql.includes('_prisma_migrations')) return [];
-      if (sql.includes('pg_tables')) {
-        return [{ tablename: 'Leaky', rowsecurity: false }];
-      }
-      return [];
-    });
-    vi.resetModules();
-    process.env['NK_INTERNAL_TOKEN'] = 'secret-internal';
-    try {
-      const { GET } = await import('@/app/api/v1/internal/build-info/route');
-      const res = await GET(makeReq({ authorization: 'Bearer secret-internal' }) as never);
-      const body = (await res.json()) as { rls: { enabled: boolean; missing: string[] } };
-      expect(body.rls.enabled).toBe(false);
-      expect(body.rls.missing).toEqual(['Leaky']);
-    } finally {
-      delete process.env['NK_INTERNAL_TOKEN'];
-    }
-  });
+  // The RLS-drift test that lived here was retired with the MariaDB port: the
+  // probe read `pg_tables`, and MariaDB has no row-level security to drift.
 });

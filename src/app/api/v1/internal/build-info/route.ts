@@ -59,13 +59,14 @@ export async function GET(req: Request): Promise<NextResponse> {
 
   const gitSha = await readLocalGitSha();
 
-  // Migration + RLS state: read-only catalog queries, never throws into a
-  // 500 — a database that cannot answer is itself the diagnostic answer.
+  // Migration state: a read-only catalog query, never throws into a 500 — a
+  // database that cannot answer is itself the diagnostic answer. The RLS probe
+  // that used to sit here read `pg_tables`, which does not exist on MariaDB,
+  // and row-level security has no MariaDB equivalent: on the hosting the
+  // database is reachable only from the app's own process, so there is no
+  // second role to lock out.
   let migrationVersion: string | null = null;
   let migrationFinishedAt: string | null = null;
-  let rlsEnabled = true;
-  let rlsTablesChecked = 0;
-  let rlsMissing: string[] = [];
   let dbError: string | null = null;
 
   try {
@@ -81,16 +82,8 @@ export async function GET(req: Request): Promise<NextResponse> {
       migrationVersion = migrations[0].migration_name;
       migrationFinishedAt = migrations[0].finished_at?.toISOString() ?? null;
     }
-
-    const rlsRows = await prisma.$queryRawUnsafe<{ tablename: string; rowsecurity: boolean }[]>(
-      "SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public'",
-    );
-    rlsTablesChecked = rlsRows.length;
-    rlsMissing = rlsRows.filter((r) => !r.rowsecurity).map((r) => r.tablename);
-    rlsEnabled = rlsMissing.length === 0;
   } catch (e) {
     dbError = e instanceof Error ? e.message : 'database query failed';
-    rlsEnabled = false;
   }
 
   return NextResponse.json(
@@ -99,7 +92,6 @@ export async function GET(req: Request): Promise<NextResponse> {
       gitRef: GIT_REF,
       migrationVersion,
       migrationFinishedAt,
-      rls: { enabled: rlsEnabled, tablesChecked: rlsTablesChecked, missing: rlsMissing },
       dbError,
       checkedAt: new Date().toISOString(),
     },

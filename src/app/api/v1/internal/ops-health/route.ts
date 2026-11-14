@@ -63,7 +63,7 @@ export async function GET(req: Request): Promise<NextResponse> {
     prisma
       .$queryRawUnsafe<
         { count: bigint }[]
-      >('SELECT COUNT(*)::bigint AS count FROM _prisma_migrations WHERE finished_at IS NOT NULL')
+      >('SELECT COUNT(*) AS count FROM _prisma_migrations WHERE finished_at IS NOT NULL')
       .catch(() => [] as { count: bigint }[]),
   ]);
 
@@ -81,8 +81,10 @@ export async function GET(req: Request): Promise<NextResponse> {
       // Live catalog state only. There is deliberately NO `drift` field: it
       // used to be hardcoded `false`, which is not a signal — a monitor that
       // can never go red teaches the reader to trust it (audit finding 3,
-      // 2026-10-31). Real drift is caught by the CI verify-rls + migrate
-      // deploy gates, which compare the shipped directory against the DB.
+      // 2026-10-31). Real drift is caught by `prisma migrate deploy` on every
+      // deploy, which compares the shipped directory against the DB. (The RLS
+      // half of this sentence retired with the MariaDB port — MariaDB has no
+      // row-level security, so there is nothing to verify.)
       migration: {
         latestFinished: latestFinished[0]?.migration_name ?? null,
         finishedCount: Number(shippedMigrations[0]?.count ?? 0),

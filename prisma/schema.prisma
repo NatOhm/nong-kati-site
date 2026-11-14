@@ -7,7 +7,7 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
+  provider  = "mysql"
   url       = env("DATABASE_URL")
   // Migrations (`prisma migrate deploy`, run by the Vercel build) must use the
   // DIRECT connection (db.*.supabase.co:5432), not the pgbouncer pooler on
@@ -22,11 +22,11 @@ datasource db {
 // ─── Categories ───────────────────────────────────────────
 
 model Category {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  icon      String?
-  parentId  String?
+  id        String   @id @default(cuid()) @db.VarChar(191)
+  name      String   @db.LongText
+  slug      String   @unique @db.VarChar(191)
+  icon      String?  @db.LongText
+  parentId  String?  @db.VarChar(191)
   sortOrder Int      @default(0)
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -43,25 +43,25 @@ model Category {
 // ─── Products ─────────────────────────────────────────────
 
 model Product {
-  id               String   @id @default(cuid())
-  name             String
-  slug             String   @unique
-  sku              String?  @unique
-  description      String?
-  shortDescription String?
-  imageUrl         String?
-  categoryId       String
+  id               String   @id @default(cuid()) @db.VarChar(191)
+  name             String   @db.LongText
+  slug             String   @unique @db.VarChar(191)
+  sku              String?  @unique @db.VarChar(191)
+  description      String?  @db.LongText
+  shortDescription String?  @db.LongText
+  imageUrl         String?  @db.LongText
+  categoryId       String   @db.VarChar(191)
   isActive         Boolean  @default(true)
   isFeatured       Boolean  @default(false)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  category         Category            @relation(fields: [categoryId], references: [id])
-  variants         ProductVariant[]
-  aliases          ProductAlias[]
-  inventory        InventorySnapshot[]
-  wishlist         WishlistItem[]
-  tags             ProductTag[]
+  category          Category            @relation(fields: [categoryId], references: [id])
+  variants          ProductVariant[]
+  aliases           ProductAlias[]
+  inventory         InventorySnapshot[]
+  wishlist          WishlistItem[]
+  tags              ProductTag[]
   promotionProducts PromotionProduct[]
 
   @@index([categoryId])
@@ -72,9 +72,9 @@ model Product {
 // ─── Product Variants (denominations) ─────────────────────
 
 model ProductVariant {
-  id          String   @id @default(cuid())
-  productId   String
-  label       String
+  id          String   @id @default(cuid()) @db.VarChar(191)
+  productId   String   @db.VarChar(191)
+  label       String   @db.LongText
   price       Decimal  @db.Decimal(10, 2)
   costThb     Decimal? @db.Decimal(10, 2)
   memberPrice Decimal? @db.Decimal(10, 2)
@@ -99,9 +99,9 @@ model ProductVariant {
 // ─── Product Aliases (for search) ─────────────────────────
 
 model ProductAlias {
-  id        String   @id @default(cuid())
-  productId String
-  alias     String
+  id        String   @id @default(cuid()) @db.VarChar(191)
+  productId String   @db.VarChar(191)
+  alias     String   @db.VarChar(191)
   createdAt DateTime @default(now())
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -113,12 +113,12 @@ model ProductAlias {
 // ─── Inventory Snapshots (for stock tracking) ─────────────
 
 model InventorySnapshot {
-  id               String   @id @default(cuid())
-  productId        String
-  productVariantId String
+  id               String   @id @default(cuid()) @db.VarChar(191)
+  productId        String   @db.VarChar(191)
+  productVariantId String   @db.VarChar(191)
   previousStock    Int
   newStock         Int
-  reason           String
+  reason           String   @db.LongText
   createdAt        DateTime @default(now())
 
   product        Product        @relation(fields: [productId], references: [id])
@@ -131,16 +131,16 @@ model InventorySnapshot {
 // ─── Stock Moves (ประวัติการจัดสต๊อกแบบละเอียด — ตัด/เติม/ขาย/คืน) ───
 
 model StockMove {
-  id         String   @id @default(cuid())
-  variantId  String
+  id         String   @id @default(cuid()) @db.VarChar(191)
+  variantId  String   @db.VarChar(191)
   delta      Int // +เติม / −ตัด / −ขาย / +คืน
-  reason     String // restock, adjust, sale, refund, import
-  refType    String? // order, upload, manual, csv
-  refId      String?
-  note       String?
+  reason     String   @db.VarChar(191) // restock, adjust, sale, refund, import
+  refType    String?  @db.LongText // order, upload, manual, csv
+  refId      String?  @db.LongText
+  note       String?  @db.LongText
   stockAfter Int
-  actorType  String   @default("admin") // admin, system
-  actorId    String?
+  actorType  String   @default("admin") @db.LongText // admin, system
+  actorId    String?  @db.LongText
   createdAt  DateTime @default(now())
 
   variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
@@ -152,9 +152,9 @@ model StockMove {
 // ─── Carts (§9) ──────────────────────────────────────────
 
 model Cart {
-  id         String   @id @default(cuid())
-  customerId String?
-  sessionKey String   @unique
+  id         String   @id @default(cuid()) @db.VarChar(191)
+  customerId String?  @db.VarChar(191)
+  sessionKey String   @unique @db.VarChar(191)
   expiresAt  DateTime
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -169,9 +169,9 @@ model Cart {
 // ─── Cart Items (§9) ─────────────────────────────────────
 
 model CartItem {
-  id           String   @id @default(cuid())
-  cartId       String
-  variantId    String
+  id           String   @id @default(cuid()) @db.VarChar(191)
+  cartId       String   @db.VarChar(191)
+  variantId    String   @db.VarChar(191)
   quantity     Int      @default(1)
   unitPriceThb Decimal  @db.Decimal(10, 2)
   createdAt    DateTime @default(now())
@@ -188,13 +188,13 @@ model CartItem {
 // ─── Customers (08-auth.md §3) ───────────────────────────
 
 model Customer {
-  id                  String    @id @default(cuid())
-  email               String    @unique
+  id                  String    @id @default(cuid()) @db.VarChar(191)
+  email               String    @unique @db.VarChar(191)
   // Nullable for OAuth-only accounts (Google/LINE/Facebook sign-in has no local password).
-  passwordHash        String?
-  fullName            String?
-  phoneNumber         String? @unique
-  status              String    @default("active") // active | blocked | anonymised
+  passwordHash        String?   @db.LongText
+  fullName            String?   @db.LongText
+  phoneNumber         String?   @unique @db.VarChar(191)
+  status              String    @default("active") @db.LongText // active | blocked | anonymised
   emailVerified       Boolean   @default(false)
   // Set when the customer proves control of the number via sign-in OTP.
   phoneVerified       Boolean   @default(false)
@@ -204,17 +204,17 @@ model Customer {
   lastLoginAt         DateTime?
   walletBalanceThb    Decimal   @default(0) @db.Decimal(10, 2)
   // ระดับราคา: retail = ราคาปกติ, member = ราคาสมาชิก, dealer = ราคาตัวแทนจำหน่าย
-  tier                String    @default("retail")
+  tier                String    @default("retail") @db.VarChar(191)
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
-  orders            Order[]
-  wishlist          WishlistItem[]
-  topups            TopUpLog[]
-  supportTickets    SupportTicket[]
-  couponRedemptions CouponRedemption[]
-  notificationReads NotificationRead[]
-  passwordResetTokens PasswordResetToken[]
+  orders                Order[]
+  wishlist              WishlistItem[]
+  topups                TopUpLog[]
+  supportTickets        SupportTicket[]
+  couponRedemptions     CouponRedemption[]
+  notificationReads     NotificationRead[]
+  passwordResetTokens   PasswordResetToken[]
   // Customer JWTs issued before this instant stop resolving (password reset
   // revokes stolen/unknown sessions). Login flows always mint fresh tokens
   // with a later iat, so only pre-reset sessions are affected.
@@ -230,9 +230,9 @@ model Customer {
 // ─── Wishlist (client ask: รายการโปรด — สินค้าที่ลูกค้ากดใจไว้) ──
 
 model WishlistItem {
-  id         String   @id @default(cuid())
-  customerId String
-  productId  String
+  id         String   @id @default(cuid()) @db.VarChar(191)
+  customerId String   @db.VarChar(191)
+  productId  String   @db.VarChar(191)
   createdAt  DateTime @default(now())
 
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
@@ -246,12 +246,12 @@ model WishlistItem {
 // ─── Wallet top-ups (client ask: ประวัติการเดินเงิน / เครดิตคงเหลือ) ──
 
 model TopUpLog {
-  id         String   @id @default(cuid())
-  customerId String
+  id         String   @id @default(cuid()) @db.VarChar(191)
+  customerId String   @db.VarChar(191)
   amountThb  Decimal  @db.Decimal(10, 2)
-  method     String   @default("promptpay") // promptpay | credit_card | admin_credit
-  reference  String? // payment provider reference / slip id
-  status     String   @default("pending") // pending | completed | failed
+  method     String   @default("promptpay") @db.LongText // promptpay | credit_card | admin_credit
+  reference  String?  @db.LongText // payment provider reference / slip id
+  status     String   @default("pending") @db.LongText // pending | completed | failed
   createdAt  DateTime @default(now())
 
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
@@ -263,39 +263,39 @@ model TopUpLog {
 // ─── Promotions (โปรโมชัน — ส่วนลดอัตโนมัติโดยไม่ต้องใส่โค้ด) ──
 
 model Promotion {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  scope       String   @default("selected") // all | selected
-  discountType String  @default("percent")  // percent | amount
-  discountValue Decimal @db.Decimal(10, 2)
+  id            String             @id @default(cuid()) @db.VarChar(191)
+  name          String             @db.LongText
+  description   String?            @db.LongText
+  scope         String             @default("selected") @db.LongText // all | selected
+  discountType  String             @default("percent") @db.LongText // percent | amount
+  discountValue Decimal            @db.Decimal(10, 2)
   // Legacy compatibility column. The expand migration keeps Promotion.productIds
   // so the previously deployed reader keeps working, and the migration's backfill
   // copies each JSON array into PromotionProduct. Nothing in this codebase reads
   // or writes it — it is declared here only so schema.prisma matches the database
   // the migration produces. A later contract migration drops the column and this
   // field together.
-  productIds  String?
+  productIds    String?            @db.LongText
   // For 'all' scope, applies to entire shop. For 'selected', these products.
-  products   PromotionProduct[]
-  minSpendThb Decimal? @db.Decimal(10, 2)
-  isActive    Boolean  @default(true)
-  startsAt    DateTime?
-  expiresAt   DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  products      PromotionProduct[]
+  minSpendThb   Decimal?           @db.Decimal(10, 2)
+  isActive      Boolean            @default(true)
+  startsAt      DateTime?
+  expiresAt     DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
 
   @@index([isActive, expiresAt])
   @@index([startsAt, expiresAt])
 }
 
 model PromotionProduct {
-  id           String @id @default(cuid())
-  promotionId  String @map("promotion_id")
-  productId    String @map("product_id")
+  id          String @id @default(cuid()) @db.VarChar(191)
+  promotionId String @map("promotion_id") @db.VarChar(191)
+  productId   String @map("product_id") @db.VarChar(191)
 
-  promotion   Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
-  product     Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  promotion Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
 
   @@unique([promotionId, productId])
   @@index([productId])
@@ -305,10 +305,10 @@ model PromotionProduct {
 // ─── Coupons (คูปองส่วนลด — บาท/%, ยอดขั้นต่ำ, วันหมดอายุ) ──
 
 model Coupon {
-  id               String    @id @default(cuid())
-  code             String    @unique
-  description      String?
-  discountType     String    @default("percent") // percent | amount
+  id               String    @id @default(cuid()) @db.VarChar(191)
+  code             String    @unique @db.VarChar(191)
+  description      String?   @db.LongText
+  discountType     String    @default("percent") @db.LongText // percent | amount
   discountValue    Decimal   @db.Decimal(10, 2)
   minSpendThb      Decimal?  @db.Decimal(10, 2)
   usageLimit       Int? // null = ไม่จำกัด
@@ -317,7 +317,7 @@ model Coupon {
   isActive         Boolean   @default(true)
   startsAt         DateTime?
   expiresAt        DateTime?
-  createdBy        String?
+  createdBy        String?   @db.LongText
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -332,10 +332,10 @@ model Coupon {
 // One row per (coupon, order). The orderId unique constraint makes a
 // redemption idempotent per order; per-customer limits count these rows.
 model CouponRedemption {
-  id         String   @id @default(cuid())
-  couponId   String
-  customerId String
-  orderId    String   @unique
+  id         String   @id @default(cuid()) @db.VarChar(191)
+  couponId   String   @db.VarChar(191)
+  customerId String   @db.VarChar(191)
+  orderId    String   @unique @db.VarChar(191)
   createdAt  DateTime @default(now())
 
   coupon   Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
@@ -348,43 +348,43 @@ model CouponRedemption {
 // ─── Orders (§10) ────────────────────────────────────────
 
 model Order {
-  id                     String    @id @default(cuid())
-  orderNumber            String    @unique
-  customerId             String?
-  customerEmail          String
-  customerPhone          String?
-  status                 String    @default("pending_payment")
-  paymentMethod          String?
+  id                     String    @id @default(cuid()) @db.VarChar(191)
+  orderNumber            String    @unique @db.VarChar(191)
+  customerId             String?   @db.VarChar(191)
+  customerEmail          String    @db.VarChar(191)
+  customerPhone          String?   @db.LongText
+  status                 String    @default("pending_payment") @db.VarChar(191)
+  paymentMethod          String?   @db.LongText
   subtotalThb            Decimal   @db.Decimal(10, 2)
   vatAmountThb           Decimal   @db.Decimal(10, 2)
   discountThb            Decimal   @default(0) @db.Decimal(10, 2)
   totalAmountThb         Decimal   @db.Decimal(10, 2)
-  couponId               String?
+  couponId               String?   @db.VarChar(191)
   lineOptIn              Boolean   @default(false)
   marketingOptIn         Boolean   @default(false)
   tosAcceptedAt          DateTime
-  tosVersion             String    @default("1.0")
+  tosVersion             String    @default("1.0") @db.LongText
   requiresTaxInvoice     Boolean   @default(false)
-  taxInvoiceName         String?
-  taxInvoiceTaxId        String?
-  ipAddress              String?
-  userAgent              String?
-  confirmationUuid       String    @unique @default("")
-  notes                  String?
-  manualFulfilmentReason String?
+  taxInvoiceName         String?   @db.LongText
+  taxInvoiceTaxId        String?   @db.LongText
+  ipAddress              String?   @db.LongText
+  userAgent              String?   @db.LongText
+  confirmationUuid       String    @unique @default("") @db.VarChar(191)
+  notes                  String?   @db.LongText
+  manualFulfilmentReason String?   @db.LongText
   // Aggregate automatic-promotion discount for the order. Per-line promotion
   // evidence (id/name/type/value) lives on OrderItem — the algorithm picks the
   // best promotion per line, so an order-level promotion id/name cannot
   // represent the charged price.
-  promotionDiscountThb Decimal   @default(0) @db.Decimal(10, 2)
+  promotionDiscountThb   Decimal   @default(0) @db.Decimal(10, 2)
   // VAT snapshot (rate in effect at order time, stored as fraction e.g. 0.07)
-  vatEnabled           Boolean  @default(false)
-  vatRate              Decimal? @db.Decimal(5, 4)
+  vatEnabled             Boolean   @default(false)
+  vatRate                Decimal?  @db.Decimal(5, 4)
   // Manual slip check (ลูกค้าส่งสลิปให้แอดมินตรวจ): image path in the
   // SiteSetting image store; admin note recorded on confirmation.
-  slipImageUrl           String?
+  slipImageUrl           String?   @db.LongText
   slipUploadedAt         DateTime?
-  slipAdminNote          String?
+  slipAdminNote          String?   @db.LongText
   completedAt            DateTime?
   expiredAt              DateTime?
   createdAt              DateTime  @default(now())
@@ -412,45 +412,45 @@ model Order {
 // ─── Order Items (§10) ───────────────────────────────────
 
 model OrderItem {
-  id              String    @id @default(cuid())
-  orderId         String
+  id                   String    @id @default(cuid()) @db.VarChar(191)
+  orderId              String    @db.VarChar(191)
   // Nullable since 2026-10-25 (nullable_catalog_variant_links): a hard
   // product delete detaches historical lines here instead of destroying the
   // order's itemised history. All rendered fields below are snapshots with
   // no catalog FK, so a null variantId still renders and totals correctly.
-  variantId       String?
-  productNameTh   String
-  productNameEn   String
-  skuCode         String
-  denominationThb Decimal   @db.Decimal(10, 2)
-  quantity        Int
-  unitPriceThb    Decimal   @db.Decimal(10, 2)
-  unitPriceExVat  Decimal   @db.Decimal(10, 2)
-  unitVatAmount   Decimal   @db.Decimal(10, 2)
-  lineTotalThb    Decimal   @db.Decimal(10, 2)
-  deliveryStatus  String    @default("pending")
-  deliveredAt     DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  variantId            String?   @db.VarChar(191)
+  productNameTh        String    @db.LongText
+  productNameEn        String    @db.LongText
+  skuCode              String    @db.LongText
+  denominationThb      Decimal   @db.Decimal(10, 2)
+  quantity             Int
+  unitPriceThb         Decimal   @db.Decimal(10, 2)
+  unitPriceExVat       Decimal   @db.Decimal(10, 2)
+  unitVatAmount        Decimal   @db.Decimal(10, 2)
+  lineTotalThb         Decimal   @db.Decimal(10, 2)
+  deliveryStatus       String    @default("pending") @db.LongText
+  deliveredAt          DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
   // Promotion evidence snapshot for this line (historical record — no FK so
   // rows survive promotion edit/delete). unitPriceThb is the effective
   // post-promotion unit price; originalUnitPriceThb is the tier price before
   // any promotion; promotionDiscountThb is the TOTAL discount for the line.
-  originalUnitPriceThb Decimal  @default(0) @db.Decimal(10, 2)
-  appliedPromotionId    String?
-  promotionName         String?
-  promotionType         String? // percent | amount
-  promotionValue        Decimal? @db.Decimal(10, 2)
-  promotionDiscountThb  Decimal  @default(0) @db.Decimal(10, 2)
+  originalUnitPriceThb Decimal   @default(0) @db.Decimal(10, 2)
+  appliedPromotionId   String?   @db.LongText
+  promotionName        String?   @db.LongText
+  promotionType        String?   @db.LongText // percent | amount
+  promotionValue       Decimal?  @db.Decimal(10, 2)
+  promotionDiscountThb Decimal   @default(0) @db.Decimal(10, 2)
   // Final line totals after coupon allocation; these persist the exact
   // satang-level values the customer pays per line so item sums reconcile
   // to Order.totalAmountThb and Order.vatAmountThb without rounding drift.
-  couponDiscountThb      Decimal  @default(0) @db.Decimal(10, 2)
-  finalLineTotalThb      Decimal  @default(0) @db.Decimal(10, 2)
-  finalLineExVat         Decimal  @default(0) @db.Decimal(10, 2)
-  finalLineVatAmount     Decimal  @default(0) @db.Decimal(10, 2)
+  couponDiscountThb    Decimal   @default(0) @db.Decimal(10, 2)
+  finalLineTotalThb    Decimal   @default(0) @db.Decimal(10, 2)
+  finalLineExVat       Decimal   @default(0) @db.Decimal(10, 2)
+  finalLineVatAmount   Decimal   @default(0) @db.Decimal(10, 2)
 
-  order     Order          @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  order     Order           @relation(fields: [orderId], references: [id], onDelete: Restrict)
   variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Restrict)
   giftCodes GiftCode[]
 
@@ -461,22 +461,22 @@ model OrderItem {
 // ─── Gift Codes (§8) ─────────────────────────────────────
 
 model GiftCode {
-  id            String    @id @default(cuid())
+  id            String    @id @default(cuid()) @db.VarChar(191)
   // Nullable since 2026-10-25 (nullable_catalog_variant_links): a code that
   // was already delivered to a customer survives a product purge with
   // variantId nulled — it stays reachable via orderId/orderItemId only.
-  variantId     String?
+  variantId     String?   @db.VarChar(191)
   codeEncrypted Bytes
-  codeHash      Bytes     @unique
+  codeHash      Bytes     @unique @db.VarBinary(32)
   nonce         Bytes
   keyVersion    Int       @default(1)
-  status        String    @default("available")
-  orderId       String?
-  orderItemId   String?
-  voidedById    String?
-  voidReason    String?
-  uploadedById  String?
-  uploadBatchId String?
+  status        String    @default("available") @db.VarChar(191)
+  orderId       String?   @db.VarChar(191)
+  orderItemId   String?   @db.VarChar(191)
+  voidedById    String?   @db.LongText
+  voidReason    String?   @db.LongText
+  uploadedById  String?   @db.LongText
+  uploadBatchId String?   @db.VarChar(191)
   reservedAt    DateTime?
   deliveredAt   DateTime?
   voidedAt      DateTime?
@@ -499,15 +499,15 @@ model GiftCode {
 // ─── Code Upload Batches (§8) ────────────────────────────
 
 model CodeUploadBatch {
-  id               String    @id @default(cuid())
-  variantId        String
-  uploadedById     String
-  originalFilename String
+  id               String    @id @default(cuid()) @db.VarChar(191)
+  variantId        String    @db.VarChar(191)
+  uploadedById     String    @db.LongText
+  originalFilename String    @db.LongText
   totalRows        Int       @default(0)
   importedCount    Int       @default(0)
   rejectedCount    Int       @default(0)
   rejectionDetails Json?
-  status           String    @default("processing")
+  status           String    @default("processing") @db.LongText
   completedAt      DateTime?
   createdAt        DateTime  @default(now())
 
@@ -520,27 +520,27 @@ model CodeUploadBatch {
 // ─── Payment Attempts (§10) ──────────────────────────────
 
 model PaymentAttempt {
-  id                    String    @id @default(cuid())
-  orderId               String
-  paymentMethod         String
-  status                String    @default("pending")
+  id                    String    @id @default(cuid()) @db.VarChar(191)
+  orderId               String    @db.VarChar(191)
+  paymentMethod         String    @db.LongText
+  status                String    @default("pending") @db.VarChar(191)
   amountThb             Decimal   @db.Decimal(10, 2)
-  gatewayName           String
-  gatewayRef            String?
-  gatewayStatusCode     String?
+  gatewayName           String    @db.VarChar(191)
+  gatewayRef            String?   @db.VarChar(191)
+  gatewayStatusCode     String?   @db.LongText
   gatewayResponse       Json?
-  failureReason         String?
+  failureReason         String?   @db.LongText
   qrExpiresAt           DateTime?
   threeDsRequired       Boolean   @default(false)
-  threeDsStatus         String?
+  threeDsStatus         String?   @db.LongText
   webhookReceivedAt     DateTime?
   webhookSignatureValid Boolean?
   // Automatic slip verification (SlipOK): the bank ref is globally unique —
   // one real transfer can confirm exactly one order.
-  slipVerifiedRef       String?   @unique
+  slipVerifiedRef       String?   @unique @db.VarChar(191)
   slipVerifiedAt        DateTime?
-  slipReceiverAccount   String?
-  slipVerifiedBy        String?
+  slipReceiverAccount   String?   @db.LongText
+  slipVerifiedBy        String?   @db.LongText
   attemptNumber         Int       @default(1)
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
@@ -556,11 +556,11 @@ model PaymentAttempt {
 // ─── Invoices (§12) ──────────────────────────────────────
 
 model Invoice {
-  id                  String    @id @default(cuid())
-  orderId             String
-  invoiceType         String
-  invoiceNumber       String    @unique
-  pdfStorageKey       String?
+  id                  String    @id @default(cuid()) @db.VarChar(191)
+  orderId             String    @db.VarChar(191)
+  invoiceType         String    @db.LongText
+  invoiceNumber       String    @unique @db.VarChar(191)
+  pdfStorageKey       String?   @db.LongText
   pdfGeneratedAt      DateTime?
   pdfGenerationFailed Boolean   @default(false)
   createdAt           DateTime  @default(now())
@@ -575,14 +575,14 @@ model Invoice {
 // ─── Refunds (11-admin.md §14.1) ──────────────────────────
 
 model Refund {
-  id                     String   @id @default(cuid())
-  orderId                String
+  id                     String   @id @default(cuid()) @db.VarChar(191)
+  orderId                String   @db.VarChar(191)
   amountThb              Decimal  @db.Decimal(10, 2)
-  reasonCategory         String
-  reasonDetail           String?
-  gatewayRefundReference String
+  reasonCategory         String   @db.VarChar(191)
+  reasonDetail           String?  @db.LongText
+  gatewayRefundReference String   @db.LongText
   codesVoidedCount       Int      @default(0)
-  initiatedBy            String
+  initiatedBy            String   @db.VarChar(191)
   createdAt              DateTime @default(now())
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
@@ -597,11 +597,11 @@ model Refund {
 // ─── Site Settings (key/value store for storefront chrome) ──
 
 model SiteSetting {
-  id        String   @id @default(cuid())
-  key       String   @unique
-  value     String
+  id        String   @id @default(cuid()) @db.VarChar(191)
+  key       String   @unique @db.VarChar(191)
+  value     String   @db.LongText
   updatedAt DateTime @updatedAt
-  updatedBy String?
+  updatedBy String?  @db.LongText
 
   @@index([key])
 }
@@ -611,16 +611,16 @@ model SiteSetting {
 /// objection) — persisted so a submitted request survives restarts and is
 /// visible to pdpa:read admins in /management/pdpa.
 model DataSubjectRequest {
-  id          String    @id @default(cuid())
-  requestId   String    @unique
-  requestType String // access | correction | erasure | portability | objection
-  fullName    String
-  email       String
-  phone       String?
-  details     String?
-  status      String    @default("pending") // pending | in_progress | completed | rejected
-  adminNote   String?
-  handledById String?
+  id          String    @id @default(cuid()) @db.VarChar(191)
+  requestId   String    @unique @db.VarChar(191)
+  requestType String    @db.LongText // access | correction | erasure | portability | objection
+  fullName    String    @db.LongText
+  email       String    @db.VarChar(191)
+  phone       String?   @db.LongText
+  details     String?   @db.LongText
+  status      String    @default("pending") @db.VarChar(191) // pending | in_progress | completed | rejected
+  adminNote   String?   @db.LongText
+  handledById String?   @db.LongText
   handledAt   DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -633,13 +633,13 @@ model DataSubjectRequest {
 // TOTP secrets and server-side refresh-token sessions.
 
 model AdminUser {
-  id                    String    @id @default(cuid())
-  email                 String    @unique
-  fullName              String
-  role                  String    @default("super_admin")
-  status                String    @default("active") // active | deactivated | locked
-  passwordHash          String // scrypt$N$r$p$salt$hash (lib/password.ts)
-  totpSecret            String? // base32, set during 2FA setup
+  id                    String    @id @default(cuid()) @db.VarChar(191)
+  email                 String    @unique @db.VarChar(191)
+  fullName              String    @db.LongText
+  role                  String    @default("super_admin") @db.LongText
+  status                String    @default("active") @db.LongText // active | deactivated | locked
+  passwordHash          String    @db.LongText // scrypt$N$r$p$salt$hash (lib/password.ts)
+  totpSecret            String?   @db.LongText // base32, set during 2FA setup
   totpConfirmed         Boolean   @default(false)
   mustChangePassword    Boolean   @default(false)
   failedLoginAttempts   Int       @default(0)
@@ -668,9 +668,9 @@ model AdminUser {
 /// present a code instead of the 6-digit TOTP; the guarded usedAt update is
 /// the one-time CAS, and wrong guesses feed the same 5-strike TOTP lockout.
 model AdminBackupCode {
-  id          String    @id @default(cuid())
-  adminUserId String
-  codeHash    String    @unique // SHA-256 of the normalized plaintext code
+  id          String    @id @default(cuid()) @db.VarChar(191)
+  adminUserId String    @db.VarChar(191)
+  codeHash    String    @unique @db.VarChar(191) // SHA-256 of the normalized plaintext code
   usedAt      DateTime?
   createdAt   DateTime  @default(now())
 
@@ -685,17 +685,17 @@ model AdminBackupCode {
 /// — confirm2fa records the token here before minting a session, so a
 /// replayed challenge can never mint a second session.
 model AdminChallengeConsumed {
-  id         String   @id @default(cuid())
-  tokenHash  String   @unique
+  id         String   @id @default(cuid()) @db.VarChar(191)
+  tokenHash  String   @unique @db.VarChar(191)
   consumedAt DateTime @default(now())
 
   @@index([consumedAt])
 }
 
 model AdminSession {
-  id          String    @id @default(cuid())
-  adminUserId String
-  tokenHash   String    @unique // SHA-256 of the opaque refresh token
+  id          String    @id @default(cuid()) @db.VarChar(191)
+  adminUserId String    @db.VarChar(191)
+  tokenHash   String    @unique @db.VarChar(191) // SHA-256 of the opaque refresh token
   expiresAt   DateTime
   createdAt   DateTime  @default(now())
   revokedAt   DateTime?
@@ -710,35 +710,35 @@ model AdminSession {
 
 /// Homepage hero carousel slides (admin-managed; images via /api/v1/admin/upload).
 model HeroSlide {
-  id        String   @id @default(cuid())
+  id         String   @id @default(cuid()) @db.VarChar(191)
   /// Image banner; null when the slide is a text deal card (label only).
-  imageUrl  String?
+  imageUrl   String?  @db.LongText
   /// Focal point used when object-cover crops the banner, e.g. "50% 30%".
   /// Null means centred — the historical behaviour, so existing slides are unchanged.
-  imageFocus String?
+  imageFocus String?  @db.LongText
   /// Promo deal text, e.g. "🔥 HBO Max 7 วัน ฿25" — the ticker's old role.
-  label     String?
-  href      String?
-  alt       String
-  sortOrder Int      @default(0)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  label      String?  @db.LongText
+  href       String?  @db.LongText
+  alt        String   @db.LongText
+  sortOrder  Int      @default(0)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@index([isActive, sortOrder])
 }
 
 model AuditLog {
-  id         String   @id @default(cuid())
-  actorType  String
-  actorId    String
-  actorEmail String
-  action     String
-  tableName  String
-  recordId   String
+  id         String   @id @default(cuid()) @db.VarChar(191)
+  actorType  String   @db.VarChar(191)
+  actorId    String   @db.VarChar(191)
+  actorEmail String   @db.LongText
+  action     String   @db.VarChar(191)
+  tableName  String   @db.VarChar(191)
+  recordId   String   @db.VarChar(191)
   diffBefore Json?
   diffAfter  Json?
-  ipAddress  String?
+  ipAddress  String?  @db.LongText
   metadata   Json?
   createdAt  DateTime @default(now())
 
@@ -750,16 +750,16 @@ model AuditLog {
 
 /// Free-form product labels beyond categories (client ask: การจัดการแท็ก).
 model Tag {
-  id        String       @id @default(cuid())
-  name      String       @unique
-  slug      String       @unique
+  id        String       @id @default(cuid()) @db.VarChar(191)
+  name      String       @unique @db.VarChar(191)
+  slug      String       @unique @db.VarChar(191)
   createdAt DateTime     @default(now())
   products  ProductTag[]
 }
 
 model ProductTag {
-  productId String
-  tagId     String
+  productId String  @db.VarChar(191)
+  tagId     String  @db.VarChar(191)
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
@@ -770,16 +770,16 @@ model ProductTag {
 // ─── Support Tickets (customer → admin correspondence) ───
 
 model SupportTicket {
-  id            String    @id @default(cuid())
-  ticketNumber  String    @unique
-  customerId    String?
-  customerEmail String
-  customerName  String?
-  subject       String
-  message       String
-  status        String    @default("open") // open, answered, closed
-  adminReply    String?
-  answeredById  String?
+  id            String    @id @default(cuid()) @db.VarChar(191)
+  ticketNumber  String    @unique @db.VarChar(191)
+  customerId    String?   @db.VarChar(191)
+  customerEmail String    @db.LongText
+  customerName  String?   @db.LongText
+  subject       String    @db.LongText
+  message       String    @db.LongText
+  status        String    @default("open") @db.VarChar(191) // open, answered, closed
+  adminReply    String?   @db.LongText
+  answeredById  String?   @db.VarChar(191)
   answeredAt    DateTime?
   closedAt      DateTime?
   createdAt     DateTime  @default(now())
@@ -800,9 +800,9 @@ model SupportTicket {
 // reality instead of mock sample data.
 
 model NotificationRead {
-  id         String   @id @default(cuid())
-  customerId String
-  couponId   String
+  id         String   @id @default(cuid()) @db.VarChar(191)
+  customerId String   @db.VarChar(191)
+  couponId   String   @db.VarChar(191)
   readAt     DateTime @default(now())
 
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
@@ -819,13 +819,13 @@ model NotificationRead {
 // consumption. Expired rows are swept opportunistically on request.
 
 model MagicLinkToken {
-  id          String    @id @default(cuid())
-  email       String
-  tokenHash   String    @unique
+  id          String    @id @default(cuid()) @db.VarChar(191)
+  email       String    @db.VarChar(191)
+  tokenHash   String    @unique @db.VarChar(191)
   expiresAt   DateTime
   usedAt      DateTime?
   attemptedAt DateTime?
-  ipAddress   String?
+  ipAddress   String?   @db.LongText
   createdAt   DateTime  @default(now())
 
   @@index([email])
@@ -836,13 +836,13 @@ model MagicLinkToken {
 // token is stored (the emailed value is never persisted), single-use via a
 // guarded updateMany, 30-minute expiry, attempt tracking for the audit trail.
 model PasswordResetToken {
-  id          String    @id @default(cuid())
-  customerId  String
-  tokenHash   String    @unique
+  id          String    @id @default(cuid()) @db.VarChar(191)
+  customerId  String    @db.VarChar(191)
+  tokenHash   String    @unique @db.VarChar(191)
   expiresAt   DateTime
   usedAt      DateTime?
   attemptedAt DateTime?
-  ipAddress   String?
+  ipAddress   String?   @db.LongText
   createdAt   DateTime  @default(now())
 
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
@@ -862,40 +862,40 @@ model PasswordResetToken {
 // concurrent workers never double-send; failures back off exponentially
 // and the row keeps lastError for the admin outbox view.
 model EmailOutbox {
-  id             String    @id @default(cuid())
+  id             String    @id @default(cuid()) @db.VarChar(191)
   // Idempotency: one row per logical email (e.g. code_delivery:<orderId>).
   // A repeated enqueue attempt inside any later transaction is a no-op
   // (P2002 caught), so retries of confirmations never duplicate mail.
-  idempotencyKey String    @unique
-  templateKey    String // code_delivery | magic_link | password_reset | order_confirm
-  toEmail        String
-  subject        String
-  html           String
-  text           String?
-  status         String    @default("pending") // pending | sent | failed
+  idempotencyKey String    @unique @db.VarChar(191)
+  templateKey    String    @db.VarChar(191) // code_delivery | magic_link | password_reset | order_confirm
+  toEmail        String    @db.LongText
+  subject        String    @db.LongText
+  html           String    @db.LongText
+  text           String?   @db.LongText
+  status         String    @default("pending") @db.VarChar(191) // pending | sent | failed
   attempts       Int       @default(0)
-  lastError      String?
+  lastError      String?   @db.LongText
   availableAt    DateTime  @default(now()) // next eligible delivery attempt
   sentAt         DateTime?
   createdAt      DateTime  @default(now())
   // The migrated database carries a DEFAULT on this column; declaring it here
   // keeps schema.prisma and the database in agreement so `migrate dev` does not
   // strip the default out from under non-Prisma inserts.
-  updatedAt      DateTime  @updatedAt @default(now())
+  updatedAt      DateTime  @default(now()) @updatedAt
 
   @@index([status, availableAt])
   @@index([templateKey, createdAt(sort: Desc)])
 }
 
 model PhoneOtpToken {
-  id               String    @id @default(cuid())
-  destinationPhone String
-  codeHash         String    @unique
+  id               String    @id @default(cuid()) @db.VarChar(191)
+  destinationPhone String    @db.VarChar(191)
+  codeHash         String    @unique @db.VarChar(191)
   expiresAt        DateTime
   usedAt           DateTime?
   attemptedAt      DateTime?
   attempts         Int       @default(0)
-  ipAddress        String?
+  ipAddress        String?   @db.LongText
   createdAt        DateTime  @default(now())
 
   @@index([destinationPhone])

@@ -43,8 +43,8 @@ export async function GET_search(req: NextRequest): Promise<NextResponse> {
   const fullAccess = check.payload!.perms.includes('orders:read:full');
 
   const where: Prisma.OrderWhereInput = {};
-  if (email) where.customerEmail = { contains: email, mode: 'insensitive' as const };
-  if (orderNumber) where.orderNumber = { contains: orderNumber, mode: 'insensitive' as const };
+  if (email) where.customerEmail = { contains: email };
+  if (orderNumber) where.orderNumber = { contains: orderNumber };
   if (status) where.status = status;
   if (from || to) {
     where.createdAt = {

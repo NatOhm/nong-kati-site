@@ -319,9 +319,13 @@ describe('§1 CSP enforcement', () => {
   });
 
   it('one-time migration revokes every live admin session', async () => {
+    // The MariaDB port replaced the Postgres migration history with a single
+    // baseline, so the record of what actually ran against production lives in
+    // prisma/migrations-archive-postgres/. The assertion is unchanged — it still
+    // pins the SQL that revoked every live session — only the path moved.
     const { readFileSync } = await import('fs');
     const sql = readFileSync(
-      'prisma/migrations/20260927300000_revoke_stale_admin_sessions/migration.sql',
+      'prisma/migrations-archive-postgres/20260927300000_revoke_stale_admin_sessions/migration.sql',
       'utf8',
     );
     expect(sql).toMatch(/UPDATE\s+"AdminSession"/i);

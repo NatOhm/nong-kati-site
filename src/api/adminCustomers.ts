@@ -56,8 +56,8 @@ export async function adminListCustomers(params: {
     ...(q
       ? {
           OR: [
-            { email: { contains: q, mode: 'insensitive' as const } },
-            { fullName: { contains: q, mode: 'insensitive' as const } },
+            { email: { contains: q } },
+            { fullName: { contains: q } },
           ],
         }
       : {}),

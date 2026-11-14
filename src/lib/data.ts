@@ -618,9 +618,9 @@ export type CatalogSort =
 type CatalogWhere = {
   isActive: boolean;
   OR?: Array<
-    | { name: { contains: string; mode: 'insensitive' } }
-    | { description: { contains: string; mode: 'insensitive' } }
-    | { aliases: { some: { alias: { contains: string; mode: 'insensitive' } } } }
+    | { name: { contains: string } }
+    | { description: { contains: string } }
+    | { aliases: { some: { alias: { contains: string } } } }
   >;
   categoryId?: string | { in: string[] };
   variants?: { some: { stock: { gt: number }; isActive: boolean } };
@@ -648,9 +648,9 @@ export async function getCatalogProducts(
 
   if (trimmed) {
     where.OR = [
-      { name: { contains: trimmed, mode: 'insensitive' as const } },
-      { description: { contains: trimmed, mode: 'insensitive' as const } },
-      { aliases: { some: { alias: { contains: trimmed, mode: 'insensitive' as const } } } },
+      { name: { contains: trimmed } },
+      { description: { contains: trimmed } },
+      { aliases: { some: { alias: { contains: trimmed } } } },
     ];
   }
   if (categorySlug) {
@@ -708,9 +708,9 @@ export async function searchProducts(
   const where = {
     isActive: true,
     OR: [
-      { name: { contains: trimmed, mode: 'insensitive' as const } },
-      { description: { contains: trimmed, mode: 'insensitive' as const } },
-      { aliases: { some: { alias: { contains: trimmed, mode: 'insensitive' as const } } } },
+      { name: { contains: trimmed } },
+      { description: { contains: trimmed } },
+      { aliases: { some: { alias: { contains: trimmed } } } },
     ],
   };
 
@@ -748,8 +748,8 @@ export async function getSearchSuggestions(
     where: {
       isActive: true,
       OR: [
-        { name: { contains: trimmed, mode: 'insensitive' } },
-        { aliases: { some: { alias: { contains: trimmed, mode: 'insensitive' } } } },
+        { name: { contains: trimmed } },
+        { aliases: { some: { alias: { contains: trimmed } } } },
       ],
     },
     include: { category: { select: { name: true } } },

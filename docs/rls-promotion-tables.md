@@ -1,5 +1,11 @@
 # RLS on `Promotion` and `PromotionProduct` — decision record
 
+> **Retired 2026-11-15.** The database moved to MariaDB on the Hostatom hosting, which has
+> no row-level security and no `anon`/`authenticated` client roles — the `public` schema is no
+> longer exposed through a Data API at all. This record is kept because it explains why the
+> Postgres migrations were shaped the way they were; the migration history itself now lives in
+> `prisma/migrations-archive-postgres/`.
+
 **Question:** is the `ENABLE ROW LEVEL SECURITY` + `REVOKE` block in
 `prisma/migrations/20261007150000_wip_orderitem_coupon_finalline` safe for the role this
 app connects as — and does the migration need changing?

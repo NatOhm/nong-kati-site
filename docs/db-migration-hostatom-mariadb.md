@@ -1,7 +1,9 @@
 # Database migration: Supabase Postgres → Hostatom MariaDB
 
-**Status:** planned, not started. **Owner:** shop maintainer. **Target window:** one working
-day plus a ~30 min cutover at low traffic (recommend 02:00–03:00 ICT).
+**Status:** Phases 1–4 done on branch `db/mariadb-port` (15 Nov 2026), rehearsed against a
+MariaDB 10.11 copy of production. Phases 5–8 (provision, cutover, verify, retire) still need a
+window. **Owner:** shop maintainer. **Target window:** one working day plus a ~30 min cutover
+at low traffic (recommend 02:00–03:00 ICT).
 
 **Why now:** Supabase emailed on 13 Nov 2026 that org *NatOhm's Org*
 (`cdfcvazyoltgqnprnqoy`) exceeded its free-plan quota — egress is over the 5 GB allowance
@@ -38,9 +40,11 @@ fidelity, and the Postgres-only gates described in Phase 2.
 
 1. `prisma/schema.prisma`: `provider = "mysql"`. Keep `directUrl` and point both env names at
    the same MariaDB URL (the deploy script and Plesk env then need no rename).
-2. Add `@db.VarChar(191)` to every **indexed** String column (the 25 `@unique` fields and the
-   members of the 7 composite uniques). MariaDB cannot index a bare `TEXT`.
-   Keep the rest as `String` (`TEXT`) so nothing is truncated silently.
+2. Add `@db.VarChar(191)` to every **indexed** String column (the 25 `@unique` fields, the
+   members of the 7 composite uniques, and every field named by an `@@index` or by a relation's
+   `fields: [...]`). MariaDB cannot index a bare `TEXT`. Measured on this schema: 123 fields.
+   The other 94 String columns become `@db.LongText` — **not** plain `TEXT`, because
+   `SiteSetting.value` holds base64 images up to 2.6 MB and `TEXT` stops at 64 KB.
 3. `DateTime` → default MariaDB `datetime(3)`; add `@db.DateTime(3)` where millisecond
    precision is asserted by tests.
 4. `Json` fields map to `LONGTEXT` — no schema annotation needed, but any test that assumes
@@ -48,43 +52,49 @@ fidelity, and the Postgres-only gates described in Phase 2.
 5. Drop the `?schema=store` parameter: on MariaDB the database *is* the schema.
 6. Create the DB with `utf8mb4` / `utf8mb4_unicode_ci` so Thai text sorts and compares as it
    does today.
+7. `GiftCode.codeHash` (`Bytes @unique`) becomes `@db.VarBinary(32)`. Prisma's default
+   `LONGBLOB` produces `UNIQUE KEY ... USING HASH`, which MariaDB accepts but then rejects
+   *distinct* 32-byte hashes with a phantom duplicate-key error. Verified: all 170 hashes are
+   exactly 32 bytes.
 
 ## 4. Phases
 
 ### Phase 0 — preflight (no production contact)
 
-- [ ] Branch: `git switch -c db/mariadb-port`.
-- [ ] Record current live `BUILD_ID` (`/api/v1/version`) in this doc.
-- [ ] Confirm nothing else in the Supabase org is in use (Auth / Storage / Realtime) — a
-      dashboard check, because `.env` alone can't prove it. `docs/supabase-setup.md`
-      mentions Storage.
+- [x] Branch: `db/mariadb-port`, created from `6955e9b`.
+- [x] Live `BUILD_ID` recorded: `ZOptAHxrWCPUpaPYJc2L0`, git `c2c8dd3`.
+- [x] Nothing else in the Supabase org is in use: the project holds 78 tables — our 38 models
+      plus 40 Supabase-internal ones (`auth.*`, `storage.*`, `realtime.*`). Every internal
+      table with data is bookkeeping only (`_prisma_migrations` 36, `migrations` 9,
+      `schema_migrations` 13); no auth users, storage objects, or realtime rows.
 
 ### Phase 1 — schema port
 
-- [ ] Switch the provider and add the `@db.VarChar(191)` annotations.
-- [ ] Delete the Postgres-only migrations from the *working tree* (`prisma/migrations/*`),
-      keep the folder, and generate exactly one baseline:
+- [x] Provider `mysql`; 123 indexed String fields → `@db.VarChar(191)`, 94 → `@db.LongText`,
+      `GiftCode.codeHash` → `@db.VarBinary(32)`.
+- [x] Old history moved to `prisma/migrations-archive-postgres/` (34 dirs, kept as evidence
+      for the security regression test) and exactly one baseline generated:
       ```bash
       npx prisma migrate diff --from-empty \
         --to-schema-datamodel prisma/schema.prisma --script \
         > prisma/migrations/00000000000000_baseline/migration.sql
       ```
-- [ ] `npx prisma generate`, then `npx tsc --noEmit`, `npm run lint`, `npm test`.
+- [x] `npx prisma generate`, then `npx tsc --noEmit`, `npm run lint`, `npm test` — 0 / 0 /
+      1125 passed + 5 skipped. `npx prisma migrate deploy` on a clean MariaDB 10.11 applies the
+      baseline and `migrate status` reports up to date.
 
 **Done when:** gates green on the branch. No production resource touched.
 
 ### Phase 2 — retire the Postgres-only surfaces
 
-- [ ] `src/app/api/v1/internal/build-info/route.ts`: remove the `pg_tables` /
-      `rowsecurity` probe and the `rlsEnabled` / `rlsMissing` fields it feeds (MariaDB has no
-      RLS). Keep the migration-version probe — `_prisma_migrations` exists on MySQL too.
-- [ ] `src/app/api/v1/internal/ops-health/route.ts`: `COUNT(*)::bigint` → `COUNT(*)`
-      (the cast is Postgres syntax).
-- [ ] `scripts/verify-rls.cjs` + `tests/` references: delete, and remove
-      `docs/rls-promotion-tables.md`'s claim as the current policy (leave a short
-      "retired on the MariaDB move" note instead of deleting the record).
-- [ ] Any test asserting RLS/`pg_tables` behaviour must be removed with the feature, not left
-      skipping.
+- [x] `src/app/api/v1/internal/build-info/route.ts`: `pg_tables` / `rowsecurity` probe and the
+      `rlsEnabled` / `rlsMissing` fields removed; the migration-version probe stays.
+- [x] `src/app/api/v1/internal/ops-health/route.ts`: `COUNT(*)::bigint` → `COUNT(*)`.
+- [x] `scripts/verify-rls.cjs` deleted along with its tests;
+      `docs/rls-promotion-tables.md` carries a "retired 2026-11-15" note instead of vanishing.
+- [x] The RLS drift test removed with the feature (not left skipping).
+- [x] `mode: 'insensitive'` removed in 3 files (15 occurrences) — Postgres-only; MariaDB's
+      `utf8mb4_unicode_ci` collation already compares case-insensitively.
 
 **Done when:** `grep -rn "pg_tables\|rowsecurity\|::bigint" src scripts tests` is empty and
 the gates are green.
@@ -93,35 +103,58 @@ the gates are green.
 
 Never `pg_dump`: it produces Postgres SQL. Write `scripts/migrate-supabase-to-mariadb.mjs`:
 
-- [ ] Read from `SOURCE_DATABASE_URL` (Supabase **direct** :5432 string, read-only use),
-      write to `TARGET_DATABASE_URL` (local MariaDB).
-- [ ] Insert in FK order (Category → Product → Variant → codes → Customer → Order →
-      OrderItem → PaymentAttempt → ledger/audit/email tables). Cuid ids are strings — keep
-      them verbatim; nothing depends on autoincrement.
-- [ ] Decimals go through as strings (`toFixed(2)`), encrypted gift-code blobs as opaque
-      text, `DateTime` as UTC `Date`.
-- [ ] Reconcile: per-table row counts equal; `SUM(totalAmountThb)`, `SUM(walletBalanceThb)`
-      and `COUNT(*)` of delivered codes equal on both sides. Any mismatch aborts.
+- [x] `scripts/migrate-supabase-to-mariadb.mjs` reads every model through `json_agg` in a
+      throwaway `postgres:17-alpine` container (no local psql on this machine) and writes with
+      the MySQL Prisma client to `TARGET_DATABASE_URL`.
+- [x] Inserts follow the schema's model order with an FK retry loop; self-referencing tables
+      (`Category.parentId`) fall back to parent-first row-by-row passes.
+- [x] Decimals go through as strings, `Bytes` (`\\x…` hex in JSON) as `Buffer`, `DateTime` as
+      UTC `Date`, `@map` column names remapped, `PromotionProduct` included.
+- [x] Reconcile: per-table row counts equal on both sides, plus `--verify-only` for a re-check.
+      Result: **38 models, 2576 rows, every count matches**.
 
 **Done when:** reconciliation prints zero differences.
 
 ### Phase 4 — rehearsal
 
-- [ ] Container:
+- [x] Container:
       ```bash
       docker run --rm -d --name nk-mariadb -e MARIADB_ROOT_PASSWORD=ci \
         -e MARIADB_DATABASE=ci -p 3307:3306 mariadb:10.11
       ```
-- [ ] `DATABASE_URL=mysql://root:ci@127.0.0.1:3307/ci npx prisma migrate deploy`
-      (applies the baseline; `npx prisma migrate status` must then report "up to date").
-- [ ] Run the ETL, then `npm test` (1131 tests) and `next build` against the MariaDB copy.
-- [ ] Manual walk on the local build: homepage categories load, product page, add to cart,
-      checkout reachable, **decrypt one gift code in admin** (proves the encrypted blobs and
-      key still pair up), post a management save (write path), and place + void one order.
+- [x] `DATABASE_URL=mysql://root:ci@127.0.0.1:3307/ci npx prisma migrate deploy` applied the
+      baseline; `migrate status` reports up to date.
+- [x] ETL run, then `npm test` (1125 passed + 5 skipped) and `next build` compiled against the
+      MariaDB copy.
+- [x] Local build served from the MariaDB copy: `/` 200 (172 KB of real shop HTML),
+      `/api/v1/products` 200 with Thai catalogue data, `/api/v1/admin/orders` 401 signed out.
+- [x] Gift-code path proven end-to-end: 5 rows decrypted with
+      `NK_GIFT_CODE_ENCRYPTION_KEY` and each plaintext's SHA-256 matched its stored
+      `codeHash`, and the 2.68 MB image setting round-tripped intact.
+- [ ] Order/cart/checkout walk and a management save — not run in the rehearsal; the write
+      path through `Bytes`, `Decimal` and `DateTime` columns has no dedicated evidence yet.
 
 **Done when:** the same numbers pass as on Postgres, and the code decrypts.
 
+### Phase 4 findings (MariaDB traps worth remembering)
+
+1. **`TEXT` is 64 KB.** 94 String columns needed `LONGTEXT`; `SiteSetting.value` holds 31
+   base64 images, the largest 2.68 MB. This is also the likely cause of the Supabase egress
+   bill: any page that reads those settings pulls megabytes from the database. Moving the
+   images to files/R2 is a follow-up of its own.
+2. **A table cannot satisfy its own foreign key** in one multi-row `INSERT` (MySQL has no
+   deferrable constraints), so `Category` is written parents-first.
+3. **`@unique Bytes` → `LONGBLOB` + `USING HASH`** unique index rejects distinct values;
+   `@db.VarBinary(32)` fixes it.
+4. **A `@db.*` annotation appended after a trailing `//` comment is inert.** 21 fields had it
+   swallowed by their comment; the annotations were moved in front.
+5. **Wait for a real query before migrating.** `mariadb-admin ping` succeeds while the
+   container is still initialising, and `migrate deploy` then dies with `P1017`.
+
 ### Phase 5 — provision on Hostatom
+
+**Blocked on the maintainer's go-ahead** — this creates a production database and writes a
+secret, so it runs only inside the agreed window.
 
 - [ ] Plesk → Databases → **Add Database**: name `nong_kati`, server `localhost:3306`, create a
       dedicated user with a generated password. Note the collation is `utf8mb4`.
