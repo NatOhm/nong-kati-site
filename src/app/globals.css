@@ -246,9 +246,10 @@
   [data-theme='dark'] .bg-peach-500.text-fg {
     color: var(--clay-50);
   }
-  .hover\:bg-peach-400:hover {
-    background-color: var(--peach-800);
-  }
+  /* Primary-button hover fills live in the UNLAYERED block at the end of
+     this file: a rule declared in this layer loses to Tailwind's own
+     `.hover\:bg-peach-400:hover`, so the fill lightened to accent ramp-400
+     (#FB9651) and the white label fell to 2.2:1. */
   /* Site-wide primary button fill (bg-surface-brand → --bg-brand):
      light lands on peach-500 where the clay-50 label is 2.65 — deepen to
      peach-700 (clay-50 = 4.89). Dark is peach-400 + clay-900 = 4.86 and
@@ -257,14 +258,7 @@
   [data-theme='light'] .bg-surface-brand {
     background-color: var(--peach-700);
   }
-  .hover\:bg-peach-600:hover {
-    background-color: var(--peach-800);
-  }
-  /* Dark keeps its clay-900 label, so hover brightens (peach-300 +
-     clay-900 = 6.52) instead of deepening into a failing 3.09 pair. */
-  [data-theme='dark'] .hover\:bg-peach-600:hover {
-    background-color: var(--peach-300);
-  }
+  /* (its hover fill also lives in the unlayered block below) */
 
   [data-theme='dark'] .clay-btn {
     box-shadow: var(--shadow-clay-sm);
@@ -796,4 +790,26 @@ body {
   .min-h-screen {
     min-height: 100dvh;
   }
+}
+
+/* ── Primary-button hover ─────────────────────────────────────────────────
+   Same-name rules inside @layer components are out-ranked by the utility
+   Tailwind already ships for `.hover\:bg-peach-400`, so the hover fill fell
+   back to the accent ramp-400 (#FB9651) and the white label measured 2.2:1.
+   Unlayered rules beat @layer utilities regardless of specificity (same
+   pattern as the 16px input block above), so the deep fill survives the
+   build and keeps the brand orange while clearing AA. The `html` prefix is
+   there because Tailwind emits its hover utilities LAST (inside
+   `@media (hover: hover) and (pointer: fine)`); equal specificity would let
+   that later rule win on desktop. */
+html .hover\:bg-peach-400:hover {
+  background-color: var(--peach-800);
+}
+html .hover\:bg-peach-600:hover {
+  background-color: var(--peach-800);
+}
+/* Dark keeps its clay-900 label, so hover brightens (peach-300 + clay-900 =
+   6.52) instead of deepening into a failing 3.09 pair. */
+[data-theme='dark'] .hover\:bg-peach-600:hover {
+  background-color: var(--peach-300);
 }

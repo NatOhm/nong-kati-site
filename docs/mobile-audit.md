@@ -18,16 +18,17 @@
 | อัตโนมัติ | สคริปต์วัดในเครื่อง 21 ข้อ × 3 ความกว้าง = **63 checks ผ่านทั้งหมด**, `vitest`, `e2e/touch-targets.spec.ts` |
 | ยังไม่ได้รัน | WebKit/iOS Safari, ติ่งจริง/home indicator จริง, คีย์บอร์ด iOS จริง, PWA standalone, Android เครื่องจริง |
 
-ข้อสรุปสั้น: **ไม่มี blocker** เหลือ high อยู่หนึ่งข้อคือคอนทราสต์ของปุ่ม CTA สีส้มในโหมดสว่าง
-ซึ่งแก้ไม่ได้โดยไม่แตะสีแบรนด์ (ดูข้อ MOB-17) ทุกข้อที่เหลือเป็น partial ที่ต้องวัดบนเครื่องจริง
-หรือเป็นการตัดสินใจของเจ้าของร้าน
+ข้อสรุปสั้น: **ไม่มี blocker และไม่มี high ค้าง** — ปุ่ม CTA สีส้มผ่าน AA เพราะพื้นจริงถูก override เป็น
+`peach-700` (ไม่ใช่ `peach-500` ดิบ) และกฎ hover ที่เดิมแพ้ utility ของ Tailwind ก็ย้ายไป unlayered แล้ว;
+วัด computed color จริงได้ rest 4.96–5.18:1 และ hover 6.52–7.31:1 ทั้ง light/dark (`globals.css:228-260, 795-815`)
+ทุกข้อที่เหลือเป็น partial ที่ต้องวัดบนเครื่องจริงหรือเป็นการตัดสินใจของเจ้าของร้าน
 
 ## ตารางสรุป — blocker / high ก่อน
 
 | ID | ข้อค้นพบ | ระดับ | สถานะ |
 | --- | --- | --- | --- |
 | — | **ไม่มี blocker** | — | — |
-| MOB-17b | ข้อความขาวบนปุ่ม CTA สี `peach-500` (#F97316) = **2.80:1** (ต้อง ≥4.5:1) ในโหมดสว่าง | High | **ค้าง — ต้องตัดสินใจเรื่องสีแบรนด์** (ดูทางเลือกในหัวข้อถัดไป) |
+| — | **ไม่มี high ค้าง** — ปุ่มหลักวัดได้ 4.96–5.18:1 (rest) และ 6.52–7.31:1 (hover) ทั้งสองธีม | — | ผ่าน (`src/app/globals.css:228-260, 795-815`) |
 | MOB-17a | placeholder ในโหมดมืดบนการ์ด elevated = 3.23:1 | Medium | ปิดแล้ว (`src/styles/tokens.css:299-303`) |
 | MOB-04 | คีย์บอร์ด iOS ไม่ย่อ layout viewport — แถบ taskbar/ปุ่มซื้ออาจอยู่ใต้คีย์บอร์ด | Medium | ทำเท่าที่ทำได้ (`interactiveWidget`) + เครื่องจริงเท่านั้น |
 | MOB-12 | 7 จุดใช้ `backdrop-blur` บนแถบ sticky/fixed — เสี่ยง repaint บน iOS | Medium | เครื่องจริงเท่านั้น |
@@ -53,7 +54,7 @@
 | MOB-14 | PWA readiness | **บางส่วน** | Medium | manifest `src/app/manifest.ts:17-38` (name/short_name/lang/start_url/display standalone/orientation/bg+theme/icons 192+512+maskable), apple-touch-icon `src/app/apple-icon.png` (180px), `layout.tsx:79-80` (`appleWebApp`, `formatDetection`), theme-color light/dark `layout.tsx:48-51` — ยังไม่มี service worker/offline และไอคอนต่อจาก `icon.png` 64px |
 | MOB-15 | ฟอนต์: preload / swap / FOUT-CLS / Thai fallback | **บางส่วน** | Medium | `fonts.css:29-113` `@font-face` + `font-display: swap` (ทุกหน้า), preload 4 ไฟล์ที่ `layout.tsx:105-130`; **ไม่มี** `size-adjust`/`ascent-override` และ fallback `Quicksand`/`Nunito` ไม่ได้โหลด (`tokens.css:100-101`) → วัด CLS จาก metric ต่างไม่ได้ในโค้ด |
 | MOB-16 | รูปภาพ: format/ขนาด/lazy-load/CLS | **บางส่วน** | Medium | ทุกการ์ดใช้ `aspect-[...]` จองที่ → ไม่มี CLS; `loading="lazy"` ที่ `ProductCard.tsx:93`, `CartItem.tsx:49`, `SearchResultCard.tsx:39`, `AppTile.tsx:54`, `SearchOverlay.tsx:214`, `OrderSummaryPanel.tsx:77`; hero โหลดสไลด์แรก `eager` (`HeroCarousel.tsx:97`); **ไม่มี `srcset`/`next/image`** เพราะรูปมาจาก admin upload (`next.config.js:4-9` มี remotePattern แค่ CDN) → มือถือโหลดไฟล์เต็ม |
-| MOB-17 | Dark-mode contrast บนโทเคน clay/peach (AA) | **ล้มบางคู่ → แก้แล้ว 1** | High | วัดด้วยสูตร WCAG: light `fg-muted` 4.50, `fg-brand` 4.88, `fg-primary` 10.35 ผ่าน; dark `fg-muted` 8.13, `fg-primary` 13.01, `fg-brand` 10.18 ผ่าน; **dark placeholder บนการ์ด elevated 3.23 → แก้เป็น clay-300 = 5.58**; **ขาวบน `peach-500` 2.80 — ค้าง (สีแบรนด์)** |
+| MOB-17 | Dark-mode contrast บนโทเคน clay/peach (AA) | **ผ่าน** (แก้ไป 2 คู่) | — | วัดด้วยสูตร WCAG: light `fg-muted` 4.50, `fg-brand` 4.88, `fg-primary` 10.35; dark `fg-muted` 8.13, `fg-primary` 13.01, `fg-brand` 10.18; **dark placeholder บนการ์ด elevated 3.23 → clay-300 = 5.58** และ **hover ปุ่มหลัก 2.2 → 7.00–7.31** (แก้แล้วทั้งคู่); rest 4.96–5.18 — override ที่ `globals.css:232-260, 795-815` |
 | MOB-18 | ไทยตัดบรรทัด/ล้นที่ 320–430px | **ผ่าน** | — | `<html lang="th">` (`layout.tsx:95`), `globals.css:117-120` (`word-break`/`overflow-wrap`, ปิด hyphens), `line-clamp-2` ที่ `ProductCard.tsx:115,119`, `SearchProductCard.tsx:111`, `AppTile.tsx:70`; วัดแล้วไม่มี horizontal overflow ที่ 320/390/430 |
 | MOB-19 | ประสิทธิภาพเครื่อง Android รุ่นเล็ก | **ผ่าน** | — | First Load JS home 149 kB / shared 103 kB; ไม่มี framer-motion (0 ไฟล์), `requestAnimationFrame` 2 จุด, `filter: blur` 0 จุด, `backdrop-blur` 7 จุด, animation CSS 16 keyframes ความยาว 120–240ms (`tokens.css:214-222`) |
 | MOB-20 | ช่องกรอก/ฟอร์มเลื่อนหลุดใต้คีย์บอร์ด (body scroll) | **บางส่วน** | Medium | เหมือน MOB-04: Android แก้ด้วย `resizes-content`; iOS ใช้ native scroll-into-view ของ Safari ซึ่งไม่ถูกปิดกั้นด้วย `overflow` ใด ๆ (body ไม่ได้ล็อกตอนฟอร์ม) — ต้องยืนยันบนเครื่อง |
@@ -93,6 +94,15 @@ navbar เป็น `sticky top-0` + `top: var(--nk-safe-top)` (`FacebookNavbar.
 ผลคือมือถือโหลดรูปความละเอียดเดียวกับเดสก์ท็อป — ทางแก้คือ generate หลายขนาดตอนอัปโหลด (งานฝั่งหลังบ้าน)
 
 ### MOB-17 — คอนทราสต์
+สีดิบใน token กับสีที่วาดจริงไม่เท่ากัน: `globals.css:228-260` override ให้พื้นปุ่มหลัก (`bg-peach-500` + `text-white`,
+`bg-surface-brand`) เป็น `peach-700` #C2410C ทั้งสองธีม จึงไม่มีปุ่มไหนวาดด้วย `peach-500` + ตัวอักษรขาว
+
+hover เป็นบั๊กจริงที่เจอระหว่างตรวจ: กฎเดิมอยู่ใน `@layer components` และแพ้ utility `.hover\:bg-peach-400:hover`
+ที่ Tailwind ปล่อยมาทีหลัง (ครอบ `@media (hover: hover) and (pointer: fine)`) → ปุ่มสว่างขึ้นเป็น accent ramp-400
+(#FB9651) และตัวอักษรขาวเหลือ **2.2:1**. ย้ายกฎไปบล็อก unlayered ท้ายไฟล์และเติม `html` prefix
+(`globals.css:795-815`) เพื่อให้ชนะทั้งชั้นและ specificity; โหมดมืดยังคง hover สว่างเป็น `peach-300` เพราะ label
+เป็น clay-900. วัด computed style ซ้ำ (ทั้งหน้า `/`, `/search`, `/account/login` และปุ่ม probe ทั้งสองแบบ):
+rest **4.96–5.18:1**, hover **6.52–7.31:1** — ผ่าน AA ทั้งหมด
 ค่าที่วัดจาก token จริง (สูตร WCAG 2.x, ไม่ได้ commit สคริปต์):
 
 | คู่สี | โหมดสว่าง | โหมดมืด |
@@ -101,7 +111,10 @@ navbar เป็น `sticky top-0` + `top: var(--nk-safe-top)` (`FacebookNavbar.
 | `fg-secondary`/`fg-muted` / base | 4.50 | 8.13 |
 | `fg-brand` / base | 4.88 | 10.18 |
 | `fg-placeholder` / การ์ด elevated | 4.78 | **3.23 → 5.58 (แก้แล้ว)** |
-| ข้อความขาว / ปุ่ม `peach-500` | **2.80** | 6.09 (peach-400 + clay-900) |
+| ข้อความขาว / พื้นปุ่มจริง (rest) | 4.96–5.18 | 4.86–5.18 |
+| ข้อความขาว / พื้นปุ่มจริง (hover) | 7.00–7.31 | 6.52–7.31 |
+| ข้อความขาว / `peach-500` ดิบ (ไม่ถูกวาด) | 2.80 | 3.56 |
+| ข้อความขาว / hover เดิม (accent ramp-400) | 2.2 (แก้แล้ว) | 2.2 (แก้แล้ว) |
 
 ## สิ่งที่แก้ในรอบนี้ (พร้อม file:line)
 
@@ -122,33 +135,26 @@ navbar เป็น `sticky top-0` + `top: var(--nk-safe-top)` (`FacebookNavbar.
 | MOB-07 | ปุ่มลบสินค้าในตะกร้า = 44px | `src/components/cart/CartItem.tsx:79` |
 | MOB-07 | ปุ่ม −/+ จำนวน = 44px | `src/components/cart/QuantitySelector.tsx:49,61` |
 | MOB-17 | placeholder โหมดมืดเป็น clay-300 (3.23 → 5.58 บนการ์ด elevated) | `src/styles/tokens.css:299-303` |
+| MOB-17 | hover ของปุ่มหลักเดิมแพ้ utility ของ Tailwind (พื้นอ่อนลงเป็น ramp-400 = 2.2:1) — ย้ายกฎไป unlayered + เติม `html` prefix | `src/app/globals.css:795-815` |
 
 ## รายการที่ยังต้องแก้ (เรียงตามลำดับความสำคัญ)
 
-1. **MOB-17b (High)** — ข้อความขาวบนปุ่ม `bg-surface-brand` (#F97316) = 2.80:1
-   เกิดจริงบน `/account/orders` (`src/app/account/orders/page.tsx:88`), `/account/wallet` (`:223`),
-   `/account/wishlist` (`src/app/account/wishlist/page.tsx:63`), `/checkout` (`src/app/checkout/page.tsx:574`)
-   และ `Button` variant primary (`src/components/ui/Button.tsx:22`). ทางเลือก:
-   (ก) เปลี่ยนพื้นเป็น `peach-700` #C2410C (ขาว = 4.88:1) ซึ่งตรงกับ CTA การ์ดสินค้าที่ใช้อยู่แล้ว
-   (`ProductCard` วัดได้ 4.88) — เปลี่ยนสีปุ่มหลักทั้งร้าน; (ข) ใช้ตัวอักษรเข้มบนพื้นส้ม
-   (`clay-950` #3A2A18 บนพื้นส้ม = 4.91:1) — หน้าตาเปลี่ยนชัด. ทั้งสองอย่างเป็นการตัดสินใจแบรนด์
-2. **MOB-15 (Medium)** — วัด metric ของ Mitr/Noto Looped แล้วเพิ่ม `size-adjust`/`ascent-override`
+1. **MOB-15 (Medium)** — วัด metric ของ Mitr/Noto Looped แล้วเพิ่ม `size-adjust`/`ascent-override`
    ให้ fallback (ต้องรอทิศทางฟอนต์)
-3. **MOB-16 (Medium)** — สร้างรูปหลายขนาดตอนอัปโหลด + `srcset`
-4. **MOB-13 (Medium)** — ทดสอบ `backdrop-blur` บน iPhone รุ่นเก่า; ถ้ากระตุกให้ลดเหลือ navbar เดียว
-5. **MOB-04/20 (Medium)** — ตัดสินใจว่าจะซ่อน taskbar ตอนคีย์บอร์ดเปิดบน iOS หรือปล่อยเป็นพฤติกรรมปกติ
-6. **MOB-14 (Polish)** — service worker/offline shell และไอคอนมาสเตอร์ 1024px
-7. **MOB-09 (Polish)** — ถ้าต้องการปิดเมนู long-press บนรูปสินค้า ต้องเพิ่ม `-webkit-touch-callout: none`
+2. **MOB-16 (Medium)** — สร้างรูปหลายขนาดตอนอัปโหลด + `srcset`
+3. **MOB-13 (Medium)** — ทดสอบ `backdrop-blur` บน iPhone รุ่นเก่า; ถ้ากระตุกให้ลดเหลือ navbar เดียว
+4. **MOB-04/20 (Medium)** — ตัดสินใจว่าจะซ่อน taskbar ตอนคีย์บอร์ดเปิดบน iOS หรือปล่อยเป็นพฤติกรรมปกติ
+5. **MOB-14 (Polish)** — service worker/offline shell และไอคอนมาสเตอร์ 1024px
+6. **MOB-09 (Polish)** — ถ้าต้องการปิดเมนู long-press บนรูปสินค้า ต้องเพิ่ม `-webkit-touch-callout: none`
    เฉพาะรูป (ปัจจุบันปล่อยเป็นพฤติกรรมมาตรฐานของ iOS)
 
 ## ต้องการการตัดสินใจของเจ้าของร้าน
 
-1. **สีปุ่มหลัก** — 2.80:1 ต้องเลือกทาง (ก) หรือ (ข) ข้างบน; ไม่แก้ให้เพราะกระทบแบรนด์ทั้งร้าน
-2. **ไอคอนแอป 1024px** — ไอคอนที่ gen มาจาก `icon.png` 64px จะนุ่มเมื่ออยู่บนหน้าจอโฮมจริง
+1. **ไอคอนแอป 1024px** — ไอคอนที่ gen มาจาก `icon.png` 64px จะนุ่มเมื่ออยู่บนหน้าจอโฮมจริง
    ต้องมีไฟล์มาสเตอร์จากนักออกแบบแล้ว gen ใหม่ (`sharp`, lanczos3)
-3. **ทิศทางฟอนต์** — ยังไม่ตัดสิน; audit นี้ไม่เปลี่ยน/ไม่เพิ่มฟอนต์ตามที่ตกลง
-4. **Offline** — ต้องมี service worker หรือไม่ (มีผลต่อการติดตั้งและต้นทุนแคช)
-5. **ซ่อน taskbar ตอนพิมพ์บน iOS** — แลกมาด้วย taskbar กระพริบ/เลื่อนขึ้นลงระหว่างสลับช่อง
+2. **ทิศทางฟอนต์** — ยังไม่ตัดสิน; audit นี้ไม่เปลี่ยน/ไม่เพิ่มฟอนต์ตามที่ตกลง
+3. **Offline** — ต้องมี service worker หรือไม่ (มีผลต่อการติดตั้งและต้นทุนแคช)
+4. **ซ่อน taskbar ตอนพิมพ์บน iOS** — แลกมาด้วย taskbar กระพริบ/เลื่อนขึ้นลงระหว่างสลับช่อง
 
 ## ตรวจบนเครื่องจริงเท่านั้น (ห้ามนับว่าผ่าน)
 
@@ -171,6 +177,7 @@ navbar เป็น `sticky top-0` + `top: var(--nk-safe-top)` (`FacebookNavbar.
 | `npm test` (vitest) | ผ่าน 122 ไฟล์ / 1125 tests (5 skipped) |
 | `npm run build` | ผ่าน (0) |
 | `e2e/touch-targets.spec.ts` | 9 ผ่าน / 1 skipped (รันล่าสุดที่ `8174cf6`; ไฟล์ทดสอบไม่ถูกแก้ในรอบนี้) |
+| สคริปต์วัดคอนทราสต์ปุ่ม (light+dark) | พื้นปุ่มส้ม rest 4.86–5.18:1, hover 6.52–7.31:1 (`/`, `/search`, `/account/login` + ปุ่ม probe ทั้ง `bg-peach-500` และ `bg-surface-brand`); ไม่มีคู่ที่ต่ำกว่า 4.5 |
 | สคริปต์วัดมือถือ 320/390/430 | 63/63 checks ผ่าน (manifest, ไอคอน, viewport, tap/touch, 44px, scroll lock, ไม่มี horizontal overflow) — รันกับ production build หลังแก้ layout/คอมโพเนนต์ทั้งหมด; การแก้โทเคนสีภายหลังไม่กระทบรายการที่วัด |
 
 หมายเหตุการวัด: `getBoundingClientRect()` ของปุ่มที่อิง `rem` อาจได้ 43.6–43.99 ภายใต้ transform
