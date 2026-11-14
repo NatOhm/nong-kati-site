@@ -34,6 +34,8 @@
 import crypto from 'node:crypto';
 import { PrismaClient } from '@prisma/client';
 
+import { resetStrandedOrder, strandedOrderNumber } from './management-smoke-fixture.ts';
+
 const prisma = new PrismaClient();
 
 // ── Gift-code crypto (mirrors src/lib/crypto/giftCode.ts exactly) ──────
@@ -90,94 +92,10 @@ async function main() {
   console.log(`[mgmt-smoke] admin: ${admin.email}`);
 
   // ── 2. Stranded order + succeeded manual-transfer attempt ───────────
-  const variant = await prisma.productVariant.findFirst({
-    where: { isActive: true, stock: { gt: 0 } },
-    include: { product: true },
-    orderBy: { createdAt: 'asc' },
-  });
-  if (!variant) throw new Error('no active stocked variant found — run seed-smoke.mjs first');
-
-  const orderNumber = `NK-${new Date().getFullYear()}-MGMT01`;
-  const totalThb = Number(variant.price ?? 25);
-  const existing = await prisma.order.findUnique({ where: { orderNumber } });
-
-  const order = existing
-    ? await prisma.order.update({
-        where: { orderNumber },
-        data: {
-          status: 'pending_payment',
-          customerEmail: 'mgmt-smoke-customer@test.local',
-          totalAmountThb: totalThb,
-        },
-      })
-    : await prisma.order.create({
-        data: {
-          orderNumber,
-          customerEmail: 'mgmt-smoke-customer@test.local',
-          status: 'pending_payment',
-          paymentMethod: 'manual_transfer',
-          subtotalThb: totalThb,
-          vatAmountThb: 0,
-          totalAmountThb: totalThb,
-          tosAcceptedAt: new Date(),
-          confirmationUuid: crypto.randomUUID(),
-          items: {
-            create: [
-              {
-                variantId: variant.id,
-                productNameTh: variant.product.name,
-                productNameEn: variant.product.name,
-                skuCode: variant.product.sku ?? variant.id,
-                denominationThb: totalThb,
-                quantity: 1,
-                unitPriceThb: totalThb,
-                unitPriceExVat: totalThb,
-                unitVatAmount: 0,
-                lineTotalThb: totalThb,
-              },
-            ],
-          },
-        },
-      });
-
-  // Succeeded manual-transfer attempt = the "money in, order stuck" signal.
-  const attempt = await prisma.paymentAttempt.upsert({
-    where: {
-      id: (await prisma.paymentAttempt.findFirst({ where: { orderId: order.id } }))?.id ?? '',
-    },
-    update: { status: 'succeeded', failureReason: null, webhookReceivedAt: new Date() },
-    create: {
-      orderId: order.id,
-      paymentMethod: 'manual_transfer',
-      status: 'succeeded',
-      amountThb: totalThb,
-      gatewayName: 'manual',
-      gatewayRef: `mgmt-smoke-${orderNumber}`,
-      webhookReceivedAt: new Date(),
-    },
-  });
-  console.log(`[mgmt-smoke] stranded order ${orderNumber} (${order.id}) attempt ${attempt.id}`);
-
-  // ── 3. Gift codes so fulfilment can complete ────────────────────────
-  const items = await prisma.orderItem.findMany({ where: { orderId: order.id } });
-  const availableCodes = await prisma.giftCode.count({
-    where: { variantId: variant.id, status: 'available', orderId: null },
-  });
-  const need = Math.max(0, items.reduce((sum, it) => sum + it.quantity, 0) - availableCodes);
-  for (let i = 0; i < need; i++) {
-    const plain = `MGMTSMOKE-${crypto.randomBytes(6).toString('hex').toUpperCase()}`;
-    const enc = encryptCode(plain);
-    await prisma.giftCode.create({
-      data: {
-        variantId: variant.id,
-        codeEncrypted: enc.ciphertext,
-        codeHash: hashCode(plain),
-        nonce: enc.nonce,
-        status: 'available',
-      },
-    });
-  }
-  console.log(`[mgmt-smoke] gift codes ready (created ${need}, available ${availableCodes})`);
+  //    Reset lives in a shared module: the spec's beforeAll runs the same
+  //    repair, so a second suite run starts from the identical state.
+  const { variant, totalThb } = await resetStrandedOrder(prisma);
+  console.log(`[mgmt-smoke] stranded order ${strandedOrderNumber()} reset`);
 
   // ── 4. Refund fixture — a COMPLETED order with a DELIVERED code ─────
   // Written straight to the final state rather than produced by clicking

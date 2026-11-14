@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
-import crypto from 'node:crypto';
 import { PrismaClient } from '@prisma/client';
 
+import { resetStrandedOrder } from '../scripts/management-smoke-fixture';
 import { totp } from './helpers';
 
 /**
@@ -41,47 +41,10 @@ test.describe('management back office smoke', () => {
     totpSecret = admin.totpSecret ?? '';
     if (!totpSecret) throw new Error('smoke admin has no TOTP secret');
 
-    // Idempotent reruns: a previous pass left the order completed, which
-    // removes it from the queue. Reset the fixture to the stranded state
-    // (and top up one fulfilment code if the last run consumed it).
-    const orderNumber = `NK-${new Date().getFullYear()}-MGMT01`;
-    const order = await prisma.order.findUnique({
-      where: { orderNumber },
-      select: { id: true, items: { select: { variantId: true, quantity: true } } },
-    });
-    if (order) {
-      await prisma.order.update({
-        where: { id: order.id },
-        data: { status: 'pending_payment' },
-      });
-      await prisma.paymentAttempt.updateMany({
-        where: { orderId: order.id },
-        data: { status: 'succeeded', failureReason: null },
-      });
-      const variantId = order.items[0]?.variantId;
-      if (variantId) {
-        const available = await prisma.giftCode.count({
-          where: { variantId, status: 'available', orderId: null },
-        });
-        if (available < 1) {
-          const plain = `MGMTSMOKE-${crypto.randomBytes(6).toString('hex').toUpperCase()}`;
-          const keyHex = process.env['NK_GIFT_CODE_ENCRYPTION_KEY'];
-          if (!keyHex) throw new Error('NK_GIFT_CODE_ENCRYPTION_KEY not set for code reset');
-          const nonce = crypto.randomBytes(12);
-          const cipher = crypto.createCipheriv('aes-256-gcm', Buffer.from(keyHex, 'hex'), nonce);
-          const encrypted = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
-          await prisma.giftCode.create({
-            data: {
-              variantId,
-              codeEncrypted: Buffer.concat([encrypted, cipher.getAuthTag()]),
-              codeHash: crypto.createHash('sha256').update(plain).digest(),
-              nonce,
-              status: 'available',
-            },
-          });
-        }
-      }
-    }
+    // Idempotent reruns: a previous pass left the order completed or expired,
+    // sometimes detached from a purged variant. The shared fixture reset puts
+    // it back to the stranded state (variant reattached, one code in stock).
+    await resetStrandedOrder(prisma);
   });
 
   test.afterAll(async () => {
