@@ -33,11 +33,14 @@ interface SlipTicket {
 
 export function SlipUploadPanel({
   orderId,
+  orderNumber,
   slipUploadToken,
   slipVerifyEnabled,
   onConfirmed,
 }: {
   orderId: string;
+  /** Printed on the panel so two orders of the same app are distinguishable. */
+  orderNumber?: string;
   /** Capability token minted with the order — required by the upload API. */
   slipUploadToken: string | null;
   slipVerifyEnabled: boolean;
@@ -194,12 +197,18 @@ export function SlipUploadPanel({
               ? 'ระบบตรวจกับธนาคารจริง: ยอดต้องตรง, 1 สลิปใช้ได้ 1 ออเดอร์ — ใช้เวลาไม่กี่วินาที ถ้าระบบตรวจไม่ผ่าน สลิปจะถูกส่งให้แอดมินตรวจต่อทันที'
               : 'แอดมินจะเห็นสลิปของคุณในหน้าจัดการคำสั่งซื้อ และกดยืนยันให้โค้ดส่งอัตโนมัติ'}
           </p>
+          {orderNumber && (
+            <p className="mt-1 font-mono text-xs text-fg-secondary">คำสั่งซื้อ {orderNumber}</p>
+          )}
         </div>
       </div>
 
       {/* Paid: the product the customer just bought, on this page. */}
       {ticket && ticket.codes.length > 0 && (
         <div className="mt-3 space-y-3">
+          <p className="text-xs font-semibold text-fg-secondary">
+            โค้ดของคุณ{orderNumber ? ` · ${orderNumber}` : ''}
+          </p>
           {ticket.codes.map((delivered, idx) => (
             <CodeBlock
               key={`${delivered.code}-${idx}`}

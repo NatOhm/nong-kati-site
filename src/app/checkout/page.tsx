@@ -480,8 +480,15 @@ export default function CheckoutPage(): React.JSX.Element {
     );
   }
 
-  // Redirect if cart is empty
-  if (!cart || cart.items.length === 0) {
+  // The paid state has to outlive the cart. Slip verification clears the cart
+  // the moment the order confirms, and the old early return then swapped the
+  // whole page for "ตะกร้าว่างเปล่า" — unmounting SlipUploadPanel along with the
+  // codes it had just rendered (client report 2026-11-14: "ชำระเงินแล้วโค้ดยังไม่เด้ง").
+  const paidJustNow =
+    slipConfirmed !== null || walletReceipt !== null || paymentState?.status === 'succeeded';
+
+  // Redirect if cart is empty and nothing was paid in this session.
+  if ((!cart || cart.items.length === 0) && !paidJustNow) {
     return (
       <PageShell>
         {receiptDialog}
@@ -592,6 +599,36 @@ export default function CheckoutPage(): React.JSX.Element {
 
           {step === 2 && (
             <div className="rounded-md border border-line-subtle bg-surface p-6">
+              {/* Which order is this payment for? Buying the same app twice
+                  produced two identical payment screens with no way to tell
+                  them apart (client report 2026-11-14). */}
+              {order && (
+                <div className="mb-5 rounded-md border border-line-brand bg-surface-brand-subtle px-4 py-3">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <p className="text-xs text-fg-secondary">คำสั่งซื้อ</p>
+                    <p className="font-mono text-sm font-bold text-fg-brand">
+                      {order.orderNumber}
+                    </p>
+                  </div>
+                  <ul className="mt-2 space-y-1">
+                    {order.items.map((item) => (
+                      <li
+                        key={item.id}
+                        className="flex items-baseline justify-between gap-3 text-sm text-fg"
+                      >
+                        <span className="min-w-0 truncate">
+                          {item.productNameTh}
+                          {item.quantity > 1 ? ` × ${item.quantity}` : ''}
+                        </span>
+                        <span className="shrink-0 text-fg-secondary">
+                          {formatThb(item.lineTotalThb)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {/* Security review [High]: no actionable payment channel → say
                   so honestly instead of stranding the customer on step 2. */}
               {paymentMethod === 'promptpay' && !paymentState?.qrImageUrl && !manualInfo && (
@@ -706,6 +743,7 @@ export default function CheckoutPage(): React.JSX.Element {
                   {order && paymentState?.status !== 'succeeded' && (
                     <SlipUploadPanel
                       orderId={order.id}
+                      orderNumber={order.orderNumber}
                       slipUploadToken={slipUploadToken}
                       slipVerifyEnabled={slipEnabled}
                       onConfirmed={handleSlipConfirmed}
@@ -742,6 +780,7 @@ export default function CheckoutPage(): React.JSX.Element {
                     {order && paymentState.status !== 'succeeded' && (
                       <SlipUploadPanel
                         orderId={order.id}
+                        orderNumber={order.orderNumber}
                         slipUploadToken={slipUploadToken}
                         slipVerifyEnabled={slipEnabled}
                         onConfirmed={handleSlipConfirmed}
