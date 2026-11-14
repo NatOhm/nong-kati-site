@@ -361,7 +361,55 @@ Then, and only then:
 
 ---
 
-## 6. What the user must authorise
+## 6. Phase 5 — the six steps, in order
+
+Provisioning only: it creates an *empty* database, touches no running app, and leaves Supabase
+serving. Values and rationale are in §1–2.
+
+1. **Create it.** Plesk → Websites & Domains → `nongkatistore.com` → Databases → Add Database:
+   name `nong_kati`, server `localhost:3306`, user `nk_app`, password **alphanumeric 16–24
+   chars**. Store that password in your password manager — it is not recoverable from the panel
+   page afterwards, and it is needed in four places later.
+2. **Confirm the charset.** phpMyAdmin → SQL:
+   `SELECT DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME FROM information_schema.SCHEMATA
+   WHERE SCHEMA_NAME='nong_kati';` → `utf8mb4`. If not:
+   `ALTER DATABASE \`nong_kati\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`
+3. **Narrow the grants** (phpMyAdmin → SQL, or SSH `mysql -u root -p`):
+   ```sql
+   GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, DROP, INDEX, REFERENCES,
+         CREATE TEMPORARY TABLES, LOCK TABLES
+     ON `nong_kati`.* TO 'nk_app'@'localhost';
+   ```
+4. **Do NOT add `DATABASE_URL` yet.** Panel variables override Infisical, so writing them now
+   points the live shop at an empty database the next time Passenger restarts — an outage with
+   no error to explain it. They go in at §3 Step 6, after the ETL. Same for Infisical: leave
+   its Supabase values alone until the window.
+5. **Verify from the server** (SSH: `ssh nongka@thsv93.hostatom.com`; password is typed
+   interactively so it never enters argv):
+   ```bash
+   mysql -h localhost -u nk_app -p nong_kati \
+     -e "SELECT DATABASE() db, CURRENT_USER() usr, @@character_set_database charset; SHOW GRANTS;"
+   ```
+   Green: `db=nong_kati`, `usr=nk_app@localhost`, `charset=utf8mb4`, and the grants listed are
+   only step 3's plus the unavoidable `GRANT USAGE ON *.*` (a no-op that MariaDB always shows,
+   along with a credential hash — not a secret you need to hide). If `mysql` is not on PATH in
+   the chroot, do the same checks in phpMyAdmin's SQL tab.
+6. **Verify through the exact string the app will use** — from this checkout, with the tunnel
+   open (`ssh -N -L 3307:localhost:3306 nongka@thsv93.hostatom.com`):
+   ```bash
+   DATABASE_URL="mysql://nk_app:DBPASS@127.0.0.1:3307/nong_kati" \
+   DATABASE_DIRECT_URL="mysql://nk_app:DBPASS@127.0.0.1:3307/nong_kati" \
+     npx prisma migrate status
+   ```
+   Green (verified wording): `Datasource "db": MySQL database "nong_kati" at "127.0.0.1:3307"`,
+   `1 migration found in prisma/migrations`, `Following migration have not yet been applied:` /
+   `20261115000000_baseline`. That last part is correct at this stage; it proves credentials,
+   dialect and the tunnel without creating a single table.
+
+If step 5 succeeds and step 6 says "not yet applied", Phase 5 is done: nothing else about the
+running shop has changed.
+
+## 7. What the user must authorise
 
 Everything below is irreversible, credential-bearing, or both. The agent has prepared it and
 verified it on a copy; it has not done any of it.
