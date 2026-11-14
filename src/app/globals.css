@@ -31,6 +31,30 @@
     @apply cursor-pointer;
   }
 
+  /* Phone interaction defaults.
+     1. iOS paints a grey flash over every tapped link/button unless the
+        highlight is cleared; the :active/:focus-visible styles are the
+        designed feedback instead.
+     2. touch-action: manipulation removes the double-tap-zoom wait on
+        buttons and links (pinch zoom still works) — without it a quick
+        second tap can zoom the layout instead of pressing again.
+     3. text-size-adjust stops iOS from inflating text after rotation. */
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  a,
+  button,
+  [role='button'],
+  input[type='submit'],
+  input[type='button'],
+  select,
+  summary {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
   html {
     @apply scroll-smooth;
     color-scheme: light;
@@ -41,8 +65,10 @@
   }
 
   body {
-    /* Landscape notch: keep in-flow content out of the side unsafe areas.
-       Fixed chrome pads itself from the same variables. */
+    /* Notch / home indicator: in-flow content clears the top in standalone
+       mode, landscape side notches are padded, and fixed chrome reads the
+       same variables for itself. All four are 0 in a desktop browser. */
+    padding-top: var(--nk-safe-top);
     padding-left: var(--nk-safe-left);
     padding-right: var(--nk-safe-right);
     background-color: var(--bg-base);

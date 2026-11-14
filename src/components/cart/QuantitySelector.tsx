@@ -46,19 +46,19 @@ export function QuantitySelector({
         type="button"
         onClick={handleDecrement}
         disabled={disabled || value <= min}
-        className="flex h-8 w-8 items-center justify-center text-fg-muted transition-colors hover:bg-clay-300 hover:text-fg disabled:cursor-not-allowed disabled:opacity-30"
+        className="flex h-11 w-11 items-center justify-center text-fg-muted transition-colors hover:bg-clay-300 hover:text-fg disabled:cursor-not-allowed disabled:opacity-30"
         aria-label="ลดจำนวน"
       >
         <Minus size={14} strokeWidth={2} />
       </button>
-      <span className="flex h-8 min-w-[2rem] items-center justify-center text-sm font-medium text-fg">
+      <span className="flex h-11 min-w-[2rem] items-center justify-center text-sm font-medium text-fg">
         {value}
       </span>
       <button
         type="button"
         onClick={handleIncrement}
         disabled={disabled || value >= max}
-        className="flex h-8 w-8 items-center justify-center text-fg-muted transition-colors hover:bg-clay-300 hover:text-fg disabled:cursor-not-allowed disabled:opacity-30"
+        className="flex h-11 w-11 items-center justify-center text-fg-muted transition-colors hover:bg-clay-300 hover:text-fg disabled:cursor-not-allowed disabled:opacity-30"
         aria-label="เพิ่มจำนวน"
       >
         <Plus size={14} strokeWidth={2} />

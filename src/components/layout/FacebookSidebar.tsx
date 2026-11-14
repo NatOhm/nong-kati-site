@@ -17,6 +17,7 @@ import {
 import { cn } from '@/utils/cn';
 import { HamsterFace } from '@/components/ui/ClayIcons';
 import { CategoryIcon } from '@/components/product/CategoryIcon';
+import { useScrollLock } from '@/hooks/useMobileOverlay';
 import { useState, useEffect, useRef, useCallback, type MouseEventHandler } from 'react';
 
 interface NavItem {
@@ -168,7 +169,7 @@ function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
           <button
             onClick={onClose}
             aria-label="ปิดเมนู"
-            className="flex h-10 w-10 items-center justify-center rounded-full text-fg-muted transition-transform duration-150 hover:bg-surface-sunken active:scale-90"
+            className="flex h-11 w-11 items-center justify-center rounded-full text-fg-muted transition-transform duration-150 hover:bg-surface-sunken active:scale-90"
           >
             <X size={22} />
           </button>
@@ -287,16 +288,15 @@ export function FacebookSidebar({
   // focus returns to the opener (the hamburger) on close.
   const panelRef = useRef<HTMLDivElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
+  // Fixed-body lock: body overflow alone does not stop iOS rubber-band.
+  useScrollLock(isOpen);
 
   useEffect(() => {
     if (!isOpen) return;
     openerRef.current = document.activeElement as HTMLElement | null;
     const raf = requestAnimationFrame(() => panelRef.current?.focus());
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
     return () => {
       cancelAnimationFrame(raf);
-      document.body.style.overflow = prevOverflow;
       openerRef.current?.focus?.();
     };
   }, [isOpen]);

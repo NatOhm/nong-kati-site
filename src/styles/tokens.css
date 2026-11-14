@@ -296,7 +296,11 @@
   --fg-primary: var(--clay-100);
   --fg-secondary: var(--clay-300);
   --fg-muted: var(--clay-400);
-  --fg-placeholder: var(--clay-500);
+  /* Mobile audit (14 Nov 2026): clay-500 measured 3.23:1 on the elevated
+     card fill (#6B4F2E) where dark-mode inputs live — below AA for the
+     placeholder labels. clay-300 = 5.6:1 there and 10.7:1 on the base,
+     matching the light theme's choice of a strong placeholder step. */
+  --fg-placeholder: var(--clay-300);
   --fg-inverse: var(--clay-900);
   --fg-brand: var(--peach-200);
   --fg-brand-strong: var(--peach-200);

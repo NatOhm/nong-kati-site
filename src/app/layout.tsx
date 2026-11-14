@@ -41,6 +41,10 @@ export const viewport: Viewport = {
   // Without cover, Safari letterboxes the page above the home indicator and
   // `env()` reports 0 — safe, but the taskbar floats on a cream strip.
   viewportFit: 'cover',
+  // Android Chrome: shrink the layout viewport when the keyboard opens so
+  // fixed bars and the focused field are not left under it. iOS ignores this
+  // (it shrinks the visual viewport instead) and keeps its native behaviour.
+  interactiveWidget: 'resizes-content',
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#FFF7ED' },
     { media: '(prefers-color-scheme: dark)', color: '#3A2A18' },
@@ -70,6 +74,10 @@ export const metadata: Metadata = {
   description:
     'ซื้อแอคดูหนัง ซีรีส์ Netflix Spotify YouTube ราคาดี โอนเงินพร้อมส่งสลิปยืนยัน ทีมงานยืนยันแล้วส่งโค้ดถึงอีเมล',
   applicationName: 'Nong-Kati',
+  // iOS "Add to Home Screen": standalone shell, brand title under the icon,
+  // and no auto-detected phone numbers in Thai copy.
+  appleWebApp: { capable: true, title: 'Nong-Kati', statusBarStyle: 'default' },
+  formatDetection: { telephone: false },
   robots: { index: true, follow: true },
 };
 

@@ -119,7 +119,12 @@ export function FacebookNavbar({ onMenuToggle, searchCategory }: FacebookNavbarP
   return (
     <>
       {/* Slightly darker than the page base — anchors the chrome without going dark */}
-      <nav className="sticky top-0 z-50 border-b border-line bg-surface-nav shadow-clay-sm backdrop-blur-md">
+      {/* Sticky offset clears the status bar in an installed/standalone shell;
+          0 in a normal browser, so nothing moves on desktop or Android. */}
+      <nav
+        className="sticky top-0 z-50 border-b border-line bg-surface-nav shadow-clay-sm backdrop-blur-md"
+        style={{ top: 'var(--nk-safe-top)' }}
+      >
         {/* overflow-hidden is the reflow safety net (WCAG 1.4.10 audit): the
             justify-between row must never push the document wider than the
             viewport — the widest cluster still fits from lg up. */}
@@ -321,7 +326,7 @@ export function FacebookNavbar({ onMenuToggle, searchCategory }: FacebookNavbarP
               }
               aria-label="ฝ่ายสนับสนุน"
               title="ฝ่ายสนับสนุน"
-              className="clay-btn transition-smart hidden h-10 w-10 items-center justify-center rounded-full text-fg-muted duration-interactive ease-ease-out hover:-translate-y-0.5 hover:text-fg-brand active:translate-y-0 active:scale-95 active:shadow-clay-press md:flex"
+              className="clay-btn transition-smart hidden h-11 w-11 items-center justify-center rounded-full text-fg-muted duration-interactive ease-ease-out hover:-translate-y-0.5 hover:text-fg-brand active:translate-y-0 active:scale-95 active:shadow-clay-press md:flex"
             >
               <MessageCircle size={20} strokeWidth={1.5} />
             </Link>

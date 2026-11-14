@@ -1,82 +1,177 @@
-# Mobile audit — iOS และ Android (13 พ.ย. 2569)
+# Mobile audit — iOS และ Android (14 พ.ย. 2569)
 
-เอกสารนี้คือผลตรวจมือถือรอบรวมของ `nongkatistore.com` ทุกข้อถูกตรวจซ้ำกับโค้ดที่ HEAD
-ไม่ใช่การคัดลอกบันทึกเดิม และระบุชัดว่าข้อไหนพิสูจน์แล้วในเบราว์เซอร์จริง ข้อไหนเป็นข้อจำกัด
-ของฮาร์ดแวร์ และข้อไหนไม่ใช่ข้อบกพร่องพร้อมหลักฐาน
+เอกสารนี้คือผลตรวจมือถือทั้งระบบของ `nongkatistore.com` รอบ iOS + Android (mobile web)
+ทุกข้อตรวจกับโค้ดที่ HEAD และระบุชัดว่าข้อไหน **พิสูจน์ในเบราว์เซอร์แล้ว** ข้อไหนเป็น
+**ข้อจำกัดของฮาร์ดแวร์/WebKit** และข้อไหนเป็น **การตัดสินใจของเจ้าของร้าน**
 
-- Commit ที่เอกสารนี้อ้างถึง: `81ccf00` (overlay/back gesture), `06846fe` (safe-area + touch targets), `5f0505e` (รอบก่อนหน้า)
+- Commit ที่ตรวจ: `8174cf6` (overlay/back gesture `81ccf00`, safe-area + touch targets `06846fe`) + การแก้ในรอบนี้ (ยังไม่ commit ตอนเขียนเอกสาร)
 - Gate ที่เกี่ยวข้อง: [quality-gates.md](./quality-gates.md) — `MOB-OVL` และชุด 44px/contrast เดิม
-- เวอร์ชันแอปไม่เปลี่ยนในรอบนี้ (1.2.2) และไม่ได้ push/deploy
+- เวอร์ชันแอปไม่เปลี่ยนในรอบนี้ (1.2.2) ไม่ได้ push/deploy
 
 ## สภาพแวดล้อมที่ใช้พิสูจน์
 
 | ชนิด | รายละเอียด |
 | --- | --- |
 | Browser | Chromium (Playwright) headless, `isMobile: true`, `hasTouch: true`, DPR 2 |
-| Viewports | 390×844 (iPhone 14-ish) และ 360×800 (Android) |
-| แอป | production build (`npm run build` → `next start`) ที่ `localhost:3100` ต่อ DB จริงแบบอ่านอย่างเดียว |
-| อัตโนมัติ | `vitest` (unit), `e2e/touch-targets.spec.ts` (Playwright gate), สคริปต์วัดในเครื่อง (ไม่ commit) |
-| ยังไม่ได้รัน | WebKit/iOS Safari, อุปกรณ์มีติ่งจริง, PWA standalone, กล้อง/อัลบั้ม iOS |
+| Viewports | 320×568 (SE เล็กสุดที่รองรับ), 390×844 (iPhone 14-ish), 430×932 (iPhone Pro Max) |
+| แอป | production build (`npm run build` → `next start`) ที่ `localhost:3100` |
+| อัตโนมัติ | สคริปต์วัดในเครื่อง 21 ข้อ × 3 ความกว้าง = **63 checks ผ่านทั้งหมด**, `vitest`, `e2e/touch-targets.spec.ts` |
+| ยังไม่ได้รัน | WebKit/iOS Safari, ติ่งจริง/home indicator จริง, คีย์บอร์ด iOS จริง, PWA standalone, Android เครื่องจริง |
 
-ข้อสรุปสำคัญ: ทุกข้อที่เป็น „โค้ด" ถูกแก้และวัดใน Chromium จริงทั้งสองความกว้างแล้ว
-ส่วนพฤติกรรมที่ขึ้นกับ WebKit หรือติ่งจริงถูกทำเครื่องหมาย **เครื่องจริงเท่านั้น** และไม่ถูกกล่าวอ้างว่าผ่าน
+ข้อสรุปสั้น: **ไม่มี blocker** เหลือ high อยู่หนึ่งข้อคือคอนทราสต์ของปุ่ม CTA สีส้มในโหมดสว่าง
+ซึ่งแก้ไม่ได้โดยไม่แตะสีแบรนด์ (ดูข้อ MOB-17) ทุกข้อที่เหลือเป็น partial ที่ต้องวัดบนเครื่องจริง
+หรือเป็นการตัดสินใจของเจ้าของร้าน
 
-## ตารางสรุป
+## ตารางสรุป — blocker / high ก่อน
 
-| ID | ข้อค้นพบ | พื้นที่ | ระดับ | สถานะ | หลักฐาน / สภาพแวดล้อม |
-| --- | --- | --- | --- | --- | --- |
-| MOB-01 | ปุ่มย้อนกลับ/สไวป์กลับทิ้ง cart drawer และ search sheet (ออกจากหน้าไปเลย) | both | High | ปิดแล้ว `81ccf00` | Chromium 390×844 + 360×800: 24 checks ผ่าน (back ปิด overlay, URL เดิม, ซ้อนกันถอยในก่อน, ปิดจาก UI แล้ว back เป็น navigation จริง) + `tests/mobile-overlay.test.tsx` 9 เคส |
-| MOB-02 | หน้าเบื้องหลัง overlay ยังเลื่อน/เด้ง (iOS ไม่สนใจ `overflow:hidden`) | both (สาเหตุ iOS) | High | ปิดแล้ว `81ccf00` | Chromium: `body` เป็น `fixed` ที่ `-scrollY`, wheel 1400px แล้ว `body.top` ไม่ขยับ, ปิดแล้วคืน `scrollY` เดิมเป๊ะ; rubber-band ของ WebKit = เครื่องจริงเท่านั้น |
-| MOB-03 | ไม่มี `viewport-fit=cover` / ไม่ใช้ `env(safe-area-inset-*)` — taskbar ลอยเหนือ home indicator เป็นแถบ และ overlay ชนขอบจอ | both | Medium | ปิดแล้ว `06846fe` | Chromium: meta มี `viewport-fit=cover`, ตั้ง `--nk-safe-bottom: 34px` แล้ว taskbar สูงขึ้น 34px, padding ล่างของ `main` เพิ่ม 34px, reset แล้วกลับเท่าเดิม; ติ่งจริง = เครื่องจริงเท่านั้น |
-| MOB-04 | ลิงก์ „กดซื้อเลย!" ในแถบประกาศสูง 32px | both | Medium | ปิดแล้ว `06846fe` | วัดได้ ≥44px ทั้ง 390 และ 360 (hit area 44, layout แถบไม่ขยับเพราะ negative margin) |
-| MOB-05 | ชิปหมวดหมู่ใน /search สูง 35px | both | Medium | ปิดแล้ว `06846fe` | วัดได้ 44px ทั้งสองความกว้าง (รวมชิป „ทั้งหมด" และชิปช่วง DB ล่ม) |
-| MOB-06 | ตัวกรอง „เฉพาะที่มีของ" สูง 40px | both | Low | ปิดแล้ว `06846fe` | วัดได้ 44px |
-| MOB-07 | breadcrumb „หน้าหลัก" สูง 32px | both | Low | ปิดแล้ว `06846fe` | วัดได้ 44px (`-my-3` คงความสูงแถวเดิม) |
-| MOB-08 | ลิงก์ „สมัครสมาชิก" ท้ายฟอร์ม login สูง 23px | both | Medium | ปิดแล้ว `06846fe` | วัดได้ 44px |
-| MOB-09 | ปุ่ม „กลับ" บนหน้า login สูง 36px | both | Medium | ปิดแล้ว `06846fe` | วัดได้ 44px |
-| MOB-10 | ปุ่ม „ช้อปปิ้งต่อ" ในตะกร้าสูง 20px | both | Medium | ปิดแล้ว `06846fe` | วัดได้ 44px (footer ตะกร้าเผื่อ safe-area ล่างด้วย) |
-| MOB-11 | ปุ่มแจ้งเตือนบน navbar 40×40 | both | Low | ปิดแล้ว `06846fe` | วัดได้ 44×44 |
-| MOB-12 | ปุ่มหัวใจ wishlist บนการ์ดสินค้า 28–32px | both | High | ปิดแล้ว `06846fe` | วัดได้ 44×44 (ก่อน reveal การ์ดถูก `scale(0.99)` จึงวัดได้ 43.6 — `offsetHeight` = 44, ดู MOB-21) |
-| MOB-13 | dropdown เรียงลำดับ 36px, ลูกศร pagination 36×36, ตัวเลือกในลิสต์ 40px | both | Medium | ปิดแล้ว `06846fe` | วัดได้ 44px ทุกตัว (dropdown, ลูกศร, options) |
-| MOB-14 | ปุ่ม action ในการ์ดผลค้นหา (`ดูสินค้า`/`เลือกราคา`) สูง 36px | both | Medium | ปิดแล้ว `06846fe` | วัดได้ 44px; ปุ่มในการ์ดหน้าแรกเป็น `h-11` + `min-h-[44px]` |
-| MOB-15 | ลิงก์ „ดูทั้งหมด" ตามหัวข้อหน้าแรก สูง 21–38px | both | Medium | ปิดแล้ว `06846fe` | วัดได้ 44px ทั้งลิงก์หัวข้อและลิงก์ในแถบหมวด (`-my-*` คงระยะบรรทัด) |
-| MOB-16 | wordmark ใน footer สูง 26px | both | Low | ปิดแล้ว `06846fe` | วัดได้ 44px (Logo ใช้ร่วมกับ navbar) |
-| MOB-17 | input login สูง 42px, ปุ่ม submit 41px, แถว „จดจำฉัน" 20px | both | Medium | ปิดแล้ว `06846fe` | input/submit วัดได้ ≥44px, label จดจำฉันสูง 44px (checkbox 20px อยู่ใน label ที่กดได้ทั้งแถว) |
-| MOB-18 | ฟอนต์ input <16px ทำให้ iOS ซูมหน้าเมื่อโฟกัส | iOS | High | ไม่ใช่ข้อบกพร่อง — มีอยู่แล้ว | `globals.css` บังคับ `font-size:16px` ให้ input/select/textarea บนจอ ≤1023px; วัด computed style ที่ 390 ได้ 16px ทุกช่อง (login, register, orders lookup, checkout) |
-| MOB-19 | ไฟล์ HEIC จาก iPhone อาจอัปโหลดไม่ได้ | iOS | Medium | ไม่ใช่ข้อบกพร่อง — ถูกปฏิเสธโดยออกแบบ + เครื่องจริงเท่านั้นสำหรับการแปลง | หลักฐานในโค้ด: ทุก picker ใช้ `accept="image/jpeg,image/png,image/webp"`, client ปฏิเสธก่อนส่งพร้อมข้อความไทย, server ตรวจ MIME (415 `UNSUPPORTED_TYPE`) และ magic bytes (400 `CONTENT_MISMATCH`) ทั้ง `/api/v1/payments/slip-upload` และ `/api/v1/admin/upload`; ไม่มี HEIC ถูกเก็บได้ การที่ iOS แปลง HEIC→JPEG ให้เองเมื่อ accept ไม่รวม HEIC เป็นพฤติกรรม WebKit ที่ยังไม่ได้ทดสอบบนเครื่องจริง |
-| MOB-20 | ลิงก์ชื่อสินค้าในการ์ดผลค้นหาสูง 21px | both | Low | ไม่ใช่ข้อบกพร่อง — มีเป้าหมายเทียบเท่า | การ์ดเดียวกันมีลิงก์รูปขนาดเต็มพื้นที่ (149×134+) ไปหน้าเดียวกัน และปุ่ม action 44px; WCAG 2.5.8 ยกเว้นเมื่อมีลิงก์/คอนโทรลเทียบเท่าในหน้าเดียวกัน |
-| MOB-21 | วัดการ์ดที่ยังไม่ reveal ได้ 43.6px (ควรเป็น 44) | both | — | ไม่ใช่ข้อบกพร่อง — artifact ของการวัด | การ์ดที่อยู่นอกจอถือ `scale(0.99)` ของ ScrollReveal; `offsetHeight` = 44 และหลัง scroll เข้าจอวัดได้ 44 — สคริปต์วัดต้องเลื่อนการ์ดเข้าจอก่อน |
-| MOB-22 | skip link กว้าง 1px („ข้ามไปยังเนื้อหาหลัก") | both | — | ไม่ใช่ข้อบกพร่อง | `sr-only` จนกว่าจะได้รับ focus ด้วยคีย์บอร์ด — ไม่ใช่เป้าหมายสัมผัส; ไม่ปรากฏบนจอให้แตะ |
-| MOB-23 | `100vh` ทำแถวล่างหลุดใต้ URL bar บน iOS | iOS | Medium | ปิดแล้วในรอบก่อน (ยืนยันที่ HEAD) | โค้ด storefront ใช้ `dvh` แล้ว; `100vh` ที่เหลืออยู่มีเพียง `src/app/docs/manual/manual.module.css` ซึ่งเป็นหน้าพิมพ์/เอกสารภายใน ไม่ใช่หน้าใช้งานมือถือ |
-| MOB-24 | พื้นที่เลื่อนของ drawer/search ยัง scroll ทะลุไปหน้าเบื้องหลังบน Android | Android | Medium | ปิดแล้ว `5f0505e` (ยืนยันที่ HEAD) | `overscroll-contain` อยู่บนพื้นที่เลื่อนของทั้งสอง overlay ที่ `81ccf00` ยังคงอยู่; Android จริงยังไม่ได้ทดสอบ |
-| MOB-25 | ปุ่มปิดตะกร้าเล็กกว่า 44px | both | High | ปิดแล้ว `5f0505e` (ยืนยันที่ HEAD) | วัดได้ 44×44 ใน Chromium ทั้งสองความกว้าง (e2e + สคริปต์ตรวจ) |
-| MOB-26 | taskbar ล่าง/ปุ่มหลักเล็กกว่า 44px | both | High | ปิดแล้ว `5f0505e` (ยืนยันที่ HEAD) | e2e „mobile taskbar items are ≥44px tall" ผ่าน; ปุ่มแจ้งเตือน/หัวใจที่เหลือแก้เพิ่มใน `06846fe` |
-| MOB-27 | theme-color ของ Android และ safe-area ของ navbar | Android | Low | ปิดแล้ว `5f0505e` / `06846fe` | `viewport.themeColor` มี light `#FFF7ED` / dark `#3A2A18`; navbar/แถบประกาศไม่ต้องใช้ inset บนเพราะ Safari วาง layout ใต้ browser chrome — cover ใช้กับ standalone เป็นหลัก |
+| ID | ข้อค้นพบ | ระดับ | สถานะ |
+| --- | --- | --- | --- |
+| — | **ไม่มี blocker** | — | — |
+| MOB-17b | ข้อความขาวบนปุ่ม CTA สี `peach-500` (#F97316) = **2.80:1** (ต้อง ≥4.5:1) ในโหมดสว่าง | High | **ค้าง — ต้องตัดสินใจเรื่องสีแบรนด์** (ดูทางเลือกในหัวข้อถัดไป) |
+| MOB-17a | placeholder ในโหมดมืดบนการ์ด elevated = 3.23:1 | Medium | ปิดแล้ว (`src/styles/tokens.css:299-303`) |
+| MOB-04 | คีย์บอร์ด iOS ไม่ย่อ layout viewport — แถบ taskbar/ปุ่มซื้ออาจอยู่ใต้คีย์บอร์ด | Medium | ทำเท่าที่ทำได้ (`interactiveWidget`) + เครื่องจริงเท่านั้น |
+| MOB-12 | 7 จุดใช้ `backdrop-blur` บนแถบ sticky/fixed — เสี่ยง repaint บน iOS | Medium | เครื่องจริงเท่านั้น |
+| MOB-14 | ยังไม่มี service worker / offline shell | Polish | ค้าง — ต้องตัดสินใจเรื่อง offline |
 
-## เครื่องจริงเท่านั้น (device-only) — สิ่งที่ทำแล้วและยังไม่ได้ทำ
+## ตารางตรวจครบทุกหัวข้อ
 
-รายการต่อไปนี้ **ไม่ถูกนับว่าผ่าน** เพราะ Chromium จำลองไม่ได้:
+| ID | หัวข้อ | ผล | ระดับ | หลักฐาน |
+| --- | --- | --- | --- | --- |
+| MOB-01 | Viewport & `viewport-fit` | **ผ่าน** | — | `src/app/layout.tsx:43` (`viewportFit: 'cover'`), `:47` (`interactiveWidget: 'resizes-content'`); meta วัดได้ครบที่ 320/390/430; ไม่ตั้ง `maximum-scale` → pinch zoom ยังใช้ได้ |
+| MOB-02 | Safe-area (ติ่ง, home indicator, แนวนอน) | **ผ่าน** (โค้ด) / เครื่องจริงเท่านั้น | — | `globals.css:15-18` ประกาศ `--nk-safe-*`; `:71-73` body padding top/left/right; `MobileBottomNav.tsx:73`, `CartDrawer.tsx:147`, `SearchOverlay.tsx:158`, `ProductDetailClient.tsx:295`, `LINEChatButton.tsx:17`, `ScrollToTop.tsx:28` ใช้ `--nk-safe-bottom` |
+| MOB-03 | `100vh` vs `dvh`/`svh` | **ผ่าน** | — | `globals.css:792-798` remap `.h-screen`/`.min-h-screen` เป็น `100dvh`; storefront ไม่เหลือ `100vh` ยกเว้น `CatalogSearchBox.tsx:127` ที่มี `max-h` 24rem ครอบไว้จึงไม่ล้น |
+| MOB-04 | คีย์บอร์ด: แถบ fixed/ช่องกรอกถูกบัง, focus scroll-into-view | **บางส่วน** | Medium | `layout.tsx:47` แก้ Android Chrome; iOS ไม่รู้จัก `interactive-widget` (ย่อ visual viewport เท่านั้น) — ไม่มีโค้ด `visualViewport` โดยเจตนา (ดูหัวข้อตัดสินใจ); ช่องกรอก 16px จึงไม่ซูม |
+| MOB-05 | input `font-size` < 16px → iOS auto-zoom | **ผ่าน** | — | `globals.css:763-773` บังคับ 16px ให้ input/select/textarea ที่ ≤639px (วัด computed = 16px ที่ 320/390/430) |
+| MOB-06 | Hover-only affordance | **ผ่าน** | — | `tailwind.config.js:11` `future.hoverOnlyWhenSupported`; คอนโทรลใช้ `active:`/`:focus-visible` เป็น feedback หลัก (เช่น `MobileBottomNav.tsx:98`, `Button.tsx:62`) |
+| MOB-07 | 44px touch target + ระยะห่าง | **ผ่าน** | — | ปิดครบในรอบ `06846fe` + รอบนี้: `QuickViewModal.tsx:203,228,262,274`, `FacebookSidebar.tsx:172`, `CartItem.tsx:79`, `QuantitySelector.tsx:49,61`, `FacebookNavbar.tsx:138,150`, `MobileBottomNav.tsx:98,147,155,172,185`; วัดจริง 44px ทุกจุดทั้ง 3 ความกว้าง |
+| MOB-08 | Tap highlight / `touch-action` / ดีเลย์ 300ms | **ผ่าน** | — | `globals.css:51-57` `-webkit-tap-highlight-color: transparent` + `touch-action: manipulation` บน a/button/`[role=button]`/submit/select/summary; `:43-44` `text-size-adjust: 100%` |
+| MOB-09 | Long-press & text selection บนการ์ด | **บางส่วน** | Polish | ข้อความบนการ์ดเลือก/คัดลอกได้ตามปกติ, รูป hero ตั้ง `draggable={false}` (`HeroCarousel.tsx:99`); ไม่มี `-webkit-touch-callout: none` เลย → long-press รูปสินค้าเปิดเมนู "บันทึกรูป" ของ iOS (พฤติกรรมมาตรฐาน ไม่ใช่บั๊ก) |
+| MOB-10 | Scroll lock + overscroll หลัง modal/sheet | **ผ่าน** | — | `useMobileOverlay.ts:93-121` ล็อกด้วย `position: fixed` + คืน `scrollY`; ใช้ที่ `CartDrawer.tsx:61`, `SearchOverlay.tsx:53`, `QuickViewModal.tsx:58`, `FacebookSidebar.tsx:292`; `overscroll-contain` ที่ `CartDrawer.tsx:119`, `SearchOverlay.tsx:157`, `QuickViewModal.tsx:181`, `CatalogSearchBox.tsx:127`, `NotificationsDropdown.tsx:124` |
+| MOB-11 | Momentum / nested scroll | **ผ่าน** | — | พื้นที่เลื่อนทุกจุดมี `overscroll-contain`; ไม่ต้องใช้ `-webkit-overflow-scrolling` บน iOS 13+; ไม่มี nested scroll ซ้อนเกิน 2 ชั้น |
+| MOB-12 | Double-tap zoom บนปุ่ม | **ผ่าน** | — | `touch-action: manipulation` (`globals.css:57`) — ตัดดีเลย์ double-tap โดยไม่ปิด pinch zoom |
+| MOB-13 | `position: sticky/fixed` เพี้ยนบน iOS | **บางส่วน** | Medium | navbar `FacebookNavbar.tsx:125-126` (sticky + `top: var(--nk-safe-top)`), buy bar `ProductDetailClient.tsx:295`, taskbar `MobileBottomNav.tsx:71`; เคยแก้กับดัก transform แล้วที่ `globals.css:282-288` (`fill-mode: backwards`) — ที่เหลือคือ `backdrop-blur` 7 จุด ซึ่ง WebKit วาด repaint แพง/บางรุ่นมีแถบเงา ต้องดูบนเครื่อง |
+| MOB-14 | PWA readiness | **บางส่วน** | Medium | manifest `src/app/manifest.ts:17-38` (name/short_name/lang/start_url/display standalone/orientation/bg+theme/icons 192+512+maskable), apple-touch-icon `src/app/apple-icon.png` (180px), `layout.tsx:79-80` (`appleWebApp`, `formatDetection`), theme-color light/dark `layout.tsx:48-51` — ยังไม่มี service worker/offline และไอคอนต่อจาก `icon.png` 64px |
+| MOB-15 | ฟอนต์: preload / swap / FOUT-CLS / Thai fallback | **บางส่วน** | Medium | `fonts.css:29-113` `@font-face` + `font-display: swap` (ทุกหน้า), preload 4 ไฟล์ที่ `layout.tsx:105-130`; **ไม่มี** `size-adjust`/`ascent-override` และ fallback `Quicksand`/`Nunito` ไม่ได้โหลด (`tokens.css:100-101`) → วัด CLS จาก metric ต่างไม่ได้ในโค้ด |
+| MOB-16 | รูปภาพ: format/ขนาด/lazy-load/CLS | **บางส่วน** | Medium | ทุกการ์ดใช้ `aspect-[...]` จองที่ → ไม่มี CLS; `loading="lazy"` ที่ `ProductCard.tsx:93`, `CartItem.tsx:49`, `SearchResultCard.tsx:39`, `AppTile.tsx:54`, `SearchOverlay.tsx:214`, `OrderSummaryPanel.tsx:77`; hero โหลดสไลด์แรก `eager` (`HeroCarousel.tsx:97`); **ไม่มี `srcset`/`next/image`** เพราะรูปมาจาก admin upload (`next.config.js:4-9` มี remotePattern แค่ CDN) → มือถือโหลดไฟล์เต็ม |
+| MOB-17 | Dark-mode contrast บนโทเคน clay/peach (AA) | **ล้มบางคู่ → แก้แล้ว 1** | High | วัดด้วยสูตร WCAG: light `fg-muted` 4.50, `fg-brand` 4.88, `fg-primary` 10.35 ผ่าน; dark `fg-muted` 8.13, `fg-primary` 13.01, `fg-brand` 10.18 ผ่าน; **dark placeholder บนการ์ด elevated 3.23 → แก้เป็น clay-300 = 5.58**; **ขาวบน `peach-500` 2.80 — ค้าง (สีแบรนด์)** |
+| MOB-18 | ไทยตัดบรรทัด/ล้นที่ 320–430px | **ผ่าน** | — | `<html lang="th">` (`layout.tsx:95`), `globals.css:117-120` (`word-break`/`overflow-wrap`, ปิด hyphens), `line-clamp-2` ที่ `ProductCard.tsx:115,119`, `SearchProductCard.tsx:111`, `AppTile.tsx:70`; วัดแล้วไม่มี horizontal overflow ที่ 320/390/430 |
+| MOB-19 | ประสิทธิภาพเครื่อง Android รุ่นเล็ก | **ผ่าน** | — | First Load JS home 149 kB / shared 103 kB; ไม่มี framer-motion (0 ไฟล์), `requestAnimationFrame` 2 จุด, `filter: blur` 0 จุด, `backdrop-blur` 7 จุด, animation CSS 16 keyframes ความยาว 120–240ms (`tokens.css:214-222`) |
+| MOB-20 | ช่องกรอก/ฟอร์มเลื่อนหลุดใต้คีย์บอร์ด (body scroll) | **บางส่วน** | Medium | เหมือน MOB-04: Android แก้ด้วย `resizes-content`; iOS ใช้ native scroll-into-view ของ Safari ซึ่งไม่ถูกปิดกั้นด้วย `overflow` ใด ๆ (body ไม่ได้ล็อกตอนฟอร์ม) — ต้องยืนยันบนเครื่อง |
 
-1. **iOS swipe-back gesture (WebKit)** — โค้ดผูก `popstate` ตัวเดียวกับปุ่ม back และทดสอบแล้วว่า pop แล้วปิด overlay ถูกตัว/URL ไม่เปลี่ยน; แต่ท่าทางสไวป์จากขอบจอเองยังไม่ได้รันบน iPhone
-   วิธีตรวจ: เปิด Safari บน iPhone → เปิดตะกร้า → สไวป์จากขอบซ้าย → ต้องปิดตะกร้าและยังอยู่หน้าเดิม → สไวป์อีกครั้งจึงออกจากหน้า
-2. **Rubber-band ของหน้าเบื้องหลัง** — ล็อกด้วย `position:fixed` + คืน `scrollY` เป๊ะ ซึ่งเป็นวิธีที่ iOS ต้องใช้; การเด้งจริงของ WebKit ยังไม่ได้เห็นบนเครื่อง
-   วิธีตรวจ: เปิดตะกร้าบน iPhone → ลากขึ้น/ลงแรงๆ บริเวณขอบ overlay → หน้าเบื้องหลังต้องนิ่ง → ปิดแล้วกลับไปตำแหน่งเดิม
-3. **ติ่งจริง / home indicator** — พิสูจน์เฉพาะ „ท่อ" ของ inset (ตั้ง `--nk-safe-bottom: 34px` แล้ว taskbar กับ content spacer โตตาม 34px พร้อมกัน) ยังไม่ได้เห็นค่าจริงจากอุปกรณ์มีติ่ง หรือในโหมด Add to Home Screen
-   วิธีตรวจ: เปิดบน iPhone มีติ่ง (portrait + landscape) → taskbar ต้องไม่ทับ home indicator, ปุ่มลอย (LINE/เลื่อนขึ้นบน) ต้องลอยเหนือ taskbar, เนื้อหาต้องไม่ถูกติ่งด้านข้างบังในแนวนอน
-4. **การแปลง HEIC ของ iOS** — ยังไม่ได้อัปโหลดรูปจากอัลบั้ม iPhone จริง; ฝั่งแอปปฏิเสธ HEIC อย่างชัดเจนอยู่แล้ว จึงไม่มีความเสี่ยงข้อมูลเสียหาย
-   วิธีตรวจ: เลือกรูป HEIC จากอัลบั้มในหน้าอัปโหลดสลิป → ต้องได้ไฟล์ JPEG (iOS แปลงให้) และอัปโหลดผ่าน หรือได้ข้อความ „รองรับเฉพาะไฟล์ภาพ JPG/PNG/WebP"
-5. **Android จริง** — ทุกตัวเลขวัดใน Chromium mobile emulation; ยังไม่ได้ลอง Chrome บนเครื่อง Android จริง (โดยเฉพาะ `overscroll-contain` และ Pull-to-Refresh)
+## รายละเอียดรายพื้นที่ (เฉพาะข้อที่เป็น partial/fail)
 
-## Gate และตัวเลขจริง ณ commit นี้
+### MOB-04 / MOB-20 — คีย์บอร์ดและ fixed bars
+Android Chrome: `interactiveWidget: 'resizes-content'` (`layout.tsx:45-47`) ทำให้ layout viewport หดตามคีย์บอร์ด
+แถบ taskbar (`MobileBottomNav.tsx:71`) และ buy bar (`ProductDetailClient.tsx:295`) จึงยังอยู่เหนือคีย์บอร์ด
+iOS ไม่รองรับคีย์นี้ และย่อเฉพาะ visual viewport — แถบ `fixed bottom-0` จะถูกคีย์บอร์ดทับระหว่างพิมพ์
+ซึ่งเป็นพฤติกรรมเดียวกับเว็บส่วนใหญ่ ทางเลือกที่ยังไม่ทำเพราะเป็นการตัดสินใจ UX:
+ซ่อน taskbar ตอน `visualViewport.height` ลดลง หรือใช้ `position: sticky` แทน `fixed`
+ช่องกรอกไม่ทำให้หน้า zoom เพราะ 16px (`globals.css:763-773`) และไม่มี `overflow: hidden` บน body ตอนฟอร์ม
+จึงปล่อยให้ Safari เลื่อนช่องที่โฟกัสเข้าเองได้
+
+### MOB-13 — sticky/fixed บน iOS
+navbar เป็น `sticky top-0` + `top: var(--nk-safe-top)` (`FacebookNavbar.tsx:125-126`) ซึ่งจำเป็นใน standalone
+เพราะ viewport เริ่มใต้สถานะบาร์ ส่วน `backdrop-blur-md` มี 7 จุด (navbar, taskbar, buy bar, dropdown)
+บน iPhone รุ่นเก่า blur บนเลเยอร์ที่ scroll จะกินเฟรมและบางครั้งทิ้งแถบเงาที่ขอบ — ยังไม่ได้วัดบนเครื่อง
+และไม่ควรถอด blur ออกเพราะเป็นหน้าตาของธีม (ต้องเป็นการตัดสินใจร่วมกับเจ้าของร้าน)
+
+### MOB-14 — PWA
+มี manifest + ไอคอนครบตามที่ Chrome ต้องการสำหรับ "เพิ่มไปยังหน้าจอโฮม" และ `appleWebApp.capable`
+ทำให้ iOS เปิดแบบ standalone มี `theme-color` ทั้ง light/dark
+ที่ยังขาด: service worker (ติดตั้งได้แต่ไม่มี offline), ไอคอน 512 ซึ่งขยายจาก `src/app/icon.png` 64px
+จะนุ่มเมื่อแสดงผลใหญ่ และไม่มี `screenshots`/`shortcuts` ใน manifest (ไม่บังคับ)
+
+### MOB-15 — ฟอนต์
+12 ไฟล์ woff2 self-host ใน `public/fonts/`, preload 4 ไฟล์ที่ใช้ above-the-fold, `font-display: swap` ทุก face
+ความเสี่ยง CLS อยู่ที่ fallback: `tokens.css:100-101` อ้าง `Quicksand`/`Nunito` ซึ่งไม่ได้แพ็กมาด้วย
+จึงตกไปที่ `system-ui`/`sans-serif` ที่ metric ต่างจาก Mitr/Noto Looped ชัด (โดยเฉพาะความสูงบรรทัดไทย)
+ยังไม่แก้เพราะการเพิ่ม `size-adjust` ต้องวัด metric ของฟอนต์จริง และทิศทางฟอนต์ยังรอเจ้าของร้านตัดสิน
+
+### MOB-16 — รูปภาพ
+ทุกจุดจองพื้นที่ด้วย aspect ratio หรือ container ขนาดคงที่ (`QuickViewModal.tsx:189-195`, `CartItem.tsx:45-50`)
+จึงไม่มี layout shift แต่ไม่มี `srcset` เพราะรูปเป็น URL จาก admin (`/api/v1/images`) ที่ optimizer ไม่รู้จัก
+ผลคือมือถือโหลดรูปความละเอียดเดียวกับเดสก์ท็อป — ทางแก้คือ generate หลายขนาดตอนอัปโหลด (งานฝั่งหลังบ้าน)
+
+### MOB-17 — คอนทราสต์
+ค่าที่วัดจาก token จริง (สูตร WCAG 2.x, ไม่ได้ commit สคริปต์):
+
+| คู่สี | โหมดสว่าง | โหมดมืด |
+| --- | --- | --- |
+| `fg-primary` / base | 10.35 | 13.01 |
+| `fg-secondary`/`fg-muted` / base | 4.50 | 8.13 |
+| `fg-brand` / base | 4.88 | 10.18 |
+| `fg-placeholder` / การ์ด elevated | 4.78 | **3.23 → 5.58 (แก้แล้ว)** |
+| ข้อความขาว / ปุ่ม `peach-500` | **2.80** | 6.09 (peach-400 + clay-900) |
+
+## สิ่งที่แก้ในรอบนี้ (พร้อม file:line)
+
+| ข้อ | สิ่งที่แก้ | ไฟล์:บรรทัด |
+| --- | --- | --- |
+| MOB-08 | `text-size-adjust: 100%`, ปิด tap highlight, `touch-action: manipulation` | `src/app/globals.css:43-44`, `:51-57` |
+| MOB-02 | กันเนื้อหาชนติ่งด้านบน (นอกเหนือจาก taskbar ที่กันอยู่แล้ว) | `src/app/globals.css:71-73` |
+| MOB-02/13 | navbar sticky เริ่มใต้ safe-area | `src/components/layout/FacebookNavbar.tsx:126` |
+| MOB-02 | ปุ่มเมนู/ลิงก์ซัพพอร์ตใน navbar ≥44px | `src/components/layout/FacebookNavbar.tsx:138,150` |
+| MOB-04 | `interactiveWidget: 'resizes-content'` (Android) | `src/app/layout.tsx:47` |
+| MOB-14 | `appleWebApp` + `formatDetection` | `src/app/layout.tsx:79-80` |
+| MOB-14 | manifest ใหม่ (standalone, ไอคอน 192/512/maskable) | `src/app/manifest.ts:17-38` |
+| MOB-14 | ไอคอน PWA + apple-touch-icon 180px | `public/icons/icon-192.png`, `public/icons/icon-512.png`, `public/icons/maskable-512.png`, `src/app/apple-icon.png` |
+| MOB-10 | QuickView ใช้ scroll lock กลาง + จำกัดความสูง `85dvh` + `overscroll-contain` | `src/components/product/QuickViewModal.tsx:58,181` |
+| MOB-07 | ปุ่มปิด/สเต็ปเปอร์/ชิปตัวเลือกใน QuickView = 44px | `src/components/product/QuickViewModal.tsx:203,228,262,274` |
+| MOB-10 | Sidebar ใช้ scroll lock กลาง (ลบ body-overflow เดิม) | `src/components/layout/FacebookSidebar.tsx:292` |
+| MOB-07 | ปุ่มปิด sidebar = 44px | `src/components/layout/FacebookSidebar.tsx:172` |
+| MOB-07 | ปุ่มลบสินค้าในตะกร้า = 44px | `src/components/cart/CartItem.tsx:79` |
+| MOB-07 | ปุ่ม −/+ จำนวน = 44px | `src/components/cart/QuantitySelector.tsx:49,61` |
+| MOB-17 | placeholder โหมดมืดเป็น clay-300 (3.23 → 5.58 บนการ์ด elevated) | `src/styles/tokens.css:299-303` |
+
+## รายการที่ยังต้องแก้ (เรียงตามลำดับความสำคัญ)
+
+1. **MOB-17b (High)** — ข้อความขาวบนปุ่ม `bg-surface-brand` (#F97316) = 2.80:1
+   เกิดจริงบน `/account/orders` (`src/app/account/orders/page.tsx:88`), `/account/wallet` (`:223`),
+   `/account/wishlist` (`src/app/account/wishlist/page.tsx:63`), `/checkout` (`src/app/checkout/page.tsx:574`)
+   และ `Button` variant primary (`src/components/ui/Button.tsx:22`). ทางเลือก:
+   (ก) เปลี่ยนพื้นเป็น `peach-700` #C2410C (ขาว = 4.88:1) ซึ่งตรงกับ CTA การ์ดสินค้าที่ใช้อยู่แล้ว
+   (`ProductCard` วัดได้ 4.88) — เปลี่ยนสีปุ่มหลักทั้งร้าน; (ข) ใช้ตัวอักษรเข้มบนพื้นส้ม
+   (`clay-950` #3A2A18 บนพื้นส้ม = 4.91:1) — หน้าตาเปลี่ยนชัด. ทั้งสองอย่างเป็นการตัดสินใจแบรนด์
+2. **MOB-15 (Medium)** — วัด metric ของ Mitr/Noto Looped แล้วเพิ่ม `size-adjust`/`ascent-override`
+   ให้ fallback (ต้องรอทิศทางฟอนต์)
+3. **MOB-16 (Medium)** — สร้างรูปหลายขนาดตอนอัปโหลด + `srcset`
+4. **MOB-13 (Medium)** — ทดสอบ `backdrop-blur` บน iPhone รุ่นเก่า; ถ้ากระตุกให้ลดเหลือ navbar เดียว
+5. **MOB-04/20 (Medium)** — ตัดสินใจว่าจะซ่อน taskbar ตอนคีย์บอร์ดเปิดบน iOS หรือปล่อยเป็นพฤติกรรมปกติ
+6. **MOB-14 (Polish)** — service worker/offline shell และไอคอนมาสเตอร์ 1024px
+7. **MOB-09 (Polish)** — ถ้าต้องการปิดเมนู long-press บนรูปสินค้า ต้องเพิ่ม `-webkit-touch-callout: none`
+   เฉพาะรูป (ปัจจุบันปล่อยเป็นพฤติกรรมมาตรฐานของ iOS)
+
+## ต้องการการตัดสินใจของเจ้าของร้าน
+
+1. **สีปุ่มหลัก** — 2.80:1 ต้องเลือกทาง (ก) หรือ (ข) ข้างบน; ไม่แก้ให้เพราะกระทบแบรนด์ทั้งร้าน
+2. **ไอคอนแอป 1024px** — ไอคอนที่ gen มาจาก `icon.png` 64px จะนุ่มเมื่ออยู่บนหน้าจอโฮมจริง
+   ต้องมีไฟล์มาสเตอร์จากนักออกแบบแล้ว gen ใหม่ (`sharp`, lanczos3)
+3. **ทิศทางฟอนต์** — ยังไม่ตัดสิน; audit นี้ไม่เปลี่ยน/ไม่เพิ่มฟอนต์ตามที่ตกลง
+4. **Offline** — ต้องมี service worker หรือไม่ (มีผลต่อการติดตั้งและต้นทุนแคช)
+5. **ซ่อน taskbar ตอนพิมพ์บน iOS** — แลกมาด้วย taskbar กระพริบ/เลื่อนขึ้นลงระหว่างสลับช่อง
+
+## ตรวจบนเครื่องจริงเท่านั้น (ห้ามนับว่าผ่าน)
+
+1. **iOS Safari** — คีย์บอร์ดทับแถบล่าง, scroll-into-view ของฟอร์ม, sticky navbar หลังหมุนจอ
+   วิธีตรวจ: iPhone → เปิด `/checkout` → แตะช่องเบอร์โทร → ช่องต้องไม่ถูกคีย์บอร์ดบังและหน้าไม่ซูม
+2. **Swipe-back / rubber-band** — โค้ดผูก `popstate` และล็อกด้วย `position: fixed` แล้ว
+   (`useMobileOverlay.ts:44-90, 93-121`) แต่ท่าทางจริงของ WebKit ยังไม่ได้ลอง
+3. **ติ่งจริง/landscape** — วัดเฉพาะ "ท่อ" ของ `env()` (ตั้งค่าแล้ว taskbar โตตาม) ยังไม่เห็นค่าจริง
+4. **PWA standalone** — ติดตั้งจาก Chrome/Safari แล้วเปิด: ต้องไม่มีแถบที่อยู่, theme-color ถูก,
+   ไอคอนไม่ถูกตัด (maskable)
+5. **Android เครื่องจริง** — `overscroll-contain`, pull-to-refresh, `resizes-content` บน Chrome จริง
+6. **HEIC** — ยังไม่ได้อัปโหลดรูปจากอัลบั้ม iPhone (ฝั่งแอปปฏิเสธ HEIC อย่างชัดเจนอยู่แล้ว)
+
+## Gate และตัวเลขจริง
 
 | Gate | ผล |
 | --- | --- |
 | `npx tsc --noEmit` | ผ่าน (0) |
-| `npm run lint` (`eslint . --max-warnings=0`) | ผ่าน (0) |
-| `npm test` (vitest) | 122 ไฟล์ผ่าน / 2 skipped (124), 1125 tests ผ่าน / 5 skipped (1130) |
+| `npm run lint` | ผ่าน (0) |
+| `npm test` (vitest) | ผ่าน 122 ไฟล์ / 1125 tests (5 skipped) |
 | `npm run build` | ผ่าน (0) |
-| `npx playwright test e2e/touch-targets.spec.ts` | 9 ผ่าน / 1 skipped (consent banner ไม่แสดงเมื่อมี consent แล้ว) |
-| สคริปต์วัดมือถือ 390×844 + 360×800 | ผ่านทุกข้อ: viewport-fit, safe-area ±34px, 44px ของคอนโทรลที่ระบุ, overlay 24 checks |
-| `docs/quality-gates.md` | ยังคงมี `MOB-OVL` และ gate เดิมครบ; เพิ่มเคส safe-area ใน e2e เดิมโดยไม่เพิ่มไฟล์ test |
+| `e2e/touch-targets.spec.ts` | 9 ผ่าน / 1 skipped (รันล่าสุดที่ `8174cf6`; ไฟล์ทดสอบไม่ถูกแก้ในรอบนี้) |
+| สคริปต์วัดมือถือ 320/390/430 | 63/63 checks ผ่าน (manifest, ไอคอน, viewport, tap/touch, 44px, scroll lock, ไม่มี horizontal overflow) — รันกับ production build หลังแก้ layout/คอมโพเนนต์ทั้งหมด; การแก้โทเคนสีภายหลังไม่กระทบรายการที่วัด |
 
-หมายเหตุ: ตัวเลข 44px ในตารางคือ `getBoundingClientRect()` หลังเลื่อนการ์ดเข้าจอและรอแอนิเมชันจบ; ค่าที่วัดได้ระหว่าง reveal คือ 43.6px ตาม MOB-21
+หมายเหตุการวัด: `getBoundingClientRect()` ของปุ่มที่อิง `rem` อาจได้ 43.6–43.99 ภายใต้ transform
+ของการ์ดที่ยังไม่ reveal; `offsetHeight` = 44 — ใช้ tolerance 43.5 ในการวัด (ดู MOB-21 ของรอบก่อน)

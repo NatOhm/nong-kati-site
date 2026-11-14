@@ -7,6 +7,7 @@ import { Check, Minus, Plus, X } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { formatThb } from '@/utils/format';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { useScrollLock } from '@/hooks/useMobileOverlay';
 import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/useToast';
 import { useVatConfig } from '@/hooks/useVatConfig';
@@ -52,6 +53,9 @@ export function QuickViewModal({
   const vatConfig = useVatConfig();
   const { toast } = useToast();
   const modalRef = useFocusTrap(isOpen);
+  // iOS ignores body overflow: pin the page behind the modal instead, so a
+  // drag on the dimmed area cannot rubber-band the catalogue away.
+  useScrollLock(isOpen);
   const available = product.variants.filter((v) => v.stock > 0);
   const [selectedId, setSelectedId] = useState<string | null>(available[0]?.id ?? null);
   const [quantity, setQuantity] = useState(1);
@@ -87,10 +91,8 @@ export function QuickViewModal({
       if (e.key === 'Escape') requestClose();
     };
     document.addEventListener('keydown', handleEsc);
-    document.body.style.overflow = 'hidden';
     return () => {
       document.removeEventListener('keydown', handleEsc);
-      document.body.style.overflow = '';
     };
   }, [isOpen, requestClose]);
 
@@ -173,7 +175,10 @@ export function QuickViewModal({
       >
         <div
           className={cn(
-            'clay-card rounded-2xl p-5',
+            // Tall variant lists must scroll inside the sheet: centred in the
+            // viewport with no cap, the add button could sit off-screen on a
+            // short phone once a product had many denominations.
+            'clay-card max-h-[85dvh] overflow-y-auto overscroll-contain rounded-2xl p-5',
             closing ? 'animate-modal-exit' : 'animate-modal-enter',
           )}
         >
@@ -195,7 +200,7 @@ export function QuickViewModal({
             </div>
             <button
               onClick={requestClose}
-              className="clay-btn transition-smart rounded-full p-1.5 text-fg-muted duration-fast hover:bg-surface-sunken hover:text-fg-secondary active:scale-95"
+              className="clay-btn transition-smart flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-fg-muted duration-fast hover:bg-surface-sunken hover:text-fg-secondary active:scale-95"
               aria-label="ปิดหน้าต่างเลือกราคา"
             >
               <X size={18} strokeWidth={1.5} />
@@ -220,7 +225,7 @@ export function QuickViewModal({
                     }}
                     aria-pressed={isSelected}
                     className={cn(
-                      'clay-btn transition-smart rounded-full px-3.5 py-2 text-xs font-semibold duration-fast ease-ease-out',
+                      'clay-btn transition-smart inline-flex min-h-[44px] items-center rounded-full px-3.5 py-2 text-xs font-semibold duration-fast ease-ease-out',
                       isSelected
                         ? 'bg-surface-brand text-fg-inverse shadow-clay-brand'
                         : 'bg-surface-elevated text-fg-secondary shadow-clay-xs hover:-translate-y-0.5 hover:text-fg-brand active:scale-95',
@@ -254,7 +259,7 @@ export function QuickViewModal({
                 type="button"
                 onClick={() => setQuantity((q) => Math.max(1, q - 1))}
                 disabled={quantity <= 1 || addState !== 'idle'}
-                className="clay-btn transition-smart flex h-8 w-8 items-center justify-center rounded-full bg-surface-elevated text-fg-secondary shadow-clay-xs hover:text-fg-brand active:scale-90 disabled:opacity-40"
+                className="clay-btn transition-smart flex h-11 w-11 items-center justify-center rounded-full bg-surface-elevated text-fg-secondary shadow-clay-xs hover:text-fg-brand active:scale-90 disabled:opacity-40"
                 aria-label="ลดจำนวน"
               >
                 <Minus size={14} />
@@ -266,7 +271,7 @@ export function QuickViewModal({
                 type="button"
                 onClick={() => setQuantity((q) => Math.min(maxQty, q + 1))}
                 disabled={quantity >= maxQty || addState !== 'idle'}
-                className="clay-btn transition-smart flex h-8 w-8 items-center justify-center rounded-full bg-surface-elevated text-fg-secondary shadow-clay-xs hover:text-fg-brand active:scale-90 disabled:opacity-40"
+                className="clay-btn transition-smart flex h-11 w-11 items-center justify-center rounded-full bg-surface-elevated text-fg-secondary shadow-clay-xs hover:text-fg-brand active:scale-90 disabled:opacity-40"
                 aria-label="เพิ่มจำนวน"
               >
                 <Plus size={14} />

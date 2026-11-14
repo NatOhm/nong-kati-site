@@ -76,7 +76,7 @@ export function CartItem({ item, onUpdateQty, onRemove }: CartItemProps): React.
           </div>
           <button
             onClick={onRemove}
-            className="hover:bg-error shrink-0 rounded p-1 text-fg-placeholder transition-colors hover:text-fg-error"
+            className="hover:bg-error flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-fg-placeholder transition-colors hover:text-fg-error"
             aria-label={`ลบ ${item.productNameTh}`}
           >
             <Trash2 size={16} strokeWidth={1.5} />
