@@ -123,6 +123,11 @@ harder to un-do accurately under pressure and affect anything else that reads th
 
 ## 2. Environment and secrets checklist
 
+The *apply-it* version of this section is **§6 (Phase 5, six steps)**, and the safe-now versus
+cutover split is **§6.1**. Read this section for the values, that one for the order to click
+them in — the two are deliberately kept apart so nobody writes a database URL while reading a
+table of formats.
+
 The panel holds only `INFISICAL_CLIENT_ID`, `INFISICAL_CLIENT_SECRET`, `INFISICAL_PROJECT_ID`,
 `INFISICAL_ENV` (+ `VERCEL_GIT_COMMIT_REF`); everything else arrives from Infisical at boot. That
 is why column "today" says Infisical.
@@ -380,10 +385,9 @@ serving. Values and rationale are in §1–2.
          CREATE TEMPORARY TABLES, LOCK TABLES
      ON `nong_kati`.* TO 'nk_app'@'localhost';
    ```
-4. **Do NOT add `DATABASE_URL` yet.** Panel variables override Infisical, so writing them now
-   points the live shop at an empty database the next time Passenger restarts — an outage with
-   no error to explain it. They go in at §3 Step 6, after the ETL. Same for Infisical: leave
-   its Supabase values alone until the window.
+4. **Env secrets: audit now, write the database URLs only at cutover.** The full split of what is
+   safe to touch today versus what must wait is **§6.1** — read it before opening the Node.js
+   panel, because adding `DATABASE_URL` early points the live shop at an empty database.
 5. **Verify from the server** (SSH: `ssh nongka@thsv93.hostatom.com`; password is typed
    interactively so it never enters argv):
    ```bash
@@ -408,6 +412,163 @@ serving. Values and rationale are in §1–2.
 
 If step 5 succeeds and step 6 says "not yet applied", Phase 5 is done: nothing else about the
 running shop has changed.
+
+### 6.1 Env secrets — safe now vs at cutover
+
+#### The mechanism, checked in this checkout
+
+`server-bootstrap.js` → `planInjection(secrets, env)` copies a secret **only when
+`env[key] === undefined`**, and `server.js` applies that plan in the boot path before Next.js
+starts. So:
+
+> **A key the Plesk panel defines is never overwritten by Infisical. Panel wins; Infisical fills
+the gaps.**
+
+Consequence: a panel `DATABASE_URL` alone changes which database the next process boot uses.
+Nothing else has to move with it — which is exactly why writing it early is dangerous and why
+deleting it is a complete rollback.
+
+#### Non-database variables the app reads
+
+Derived by reading `src/**`, `server.js` and `server-bootstrap.js` for every `process.env`
+reference (both literal keys and the ones resolved through constants, e.g. `NK_RESEND_*` and
+`NK_GIFT_CODE_ENCRYPTION_KEY`), so this is the real set, not the `.env.example` wish list.
+
+**Status legend:** **I** = recorded in `docs/hostatom-live.md` as an Infisical-prod secret ·
+**P** = recorded as a Plesk panel variable · **?** = not recorded anywhere in this repo; **check
+Infisical** (`project 80151198-f2df-…`, env `prod`) before assuming it exists or is absent. The
+agent cannot read that project, so **?** rows are unverified, not missing.
+
+| Key | Read by | Format / what happens if absent | Status |
+| --- | --- | --- | --- |
+| `INFISICAL_CLIENT_ID` | `server-bootstrap.js` | machine-identity client id; absent ⇒ the Infisical loader is skipped entirely | **P** |
+| `INFISICAL_CLIENT_SECRET` | `server-bootstrap.js` | universal-auth secret; wrong/expired ⇒ boot **exits** (fail-closed) | **P** |
+| `INFISICAL_PROJECT_ID` | `server-bootstrap.js` | project UUID | **P** |
+| `INFISICAL_ENV` | `server-bootstrap.js` | env slug, `prod` | **P** |
+| `NEXT_PUBLIC_SITE_URL` | build-time + `src/lib/fulfilment.ts` | `https://nongkatistore.com`, no trailing slash; production refuses to fulfil without it | **I** |
+| `NK_JWT_SECRET` | `src/lib/jwt.ts` and slip tokens | ≥32 random chars; throws when shorter | **I** |
+| `NK_GIFT_CODE_ENCRYPTION_KEY` | `src/lib/crypto/giftCode.ts` | 64 hex; **copy, never regenerate** (§2) | **I** |
+| `NK_GIFT_CODE_ENCRYPTION_KEY_V2` | `giftCode.ts` | 64 hex, or absent (falls back to the key above) | **I** |
+| `NK_GIFT_CODE_ENCRYPTION_KEY_V1` | nothing — this build never reads it | the historical duplicate; harmless, ignorable | **I** |
+| `NK_GIFT_CODE_ACTIVE_KEY_VERSION` | `giftCode.ts` | `1` or `2`, unset ⇒ 1; leave unset | **?** (leave unset) |
+| `NK_SLIP2GO_SECRET` | `src/lib/payment/slip2go.ts` | bearer secret; absent ⇒ `isSlip2GoConfigured()` is false and the SlipOK path is used instead — with neither configured, slips are checked by hand | **I** |
+| `NK_SLIP2GO_BASE` | `slip2go.ts` | unset ⇒ `https://connect.slip2go.com` | **?** (leave unset) |
+| `NK_SLIP_TOKEN_SECRET` | slip status tokens | unset ⇒ reuses `NK_JWT_SECRET` | **?** (optional) |
+| `NK_RESEND_API_KEY` | `src/lib/email/config.ts` | `re_…`; absent ⇒ outbox rows stay failed, no customer email | **?** |
+| `NK_RESEND_FROM_EMAIL` | `src/lib/email/config.ts` | a verified sender on the Resend domain | **?** |
+| `NK_RESEND_API_URL` | `src/lib/email/config.ts` | override only; leave unset | **?** (optional) |
+| `NK_CRON_SECRET` | internal sweeps (order expiry, outbox drain) | random hex header value; absent ⇒ those routes 401 (fail-closed), orders never auto-expire | **?** |
+| `NK_INTERNAL_TOKEN` | `/api/v1/internal/*` | random hex; absent ⇒ internal routes refuse non-admin callers | **?** |
+| `NK_PAYMENT_MOCK` | `src/lib/payment/omise.ts` | mock only when `NODE_ENV !== production`; **must not be `true` in prod** | **I** (leave false) |
+| `NK_OMISE_SECRET_KEY` | card gateway path | unused on the manual-transfer checkout | **?** (optional) |
+| `NK_OMISE_WEBHOOK_SECRET` | card webhook | unused today | **?** (optional) |
+| `NK_OMISE_API_BASE` | Omise client base | unset ⇒ Omise default | **?** (optional) |
+| `NK_TICKET_SECRET` | `src/api/supportTickets.ts` | HMAC secret; falls back to `NK_ORDER_SECRET`, `NEXTAUTH_SECRET`, then a hardcoded dev string | **?** |
+| `NK_ORDER_SECRET` | same fallback chain | as above | **?** (optional) |
+| `NEXTAUTH_SECRET` | same fallback chain | as above | **?** (optional) |
+| `UPSTASH_REDIS_REST_URL` | `src/lib/rateLimit.ts` | shared limiter; absent ⇒ in-process limiter | **?** |
+| `UPSTASH_REDIS_REST_TOKEN` | `src/lib/rateLimit.ts` | paired with the URL | **?** |
+| `NK_RATE_LIMIT_STRICT` | `rateLimit.ts` | `true` only once Upstash is configured; strict mode fails closed on Redis errors | **?** (leave unset) |
+| `NK_CSP_REPORT_ONLY` | CSP middleware | unset ⇒ enforce with nonce; never `true` in prod | **?** (leave unset) |
+| `NK_CSP_UNSAFE_INLINE` | CSP middleware | relaxation hatch; leave unset in prod | **?** (leave unset) |
+| `NK_GOOGLE_CLIENT_ID` / `NK_GOOGLE_CLIENT_SECRET` | `src/lib/oauth.ts` | customer Google login; absent ⇒ button unusable | **?** (optional) |
+| `NK_FB_APP_ID` / `NK_FB_APP_SECRET` | `src/lib/oauthFacebook.ts` | Facebook login | **?** (optional) |
+| `LINE_CHANNEL_ID` / `LINE_CHANNEL_SECRET` (and `LINE_CLIENT_ID` / `LINE_CLIENT_SECRET`) | `src/lib/oauth.ts` | LINE login | **?** (optional) |
+| `FACEBOOK_APP_ID` / `FACEBOOK_APP_SECRET`, `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | `oauth*.ts` legacy fallbacks | only if the `NK_*` names are unset | **?** (optional) |
+| `NK_TWILIO_ACCOUNT_SID` / `NK_TWILIO_AUTH_TOKEN` / `NK_TWILIO_FROM_NUMBER` | `src/lib/sms/otpSms.ts` | SMS OTP; absent ⇒ SMS codes are not sent | **?** (optional) |
+| `NK_OTP_DEV_MODE` | `otpSms.ts` | `1` logs the OTP instead of sending — **must not be `1` in prod** | **?** (leave unset) |
+| `NK_DISCORD_WEBHOOK_URL` | alerting helpers | webhook URL | **?** (optional) |
+| `NEXT_PUBLIC_API_URL` | client API base override | unset ⇒ same-origin | **?** (leave unset) |
+| `SLIP_VERIFY_BASE_OVERRIDE` | slip verification | **test hook — must be unset in production** | **?** (must be unset) |
+| `NK_SLIP_OK_KEY` / `NK_SLIP_OK_BRANCH` | SlipOK variant | not used by the Slip2Go path | documented as local-only |
+| `GIT_SHA` | `/api/v1/version`, build-info | `scripts/stamp-git-sha.mjs` writes `.next/GIT_SHA` during `npm run build`; the env var is only the fallback | **I** |
+| `GIT_REF` / `VERCEL_GIT_COMMIT_REF` / `VERCEL_GIT_COMMIT_SHA` | version/build-info | release identity only | **I** / **P** |
+| `NODE_ENV` / `PORT` | Next.js + Passenger | supplied by the runtime; do not set in the panel | runtime |
+| `NK_SENTRY_DSN` | nothing in `src/` | appears in `.env.example` only; not read by this build | not used |
+
+**What to do with this today:** open Infisical prod and confirm every **?** row that the shop
+actually depends on — `NK_RESEND_API_KEY`, `NK_RESEND_FROM_EMAIL`, `NK_CRON_SECRET`,
+`NK_INTERNAL_TOKEN`, the Upstash pair, and `NK_TICKET_SECRET` are the ones whose absence is felt
+by customers or by operations. Add nothing with a *new* value: a corrected secret takes effect
+at the next Passenger respawn, which can be minutes later and at random, so treat every value
+edit as a mini-cutover of its own.
+
+#### At cutover — the two database keys
+
+This is §3 Step 6 spelled out. Do it only when the ordering chain below is satisfied.
+
+**Ordering chain (do not reorder):**
+
+```
+1. `prisma migrate deploy` on the target          → 39 tables
+2. ETL run + `--verify-only` shows 0 differences   → the data exists
+3. panel gets the two mysql:// URLs                → the next boot reads MariaDB
+4. Restart App                                     → new process, new URL
+5. smoke check + PROCESSLIST confirmation          → traffic really is on MariaDB
+```
+
+Writing step 3 before step 2 is the one mistake this runbook exists to prevent.
+
+**Where:** Plesk → `nongkatistore.com` → **Node.js** → **Custom environment variables** →
+*Add variable* twice — this is the field that ends up in the process environment, which is all
+`server.js` reads. Whether the panel's separate *Secrets* store also surfaces values as
+environment variables is **not verified from this checkout**: use Custom environment variables,
+and, if you prefer Secrets, prove it with the PROCESSLIST check below.
+
+| Name | Value |
+| --- | --- |
+| `DATABASE_URL` | `mysql://nk_app:DBPASS@localhost:3306/nong_kati` |
+| `DATABASE_DIRECT_URL` | `mysql://nk_app:DBPASS@localhost:3306/nong_kati` |
+
+Both are required: `DATABASE_URL` is what `src/lib/db.ts` hands to Prisma, `DATABASE_DIRECT_URL`
+is the `directUrl` the schema uses for migrations. `mysql://`, **no `?schema=`** (verified: Prisma
+silently ignores it on MySQL, so a stale parameter hides instead of failing), no pooler params.
+
+**What a Passenger restart does here, precisely.** `Restart App` re-execs `server.js`; it logs
+into Infisical, injects only the keys the panel has not defined, then constructs `PrismaClient`
+with the panel's URL. If the ETL did not run, the database has no tables (or the baseline was
+never applied) and the failure is nasty in two ways:
+
+- Prisma raises `P2021` (*table does not exist*) on the first query, so storefront pages, catalogue
+  and admin all answer 500 — while `/api/v1/health` still reports **`database: ok`**, because it
+  only runs `SELECT 1` and `SELECT 1` succeeds on an empty schema. Reproduced on a scratch empty
+  database: `SELECT 1` returned a row while `prisma.product.findMany()` threw `P2021`.
+- If the schema exists but the data does not, the same health check is green and the shop renders
+  an *empty* storefront: no products, no categories, every login rejected (no users).
+
+So the health endpoint is not your cutover gate — the gate is `/api/v1/products` returning the
+catalogue and the check in §3 Step 5.
+
+**Confirm the panel actually won (after the restart):**
+
+```bash
+curl -s https://nongkatistore.com/api/v1/products | head -c 200   # real catalogue, not []
+curl -s https://nongkatistore.com/api/v1/health                  # database: ok, uptime low
+```
+
+and, on the server, the process list shows the app's own connections with the new user and db:
+
+```sql
+SELECT user, host, db, COUNT(*) FROM information_schema.PROCESSLIST
+WHERE user = 'nk_app' GROUP BY user, host, db;
+-- expect rows after you load a page; db = nong_kati, host = localhost
+```
+
+Rows with `db = nong_kati` are proof that the panel value is the one in force. No rows, while the
+shop still serves, means the app never connected as `nk_app` — i.e. it is still on Infisical's
+Supabase URL and the panel edit did not apply (wrong field, or no restart).
+
+**Rollback of just the env change** (production is on MariaDB and you want it back on Supabase):
+
+1. Node.js → Custom environment variables → **delete `DATABASE_URL`** → delete
+   `DATABASE_DIRECT_URL`.
+2. **Restart App**.
+3. `curl -s https://nongkatistore.com/api/v1/health` → `database: ok`; reload
+   `/api/v1/products` → catalogue; the PROCESSLIST query above now returns nothing for `nk_app`.
+
+Deleting the rows restores Infisical's Supabase values exactly, because Infisical was never
+edited. Anything written to MariaDB during the detour stays only in MariaDB — see §4 Rollback B
+for the reconciliation list before any retry.
 
 ## 7. What the user must authorise
 
