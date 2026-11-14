@@ -80,6 +80,8 @@ const HARDCODED_ID_FILES = [
   'src/app/layout.tsx',
   'src/app/account/layout.tsx',
   'src/components/layout/FacebookLayout.tsx',
+  // AdminShell is the admin layout's landmark shell (one per /management page).
+  'src/components/layout/AdminShell.tsx',
 ];
 
 function* walk(dir: string): Generator<string> {
