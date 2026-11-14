@@ -30,7 +30,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const ROOT = process.cwd();
-const BACKUPS = path.join(ROOT, 'backups');
+// `--out-dir=` (or BACKUP_DIR) lets the artifacts live outside the repository — the dump
+// contains customer PII, so a path that a `git clean` or a clone can never resurrect is
+// preferable to a git-ignored folder inside the working tree.
+const outDirArg = (process.argv.find((a) => a.startsWith('--out-dir=')) ?? '').split('=')[1];
+const BACKUPS = path.resolve(outDirArg || process.env.BACKUP_DIR || path.join(ROOT, 'backups'));
 const TMP = path.join(ROOT, 'tmp');
 const PG_IMAGE = 'postgres:17-alpine';
 
@@ -72,6 +76,7 @@ process.on('exit', () => fs.rmSync(envFile, { force: true }));
 
 const stamp = new Date().toISOString().replace(/[:]/g, '-').slice(0, 19);
 const dumpName = `db-full-${stamp}.dump`;
+const shown = (p) => path.relative(ROOT, p).replace(/\\/g, '/') || p;
 const countsName = `db-full-${stamp}.counts.json`;
 const manifestName = `db-full-${stamp}.manifest.json`;
 
@@ -144,7 +149,7 @@ if (tableCount === 0) fail('the fingerprint query returned no tables — refusin
 console.log(`   ${tableCount} tables, ${rowCount} rows`);
 
 // ── 2. dump every schema ───────────────────────────────────────────────────
-console.log(`→ pg_dump all schemas → backups/${dumpName}`);
+console.log(`→ pg_dump all schemas → ${shown(path.join(BACKUPS, dumpName))}`);
 // The dump covers every schema in the database, including ones that hold no tables
 // (extensions, graphql, graphql_public). Record them so the artifact's scope is explicit.
 const nsRun = spawnSync(
@@ -225,9 +230,19 @@ const manifest = {
     schemasWithTables,
     note: 'Connection target of the dump. The dump was taken read-only through pg_dump; nothing on the source was modified.',
   },
+  location: path.relative(ROOT, BACKUPS).startsWith('..') ? BACKUPS : shown(BACKUPS),
   files: [
-    { path: `backups/${dumpName}`, role: 'full logical backup, custom format (pg_dump -Fc), every non-system schema', bytes, sha256 },
-    { path: `backups/${countsName}`, role: 'per-table source row counts + ordered content fingerprints', bytes: fs.statSync(countsPath).size },
+    {
+      path: path.resolve(BACKUPS, dumpName).replace(/\\/g, '/'),
+      role: 'full logical backup, custom format (pg_dump -Fc), every non-system schema',
+      bytes,
+      sha256,
+    },
+    {
+      path: path.resolve(countsPath).replace(/\\/g, '/'),
+      role: 'per-table source row counts + ordered content fingerprints',
+      bytes: fs.statSync(countsPath).size,
+    },
   ],
   totals: { tables: tableCount, rows: rowCount, populatedTables: Object.values(tables).filter((t) => t.rows > 0).length },
   restoreHint: `node scripts/verify-supabase-backup.mjs --dump=backups/${dumpName} (see docs/db-backup-restore.md)`,
@@ -245,6 +260,6 @@ const manifest = {
 const manifestPath = path.join(BACKUPS, manifestName);
 fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
-console.log(`✔ backups/${dumpName}  ${(bytes / 1024 / 1024).toFixed(1)} MB  sha256 ${sha256.slice(0, 16)}…`);
-console.log(`✔ backups/${countsName}  ${tableCount} tables / ${rowCount} rows`);
-console.log(`✔ backups/${manifestName}`);
+console.log(`✔ ${shown(dumpPath)}  ${(bytes / 1024 / 1024).toFixed(1)} MB  sha256 ${sha256.slice(0, 16)}…`);
+console.log(`✔ ${shown(countsPath)}  ${tableCount} tables / ${rowCount} rows`);
+console.log(`✔ ${shown(manifestPath)}`);

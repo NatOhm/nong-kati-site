@@ -1,102 +1,130 @@
 # Database backup and restore (production Supabase)
 
-How the production database is backed up, where those artifacts live, and how to restore one.
-Companion to `docs/db-migration-hostatom-mariadb.md` (which uses these artifacts as its safety
-net before the MariaDB cutover).
+How the live database is backed up, where the artifacts live, what they do and do not contain,
+and the exact commands that were executed to prove a restore. Companion to
+`docs/db-migration-hostatom-mariadb.md` (the cutover runbook that consumes these artifacts).
 
-**Important:** the earlier dumps (`backups/db-2026-11-14T19-43-04.dump` and the seeded ones)
-were taken with `pg_dump --schema public`, so they do **not** contain `auth`, `storage`,
-`realtime` or `vault`. The `db-full-*` artifacts described here supersede them.
+## Where the artifacts live
 
-## What exists
+Outside both repositories, on this machine:
 
-Taken 2026-11-14, all from the same `pg_dump` run, in `backups/` (git-ignored — it holds PII,
-so it lives on disk and never in the repository):
-
-| File | Size | What it is |
-| --- | --- | --- |
-| `backups/db-full-2026-11-14T20-36-47.dump` | 32.7 MB | Full logical backup, `pg_dump -Fc -Z6`, **every** non-system schema |
-| `backups/db-full-2026-11-14T20-36-47.counts.json` | ~7 KB | Per-table row count + content fingerprint, measured on the source at dump time |
-| `backups/db-full-2026-11-14T20-36-47.manifest.json` | ~2 KB | sha256, sizes, source target (credentials redacted), scope notes |
-| `backups/db-full-2026-11-14T20-36-47.verify.json` | ~1 KB | Machine-written receipt of the restore rehearsal that passed |
-
-Source: `aws-0-ap-southeast-1.pooler.supabase.com:5432`, database `postgres` (the direct
-endpoint — `pg_dump` cannot run through the pgbouncer pooler on `:6543`), user and password
-redacted in every artifact.
-
-Verify the artifact pair at any time:
-
-```bash
-sha256sum backups/db-full-2026-11-14T20-36-47.dump   # compare with the manifest's sha256
+```
+E:\งานนะจ๊ะ\2569\Nong-kati\db-backups\
 ```
 
-## What the backup covers
+`db-backups/` is ignored by the workspace `.gitignore` as well, so a stray `git add -A` cannot
+pick up customer PII. The dumps under `backups/` **inside** the app repo are older and narrower
+(see "Superseded artifacts") — do not restore from them.
 
-- **All nine schemas**: `public`, `auth`, `extensions`, `graphql`, `graphql_public`,
-  `pgbouncer`, `realtime`, `storage`, `vault` — DDL (tables, indexes, constraints, sequences)
-  and rows. Schemas that hold no tables (`extensions`, `graphql`, `graphql_public`,
-  `pgbouncer`) are still in the dump; only the five with tables appear in `counts.json`.
-- **77 tables, 2857 rows**, of which 31 tables hold data. That includes the Prisma migration
-  bookkeeping (`public._prisma_migrations`, 36 rows) — the history that
-  `prisma migrate deploy` compares against — plus Supabase's own bookkeeping tables
-  (`auth.schema_migrations` 82, `realtime.schema_migrations` 89, `storage.migrations` 74).
-- Business data: `Order` 216, `OrderItem` 216, `GiftCode` 170, `Product` 31,
-  `ProductVariant` 88, `Customer` 54, `AdminSession` 962, `AuditLog` 429, `SiteSetting` 87,
-  `StockMove` 62, `TopUpLog` 38, and the rest — the full per-table list is in `counts.json`.
+| File | Size | sha256 |
+| --- | --- | --- |
+| `db-full-2026-11-14T21-12-33.dump` | 34,260,713 B (32.7 MB) | `4c08d972050403cdfb5b72e23e9e49a4444b1bfa0c544961cb0285745e27ea8e` |
+| `db-full-2026-11-14T21-12-33.counts.json` | 6,928 B | — |
+| `db-full-2026-11-14T21-12-33.manifest.json` | 2.3 KB | — |
+| `db-full-2026-11-14T21-12-33.verify.json` | 813 B | — |
+
+- **dump** — `pg_dump -Fc -Z6` of the whole database (custom format, all non-system schemas).
+- **counts** — per-table row count plus a content fingerprint measured on the source at dump
+  time, so the artifact can be judged later without the source.
+- **manifest** — sizes, sha256, schema list, server version, and the connection target with the
+  user and password redacted.
+- **verify** — machine-written receipt of the restore rehearsal that passed.
+
+Integrity check (re-run any time):
+
+```bash
+sha256sum "E:/งานนะจ๊ะ/2569/Nong-kati/db-backups/db-full-2026-11-14T21-12-33.dump"
+# expect 4c08d972…ea8e and 34260713 bytes
+```
+
+Source: `aws-0-ap-southeast-1.pooler.supabase.com:5432`, database `postgres`, taken over the
+direct endpoint (`pg_dump` cannot run through the pgbouncer pooler on `:6543`). Server was
+PostgreSQL 17.12, dump made with `pg_dump (PostgreSQL) 17.12`. The source was only read.
+
+## What it covers
+
+- **All nine schemas**: `public`, `auth`, `extensions`, `graphql`, `graphql_public`, `pgbouncer`,
+  `realtime`, `storage`, `vault`. Five hold tables and appear in `counts.json`; the other four
+  are dumped for their objects only.
+- **77 tables, 2857 rows**, of which **31 tables have data** — including the Prisma migration
+  bookkeeping `public._prisma_migrations` (36 rows), `auth.schema_migrations` (82),
+  `realtime.schema_migrations` (89), `storage.migrations` (74), and the business tables:
+  `Order` 216, `OrderItem` 216, `AdminSession` 962, `AuditLog` 429, `GiftCode` 170,
+  `ProductVariant` 88, `SiteSetting` 87, `StockMove` 62, `Customer` 54, `TopUpLog` 38,
+  `Product` 31, `AdminBackupCode` 30, `Category` 29, `PaymentAttempt` 28, `CodeUploadBatch` 22,
+  `AdminUser` 19, `AdminChallengeConsumed` 18, `ProductTag` 11, `WishlistItem` 7, `Refund` 7,
+  `SupportTicket` 3, and the single-row tables (`Coupon`, `Promotion`, `Tag`, `MagicLinkToken`,
+  `PasswordResetToken`). The full list with counts and hashes is in `counts.json`.
+- **Gift-code material survives as it is stored**: `GiftCode.codeEncrypted` (AES-256-GCM
+  ciphertext with the auth tag appended), `nonce`, `keyVersion` and the `codeHash` dedup index.
+  Nothing is decrypted into the dump.
+  ⚠️ **To read those codes back you need `NK_GIFT_CODE_ENCRYPTION_KEY`** — the 32-byte key lives
+  in the Plesk environment / Infisical, is **not** in the backup, and without it the ciphertext
+  is unreadable. `codeHash` is SHA-256 of the uppercased plaintext, so a candidate plaintext can
+  be verified without the key.
+- Schema objects: indexes, unique constraints, foreign keys, sequences and defaults.
 
 ## What it does NOT cover
 
-- **Ownership and grants.** Dumped with `--no-owner --no-privileges`, so the artifact needs no
-  Supabase roles to restore. Re-grant permissions after a restore if the target is a real
-  Supabase project.
-- **Storage binaries.** `storage.objects` rows are in the dump; the actual file bytes live in
-  Supabase's S3-compatible bucket and are not in it. A restore brings back the references, not
-  the images/PDFs. (Today that bucket is empty — the shop keeps its images as base64 in
-  `SiteSetting` — but do not assume that stays true.)
-- **Auth users beyond their rows.** `auth.users` rows restore, but there is no external
-  identity state and no way to send mail from a restored copy.
-- **Supabase-managed extensions.** `vault` is a wrapper around the `supabase_vault` extension,
-  which does not exist in a stock Postgres image. Restoring with plain Postgres reproduces the
-  schema but not that one table (see below) — it is empty on the source.
-- **Roles, publications, other projects** in the same Supabase org.
+- **Ownership and GRANTs** — dumped with `--no-owner --no-privileges`, so it restores without any
+  Supabase role. Re-grant afterwards if you restore into a real Supabase project.
+- **Supabase Storage binaries** — `storage.objects` rows are in the dump, the file bytes live in
+  the S3-compatible bucket and are not. (That bucket is empty today: the shop keeps product
+  images as base64 in `SiteSetting`, so no image is lost by this gap.)
+- **Auth identity state beyond the rows** — `auth.users` rows restore, but external identity
+  providers, refresh-token hashes and outbound email are not reproducible from a dump.
+- **Supabase-only extensions** — `vault` wraps `supabase_vault`, which a stock Postgres image
+  does not have. `vault.secrets` (0 rows on the source) is the only object not recreated.
+- **Roles, publications, other projects** in the Supabase org; **the encryption/API keys**
+  themselves (`NK_GIFT_CODE_ENCRYPTION_KEY`, `NK_JWT_SECRET`, Resend, Slip2Go) — those are
+  secrets in Plesk/Infisical, deliberately never in a database dump.
 
-## Restoring it
+## Restore — the commands actually executed on 2026-11-14
 
-The rehearsal path (throwaway container, wiped afterwards) is scripted:
-
-```bash
-node scripts/verify-supabase-backup.mjs                 # newest db-full-*.dump
-node scripts/verify-supabase-backup.mjs --dump=backups/db-full-2026-11-14T20-36-47.dump --keep
-```
-
-It starts `postgres:17-alpine` on port 5544, restores the dump with
-`--no-owner --no-privileges`, recomputes every table's fingerprint, compares against
-`counts.json`, prints a report, writes `<dump>.verify.json`, and deletes the container
-(`--keep` leaves it up for inspection). Exit code 0 means every populated table matched.
-
-The same steps by hand — this is the exact command set, and the reason the artifact is
-trustworthy:
+Every line below was run; the output is what the verifier printed.
 
 ```bash
-# 1. scratch database. Use a current PG major that matches the source (17).
+# 1. scratch database (stock Postgres 17, no Supabase extensions)
 docker run -d --name nk-restore -e POSTGRES_PASSWORD=ci -e POSTGRES_DB=restore \
   -p 5544:5432 postgres:17-alpine
 
 # 2. load the artifact
-docker cp backups/db-full-2026-11-14T20-36-47.dump nk-restore:/tmp/backup.dump
+docker cp "E:/งานนะจ๊ะ/2569/Nong-kati/db-backups/db-full-2026-11-14T21-12-33.dump" \
+  nk-restore:/tmp/backup.dump
 docker exec nk-restore pg_restore -U postgres -d restore --no-owner --no-privileges /tmp/backup.dump
 
-# 3. inspect it
+# 3. check what landed
 docker exec -it nk-restore psql -U postgres -d restore -c '\dt public.*'
 
-# 4. tear it down (the scratch DB is disposable)
+# 4. tear it down
 docker rm -f nk-restore
 ```
 
-Expected: three `pg_restore: error` lines, all the same cause — `extension "supabase_vault" is
-not available`, then `vault.secrets does not exist`. They are a property of the stock image,
-not of the artifact; `vault.secrets` holds 0 rows on the source. Everything else restores
-silently.
+The scripted form of the same thing (what was used, and is repeatable):
+
+```bash
+node scripts/verify-supabase-backup.mjs \
+  --dump="E:/งานนะจ๊ะ/2569/Nong-kati/db-backups/db-full-2026-11-14T21-12-33.dump"
+```
+
+It starts the scratch container, restores with `--no-owner --no-privileges`, recomputes every
+table's fingerprint, compares against `counts.json`, writes `<dump>.verify.json` next to the
+artifact, and deletes the container.
+
+### Restore reconciliation result
+
+| | |
+| --- | --- |
+| Source tables measured | 77 (46 empty) |
+| Tables restored | 76 |
+| Populated tables matched (count **and** content fingerprint) | **31 / 31**, 2857 rows compared |
+| Empty tables restored empty | 45 |
+| Tables missing from the restore | 1 — `vault.secrets` (0 rows on the source) |
+| Tables in the restore absent from the source | 0 |
+| `pg_restore` errors | 3, all the same cause: `extension "supabase_vault" is not available` → `vault.secrets does not exist` |
+
+There is no unexplained difference. The one missing table holds no rows, and its absence is a
+property of the stock Postgres image, not of the artifact.
 
 ## How "the restore is good" is proven
 
@@ -108,27 +136,25 @@ SELECT count(*),
 FROM "schema"."table" x;
 ```
 
-The ordered, per-row md5 makes the value independent of physical row order (a `pg_dump`
-restore does not preserve it) and sensitive to every column of every row, so a truncated
-string, a shifted timestamp or a rounded decimal changes the hash. Restore, recompute the same
-expression, compare.
+Ordering by row hash makes the value independent of physical row order (a restore does not
+preserve heap order) and sensitive to every column of every row — a truncated string, a shifted
+timestamp, a rounded decimal all change it. Restore, recompute, compare. The verifier fails with
+a non-zero exit on any populated-table mismatch, a populated table that did not come back, or a
+table that appears only in the restore.
 
-Result of the 2026-11-14 rehearsal (recorded in `verify.json`):
-
-- 31/31 populated tables matched — count **and** fingerprint, 2857 rows compared.
-- 45/46 empty tables recreated empty.
-- `vault.secrets` not recreated (missing extension, 0 rows on the source).
-- 0 tables exist in the restore that are absent from the source.
-
-## Re-taking a backup
+## Taking a new backup
 
 ```bash
-node scripts/backup-supabase-db.mjs     # reads DATABASE_DIRECT_URL / DATABASE_URL from .env.local
+node scripts/backup-supabase-db.mjs --out-dir="E:/งานนะจ๊ะ/2569/Nong-kati/db-backups"
+node scripts/verify-supabase-backup.mjs --dump="<the new dump>"
 ```
 
-New date-stamped `db-full-*` quadruple; nothing is overwritten. The source is only read
-(`SELECT` + `pg_dump`), so this is safe to run against production at any time. Afterwards run
-the verifier against the new dump — an unverified backup is a hope, not a backup.
+New date-stamped artifacts; nothing is overwritten. Read-only against the source. Take a fresh
+pair immediately before Phase 6 of the runbook, and verify it — an unverified backup is a hope.
 
-The password never enters argv or the shell history: it travels in a `0600` env file under
-`tmp/` that the script deletes on exit.
+## Superseded artifacts
+
+`backups/db-2026-11-14T19-43-04.dump` and the September dumps inside the app repo were produced
+with `pg_dump --schema public`: they contain **no** `auth`, `storage`, `realtime` or `vault`
+schema, and predate the last writes before the cutover. Keep them if you like, but the
+`db-backups/db-full-*` artifacts are the ones to restore from.
