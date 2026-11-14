@@ -256,10 +256,78 @@ until Phase 8, so this is a two-minute revert.
 ### Phase 8 — retire Supabase, then housekeeping
 
 - [ ] Run clean for 7–14 days, then **pause** the Supabase project (pausing stops egress and
-      is what actually answers the quota email). Delete only after that.
-- [ ] Plesk Backup Manager: daily, databases included.
-- [ ] Nightly `mysqldump` to a dated file with 14-day pruning (Plesk scheduled task; the
-      chroot has shell tools but no Node — do not use the Node route).
+      is what actually answers the quota email). Delete only after that. Keep the
+      `db-backups/db-full-2026-11-14T21-12-33.dump` artifact until the pause is confirmed —
+      it is the only way back to the Postgres data.
+- [ ] Plesk Backup Manager (Tools & Settings → Backup Manager → Scheduled Backup Settings):
+      daily, **include databases**, keep 7–14 days, store on the subscription (or a remote
+      destination if configured). This covers the whole vhost, not just MySQL.
+- [ ] Nightly logical dump with `scripts/backup-mariadb.sh` (below).
+
+#### Nightly MariaDB dump — install and schedule
+
+The script is plain `sh` because Plesk's scheduled tasks run inside the vhost chroot, where
+`tr` is missing and there is no `node`: no dependency on the app, the repo, or a Node runtime.
+
+```bash
+# 1. put the script on the server (anywhere readable by the subscription user)
+mkdir -p /httpdocs/scripts
+cp scripts/backup-mariadb.sh /httpdocs/scripts/ && chmod 750 /httpdocs/scripts/backup-mariadb.sh
+
+# 2. backup directory + secret env file (0600 — holds the DB password)
+mkdir -p /var/backups/nong-kati && chmod 700 /var/backups/nong-kati
+cat > /var/backups/nong-kati/.env <<'EOF'
+DATABASE_URL=mysql://DBUSER:DBPASS@localhost:3306/nong_kati
+BACKUP_DIR=/var/backups/nong-kati
+PREFIX=nong_kati
+RETENTION_COUNT=14
+RETENTION_DAYS=30
+EOF
+chmod 600 /var/backups/nong-kati/.env
+
+# 3. one manual run to prove it before trusting the scheduler
+BACKUP_ENV_FILE=/var/backups/nong-kati/.env /bin/sh /httpdocs/scripts/backup-mariadb.sh
+```
+
+Plesk → **Scheduled Tasks** → Add Task: **Daily, 03:15** (server time), run as the subscription
+user, command:
+
+```sh
+BACKUP_ENV_FILE=/var/backups/nong-kati/.env /bin/sh /httpdocs/scripts/backup-mariadb.sh >> /var/backups/nong-kati/backup.log 2>&1
+```
+
+Why it is shaped this way:
+
+- No password in the task command — the scheduler stores and echoes the command line, so the
+  credentials live in the `0600` env file and `BACKUP_ENV_FILE` only names it.
+- A dump is written to `.*.partial`, passes `gzip -t`, and only then is renamed; a failed run
+  exits non-zero and leaves no file that looks restorable.
+- `--single-transaction --hex-blob --routines --triggers`: a consistent snapshot while the shop
+  keeps selling, and gift-code `VARBINARY` columns survive as bytes.
+- Pruning keeps the newest `RETENTION_COUNT` dumps and drops anything older than
+  `RETENTION_DAYS`, but never the newest surviving copy and never the one just written.
+
+Monthly restore drill (5 minutes): unzip the newest dump into a scratch database and compare
+counts; an untested backup is a hope.
+
+```sh
+mkdir /tmp/restore && gunzip -c /var/backups/nong-kati/<newest>.sql.gz | mysql -u root -p
+mysql -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='nong_kati'"
+mysql -N -e "SELECT COUNT(*) FROM nong_kati.\`Order\`; SELECT COUNT(*) FROM nong_kati.GiftCode"
+```
+
+**Verified on the MariaDB copy 2026-11-14** (`scripts/backup-mariadb.sh` run inside a
+`mariadb:10.11` client against the `:3307` instance):
+
+- 4 consecutive runs with `RETENTION_COUNT=3` → kept exactly 3, the oldest removed, the newest
+  intact; each dump 33,805,995 B and a `.sha256` sidecar written.
+- The newest dump restored into a **fresh empty** MariaDB: **39 tables**, and
+  `Order` 216, `GiftCode` 170, `Customer` 54, `Coupon` 1, `PaymentAttempt` 28, `Product` 31 —
+  identical to the source. Gift-code bytes survived exactly: 170 rows, 5440 B of `codeHash`
+  and 13245 B of `codeEncrypted`, same ordered-hex MD5 on both sides.
+- Age pruning: a dump backdated 30 days with `RETENTION_DAYS=7` was removed while the four
+  recent dumps were kept.
+- Failure path: a wrong password exits **1** and leaves **0** files behind (no partial dump).
 - [ ] Docs: mark `docs/supabase-setup.md` and `docs/vercel-env-checklist.md` superseded; add
       the cutover row to `docs/hostatom-live.md` **and run `npm run patch-notes`** afterwards
       (P1 gate) plus a `note` on the Thai entry (D1 gate).

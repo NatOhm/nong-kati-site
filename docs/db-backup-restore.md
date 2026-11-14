@@ -142,7 +142,19 @@ timestamp, a rounded decimal all change it. Restore, recompute, compare. The ver
 a non-zero exit on any populated-table mismatch, a populated table that did not come back, or a
 table that appears only in the restore.
 
-## Taking a new backup
+## Nightly backups once the shop is on MariaDB
+
+From Phase 8 of the runbook onwards, `scripts/backup-mariadb.sh` runs nightly from a Plesk
+scheduled task: `mariadb-dump --single-transaction --hex-blob … | gzip`, a `gzip -t` gate before
+the file is published, a `.sha256` sidecar, and count/age pruning that never deletes the newest
+surviving dump. Install steps, the exact task command and the retention variables are in
+`docs/db-migration-hostatom-mariadb.md` → Phase 8.
+
+Verified against the MariaDB copy: 4 runs with `RETENTION_COUNT=3` kept exactly 3 and removed
+the oldest; the newest restored into an empty MariaDB with 39 tables and the same per-table
+counts; a wrong password exited 1 and left no file behind.
+
+## Taking a new backup (the Postgres source, before the cutover)
 
 ```bash
 node scripts/backup-supabase-db.mjs --out-dir="E:/งานนะจ๊ะ/2569/Nong-kati/db-backups"
