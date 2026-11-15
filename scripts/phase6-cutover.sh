@@ -39,9 +39,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-say()  { printf '\n\033[1;36m▶ %s\033[0m\n' "$*"; }
-warn() { printf '\n\033[1;33m⚠ %s\033[0m\n' "$*"; }
-die()  { printf '\n\033[1;31m✖ %s\033[0m\n' "$*" >&2; exit 1; }
+say()  { printf '\n\033[1;36m▶ %b\033[0m\n' "$*"; }
+warn() { printf '\n\033[1;33m⚠ %b\033[0m\n' "$*"; }
+die()  { printf '\n\033[1;31m✖ %b\033[0m\n' "$*" >&2; exit 1; }
 
 TARGET="${TARGET_DATABASE_URL:-}"
 DRY_RUN=0
@@ -139,6 +139,45 @@ esac
 command -v node >/dev/null 2>&1 || die "node is not on PATH — Phase 6 drives node scripts."
 [ -d node_modules ] || die "node_modules missing — run 'npm ci' first."
 [ -f scripts/cutover-window.mjs ] || die "scripts/cutover-window.mjs is missing — it is the implementation of these steps."
+
+# ── Preflight: the build-time public URL ─────────────────────────────────────
+# NEXT_PUBLIC_SITE_URL is baked into the artifact by `next build`, and .env.local in a
+# workstation checkout points at http://localhost:4200. A window run that forgets to export
+# the real one ships a production build with localhost links and fulfilment that fails closed.
+SITE_URL_EFFECTIVE="$(node -e "
+const fs = require('fs');
+let v = process.env.NEXT_PUBLIC_SITE_URL || '';
+if (!v && fs.existsSync('.env.local')) {
+  const m = /^\\s*NEXT_PUBLIC_SITE_URL\\s*=\\s*(.*)$/m.exec(fs.readFileSync('.env.local', 'utf8'));
+  if (m) v = m[1];
+}
+process.stdout.write(v.trim().replace(/^[\"']|[\"']$/g, ''));
+")"
+case "$TARGET" in
+  *@127.0.0.1*|*@localhost*|*@\[::1\]*) LOOPBACK_TARGET=1 ;;
+  *) LOOPBACK_TARGET=0 ;;
+  *);;
+esac
+case "$SITE_URL_EFFECTIVE" in
+  "") die "NEXT_PUBLIC_SITE_URL is empty — the build would ship without it and fulfilment fails closed." ;;
+  *localhost*|*127.0.0.1*)
+    if [ "$LOOPBACK_TARGET" = "1" ]; then
+      warn "NEXT_PUBLIC_SITE_URL=$SITE_URL_EFFECTIVE — fine for the local copy, wrong for production."
+    else
+      die "NEXT_PUBLIC_SITE_URL=$SITE_URL_EFFECTIVE would be baked into a production build.\n  export NEXT_PUBLIC_SITE_URL=https://nongkatistore.com before running this window."
+    fi
+    ;;
+esac
+
+# A tunnel target on loopback shares the port with anything else on this machine.
+case "$TARGET" in
+  *@127.0.0.1:*|*@localhost:*)
+    TARGET_PORT="$(printf '%s' "$TARGET" | sed -E 's#.*@[^:/]+:([0-9]+)/.*#\1#')"
+    if command -v netstat >/dev/null 2>&1 && netstat -ano 2>/dev/null | grep -q ":${TARGET_PORT} .*LISTENING"; then
+      warn "port $TARGET_PORT already has a listener — make sure it is the SSH tunnel and not the\n  local rehearsal database (nk-mariadb also binds 3307). If it is the container, either stop it\n  or tunnel on another port: ssh -N -L 3308:localhost:3306 … and point TARGET at :3308."
+    fi
+    ;;
+esac
 
 SAFE_TARGET="$(printf '%s' "$TARGET" | sed -E 's#//[^@]*@#//***@#')"
 STAMP="$(date "+%Y%m%d-%H%M%S")"

@@ -201,6 +201,7 @@ one. Prefer it in the window and keep the individual steps for reading and for a
 
 ```bash
 TARGET_DATABASE_URL="mysql://nk_app:DBPASS@127.0.0.1:3307/nong_kati" \
+NEXT_PUBLIC_SITE_URL="https://nongkatistore.com" \
   bash scripts/phase6-cutover.sh --yes          # migrate deploy → ETL → images → build → gate
 ```
 
@@ -217,8 +218,24 @@ Step 1 by hand first.
 git -C webapp/nong-kati/nong-kati status --short          # must be clean
 node -v                                                   # 20.x
 docker info >/dev/null && echo "docker ok"
+export NEXT_PUBLIC_SITE_URL=https://nongkatistore.com     # the build bakes this in
 ssh -N -L 3307:localhost:3306 nongka@thsv93.hostatom.com  # keep open in one terminal
 ```
+
+Three things this checkout gets wrong by default, all caught before the window opens:
+
+- **`.env.local` says `NEXT_PUBLIC_SITE_URL=http://localhost:4200`.** `next build` bakes that
+  value into the artifact, so a window run without the export ships localhost links and
+  fulfilment that fails closed. `phase6-cutover.sh` now refuses a localhost build URL against a
+  non-loopback target — export the real one *before* running it, not after.
+- **The local rehearsal container `nk-mariadb` binds `127.0.0.1:3307`**, the same port the runbook
+  tells the SSH tunnel to bind. Either stop it (`docker stop nk-mariadb`) or tunnel on 3308
+  (`ssh -N -L 3308:localhost:3306 …`) and point `TARGET_DATABASE_URL` at `:3308`. The driver warns
+  when something is already listening on the target port; it cannot tell the tunnel from the
+  container, so check which one it is.
+- **The Plesk panel (`https://nongkatistore.com:8443`) serves a certificate Chromium will not
+  accept** — the automation browser stops on it. Drive the panel in a normal browser, or consider
+  it a deliberate human-only surface; `curl -k` reaches it for read-only checks.
 
 In a second terminal, prove the tunnel reaches MariaDB (you will be prompted for the DB password):
 
