@@ -194,6 +194,7 @@ printf '  stop at the first failure; %s\n' \
 if [ "$DRY_RUN" = "1" ]; then
   say "Dry run — plan only, nothing is executed"
   [ "$WITH_BACKUP" = "1" ] || warn "Phase 6 assumes a verified dump taken immediately before it — see docs/db-backup-restore.md."
+  printf '  0. target database exists?                               (a missing one is refused, never created)\n'
   printf '  1. prisma migrate deploy  &&  prisma migrate status      (DATABASE_URL=target)\n'
   if [ "$SKIP_ETL" = "1" ]; then
     printf '  2. ETL copy                                              (skipped by --skip-etl)\n'
@@ -215,6 +216,35 @@ if [ "$DRY_RUN" = "1" ]; then
   printf '  DATABASE_DIRECT_URL, Restart App, then /api/v1/health and one real slip (runbook Phase 6).\n'
   exit 0
 fi
+
+# ── Preflight: the target database must ALREADY exist ─────────────────────────
+# `prisma migrate deploy` CREATES a missing MySQL database instead of failing
+# (measured 2026-11-15: it printed "MySQL database nk_p6_absent created"). A typo in
+# TARGET_DATABASE_URL therefore migrates an empty schema and the ETL then copies
+# production rows into it — a window that reports success against a database nobody
+# meant to create. The only safe moment to notice is before step 1, and a missing
+# database must never be reported as an unreachable server, or the other way round.
+say "Checking the target database already exists"
+DB_NAME="$(printf '%s' "$TARGET" | sed -E 's#^[a-zA-Z]+://[^/]*/([^?]*).*#\1#')"
+set +e
+DB_PROBE="$(node scripts/target-db-check.mjs --url="$TARGET" 2>&1)"
+DB_STATUS=$?
+set -e
+printf '  %s\n' "$DB_PROBE"
+case "$DB_STATUS" in
+  0) : ;;
+  3) die "refusing to run Phase 6: the target database \"$DB_NAME\" does not exist.
+  prisma migrate deploy would CREATE it, migrate an empty schema, and the ETL would then
+  copy production rows into a database nobody meant to create. Create it first (Phase 5
+  does this), then re-run:
+    CREATE DATABASE \`$DB_NAME\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+  Nothing was changed." ;;
+  4) die "refusing to run Phase 6: the target database server cannot be reached.
+  That is not a missing database — check the SSH tunnel (ssh -N -L 3306:127.0.0.1:3306 …)
+  and the host/port in TARGET_DATABASE_URL. Nothing was changed." ;;
+  *) die "refusing to run Phase 6: the target database check failed (exit $DB_STATUS).
+  $(printf '%s' "$DB_PROBE" | head -3)" ;;
+esac
 
 set +e
 node scripts/cutover-window.mjs ${STEP_ARGS[@]+"${STEP_ARGS[@]}"} ${PASSTHROUGH[@]+"${PASSTHROUGH[@]}"} 2>&1 | tee "$LOG"

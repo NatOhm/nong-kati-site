@@ -225,9 +225,10 @@ secret, so it runs only inside the agreed window.
 ### Phase 6 — cutover (one window, ~30 min)
 
 Rehearse the driver itself before the window, against the local MariaDB copy —
-`bash scripts/rehearse-phase6.sh` runs the plan, a trimmed plan, the real 32-check gate and a
-deliberate failure, and asserts from the logs that the steps still fire in order
-(`--plan-only` does the two plan cases without a database).
+`bash scripts/rehearse-phase6.sh` runs the plan, a trimmed plan, the real 32-check gate, an
+unreachable target and a missing database, and asserts from the logs that the steps still fire in
+order and that both bad targets are refused before any step (`--plan-only` does the two plan cases
+without a database).
 
 **Trap the rehearsal found:** `prisma migrate deploy` against MariaDB **creates the database when it
 does not exist** — it printed `MySQL database nk_p6_absent created at 127.0.0.1:3307` and carried
@@ -235,6 +236,12 @@ on. So a typo in `DATABASE_URL` does not fail the window; it silently provisions
 database that the ETL then fills, leaving the one Plesk created untouched and the app pointed at a
 name nobody meant. Check the target name against `/smb/database/list` before the run, and treat a
 first-time `created at …` line in the log as a stop signal.
+
+The driver now enforces that itself: it probes the target with `scripts/target-db-check.mjs` before
+step 1 and **refuses to run when the database does not exist**, naming it and saying that
+`prisma migrate deploy` would create it. An unreachable server is reported as unreachable, never as
+a missing database, and a refusal leaves nothing behind — `rehearse-phase6.sh` case 5 re-probes
+afterwards to prove the database was not created.
 
 1. [ ] Put the shop to sleep if the window is not already quiet (the app can stay up; the
        risk is writes during the export).

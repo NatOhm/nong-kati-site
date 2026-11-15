@@ -17,11 +17,17 @@
 #                                                        assert the trim keeps order
 #   3. live-gate        --from=check                     really runs the 32-check gate
 #                                                        against the copy and passes
-#   4. first-failure    --from=schema to an unreachable server (closed port)
-#                                                        assert it stops AT schema and
-#                                                        never starts the ETL. A missing
-#                                                        database name would not do: Prisma
-#                                                        creates it and the ETL would run.
+#   4. unreachable      --from=schema to a closed port    assert it refuses before any
+#                                                        step and says "unreachable",
+#                                                        not "missing"
+#   5. missing-database --from=schema at a name that does not exist on the reachable
+#                                                        copy. This is the one that used
+#                                                        to slip through: `prisma migrate
+#                                                        deploy` CREATES a missing MySQL
+#                                                        database, so the driver now
+#                                                        refuses before step 1 _and_ the
+#                                                        case re-probes afterwards to prove
+#                                                        nothing was created.
 #
 # Nothing here writes to Supabase, and the only database it touches is the local
 # copy in NK_REHEARSAL_TARGET. Case 3 is the documented, repeatable gate: it
@@ -143,7 +149,9 @@ order() {
     if [ -z "$line" ]; then
       bad "order broken: '$text' never appears after line $from"
       assert_fail=1
-      return 1
+      # Not a non-zero return: under `set -e` that aborted the whole rehearsal at the
+      # first broken assertion, so the remaining cases never ran and never reported.
+      return 0
     fi
     from=$((line + 1))
   done
@@ -172,18 +180,19 @@ if [ "$DRY_RUN" = "1" ]; then
   printf '  target  : %s\n' "$(printf '%s' "$TARGET" | sed -E 's#//[^@]*@#//***@#')"
   printf '  driver  : %s\n' "$DRIVER"
   printf '  logs    : %s/phase6-rehearsal-%s-*.log\n' "$LOG_DIR" "$STAMP"
-  printf '  cases   : 1 plan · 2 plan-trimmed%s\n' "$([ "$PLAN_ONLY" = "1" ] && echo '' || echo ' · 3 live-gate · 4 first-failure')"
+  printf '  cases   : 1 plan · 2 plan-trimmed%s\n' "$([ "$PLAN_ONLY" = "1" ] && echo '' || echo ' · 3 live-gate · 4 unreachable · 5 missing-database')"
   printf '\n  1. --dry-run                       assert schema → etl → images → build → gate\n'
   printf '  2. --dry-run --skip-etl --skip-images  assert the trim keeps the remaining order\n'
   if [ "$PLAN_ONLY" = "0" ]; then
     printf '  3. --from=check                     the 32-check gate, for real, against the copy\n'
-    printf '  4. --from=schema to nk_p6_absent     assert it stops at schema and never starts the ETL\n'
+    printf '  4. --from=schema to a closed port    assert it refuses before any step, as "unreachable"\n'
+    printf '  5. --from=schema to a missing db     assert it refuses by name and creates nothing\n'
   fi
   exit 0
 fi
 
 # ── Case 1: the plan, in full ──────────────────────────────────────────────
-say "1/4 plan — the full sequence, order only"
+say "1/5 plan — the full sequence, order only"
 run_case plan --dry-run
 assert_exit 0
 present "Dry run — plan only, nothing is executed" "dry run announced"
@@ -199,7 +208,7 @@ order \
 finish_case "plan"
 
 # ── Case 2: flags trim the plan without reordering it ─────────────────────
-say "2/4 plan-trimmed — --skip-etl --skip-images must not move the survivors"
+say "2/5 plan-trimmed — --skip-etl --skip-images must not move the survivors"
 run_case plan-trimmed --dry-run --skip-etl --skip-images
 assert_exit 0
 present "steps  : migrate deploy · build · gate" "banner keeps only the enabled steps"
@@ -215,7 +224,7 @@ if [ "$PLAN_ONLY" = "1" ]; then
   say "Plan-only rehearsal finished (cases 3–4 need the local MariaDB copy)"
 else
   # ── Case 3: the gate, for real, against the copy ────────────────────────
-  say "3/4 live-gate — --from=check against the copy"
+  say "3/5 live-gate — --from=check against the copy"
   run_case live-gate --from=check
   assert_exit 0
   present "▶ run the 32-check cutover gate" "the gate started"
@@ -226,36 +235,65 @@ else
   order "▶ run the 32-check cutover gate" "✔ run the 32-check cutover gate"
   finish_case "live-gate"
 
-  # ── Case 4: a failure stops at its step and takes nothing with it ───────
-  say "4/4 first-failure — an unreachable target must stop at schema, not scrape past it"
-  # Deliberately a closed port, not a missing database name: `prisma migrate deploy`
-  # CREATES a MySQL database that does not exist (measured 2026-11-15 — it printed
-  # "MySQL database nk_p6_absent created"), so a mistyped name rehearses nothing and
-  # would have run the ETL for real. An unreachable server cannot be created.
-  DEAD_PORT="${NK_P6_DEAD_PORT:-3399}"
   AUTH="$(printf '%s' "$TARGET" | sed -E 's#^mysqls?://([^@]*)@.*#\1#')"
+  TARGET_PORT="$(printf '%s' "$TARGET" | sed -E 's#^mysqls?://[^@]*@[^:/]+:([0-9]+)/.*#\1#')"
+
+  # ── Case 4: a target that cannot be reached refuses before any step ─────
+  # This used to reach the schema step; the database-existence preflight now
+  # refuses earlier, which is the stronger guarantee. What matters here is that an
+  # unreachable server is never reported as, or mistaken for, a missing database.
+  say "4/5 unreachable — a closed port must refuse before any step"
+  DEAD_PORT="${NK_P6_DEAD_PORT:-3399}"
   BROKEN_TARGET="mysql://${AUTH}@127.0.0.1:${DEAD_PORT}/nk_p6_absent"
   if netstat -ano 2>/dev/null | grep -q ":${DEAD_PORT} .*LISTENING"; then
     bad "port ${DEAD_PORT} is listening — the failure case needs a closed port (set NK_P6_DEAD_PORT)"
-    FAILED=$((FAILED + 1)); SUMMARY+=("FAIL  first-failure  (port ${DEAD_PORT} is in use)")
+    FAILED=$((FAILED + 1)); SUMMARY+=("FAIL  unreachable  (port ${DEAD_PORT} is in use)")
   elif [ "$AUTH" = "$TARGET" ]; then
     bad "could not take credentials out of $TARGET to build the failure target"
-    FAILED=$((FAILED + 1)); SUMMARY+=("FAIL  first-failure  (no throwaway target)")
+    FAILED=$((FAILED + 1)); SUMMARY+=("FAIL  unreachable  (no throwaway target)")
   else
     # This case needs a different target, so it drives the wrapper directly
     # instead of going through run_case (which pins TARGET_DATABASE_URL).
-    CASE_LOG="$(case_log first-failure)"
+    CASE_LOG="$(case_log unreachable)"
     set +e
     TARGET_DATABASE_URL="$BROKEN_TARGET" bash "$DRIVER" --from=schema --skip-check 2>&1 | tee "$CASE_LOG" >/dev/null
     CASE_STATUS="${PIPESTATUS[0]}"
     set -e
     assert_nonzero_exit
-    present "▶ apply the baseline migration to the target" "it reached the schema step"
-    present "failed" "the driver named the failing step"
-    absent "✔ apply the baseline migration to the target" "it did not claim the schema succeeded"
-    absent "copy every row from the source into the target" "it never started the ETL after the schema failed"
-    finish_case "first-failure"
+    present "refusing to run Phase 6: the target database server cannot be reached" "it refused, and called it unreachable"
+    absent "does not exist" "it did not blame a missing database"
+    absent "▶ apply the baseline migration to the target" "no step ran"
+    absent "copy every row from the source into the target" "it never started the ETL"
+    finish_case "unreachable"
   fi
+
+  # ── Case 5: a database that does not exist is refused, not created ──────
+  # `prisma migrate deploy` CREATES a missing MySQL database (measured 2026-11-15:
+  # "MySQL database nk_p6_absent created"), so before the guard a typo in
+  # TARGET_DATABASE_URL migrated an empty schema and the ETL then filled it with
+  # production rows. Here the server is the reachable copy: only the name is wrong.
+  say "5/5 missing-database — a database that does not exist must be refused, never created"
+  MISSING_NAME="nk_p6_absent_$(date +%s)"
+  MISSING_TARGET="mysql://${AUTH}@127.0.0.1:${TARGET_PORT}/${MISSING_NAME}"
+  CASE_LOG="$(case_log missing-database)"
+  set +e
+  TARGET_DATABASE_URL="$MISSING_TARGET" bash "$DRIVER" --from=schema --skip-check 2>&1 | tee "$CASE_LOG" >/dev/null
+  CASE_STATUS="${PIPESTATUS[0]}"
+  set -e
+  assert_nonzero_exit
+  present "refusing to run Phase 6: the target database" "it refused to run"
+  present "\"$MISSING_NAME\" does not exist" "it named the database it could not find"
+  present "would CREATE it" "it says why a missing database is dangerous here"
+  absent "▶ apply the baseline migration to the target" "prisma migrate deploy never ran"
+  absent "copy every row from the source into the target" "the ETL never ran"
+  # A refusal must leave nothing behind: re-probe and require "still missing".
+  set +e
+  node scripts/target-db-check.mjs --url="$MISSING_TARGET" >/dev/null 2>&1
+  AFTER_STATUS=$?
+  set -e
+  if [ "$AFTER_STATUS" = "3" ]; then ok "the database still does not exist — nothing was created"; else
+    bad "the database exists now (probe exit $AFTER_STATUS) — the refusal created it anyway"; assert_fail=1; fi
+  finish_case "missing-database"
 fi
 
 # ── summary ───────────────────────────────────────────────────────────────
