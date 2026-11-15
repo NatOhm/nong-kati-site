@@ -43,6 +43,12 @@ cd "$(dirname "$0")/.."
 SITE_URL="${SITE_URL:-https://nongkatistore.com}"
 ARTIFACT_BRANCH="${ARTIFACT_BRANCH:-deploy-artifact}"
 REMOTE="${REMOTE:-origin}"
+# .github/workflows/postswitch-gate.yml watches `deploy-artifact` by name (and only
+# starts because this commit carries its file). Ship under another name and the push
+# still deploys, but no CI certification ever runs — silently, which is the worst kind.
+if [ "$ARTIFACT_BRANCH" != "deploy-artifact" ]; then
+  printf '⚠ ARTIFACT_BRANCH=%s — postswitch-gate.yml watches deploy-artifact, so this\n  release will NOT be certified in CI.\n' "$ARTIFACT_BRANCH" >&2
+fi
 STAGE=".deploy-stage"
 BUNDLE="deploy-bundle.tar.gz"
 
@@ -125,10 +131,18 @@ else
   # pushed commit's own tree. This branch is otherwise just the tarball, so the
   # post-switch gate's workflow must travel with it or the gate can never fire
   # (measured 2026-11-15: without this, nothing runs on the push at all). The job
-  # checks the source commit named in the subject out, never this tree.
+  # still checks out the source commit named in the subject; this tree only supplies
+  # the gate scripts when that source commit predates them.
   if [ -f .github/workflows/postswitch-gate.yml ]; then
     git add -f .github/workflows/postswitch-gate.yml
   fi
+  # Same reason, one level down: a release built before the gate existed has no
+  # scripts/ci-postswitch-gate.sh in its tree, so the job could not run the gate
+  # against it at all. Carrying the gate scripts here makes every artifact
+  # certifiable regardless of how old its source commit is.
+  for f in scripts/ci-postswitch-gate.sh scripts/wait-for-build.mjs scripts/postswitch-check.mjs; do
+    [ -f "$f" ] && git add -f "$f"
+  done
   TREE="$(git write-tree)"
   COMMIT="$(git commit-tree "$TREE" -m "deploy bundle $BUILD_ID (git $START_SHA)")"
   unset GIT_INDEX_FILE

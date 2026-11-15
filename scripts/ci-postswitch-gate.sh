@@ -46,7 +46,22 @@ cd "$ROOT"
 
 say()  { printf '\n\033[1;36m▶ %b\033[0m\n' "$*"; }
 warn() { printf '\n\033[1;33m⚠ %b\033[0m\n' "$*"; }
-die()  { printf '\n\033[1;31m✖ %b\033[0m\n' "$*" >&2; exit 2; }
+
+# GitHub shows workflow annotations only for these workflow commands; a plain ✖ line
+# in the log makes the job red but gives nobody a pull-request annotation or a
+# one-line reason. Emit them when running under Actions, stay quiet (and readable)
+# everywhere else.
+annotate() { # level message — multi-line messages are flattened by GitHub anyway
+  if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+    printf '::%s::%s\n' "$1" "$(printf '%s' "$2" | tr '\n' ' ' | sed 's/  */ /g')"
+  fi
+}
+
+die()  {
+  annotate error "$*"
+  printf '\n\033[1;31m✖ %b\033[0m\n' "$*" >&2
+  exit 2
+}
 
 BASE="${POSTSWITCH_BASE_URL:-https://nongkatistore.com}"
 EXPECTED="${EXPECTED_BUILD_ID:-}"
@@ -121,6 +136,7 @@ say "Waiting for $EXPECTED to serve at $BASE"
 if ! node scripts/wait-for-build.mjs --build-id="$EXPECTED" --base="$BASE" --timeout="$TIMEOUT"; then
   # Exit 1, not 2: the artifact was published, the switch never landed. That is a
   # release failure — it just is not a certification failure.
+  annotate error "bad release: $DEPLOY_REF names BUILD_ID $EXPECTED but $BASE never served it"
   printf '\n\033[1;31m✖ the artifact is published but the site never served it — nothing to certify.\033[0m\n' >&2
   printf '  artifact : %s (BUILD_ID %s)\n' "$DEPLOY_REF" "$EXPECTED" >&2
   printf '  site     : %s\n' "$BASE" >&2
@@ -129,6 +145,7 @@ fi
 
 if [ "$CHECK_ONLY" = "1" ]; then
   say "check-only: the release is live. The database half of the gate was not run."
+  annotate notice "check-only: $BASE serves $EXPECTED; the database half of the gate was not run"
   exit 0
 fi
 
@@ -191,6 +208,7 @@ STATUS="${PIPESTATUS[0]}"
 set -e
 
 if [ "$STATUS" != "0" ]; then
+  annotate error "release $EXPECTED is live at $BASE but NOT CERTIFIED (post-switch gate exit $STATUS)"
   printf '\n\033[1;31m✖ release %s is LIVE at %s but NOT CERTIFIED (exit %s).\033[0m\n' "$EXPECTED" "$BASE" "$STATUS"
   printf '  evidence: %s\n' "$LOG"
   printf '  nothing was rolled back — the site keeps serving what it has.\n'

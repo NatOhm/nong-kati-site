@@ -53,6 +53,11 @@ cd "$(dirname "$0")/.."
 SITE_URL="${SITE_URL:-https://nongkatistore.com}"
 ARTIFACT_BRANCH="${ARTIFACT_BRANCH:-deploy-artifact}"
 REMOTE="${REMOTE:-origin}"
+# Same guard as deploy-artifact.sh: CI watches deploy-artifact, so a renamed branch
+# ships the release uncertified, and nothing else would say so.
+if [ "$ARTIFACT_BRANCH" != "deploy-artifact" ]; then
+  echo "⚠ ARTIFACT_BRANCH=$ARTIFACT_BRANCH — postswitch-gate.yml watches deploy-artifact, so this release will NOT be certified in CI." >&2
+fi
 SSH_HOST="${HOSTATOM_SSH_HOST:-thsv93.hostatom.com}"
 SSH_USER="${HOSTATOM_SSH_USER:-nongka}"
 SSH_PORT="${HOSTATOM_SSH_PORT:-22}"

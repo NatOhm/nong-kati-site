@@ -104,6 +104,41 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      # A release built before the gate existed cannot run it: its tree has no
+      # scripts/ci-postswitch-gate.sh, so the job would die on "no such file" and
+      # blame the release for the tooling's age. Such a release borrows the scripts
+      # from the default branch, then from the artifact commit itself (which carries
+      # them since 2026-11-15) — loudly, and only the scripts/ directory, so npm ci
+      # still installs the release's own dependencies.
+      - name: Confirm the release tree can run the gate
+        env:
+          RELEASE_SHA: ${{ steps.artifact.outputs.git-sha }}
+          FALLBACK_REF: ${{ github.event.repository.default_branch }}
+        run: |
+          needed="scripts/ci-postswitch-gate.sh scripts/wait-for-build.mjs scripts/postswitch-check.mjs"
+          missing=""
+          for p in $needed; do [ -f "$p" ] || missing="$missing $p"; done
+          if [ -z "$missing" ]; then
+            echo "release $RELEASE_SHA carries the gate scripts"
+            exit 0
+          fi
+          echo "::warning::release $RELEASE_SHA predates:${missing} — borrowing scripts/ instead"
+          for src in "$FALLBACK_REF" deploy-artifact; do
+            if ! git fetch --depth=1 origin "$src"; then
+              echo "  $src: cannot fetch"; continue; fi
+            if git checkout -q FETCH_HEAD -- scripts 2>/dev/null; then
+              complete=1
+              for p in $needed; do [ -f "$p" ] || complete=0; done
+              if [ "$complete" = "1" ]; then
+                echo "  gate scripts taken from $src ($(git log -1 --format=%h FETCH_HEAD))"
+                exit 0
+              fi
+            fi
+            echo "  $src: scripts/ incomplete"
+          done
+          echo "::error::no ref carries the gate scripts ($needed): not in release $RELEASE_SHA, $FALLBACK_REF or deploy-artifact"
+          exit 1
+
       # postinstall runs `prisma generate`, which the gate's PrismaClient needs.
       - run: npm ci
 
