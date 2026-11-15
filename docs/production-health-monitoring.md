@@ -265,6 +265,62 @@ is proof an unattended fire happened, since Plesk does **not** log
 scheduler-initiated runs in `/smb/task/task-progress` (only Run Now attempts
 appear there).
 
+#### Without `NK_CRON_SECRET` (audited 2026-11-15)
+
+**It is set** — Plesk → Node.js → Environment holds 12 variables including
+`NK_CRON_SECRET` (next to `NK_SLIP2GO_SECRET`, `NK_SLIP2GO_BASE`,
+`NK_DISCORD_WEBHOOK_URL`, the four `INFISICAL_*`, `NEXT_PUBLIC_SITE_URL`,
+`VERCEL_GIT_COMMIT_REF`, `NODE_OPTIONS`), and the live endpoints confirm it: with
+no token and with a wrong token, `internal/orders/expire`,
+`internal/promotions/expire`, `internal/email-outbox/drain` and
+`internal/settings/slip-retention` all answer **`401 UNAUTHENTICATED`**. A
+missing secret answers **`503`** instead, so 401 *is* the proof it is loaded.
+
+If it ever disappears, the behaviour is not "sweeps run unauthenticated" or
+"sweeps 401" — each route short-circuits **before** any auth check, so the whole
+endpoint is closed, admin or not:
+
+| Route | Answer with no `NK_CRON_SECRET` |
+| --- | --- |
+| `POST /api/v1/internal/orders/expire` | `503 {"error":"SWEEP_DISABLED"}` |
+| `POST /api/v1/internal/promotions/expire` | `503 {"error":"SWEEP_DISABLED"}` |
+| `POST /api/v1/internal/media/sweep` | `503 {"error":"SWEEP_DISABLED"}` |
+| `POST /api/v1/internal/email-outbox/drain` | `503 {"error":"OUTBOX_DISABLED"}` |
+| `POST /api/v1/internal/settings/slip-retention` | `503 {"error":"RETENTION_DISABLED"}` |
+
+Note the consequence that is easy to miss: the admin-JWT fallback those routes
+also accept is **unreachable**, because the `if (!secret)` return happens first. A
+signed-in admin cannot trigger a sweep by hand either.
+
+And `server.js` writes no header file — it logs
+`[cron-token] NK_CRON_SECRET absent — no curl config written` and returns, so
+Plesk task 254's `-K tmp/cron-curl.conf` fails on a missing file rather than on
+a bad token. Two places would go quiet at once: the schedule and the manual
+route.
+
+What stops happening, in customer terms: `pending_payment` orders stop flipping
+to expired (and stop notifying), expired promotions stay redeemable, queued mail
+loses its recovery path, orphan image files accumulate, and **slip evidence is
+never pruned** — the 30-day retention the PDPA note depends on stops being
+enforced while the files keep accruing.
+
+`tmp/sweep-last.json` ages out as the tell-tale: if its `cutoff` stops advancing
+while orders keep being created, check the variable before the task.
+
+#### `NK_INTERNAL_TOKEN` (audited 2026-11-15)
+
+Not set in Plesk (neither the Environment list nor the Secrets store), and not in
+Infisical. Only two endpoints read it — `internal/build-info` and
+`internal/ops-health` — and both fall back to an admin JWT, so the effect is
+narrow: **machine access to those two is disabled; a signed-in admin still reads
+them**. Anonymous callers get `401 UNAUTHENTICATED` (measured on
+`/api/v1/internal/ops-health` on 2026-11-15).
+
+Nothing in this repo calls either endpoint with that token (no workflow, no
+script), so its absence breaks no automation today. Set it only when something
+machine-side actually needs to read build info or ops health without an admin
+session — and then put it in Plesk **Secrets**, not the plain Environment list.
+
 ---
 
 ### Optional third-party uptime service

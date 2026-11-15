@@ -661,8 +661,8 @@ or copied.
 | `NK_RESEND_API_KEY` | `src/lib/email/config.ts` | `re_…`; absent ⇒ outbox rows stay failed, no customer email | **I** ✓ prod + dev |
 | `NK_RESEND_FROM_EMAIL` | `src/lib/email/config.ts` | a verified sender on the Resend domain | **I** ✓ prod + dev |
 | `NK_RESEND_API_URL` | `src/lib/email/config.ts` | override only; leave unset | **A** (correct — unset in prod) |
-| `NK_CRON_SECRET` | internal sweeps (order expiry, outbox drain) | random hex header value; absent ⇒ those routes 401 (fail-closed), orders never auto-expire | **A** |
-| `NK_INTERNAL_TOKEN` | `/api/v1/internal/*` | random hex; absent ⇒ internal routes refuse non-admin callers | **A** |
+| `NK_CRON_SECRET` | internal sweeps (order expiry, outbox drain) | random hex header value; **absent ⇒ each sweep route answers 503 `*_DISABLED` before auth even runs**, so nothing sweeps — not even an admin by hand. Verified present 2026-11-15 | **P** ✓ present in the panel |
+| `NK_INTERNAL_TOKEN` | `internal/build-info`, `internal/ops-health` | random hex; absent ⇒ those two accept only an admin JWT, so machine callers get 401. Nothing in the repo uses it today | **A** (absent in Plesk *and* Infisical) |
 | `NK_PAYMENT_MOCK` | `src/lib/payment/omise.ts` | mock only when `NODE_ENV !== production`; **must not be `true` in prod** | **I** (leave false) |
 | `NK_OMISE_SECRET_KEY` | card gateway path | unused on the manual-transfer checkout | **A** (optional) |
 | `NK_OMISE_WEBHOOK_SECRET` | card webhook | unused today | **A** (optional) |
@@ -707,11 +707,15 @@ plus the optional integrations under them. The Development environment holds onl
 
 What that changes before the cutover:
 
-- **`NK_CRON_SECRET` and `NK_INTERNAL_TOKEN` are not in Infisical.** They must come from the
-  Plesk panel or the sweeps answer 401: unpaid orders never expire and the outbox never drains.
-  `server.js` mirrors `NK_CRON_SECRET` into `tmp/cron-curl.conf` for the scheduler, but only from
-  an env it actually received — mirroring a variable nobody supplies writes nothing. Confirm both
-  in the panel; do not assume Infisical fills them.
+- **`NK_CRON_SECRET` is in the Plesk panel, not Infisical** — checked 2026-11-15 in
+  Node.js → Environment (12 variables) and confirmed from outside: the sweep routes answer
+  `401 UNAUTHENTICATED` with no token, while a missing secret would answer `503 *_DISABLED`.
+  So the panel is the owner of this one; keep it there and let `server.js` keep mirroring it to
+  `tmp/cron-curl.conf` for task 254. If it ever goes missing the sweeps close entirely (see
+  `docs/production-health-monitoring.md` §3b for the per-route behaviour).
+- **`NK_INTERNAL_TOKEN` exists nowhere** (not in the panel, not in Infisical). Only
+  `internal/build-info` and `internal/ops-health` read it, and both fall back to an admin JWT, so
+  nothing breaks today — set it only if a machine needs to read them without an admin session.
 - **The Upstash pair is absent**, so rate limiting stays in-process (per Passenger worker, not
   shared). That is the current behaviour, not a regression — but it is not a global limiter.
 - **`NK_TICKET_SECRET` is absent** and falls back to `NK_ORDER_SECRET` → `NEXTAUTH_SECRET` → a
