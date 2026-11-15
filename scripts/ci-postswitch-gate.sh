@@ -92,9 +92,10 @@ if [ -z "$EXPECTED" ]; then
   [ -n "$EXPECTED" ] || EXPECTED="$(git log -1 --format=%s 2>/dev/null \
     | sed -nE 's/^deploy bundle ([^ ]+) \(git [0-9a-f]+\)$/\1/p' || true)"
 fi
-[ -n "$EXPECTED" ] || die "cannot tell which BUILD_ID to certify.
-  Push an artifact (scripts/deploy-artifact.sh) so HEAD is its 'deploy bundle …' commit,
-  or pass --build-id=<id> / set EXPECTED_BUILD_ID."
+[ -n "$EXPECTED" ] || die "cannot determine which BUILD_ID to certify:
+  $DEPLOY_REF has no 'deploy bundle <BUILD_ID> (git <sha>)' commit, and no --build-id was given.
+  Check that the artifact push reached the remote the runner fetches ($DEPLOY_REF), or pass
+  --build-id=<id> / set EXPECTED_BUILD_ID to certify a build explicitly."
 
 DEPLOYED_AT="$(git log -1 --format=%ct "$DEPLOY_REF" 2>/dev/null || git log -1 --format=%ct 2>/dev/null || echo 0)"
 [ "$DEPLOYED_AT" -gt 0 ] 2>/dev/null || DEPLOYED_AT=0
@@ -120,7 +121,9 @@ say "Waiting for $EXPECTED to serve at $BASE"
 if ! node scripts/wait-for-build.mjs --build-id="$EXPECTED" --base="$BASE" --timeout="$TIMEOUT"; then
   # Exit 1, not 2: the artifact was published, the switch never landed. That is a
   # release failure — it just is not a certification failure.
-  printf '\n\033[1;31m✖ the artifact is published but %s never served it — nothing to certify.\033[0m\n' "$EXPECTED" >&2
+  printf '\n\033[1;31m✖ the artifact is published but the site never served it — nothing to certify.\033[0m\n' >&2
+  printf '  artifact : %s (BUILD_ID %s)\n' "$DEPLOY_REF" "$EXPECTED" >&2
+  printf '  site     : %s\n' "$BASE" >&2
   exit 1
 fi
 
