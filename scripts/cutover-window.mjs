@@ -125,6 +125,18 @@ const envForTarget = {
   DATABASE_DIRECT_URL: TARGET,
 };
 
+// Windows has no bare `npx`/`npm` executable (they are .cmd shims) and spawnSync does not go
+// through a shell, so the CLIs are invoked as JS entry points instead — same tools, no shell.
+const PRISMA_CLI = path.join(ROOT, 'node_modules', 'prisma', 'build', 'index.js');
+const NEXT_CLI = path.join(ROOT, 'node_modules', 'next', 'dist', 'bin', 'next');
+const STAMP_SCRIPT = path.join(ROOT, 'scripts', 'stamp-git-sha.mjs');
+for (const [label, file] of [['prisma', PRISMA_CLI], ['next', NEXT_CLI]]) {
+  if (!fs.existsSync(file)) {
+    console.error(`✖ ${label} CLI not found at ${file} — run npm ci first`);
+    process.exit(2);
+  }
+}
+
 console.log('Cutover pre-switch sequence — docs/PLESK-CUTOVER.md §3');
 console.log(`target: ${TARGET.replace(/\/\/[^@]*@/, '//***@')}`);
 console.log(`steps:  ${STEPS.filter(stepEnabled).join(' → ') || '(none)'}`);
@@ -145,8 +157,8 @@ if (stepEnabled('backup')) {
 
 // ── 2. schema on the target ────────────────────────────────────────────────
 if (stepEnabled('schema')) {
-  run('apply the baseline migration to the target', 'npx', ['prisma', 'migrate', 'deploy'], envForTarget);
-  run('confirm the target is up to date', 'npx', ['prisma', 'migrate', 'status'], envForTarget);
+  run('apply the baseline migration to the target', process.execPath, [PRISMA_CLI, 'migrate', 'deploy'], envForTarget);
+  run('confirm the target is up to date', process.execPath, [PRISMA_CLI, 'migrate', 'status'], envForTarget);
 }
 
 // ── 3–4. ETL, then reconcile ───────────────────────────────────────────────
@@ -175,7 +187,11 @@ if (stepEnabled('build')) {
     console.error('✖ NEXT_PUBLIC_SITE_URL is not set (needed at build time; fulfilment fails closed without it)');
     process.exit(2);
   }
-  run('build against the target database', 'npm', ['run', 'build'], { ...envForTarget, NEXT_PUBLIC_SITE_URL: siteUrl });
+  // `npm run build` is `next build && node scripts/stamp-git-sha.mjs`; run the two directly so
+  // this works on Windows without a shell.
+  const buildEnv = { ...envForTarget, NEXT_PUBLIC_SITE_URL: siteUrl };
+  run('build against the target database', process.execPath, [NEXT_CLI, 'build'], buildEnv);
+  run('stamp the build with the commit it came from', process.execPath, [STAMP_SCRIPT], buildEnv);
 }
 
 // ── 7. the gate ────────────────────────────────────────────────────────────
