@@ -398,3 +398,37 @@ bash scripts/deploy-manual.sh                 # publish → wait → certify
 7. **Step 5b: the post-switch gate runs automatically** — 22 checks against the live site and the
    target database; failure is exit 3 and the ❌ banner, never a silent pass.
 8. Step 6: delete `extract-check.txt`.
+
+---
+
+## Certification in CI — the release also has to go green on GitHub
+
+Step 5b certifies from the machine running the deploy. `.github/workflows/postswitch-gate.yml`
+certifies the same release a second time, from GitHub, so a deploy that is live-but-broken leaves a
+red run on the repo instead of only a terminal somebody closed.
+
+**Trigger:** a push to `deploy-artifact` — the orphan branch `deploy-artifact.sh` force-pushes the
+bundle to. Its commit subject is `deploy bundle <BUILD_ID> (git <sha>)`, which is the only record CI
+has of *what* was shipped. `scripts/ci-postswitch-gate.sh` reads that subject, waits for the live
+site to serve that exact `BUILD_ID` (`scripts/wait-for-build.mjs`), and only then runs
+`scripts/postswitch-check.mjs` — so the window where Plesk has pulled but not restarted is never
+certified by mistake. A `--max-uptime` derived from the artifact commit's age makes a stale process
+fail the run.
+
+**What it needs, once:**
+
+| Name | Kind | Value |
+| --- | --- | --- |
+| `POSTSWITCH_TARGET_DATABASE_URL` | secret | `mysql://<user>:<pass>@localhost:3306/nongka_nongkati_nongkatistore` — the URL *as the server* sees it |
+| `PLESK_SSH_KEY` | secret | private key whose public half is in the account's `~/.ssh/authorized_keys` |
+| `PLESK_SSH_HOST` | secret | `thsv93.hostatom.com` |
+| `PLESK_SSH_USER` | variable (optional) | defaults to `nongka` |
+
+The tunnel is not optional: Phase 5 creates the database user with **local connections only**, so a
+runner cannot reach MariaDB directly. CI opens `ssh -N -L 3306:127.0.0.1:3306` and rewrites only the
+host of the URL.
+
+**Until those secrets exist the job fails**, naming the missing one — it does not skip itself. That
+is deliberate: a release nobody certified must not look green. To check the live build alone without
+a database, dispatch the workflow with `check-only: true`; by hand it is
+`bash scripts/ci-postswitch-gate.sh --check-only --build-id=<BUILD_ID>`.

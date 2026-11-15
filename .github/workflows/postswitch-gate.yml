@@ -1,0 +1,121 @@
+# ─── Nong-Kati — Post-switch gate (CI) ──────────────────────────────────────
+# Certifies the release that is ACTUALLY LIVE, from GitHub, so a deploy that
+# lands badly goes red here and not only in somebody's terminal.
+#
+# WHY THIS TRIGGER: deploys are not run by Actions. `scripts/deploy-artifact.sh`
+# publishes the bundle as a forced push to the `deploy-artifact` branch (an orphan
+# commit whose subject is `deploy bundle <BUILD_ID> (git <sha>)`), and Plesk pulls
+# that branch. A push there is therefore the only CI-visible "release was sent"
+# event; the switch itself is still a panel action, which is why the first step
+# waits for the live site to serve that BUILD_ID before it certifies anything.
+#
+# WHAT IT COSTS TO BE HONEST: the production database is created with local
+# connections only (Plesk "Allow remote access" unchecked), so a runner cannot
+# reach it directly. The gate therefore needs an SSH tunnel, which is exactly how
+# the runbook reaches it by hand:
+#
+#   secrets.POSTSWITCH_TARGET_DATABASE_URL   mysql://<user>:<pass>@localhost:3306/<db>
+#                                            (the URL as the SERVER sees it)
+#   secrets.PLESK_SSH_KEY                    private key whose public half is in
+#                                            the account's ~/.ssh/authorized_keys
+#   secrets.PLESK_SSH_HOST                   e.g. thsv93.hostatom.com
+#   vars/secrets PLESK_SSH_USER              defaults to `nongka`
+#
+# Until those exist the job FAILS with the exact missing name instead of skipping
+# itself — a release nobody certified must not look green.
+#
+# FOR A FAST CHECK with no database, run the workflow manually with check-only:
+# it proves the site is serving the shipped build and stops there.
+
+name: Post-switch gate
+
+on:
+  push:
+    branches: [deploy-artifact]
+  workflow_dispatch:
+    inputs:
+      base-url:
+        description: Site to certify
+        required: false
+        default: https://nongkatistore.com
+      build-id:
+        description: BUILD_ID to expect (blank = read it from the deploy commit)
+        required: false
+        default: ''
+      check-only:
+        description: Only prove the live build is the shipped one (no database)
+        required: false
+        type: boolean
+        default: false
+
+# One certification at a time; a second release must not race the first.
+concurrency:
+  group: postswitch-gate
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  certify:
+    name: Certify the live release
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      # `deploy-artifact` is an ORPHAN holding one bundle tarball — checking it out
+      # would leave no scripts to run. So check out the default branch and let
+      # scripts/ci-postswitch-gate.sh read the artifact commit from
+      # origin/deploy-artifact (fetch-depth 0 gives it the ref and the commit date).
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4 (pinned)
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4 (pinned)
+        with:
+          node-version: 24
+          cache: npm
+      # postinstall runs `prisma generate`, which the gate's PrismaClient needs.
+      - run: npm ci
+
+      - name: Write the tunnel key
+        env:
+          PLESK_SSH_KEY_VALUE: ${{ secrets.PLESK_SSH_KEY }}
+        run: |
+          if [ -n "${PLESK_SSH_KEY_VALUE:-}" ]; then
+            install -d -m 700 "$HOME/.ssh"
+            printf '%s\n' "$PLESK_SSH_KEY_VALUE" > "$HOME/.ssh/plesk_ci"
+            chmod 600 "$HOME/.ssh/plesk_ci"
+            echo "PLESK_SSH_KEY=$HOME/.ssh/plesk_ci" >> "$GITHUB_ENV"
+          else
+            echo "PLESK_SSH_KEY is not set — the gate will fail with instructions." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Run the post-switch gate
+        env:
+          POSTSWITCH_TARGET_DATABASE_URL: ${{ secrets.POSTSWITCH_TARGET_DATABASE_URL }}
+          POSTSWITCH_BASE_URL: ${{ inputs.base-url || 'https://nongkatistore.com' }}
+          PLESK_SSH_HOST: ${{ secrets.PLESK_SSH_HOST }}
+          PLESK_SSH_USER: ${{ vars.PLESK_SSH_USER }}
+          EXPECTED_BUILD_ID: ${{ inputs.build-id }}
+        run: |
+          if [ "${{ inputs.check-only }}" = "true" ]; then
+            bash scripts/ci-postswitch-gate.sh --check-only --base="$POSTSWITCH_BASE_URL"
+          else
+            bash scripts/ci-postswitch-gate.sh --base="$POSTSWITCH_BASE_URL"
+          fi
+
+      - name: Say what to do when it goes red
+        if: failure()
+        run: |
+          {
+            echo "### The live release was not certified"
+            echo
+            echo "The gate ran against \`$POSTSWITCH_BASE_URL\` and failed. The site keeps serving"
+            echo "whatever it has — nothing is rolled back automatically. Evidence is in the job log"
+            echo "(the script also writes \`reports/postswitch-gate-*.log\`)."
+            echo
+            echo "Typical reasons: the new BUILD_ID never served (Plesk pull or Restart App failed),"
+            echo "a missing \`POSTSWITCH_TARGET_DATABASE_URL\` / \`PLESK_SSH_KEY\`, or a real defect."
+            echo
+            echo "Same check by hand: \`bash scripts/ci-postswitch-gate.sh\`."
+          } >> "$GITHUB_STEP_SUMMARY"
