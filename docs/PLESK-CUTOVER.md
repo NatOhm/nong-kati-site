@@ -29,11 +29,25 @@ project are untouched, and this branch is not pushed.
 
 ---
 
-## 1. Provision the database (Plesk)
+## 1. Phase 5 — create the database and user (Plesk)
 
-**Where:** Hostatom clientarea → Web Hosting → Web Hosting Go PL `nongkatistore.com` (product
-74879) → การดำเนินการ → **Login to Plesk Control Panel** → Websites & Domains →
-`nongkatistore.com` → **Databases** → **Add Database**.
+This is Phase 5 of the migration and the only step that needs the panel's database screens. It
+creates an **empty** database and a dedicated user; it does not touch the running app.
+
+**Exact path** (three screens; the direct URL is a dead end, see the warning below):
+
+1. `https://support.hostatom.com/clientarea.php` → **Services → My Services** → Web Hosting →
+   **Web Hosting Go PL `nongkatistore.com`** (product id `74879`) → **การดำเนินการ** →
+   **Login to Plesk Control Panel** (this is a single-sign-on hop; it lands on
+   `https://thsv93.hostatom.com:8443/…` and needs no password).
+2. In the same product page, the **MySQL® Databases** button opens the panel's Databases screen
+   directly. If you are already inside Plesk: **Websites & Domains** → `nongkatistore.com` →
+   **Databases** → **Add Database**.
+3. The form opens with the subscription prefix already fixed on the left of the name field.
+
+> **Do not open `https://nongkatistore.com:8443` directly** — that certificate is rejected by the
+> browser. Sessions expire in minutes; re-SSO through the clientarea rather than reloading a stale
+> panel tab.
 
 The panel offers MariaDB `localhost:3306` only (v10.11.18) — there is no Postgres on this server,
 which is the whole reason for this migration.
@@ -42,10 +56,25 @@ which is the whole reason for this migration.
 
 | Field | Value |
 | --- | --- |
-| Database name | `nong_kati` |
+| Database name | type `nongkati_nongkatistore` into the name field, whose `nongka_` prefix is **fixed and greyed out** — the database that results is `nongka_nongkati_nongkatistore` |
 | Server | `localhost:3306 (default for MariaDB)` |
-| User name | `nk_app` (dedicated — never reuse the subscription's own login) |
+| User name | `nongkati_nongkatistore` → becomes `nongka_nongkati_nongkatistore` (dedicated — never reuse the subscription's own login) |
 | Password | see the rule below |
+| **Access control** | **"Allow remote access" left UNCHECKED** — this is the *local connections only* setting, and it is what you want |
+
+**The access setting, and why it matters.** Unchecked “Allow remote access” makes Plesk create the
+user as `'nongka_nongkati_nongkatistore'@'localhost'`, which is exactly the host the app connects
+from (`DATABASE_URL` uses `localhost:3306`). Ticking it creates the user as `@'%'` — a MySQL
+account reachable from any IP — which nothing here needs: the storefront, the ETL and the backup
+script all run on this same server, and remote access arrives through the SSH tunnel, which
+terminates on `localhost` anyway. If you ever do need `@'%'`, add it deliberately with a narrow
+`GRANT` and a note here; do not tick the box “just in case”.
+
+**Check before you type the password:** the name field must still show the grey `nongka_` prefix.
+Typing `nongka_` yourself produces `nongka_nongka_nongkati_nongkatistore` — a name that looks
+plausible in a URL and fails every later step. The Add Database form prefills both fields with
+`nongkati_nongkatistore`; confirm the pair on the Databases list afterwards, where the name and
+the user are shown **with** the prefix and the Access column reads `localhost`.
 
 **Password rule:** generate an **alphanumeric-only** password (16–24 chars, no `:/?#[]@%&`).
 Every consumer places it in a URL — `DATABASE_URL`, `scripts/backup-mariadb.sh`, the ETL — and a
@@ -57,10 +86,10 @@ default, but check it in phpMyAdmin:
 
 ```sql
 SELECT DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME
-FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = 'nong_kati';
+FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = 'nongka_nongkati_nongkatistore';
 -- expect utf8mb4 / utf8mb4_general_ci or utf8mb4_unicode_ci
 -- if it is not utf8mb4:
-ALTER DATABASE `nong_kati` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER DATABASE `nongka_nongkati_nongkatistore` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
 **Least-privilege grants.** Plesk's default for a database user is "all rights, on this database
@@ -71,7 +100,7 @@ DDL rights, so the minimum that still works is:
 GRANT SELECT, INSERT, UPDATE, DELETE,
       CREATE, ALTER, DROP, INDEX, REFERENCES,
       CREATE TEMPORARY TABLES, LOCK TABLES
-  ON `nong_kati`.* TO 'nk_app'@'localhost';
+  ON `nongka_nongkati_nongkatistore`.* TO 'nongka_nongkati_nongkatistore'@'localhost';
 FLUSH PRIVILEGES;
 ```
 
@@ -81,16 +110,17 @@ Notes that matter in practice:
 - `CREATE`/`ALTER`/`DROP`/`INDEX` are only needed by migrations. After the cutover has soaked you
   can revoke them and re-grant for the next release; leaving them granted is what every Prisma
   deploy needs, so most shops leave them.
-- Plesk may have created the user as `'nk_app'@'localhost'` already; the `GRANT` above then only
-  narrows it. If you instead connect over TCP as `127.0.0.1` and get `P1001`, add
-  `'nk_app'@'127.0.0.1'` with the same grant — MariaDB treats the two as different hosts.
+- Plesk created the user as `'nongka_nongkati_nongkatistore'@'localhost'` when you left “Allow
+  remote access” unchecked; the `GRANT` above then only narrows it. If you instead connect over
+  TCP as `127.0.0.1` and get `P1001`, add `'nongka_nongkati_nongkatistore'@'127.0.0.1'` with the
+  same grant — MariaDB treats the two as different hosts, and that is a real trap for the tunnel.
 
 **Connection strings the app expects** (both are required; the schema reads `directUrl` for
 migrations):
 
 ```dotenv
-DATABASE_URL="mysql://nk_app:DBPASS@localhost:3306/nong_kati"
-DATABASE_DIRECT_URL="mysql://nk_app:DBPASS@localhost:3306/nong_kati"
+DATABASE_URL="mysql://nongka_nongkati_nongkatistore:DBPASS@localhost:3306/nongka_nongkati_nongkatistore"
+DATABASE_DIRECT_URL="mysql://nongka_nongkati_nongkatistore:DBPASS@localhost:3306/nongka_nongkati_nongkatistore"
 ```
 
 - `mysql://`, not `postgresql://` — a leftover `postgresql://` makes every query fail.
@@ -137,7 +167,7 @@ is why column "today" says Infisical.
 
 | Variable | Read by | Today | At cutover | Supplied by |
 | --- | --- | --- | --- | --- |
-| `DATABASE_URL` | Prisma runtime (every query) | Supabase pooler URL (Infisical prod) | `mysql://nk_app:DBPASS@localhost:3306/nong_kati` | **you** (password is yours) |
+| `DATABASE_URL` | Prisma runtime (every query) | Supabase pooler URL (Infisical prod) | `mysql://nongka_nongkati_nongkatistore:DBPASS@localhost:3306/nongka_nongkati_nongkatistore` | **you** (password is yours) |
 | `DATABASE_DIRECT_URL` | `prisma migrate deploy`, `directUrl` | Supabase direct `:5432` (Infisical) | the identical MariaDB URL | **you** |
 | `NK_GIFT_CODE_ENCRYPTION_KEY` | `src/lib/crypto/giftCode.ts` → `keyForVersion(1)`, and `keyForVersion(2)` when `_V2` is absent | 64-hex, Infisical prod (the v2 material) | **copy it byte-for-byte** — do not regenerate | **you** (agent does not hold it) |
 | `NK_GIFT_CODE_ENCRYPTION_KEY_V2` | `keyForVersion(2)` | Infisical (same material as above, kept as a hatch) | copy or omit — either is correct | **you** |
@@ -200,7 +230,7 @@ that order and stops at the first non-zero exit, so a half-run window cannot loo
 one. Prefer it in the window and keep the individual steps for reading and for a resume:
 
 ```bash
-TARGET_DATABASE_URL="mysql://nk_app:DBPASS@127.0.0.1:3307/nong_kati" \
+TARGET_DATABASE_URL="mysql://nongka_nongkati_nongkatistore:DBPASS@127.0.0.1:3307/nongka_nongkati_nongkatistore" \
 NEXT_PUBLIC_SITE_URL="https://nongkatistore.com" \
   bash scripts/phase6-cutover.sh --yes          # migrate deploy → ETL → images → build → gate
 ```
@@ -237,14 +267,14 @@ Three things this checkout gets wrong by default, all caught before the window o
   browser stops on it. Go through the clientarea SSO instead (clientarea → product 74879 →
   **MySQL® Databases**), which lands on `https://thsv93.hostatom.com:8443/smb/…` and works.
 - **Plesk prefixes every database and user with the subscription prefix.** The panel's Add Database
-  form shows `nongka_` as a fixed prefix, so the database created here is
-  `nongka_nongkati_nongkatistore` (the runbook's `nong_kati` predates that discovery). Check the
-  name on `/smb/database/list` before pasting it into any URL.
+  form shows `nongka_` as a fixed, greyed-out prefix, so typing `nongkati_nongkatistore` creates
+  `nongka_nongkati_nongkatistore`. §1 walks the form field by field. Check the name and the user on
+  `/smb/database/list` before pasting either into a URL.
 
 In a second terminal, prove the tunnel reaches MariaDB (you will be prompted for the DB password):
 
 ```bash
-mysql -h 127.0.0.1 -P 3307 -u nk_app -p -e "SELECT 1" nong_kati
+mysql -h 127.0.0.1 -P 3307 -u nongka_nongkati_nongkatistore -p -e "SELECT 1" nongka_nongkati_nongkatistore
 ```
 
 `mysql` need not exist locally — the path is exercised for real two steps later.
@@ -264,17 +294,17 @@ proceed on a mismatch.
 ### Step 2 — schema on the target (T−30)
 
 ```bash
-DATABASE_URL="mysql://nk_app:DBPASS@127.0.0.1:3307/nong_kati" \
-DATABASE_DIRECT_URL="mysql://nk_app:DBPASS@127.0.0.1:3307/nong_kati" \
+DATABASE_URL="mysql://nongka_nongkati_nongkatistore:DBPASS@127.0.0.1:3307/nongka_nongkati_nongkatistore" \
+DATABASE_DIRECT_URL="mysql://nongka_nongkati_nongkatistore:DBPASS@127.0.0.1:3307/nongka_nongkati_nongkatistore" \
   npx prisma migrate deploy
 
-DATABASE_URL="mysql://nk_app:DBPASS@127.0.0.1:3307/nong_kati" npx prisma migrate status
+DATABASE_URL="mysql://nongka_nongkati_nongkatistore:DBPASS@127.0.0.1:3307/nongka_nongkati_nongkatistore" npx prisma migrate status
 ```
 
 **Checkpoint:** `migrate deploy` applies exactly one migration
 (`prisma/migrations/20261115000000_baseline`),
 `migrate status` says up to date, and
-`SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='nong_kati'` returns **39**.
+`SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='nongka_nongkati_nongkatistore'` returns **39**.
 
 ### Step 3 — freeze writes, then ETL (T−20)
 
@@ -286,10 +316,10 @@ writes the target you name:
 
 ```bash
 # .env.local DATABASE_URL must be the Supabase DIRECT (:5432) string at this point
-TARGET_DATABASE_URL="mysql://nk_app:DBPASS@127.0.0.1:3307/nong_kati" \
+TARGET_DATABASE_URL="mysql://nongka_nongkati_nongkatistore:DBPASS@127.0.0.1:3307/nongka_nongkati_nongkatistore" \
   node scripts/migrate-supabase-to-mariadb.mjs
 
-TARGET_DATABASE_URL="mysql://nk_app:DBPASS@127.0.0.1:3307/nong_kati" \
+TARGET_DATABASE_URL="mysql://nongka_nongkati_nongkatistore:DBPASS@127.0.0.1:3307/nongka_nongkati_nongkatistore" \
   node scripts/migrate-supabase-to-mariadb.mjs --verify-only
 ```
 
@@ -305,7 +335,7 @@ the clear can fail against rows written mid-run.
 ### Step 4 — build the artifact against the target (T−10)
 
 ```bash
-DATABASE_URL="mysql://nk_app:DBPASS@127.0.0.1:3307/nong_kati" \
+DATABASE_URL="mysql://nongka_nongkati_nongkatistore:DBPASS@127.0.0.1:3307/nongka_nongkati_nongkatistore" \
 NEXT_PUBLIC_SITE_URL="https://nongkatistore.com" \
   npm run build
 ```
@@ -316,7 +346,7 @@ building it against the target is what makes "prerendered" output honest.
 ### Step 5 — the gate (T−5)
 
 ```bash
-TARGET_DATABASE_URL="mysql://nk_app:DBPASS@127.0.0.1:3307/nong_kati" \
+TARGET_DATABASE_URL="mysql://nongka_nongkati_nongkatistore:DBPASS@127.0.0.1:3307/nongka_nongkati_nongkatistore" \
   node scripts/precutover-check.mjs
 ```
 
@@ -334,8 +364,8 @@ variant's counter back to its exact pre-run value, so the shop's numbers are unc
 
 1. Plesk → Node.js → **Custom environment variables** → add, with the **server-side** host:
    ```
-   DATABASE_URL=mysql://nk_app:DBPASS@localhost:3306/nong_kati
-   DATABASE_DIRECT_URL=mysql://nk_app:DBPASS@localhost:3306/nong_kati
+   DATABASE_URL=mysql://nongka_nongkati_nongkatistore:DBPASS@localhost:3306/nongka_nongkati_nongkatistore
+   DATABASE_DIRECT_URL=mysql://nongka_nongkati_nongkatistore:DBPASS@localhost:3306/nongka_nongkati_nongkatistore
    ```
 2. **Restart App** (Node.js panel).
 3. Start accepting traffic again.
@@ -360,7 +390,7 @@ This is the check that exists for the moment right after **Restart App**. It is 
 live URL and certifies that the process now serving traffic is reading the migrated database:
 
 ```bash
-TARGET_DATABASE_URL="mysql://nk_app:DBPASS@127.0.0.1:3307/nong_kati" \
+TARGET_DATABASE_URL="mysql://nongka_nongkati_nongkatistore:DBPASS@127.0.0.1:3307/nongka_nongkati_nongkatistore" \
   node scripts/postswitch-check.mjs --base=https://nongkatistore.com --max-uptime=600
 ```
 
@@ -406,9 +436,9 @@ largest 2.68 MB. Uploads now write files, and the extraction script moves the ex
 
 ```bash
 # 1. extract from the server's database through the tunnel, into a local folder
-DATABASE_URL="mysql://nk_app:DBPASS@127.0.0.1:3307/nong_kati" \
+DATABASE_URL="mysql://nongka_nongkati_nongkatistore:DBPASS@127.0.0.1:3307/nongka_nongkati_nongkatistore" \
   node scripts/extract-images-to-files.mjs --out-dir=./tmp/media          # dry run
-DATABASE_URL="mysql://nk_app:DBPASS@127.0.0.1:3307/nong_kati" \
+DATABASE_URL="mysql://nongka_nongkati_nongkatistore:DBPASS@127.0.0.1:3307/nongka_nongkati_nongkatistore" \
   node scripts/extract-images-to-files.mjs --out-dir=./tmp/media --apply
 
 # 2. upload the files to the server (the docroot, where the app will look)
@@ -423,9 +453,9 @@ WHERE key LIKE 'image:%'` is **0**.
 amounts, PDPA), so they go to their own private directory, never the public image namespace:
 
 ```bash
-DATABASE_URL="mysql://nk_app:DBPASS@127.0.0.1:3307/nong_kati" \
+DATABASE_URL="mysql://nongka_nongkati_nongkatistore:DBPASS@127.0.0.1:3307/nongka_nongkati_nongkatistore" \
   node scripts/extract-slips-to-files.mjs           # dry run
-DATABASE_URL="mysql://nk_app:DBPASS@127.0.0.1:3307/nong_kati" \
+DATABASE_URL="mysql://nongka_nongkati_nongkatistore:DBPASS@127.0.0.1:3307/nongka_nongkati_nongkatistore" \
   node scripts/extract-slips-to-files.mjs --apply
 scp -r ./storage/media/private/slips/* nongka@thsv93.hostatom.com:httpdocs/storage/media/private/slips/
 ```
@@ -482,7 +512,7 @@ Two cases, because the state left behind differs.
 
 **Rollback A — any checkpoint before Step 6 fails (production never moved)**
 
-1. Delete the partially-filled `nong_kati` database (Plesk → Databases → the DB → Delete), or
+1. Delete the partially-filled `nongka_nongkati_nongkatistore` database (Plesk → Databases → the DB → Delete), or
    leave it and re-run from Step 2; the ETL empties every table it writes before copying, so a
    retry is safe (with the app stopped — see Step 3).
 2. Restart the app in Plesk (it was stopped in Step 3).
@@ -572,19 +602,24 @@ Then, and only then:
 Provisioning only: it creates an *empty* database, touches no running app, and leaves Supabase
 serving. Values and rationale are in §1–2.
 
-1. **Create it.** Plesk → Websites & Domains → `nongkatistore.com` → Databases → Add Database:
-   name `nong_kati`, server `localhost:3306`, user `nk_app`, password **alphanumeric 16–24
-   chars**. Store that password in your password manager — it is not recoverable from the panel
-   page afterwards, and it is needed in four places later.
+1. **Create it** (§1 has the same steps with the form's own wording). Clientarea
+   `support.hostatom.com/clientarea.php` → product **74879** → **การดำเนินการ** →
+   **Login to Plesk Control Panel** → **MySQL® Databases** → **Add Database**. In the form: name
+   `nongkati_nongkatistore` next to the fixed `nongka_` prefix (→
+   `nongka_nongkati_nongkatistore`), user `nongkati_nongkatistore` (→ same), server
+   `localhost:3306`, password **alphanumeric 16–24 chars**, and **“Allow remote access”
+   unchecked** — local connections only, so the account is created `@'localhost'`. Store that
+   password in your password manager — it is not recoverable from the panel page afterwards, and
+   it is needed in four places later.
 2. **Confirm the charset.** phpMyAdmin → SQL:
    `SELECT DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME FROM information_schema.SCHEMATA
-   WHERE SCHEMA_NAME='nong_kati';` → `utf8mb4`. If not:
-   `ALTER DATABASE \`nong_kati\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`
+   WHERE SCHEMA_NAME='nongka_nongkati_nongkatistore';` → `utf8mb4`. If not:
+   `ALTER DATABASE \`nongka_nongkati_nongkatistore\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`
 3. **Narrow the grants** (phpMyAdmin → SQL, or SSH `mysql -u root -p`):
    ```sql
    GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, DROP, INDEX, REFERENCES,
          CREATE TEMPORARY TABLES, LOCK TABLES
-     ON `nong_kati`.* TO 'nk_app'@'localhost';
+     ON `nongka_nongkati_nongkatistore`.* TO 'nongka_nongkati_nongkatistore'@'localhost';
    ```
 4. **Env secrets: audit now, write the database URLs only at cutover.** The full split of what is
    safe to touch today versus what must wait is **§6.1** — read it before opening the Node.js
@@ -592,21 +627,21 @@ serving. Values and rationale are in §1–2.
 5. **Verify from the server** (SSH: `ssh nongka@thsv93.hostatom.com`; password is typed
    interactively so it never enters argv):
    ```bash
-   mysql -h localhost -u nk_app -p nong_kati \
+   mysql -h localhost -u nongka_nongkati_nongkatistore -p nongka_nongkati_nongkatistore \
      -e "SELECT DATABASE() db, CURRENT_USER() usr, @@character_set_database charset; SHOW GRANTS;"
    ```
-   Green: `db=nong_kati`, `usr=nk_app@localhost`, `charset=utf8mb4`, and the grants listed are
+   Green: `db=nongka_nongkati_nongkatistore`, `usr=nongka_nongkati_nongkatistore@localhost`, `charset=utf8mb4`, and the grants listed are
    only step 3's plus the unavoidable `GRANT USAGE ON *.*` (a no-op that MariaDB always shows,
    along with a credential hash — not a secret you need to hide). If `mysql` is not on PATH in
    the chroot, do the same checks in phpMyAdmin's SQL tab.
 6. **Verify through the exact string the app will use** — from this checkout, with the tunnel
    open (`ssh -N -L 3307:localhost:3306 nongka@thsv93.hostatom.com`):
    ```bash
-   DATABASE_URL="mysql://nk_app:DBPASS@127.0.0.1:3307/nong_kati" \
-   DATABASE_DIRECT_URL="mysql://nk_app:DBPASS@127.0.0.1:3307/nong_kati" \
+   DATABASE_URL="mysql://nongka_nongkati_nongkatistore:DBPASS@127.0.0.1:3307/nongka_nongkati_nongkatistore" \
+   DATABASE_DIRECT_URL="mysql://nongka_nongkati_nongkatistore:DBPASS@127.0.0.1:3307/nongka_nongkati_nongkatistore" \
      npx prisma migrate status
    ```
-   Green (verified wording): `Datasource "db": MySQL database "nong_kati" at "127.0.0.1:3307"`,
+   Green (verified wording): `Datasource "db": MySQL database "nongka_nongkati_nongkatistore" at "127.0.0.1:3307"`,
    `1 migration found in prisma/migrations`, `Following migration have not yet been applied:` /
    `20261115000000_baseline`. That last part is correct at this stage; it proves credentials,
    dialect and the tunnel without creating a single table.
@@ -759,8 +794,8 @@ and, if you prefer Secrets, prove it with the PROCESSLIST check below.
 
 | Name | Value |
 | --- | --- |
-| `DATABASE_URL` | `mysql://nk_app:DBPASS@localhost:3306/nong_kati` |
-| `DATABASE_DIRECT_URL` | `mysql://nk_app:DBPASS@localhost:3306/nong_kati` |
+| `DATABASE_URL` | `mysql://nongka_nongkati_nongkatistore:DBPASS@localhost:3306/nongka_nongkati_nongkatistore` |
+| `DATABASE_DIRECT_URL` | `mysql://nongka_nongkati_nongkatistore:DBPASS@localhost:3306/nongka_nongkati_nongkatistore` |
 
 Both are required: `DATABASE_URL` is what `src/lib/db.ts` hands to Prisma, `DATABASE_DIRECT_URL`
 is the `directUrl` the schema uses for migrations. `mysql://`, **no `?schema=`** (verified: Prisma
@@ -792,12 +827,12 @@ and, on the server, the process list shows the app's own connections with the ne
 
 ```sql
 SELECT user, host, db, COUNT(*) FROM information_schema.PROCESSLIST
-WHERE user = 'nk_app' GROUP BY user, host, db;
--- expect rows after you load a page; db = nong_kati, host = localhost
+WHERE user = 'nongka_nongkati_nongkatistore' GROUP BY user, host, db;
+-- expect rows after you load a page; db = nongka_nongkati_nongkatistore, host = localhost
 ```
 
-Rows with `db = nong_kati` are proof that the panel value is the one in force. No rows, while the
-shop still serves, means the app never connected as `nk_app` — i.e. it is still on Infisical's
+Rows with `db = nongka_nongkati_nongkatistore` are proof that the panel value is the one in force. No rows, while the
+shop still serves, means the app never connected as `nongka_nongkati_nongkatistore` — i.e. it is still on Infisical's
 Supabase URL and the panel edit did not apply (wrong field, or no restart).
 
 **Rollback of just the env change** (production is on MariaDB and you want it back on Supabase):
@@ -806,7 +841,7 @@ Supabase URL and the panel edit did not apply (wrong field, or no restart).
    `DATABASE_DIRECT_URL`.
 2. **Restart App**.
 3. `curl -s https://nongkatistore.com/api/v1/health` → `database: ok`; reload
-   `/api/v1/products` → catalogue; the PROCESSLIST query above now returns nothing for `nk_app`.
+   `/api/v1/products` → catalogue; the PROCESSLIST query above now returns nothing for `nongka_nongkati_nongkatistore`.
 
 Deleting the rows restores Infisical's Supabase values exactly, because Infisical was never
 edited. Anything written to MariaDB during the detour stays only in MariaDB — see §4 Rollback B
@@ -817,8 +852,9 @@ for the reconciliation list before any retry.
 Everything below is irreversible, credential-bearing, or both. The agent has prepared it and
 verified it on a copy; it has not done any of it.
 
-1. **Create the database and user** (`nong_kati`, `nk_app`) and grant privileges — new
-   production resources.
+1. **Create the database and user** — `nongka_nongkati_nongkatistore` for both, with “Allow remote
+   access” left unchecked (local connections only) — and grant privileges. New production
+   resources; §1 is the click-by-click path.
 2. **Write the two `DATABASE_URL` values** into the Plesk panel (contains the DB password).
 3. **Run the ETL against production** — it writes ~2.5k rows into the new database. Target only;
    the Supabase source is read, never written.

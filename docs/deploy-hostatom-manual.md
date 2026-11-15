@@ -268,7 +268,7 @@ identical.
 **Certification is not a step you remember — it is part of the deploy.**
 
 ```bash
-export TARGET_DATABASE_URL="mysql://…@127.0.0.1:3307/nong_kati"   # the DB the app should read
+export TARGET_DATABASE_URL="mysql://…@127.0.0.1:3307/nongka_nongkati_nongkatistore"   # the DB the app should read
                                 # (or keep it in .env.cutover, which is gitignored)
 
 export SITE_URL=https://nongkatistore.com

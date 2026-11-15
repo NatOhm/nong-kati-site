@@ -149,7 +149,7 @@ Never `pg_dump`: it produces Postgres SQL. Write `scripts/migrate-supabase-to-ma
 ### Pre-cutover check (`scripts/precutover-check.mjs`)
 
 ```bash
-TARGET_DATABASE_URL="mysql://…/nong_kati" node scripts/precutover-check.mjs
+TARGET_DATABASE_URL="mysql://…/nongka_nongkati_nongkatistore" node scripts/precutover-check.mjs
 ```
 
 It derives its fixtures from the target database (an active super_admin, a variant with stock
@@ -212,10 +212,13 @@ Exact steps, grants, password rules, connection-string shapes and where the valu
 **Blocked on the maintainer's go-ahead** — this creates a production database and writes a
 secret, so it runs only inside the agreed window.
 
-- [ ] Plesk → Databases → **Add Database**: name `nong_kati`, server `localhost:3306`, create a
-      dedicated user with a generated password. Note the collation is `utf8mb4`.
+- [ ] Create the database and user: clientarea → product 74879 → **Login to Plesk Control
+      Panel** → **MySQL® Databases** → **Add Database**; type `nongkati_nongkatistore` beside the
+      fixed `nongka_` prefix (result `nongka_nongkati_nongkatistore`), same name for the user,
+      server `localhost:3306`, generated password, **“Allow remote access” unchecked** (local
+      connections only → user `@'localhost'`). Confirm the collation is `utf8mb4`.
 - [ ] Store the URL as a **Secret** (Node.js → Environment → Secrets), not a plain variable:
-      `mysql://USER:PASS@localhost:3306/nong_kati?connection_limit=5`.
+      `mysql://USER:PASS@localhost:3306/nongka_nongkati_nongkatistore?connection_limit=5`.
 - [ ] Update `DATABASE_DIRECT_URL` to the identical value (the schema still reads it), and
       delete the Supabase values only after Phase 6 passes.
 
@@ -234,7 +237,7 @@ Steps 3–4 plus the image extraction, the build and the gate are one command �
 them in this order and stops at the first failure, with a log in `reports/`:
 
 ```bash
-TARGET_DATABASE_URL="mysql://nk_app:DBPASS@127.0.0.1:3307/nong_kati" \
+TARGET_DATABASE_URL="mysql://nongka_nongkati_nongkatistore:DBPASS@127.0.0.1:3307/nongka_nongkati_nongkatistore" \
   bash scripts/phase6-cutover.sh --yes
 ```
 
@@ -309,9 +312,9 @@ cp scripts/backup-mariadb.sh /httpdocs/scripts/ && chmod 750 /httpdocs/scripts/b
 # 2. backup directory + secret env file (0600 — holds the DB password)
 mkdir -p /var/backups/nong-kati && chmod 700 /var/backups/nong-kati
 cat > /var/backups/nong-kati/.env <<'EOF'
-DATABASE_URL=mysql://DBUSER:DBPASS@localhost:3306/nong_kati
+DATABASE_URL=mysql://DBUSER:DBPASS@localhost:3306/nongka_nongkati_nongkatistore
 BACKUP_DIR=/var/backups/nong-kati
-PREFIX=nong_kati
+PREFIX=nongka_nongkati_nongkatistore
 RETENTION_COUNT=14
 RETENTION_DAYS=30
 EOF
@@ -344,8 +347,8 @@ counts; an untested backup is a hope.
 
 ```sh
 mkdir /tmp/restore && gunzip -c /var/backups/nong-kati/<newest>.sql.gz | mysql -u root -p
-mysql -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='nong_kati'"
-mysql -N -e "SELECT COUNT(*) FROM nong_kati.\`Order\`; SELECT COUNT(*) FROM nong_kati.GiftCode"
+mysql -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='nongka_nongkati_nongkatistore'"
+mysql -N -e "SELECT COUNT(*) FROM nongka_nongkati_nongkatistore.\`Order\`; SELECT COUNT(*) FROM nongka_nongkati_nongkatistore.GiftCode"
 ```
 
 **Verified on the MariaDB copy 2026-11-14** (`scripts/backup-mariadb.sh` run inside a
