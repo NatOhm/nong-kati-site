@@ -238,20 +238,25 @@ order — the sequence works end to end:
 docker run -d --name nk-mariadb -e MARIADB_ROOT_PASSWORD=… -e MARIADB_DATABASE=… \
   -p 3307:3306 mariadb:10.11
 DATABASE_URL="mysql://…" DATABASE_DIRECT_URL="mysql://…" npx prisma migrate deploy   # baseline applied
-TARGET_DATABASE_URL="mysql://…" node scripts/migrate-supabase-to-mariadb.mjs         # 38 tables, 2576 rows, all counts match
+TARGET_DATABASE_URL="mysql://…" node scripts/migrate-supabase-to-mariadb.mjs         # 38 tables, 2497 rows, all counts match
 DATABASE_URL="mysql://…" npm run build                                              # compiled
 TARGET_DATABASE_URL="mysql://…" node scripts/precutover-check.mjs                     # 32/32
+TARGET_DATABASE_URL="mysql://…" node scripts/postswitch-check.mjs --base=http://127.0.0.1:3314  # 22/22, after the switch
 ```
 
-After the check removed its own rows the copy matched the ETL exactly: `Order` 216,
-`GiftCode` 170 (56 available), `Customer` 54, `Coupon` 1, `PaymentAttempt` 28, `Product` 31, and
-no `PRECHECK*` leftovers.
+After the checks removed their own rows the copy matched the ETL exactly: `Order` 216,
+`GiftCode` 125 (13 available), `Customer` 54, `Coupon` 1, `PaymentAttempt` 28, `Product` 28, and
+no `PRECHECK*`/`POSTSWITCH*` leftovers.
 
 **Rollback:** restore the two Supabase env values and Restart App. Supabase is untouched
 until Phase 8, so this is a two-minute revert.
 
 ### Phase 7 — verification
 
+- [ ] `TARGET_DATABASE_URL=… node scripts/postswitch-check.mjs --base=https://nongkatistore.com
+      --max-uptime=600` → 22/22. This is the one that proves the *running* process reads the new
+      database (health, schema head, catalogue counts, admin login + cookie, order, code
+      redemption, media); see the Plesk runbook Step 7a for what each named check means.
 - [ ] `TARGET_DATABASE_URL=… node scripts/precutover-check.mjs` → 32/32 against the **production**
       MariaDB (this is the automated version of the bullets below; they stay as the human
       sanity pass on live traffic).

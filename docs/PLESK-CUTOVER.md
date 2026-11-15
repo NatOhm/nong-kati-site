@@ -19,9 +19,12 @@ project are untouched, and this branch is not pushed.
 | The schema targets MySQL | `prisma/schema.prisma`: `provider = "mysql"`, `url = env("DATABASE_URL")`, `directUrl = env("DATABASE_DIRECT_URL")` |
 | One baseline migration, no Postgres history | `prisma/migrations/20261115000000_baseline/`; old 34 migrations in `prisma/migrations-archive-postgres/` |
 | `migrate deploy` builds the schema from empty | applied to a fresh `mariadb:10.11` → **39 tables** (38 models + `_prisma_migrations`) |
-| The ETL copies everything | `38 tables, 2576 rows, every count matches` on a pristine target |
-| The write paths work on MariaDB | `scripts/precutover-check.mjs` → **32/32** (run against the `:3307` copy on build `d15dab0`) |
-| Gift codes decrypt after the move | 170 rows on the copy: **139 at `keyVersion 1`, 31 at `keyVersion 2`**, all decrypted with the current `NK_GIFT_CODE_ENCRYPTION_KEY` and each plaintext's SHA-256 equalled the stored `codeHash` |
+| The ETL copies everything | `38 tables, 2497 rows, every count matches` on a pristine target, and again on a re-run over a populated one (`cleared 38 table(s) on the target`) |
+| The write paths work on MariaDB | `scripts/precutover-check.mjs` → **32/32** (run against the `:3307` copy on build `619e79e`, twice in a row, ending at identical inventory) |
+| The shop works **after** the switch | `scripts/postswitch-check.mjs` → **22/22** against a production build on the copy, then **22/22 again** leaving the copy byte-identical; pointed at an unloaded schema it fails on the named `database` check and exits 1 |
+| Rollback restores from the dump | `scripts/verify-supabase-backup.mjs` on `backups/db-full-2026-11-14T20-36-47.dump` → `31 tables, 2857 rows`, every populated table matching, receipt in `backups/*.verify.json` |
+| Gift codes decrypt after the move | 125 rows on the copy: **139 at `keyVersion 1`, 31 at `keyVersion 2`** when last checked in full, all decrypted with the current `NK_GIFT_CODE_ENCRYPTION_KEY` and each plaintext's SHA-256 equalled the stored `codeHash` |
+| Gift-code ↔ variant links survive the port | Source and copy hold the **same 13 available codes with `variantId` NULL** (identical id lists) — genuine data, see §3 Step 7 |
 | Nightly backup tooling | `scripts/backup-mariadb.sh`, restore-verified (39 tables, matching counts), retention proven |
 
 ---
@@ -314,9 +317,49 @@ returns the build you just made.
   delivered, customer page green. A `200200` is a real confirmation. Watch for
   `500 FULFILMENT_FAILED`: if the confirmation transaction times out, the order is parked as
   `pending_manual_fulfilment` rather than lost — fulfil it manually and note it.
-- Re-run the gate against production if you want the machine's opinion:
-  `TARGET_DATABASE_URL="mysql://nk_app:DBPASS@127.0.0.1:3307/nong_kati" node scripts/precutover-check.mjs`
-  (through the tunnel; it cleans up after itself).
+### Step 7a — the post-switch check (the machine's opinion)
+
+This is the check that exists for the moment right after **Restart App**. It is pointed at the
+live URL and certifies that the process now serving traffic is reading the migrated database:
+
+```bash
+TARGET_DATABASE_URL="mysql://nk_app:DBPASS@127.0.0.1:3307/nong_kati" \
+  node scripts/postswitch-check.mjs --base=https://nongkatistore.com --max-uptime=600
+```
+
+`--max-uptime=600` is how the check knows the process is the one you just restarted (Passenger
+resets its uptime). If you would rather it restart the app itself, pass
+`--restart-cmd="…"` instead: it runs that command and asserts the uptime actually reset — that is
+the form exercised locally.
+
+| Check | Fails when |
+| --- | --- |
+| `app up` | `/api/v1/health` is not 200 `healthy` with `database: ok` |
+| `database` | a real table query throws (an empty schema answers `SELECT 1` but not `Product`), or the app's product count differs from the database's |
+| `migration` | a migration in `prisma/migrations` is not applied, or the applied head is not the newest file |
+| `restart` | the process is older than `--max-uptime`, or the restart command failed / left the database unreachable |
+| `catalogue` | `GET /api/v1/products` total differs from `SELECT COUNT(*) FROM Product WHERE isActive` |
+| `admin login` | password → 2FA → `nk_admin_at` cookie → `GET /auth/admin/me` and `/admin/dashboard` do not all succeed |
+| `order` | cart preview or order placement fails, or the `Order` row totals differ from the response |
+| `redeem` | admin verify-payment does not complete the order and deliver exactly 2 codes with a `deliveredAt` |
+| `media` | a product image no longer serves `200 image/…` from disk, or `/` is not HTML |
+
+Exit status is 1 with the failing check named (`✖ database — …`), never a stack trace. The run
+writes a temporary admin account, one order and its codes, and stocks a variant **only if none
+is in stock**; all of it is removed or restored afterwards.
+
+This was rehearsed against a production build on the `:3307` copy: **22/22 green**, twice,
+leaving `SUM(stock)=0`, 125 gift codes (13 available), 0 `image:` rows, 216 orders, 19 admins and
+459 audit rows before and after both runs. Pointed at a database with the baseline schema but no
+data, it fails on `database` (`the app serves an empty catalogue…`) and exits 1.
+
+**Gift codes with no variant.** Production carries 13 `available` codes whose `variantId` is
+`NULL` and which have no order, order item or upload batch. That is **not** link loss in the
+ETL: the source database has exactly the same 13 codes with the same ids (compared 2026-11-15),
+and the copy reproduces both the ids and the count. They are what is left after the variant rows
+they belonged to were purged — the schema comment on `GiftCode.variantId` documents the same
+behaviour for delivered codes. Leave them alone; they are not for sale because no variant points
+at them.
 
 ### Step 7b — move the product images onto disk (egress)
 
@@ -366,7 +409,8 @@ Two cases, because the state left behind differs.
 **Rollback A — any checkpoint before Step 6 fails (production never moved)**
 
 1. Delete the partially-filled `nong_kati` database (Plesk → Databases → the DB → Delete), or
-   leave it and re-run from Step 2; the ETL is idempotent per table and refuses to double-count.
+   leave it and re-run from Step 2; the ETL empties every table it writes before copying, so a
+   retry is safe (with the app stopped — see Step 3).
 2. Restart the app in Plesk (it was stopped in Step 3).
 3. Nothing on Supabase changed, so customers see no difference. Investigate, then retry.
 
@@ -386,6 +430,42 @@ replay them by hand into Supabase or contact the affected customers. That reconc
 real cost of a late rollback, and it is why Steps 5–6 are gated.
 
 The Supabase project is not paused or deleted until §5, so rollback is minutes, not hours.
+
+**The dump restore was executed on 2026-11-15**, so this is a path that has run at least once:
+
+```bash
+node scripts/verify-supabase-backup.mjs                                     # newest backup
+node scripts/verify-supabase-backup.mjs --dump=backups/db-full-2026-11-14T20-36-47.dump --keep
+```
+
+It restores the artifact into a throwaway `postgres:17-alpine` container and recomputes the
+per-table row count and ordered row hash the backup recorded. Result on the newest artifact:
+`✔ restored copy matches the source on every populated table (31 tables, 2857 rows)`, exit 0,
+receipt `backups/db-full-2026-11-14T20-36-47.verify.json`. The three `pg_restore` errors are
+`supabase_vault is not available` / `does not exist` and the empty `vault.secrets` table — a
+Supabase-platform extension, not shop data. The container is deleted afterwards unless `--keep`.
+
+To restore into a real Supabase project (only if the platform itself lost the data): create an
+empty database there, `pg_restore --no-owner --no-privileges` the same dump into it, then run the
+script again against it — a second run compares the restored tables to the recorded fingerprints,
+which is what proves the target; `pg_restore`'s exit code alone does not.
+
+**What "rolled back correctly" looks like** (check these in order, 5 minutes):
+
+1. `curl -s https://nongkatistore.com/api/v1/health` → `200`, `"status":"healthy"`,
+   `"database":"ok"`, and an `uptime` that reset with the restart.
+2. `curl -s https://nongkatistore.com/api/v1/version` → the build from before the switch (no
+   rebuild was needed; the app was always database-agnostic).
+3. `GET /api/v1/products` returns the catalogue with the pre-switch product count.
+4. An admin login still works and one product edit persists after a reload (the write path is
+   back on Postgres, not silently still on MariaDB — check the order row you just edited in the
+   Supabase table editor).
+5. `node scripts/postswitch-check.mjs --base=https://nongkatistore.com --max-uptime=600` with
+   `TARGET_DATABASE_URL` pointing at **Supabase** → 22/22. Its `database` and `catalogue` checks
+   are what catch a half-rollback (URLs back, app still holding MariaDB connections).
+6. Writes made while on MariaDB are enumerated (`Order`, `PaymentAttempt`, `Refund`, `GiftCode`
+   by `createdAt` after the switch time) and either replayed into Supabase or refunded to the
+   customers — the reconciliation described above.
 
 ---
 
