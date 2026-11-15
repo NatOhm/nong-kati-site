@@ -17,9 +17,11 @@
 #                                                        assert the trim keeps order
 #   3. live-gate        --from=check                     really runs the 32-check gate
 #                                                        against the copy and passes
-#   4. first-failure    --from=schema to a database that does not exist
+#   4. first-failure    --from=schema to an unreachable server (closed port)
 #                                                        assert it stops AT schema and
-#                                                        never starts the ETL
+#                                                        never starts the ETL. A missing
+#                                                        database name would not do: Prisma
+#                                                        creates it and the ETL would run.
 #
 # Nothing here writes to Supabase, and the only database it touches is the local
 # copy in NK_REHEARSAL_TARGET. Case 3 is the documented, repeatable gate: it
@@ -225,10 +227,19 @@ else
   finish_case "live-gate"
 
   # ── Case 4: a failure stops at its step and takes nothing with it ───────
-  say "4/4 first-failure — a broken target must stop at schema, not scrape past it"
-  BROKEN_TARGET="$(printf '%s' "$TARGET" | sed -E 's#/[^/?]+(\?.*)?$#/nk_p6_absent\1#')"
-  if [ "$BROKEN_TARGET" = "$TARGET" ]; then
-    bad "could not derive a throwaway database name from $TARGET"
+  say "4/4 first-failure — an unreachable target must stop at schema, not scrape past it"
+  # Deliberately a closed port, not a missing database name: `prisma migrate deploy`
+  # CREATES a MySQL database that does not exist (measured 2026-11-15 — it printed
+  # "MySQL database nk_p6_absent created"), so a mistyped name rehearses nothing and
+  # would have run the ETL for real. An unreachable server cannot be created.
+  DEAD_PORT="${NK_P6_DEAD_PORT:-3399}"
+  AUTH="$(printf '%s' "$TARGET" | sed -E 's#^mysqls?://([^@]*)@.*#\1#')"
+  BROKEN_TARGET="mysql://${AUTH}@127.0.0.1:${DEAD_PORT}/nk_p6_absent"
+  if netstat -ano 2>/dev/null | grep -q ":${DEAD_PORT} .*LISTENING"; then
+    bad "port ${DEAD_PORT} is listening — the failure case needs a closed port (set NK_P6_DEAD_PORT)"
+    FAILED=$((FAILED + 1)); SUMMARY+=("FAIL  first-failure  (port ${DEAD_PORT} is in use)")
+  elif [ "$AUTH" = "$TARGET" ]; then
+    bad "could not take credentials out of $TARGET to build the failure target"
     FAILED=$((FAILED + 1)); SUMMARY+=("FAIL  first-failure  (no throwaway target)")
   else
     # This case needs a different target, so it drives the wrapper directly

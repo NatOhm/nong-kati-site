@@ -229,6 +229,13 @@ Rehearse the driver itself before the window, against the local MariaDB copy —
 deliberate failure, and asserts from the logs that the steps still fire in order
 (`--plan-only` does the two plan cases without a database).
 
+**Trap the rehearsal found:** `prisma migrate deploy` against MariaDB **creates the database when it
+does not exist** — it printed `MySQL database nk_p6_absent created at 127.0.0.1:3307` and carried
+on. So a typo in `DATABASE_URL` does not fail the window; it silently provisions a *second*, empty
+database that the ETL then fills, leaving the one Plesk created untouched and the app pointed at a
+name nobody meant. Check the target name against `/smb/database/list` before the run, and treat a
+first-time `created at …` line in the log as a stop signal.
+
 1. [ ] Put the shop to sleep if the window is not already quiet (the app can stay up; the
        risk is writes during the export).
 2. [ ] Freeze writes: stop the Node app from the Plesk Node.js panel.
