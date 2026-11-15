@@ -390,22 +390,35 @@ DATABASE_URL="mysql://nk_app:DBPASS@127.0.0.1:3307/nong_kati" \
   node scripts/extract-slips-to-files.mjs           # dry run
 DATABASE_URL="mysql://nk_app:DBPASS@127.0.0.1:3307/nong_kati" \
   node scripts/extract-slips-to-files.mjs --apply
-scp -r ./tmp/slips/* nongka@thsv93.hostatom.com:httpdocs/storage/media/private/slips/
+scp -r ./storage/media/private/slips/* nongka@thsv93.hostatom.com:httpdocs/storage/media/private/slips/
 ```
 
-Files land in `<NK_MEDIA_DIR>/private/slips` (or `NK_SLIP_DIR` when set) — a SUBdirectory, so
-`/api/v1/images/<key>` can never serve one; only
+**The destination is the directory the app serves from** — `NK_SLIP_DIR` when set, otherwise
+`<NK_MEDIA_DIR>/private/slips` (here `./storage/media/private/slips`, the same layout the server
+uses). Do **not** point it at a scratch directory: the rows are deleted as soon as their file
+verifies, so a throwaway path strands evidence where the download route will never look for it.
+Use `--slip-dir=` only when the panel's `NK_SLIP_DIR` is somewhere else, and then copy to *that*
+path on the server.
+
+It is a SUBdirectory, so `/api/v1/images/<key>` can never serve one; only
 `/api/v1/payments/slip-download/<key>` (admin `orders:read`, or the order's own upload token)
 reads them. The download route checks the file first and falls back to a legacy `slip:` row, so
 links written before this run keep working.
 
 **Checkpoints:** the dry run lists every row it would move and writes the files without deleting
 anything; `--apply` reports `rows deleted: N` and `✔ every slip row has a verified file on disk`;
-re-running says `nothing to do`; `SELECT COUNT(*) FROM SiteSetting WHERE key LIKE 'slip:%'` drops
-to whatever the script reports as skipped (a row whose key is not 32 hex is unreachable by the
-download route — it can be deleted by hand). Rehearsed on the `:3307` copy on 2026-11-15:
-**45 rows / 9.6 MB** moved out of `SiteSetting`, 45 files written and SHA-256 verified, one
-unreachable `slip:livechecknew` row reported and left alone.
+a re-run prints `✔ nothing to do — no slip row with a servable key is left to move`;
+`SELECT COUNT(*) FROM SiteSetting WHERE key LIKE 'slip:%'` drops to the number the script reports
+as skipped. A skipped row is one whose key is not `<32 hex>`: every route rejects it with 400, so
+it is dead data from an old probe — the script names it and leaves it for you to delete by hand
+rather than silently dropping a row it cannot verify.
+
+Rehearsed on the `:3307` copy on 2026-11-15, against the **real** private directory: 44 rows /
+9.6 MB moved out of `SiteSetting` into `storage/media/private/slips`, 44 files SHA-256 verified,
+then all 44 downloaded through `/api/v1/payments/slip-download/<key>` as 200 `private, no-store`
+with bytes identical to the file, 401 without a token, 404 on the public image route. One
+`slip:livechecknew` row (24 B, key not 32 hex) is reported and left; production has the same row,
+so it is not something this script introduced.
 
 Why the files go up by `scp` instead of running the script on the server: the Plesk chroot has no
 `node` on PATH, and the app reads whatever `NK_MEDIA_DIR` names — so the extractor runs where

@@ -28,8 +28,15 @@
  *
  *   ... node scripts/extract-slips-to-files.mjs --apply    # writes + deletes
  *
- *   --out-dir=/var/www/.../storage/media/private/slips    override NK_SLIP_DIR
- *   --limit=5                                             only the N largest rows
+ *   --slip-dir=/mnt/evidence/slips    override NK_SLIP_DIR (a separate disk)
+ *   --limit=5                         only the N largest rows
+ *
+ * The destination is the SAME directory the app serves from — NK_SLIP_DIR, else
+ * `<NK_MEDIA_DIR>/private/slips`. Subdirectory matters: `/api/v1/images/<key>`
+ * reads only the media root, so a slip written there can never be served
+ * publicly. Do not point this at a scratch directory: rows are deleted after
+ * their file verifies, so a scratch path strands evidence where the download
+ * route will never find it.
  */
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
@@ -43,16 +50,12 @@ const arg = (name) => {
   return hit ? hit.split('=').slice(1).join('=') : null;
 };
 const APPLY = process.argv.includes('--apply');
-const MEDIA_ROOT = path.resolve(
-  arg('out-dir') || process.env.NK_MEDIA_DIR || path.join(ROOT, 'storage', 'media'),
+// Same rule as src/lib/slipStore.ts: NK_SLIP_DIR wins, otherwise the private
+// SUBdirectory of the media root (which the public image route never reads).
+const MEDIA_ROOT = path.resolve(process.env.NK_MEDIA_DIR || path.join(ROOT, 'storage', 'media'));
+const OUT_DIR = path.resolve(
+  arg('slip-dir') || process.env.NK_SLIP_DIR || path.join(MEDIA_ROOT, 'private', 'slips'),
 );
-// Same rule as src/lib/slipStore.ts: a subdirectory of the media root, which
-// the public image route never reads.
-const OUT_DIR = process.env.NK_SLIP_DIR
-  ? path.resolve(process.env.NK_SLIP_DIR)
-  : arg('out-dir')
-    ? path.resolve(arg('out-dir'))
-    : path.join(MEDIA_ROOT, 'private', 'slips');
 const LIMIT = Number(arg('limit') || 0);
 
 function readDotenv() {
@@ -163,14 +166,23 @@ async function main() {
     }
   }
 
-  console.log(
-    `files: ${written} written, ${already} already present · rows ${APPLY ? `deleted: ${deleted}` : 'kept (dry run)'}` +
-      (APPLY ? ` · ~${(freed / 1024 / 1024).toFixed(1)} MB of data-URL text removed` : ''),
-  );
+  if (written === 0 && already === 0 && deleted === 0) {
+    // Every row in this run was skipped (no servable key). Nothing to move: say
+    // so, so a re-run reads as the no-op it is instead of an empty report.
+    console.log('✔ nothing to do — no slip row with a servable key is left to move');
+  } else {
+    console.log(
+      `files: ${written} written, ${already} already present · rows ${APPLY ? `deleted: ${deleted}` : 'kept (dry run)'}` +
+        (APPLY ? ` · ~${(freed / 1024 / 1024).toFixed(1)} MB of data-URL text removed` : ''),
+    );
+  }
 
   if (skipped.length > 0) {
-    console.log(`
-${skipped.length} row(s) skipped — not addressable as slip evidence:`);
+    console.log(
+      `
+${skipped.length} row(s) skipped — their key is not 32 hex, so no route can serve them ` +
+        '(dead row, safe to delete by hand):',
+    );
     for (const s of skipped.slice(0, 20)) console.log(`  · ${s}`);
   }
 
