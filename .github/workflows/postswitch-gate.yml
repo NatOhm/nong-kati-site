@@ -9,6 +9,14 @@
 # event; the switch itself is still a panel action, which is why the first step
 # waits for the live site to serve that BUILD_ID before it certifies anything.
 #
+# TWO THINGS THAT ONLY BREAK ON GITHUB, both handled below:
+#   1. A `push` workflow only starts if ITS OWN FILE is in the pushed commit's tree.
+#      `deploy-artifact` is an orphan holding the tarball, so deploy-artifact.sh
+#      carries this file in that commit — otherwise the gate never runs at all.
+#   2. The scripts are not on every branch. This repo's default branch can lag the
+#      release commit, so the job reads the source sha the artifact names and checks
+#      THAT out — the scripts that shipped with the release, not today's default.
+#
 # WHAT IT COSTS TO BE HONEST: the production database is created with local
 # connections only (Plesk "Allow remote access" unchecked), so a runner cannot
 # reach it directly. The gate therefore needs an SSH tunnel, which is exactly how
@@ -62,13 +70,35 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      # `deploy-artifact` is an ORPHAN holding one bundle tarball — checking it out
-      # would leave no scripts to run. So check out the default branch and let
-      # scripts/ci-postswitch-gate.sh read the artifact commit from
-      # origin/deploy-artifact (fetch-depth 0 gives it the ref and the commit date).
+      # A git directory to read the artifact commit from; replaced below by the
+      # source commit the artifact names.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4 (pinned)
         with:
-          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 1
+
+      - name: Read the artifact commit
+        id: artifact
+        run: |
+          git fetch --depth=1 origin deploy-artifact
+          subject="$(git log -1 --format=%s FETCH_HEAD)"
+          echo "artifact subject: $subject"
+          build_id="$(printf '%s' "$subject" | sed -nE 's/^deploy bundle ([^ ]+) \(git ([0-9a-f]{40})\)$/\1/p')"
+          git_sha="$(printf '%s' "$subject" | sed -nE 's/^deploy bundle ([^ ]+) \(git ([0-9a-f]{40})\)$/\2/p')"
+          if [ -z "$build_id" ] || [ -z "$git_sha" ]; then
+            echo "::error::origin/deploy-artifact's tip does not look like a deploy bundle:"\\
+              "'$subject'. Expected 'deploy bundle <BUILD_ID> (git <40-hex sha>)'."
+            exit 1
+          fi
+          {
+            echo "build-id=$build_id"
+            echo "git-sha=$git_sha"
+          } >> "$GITHUB_OUTPUT"
+
+      # The release's own scripts. Checking out the default branch would run the
+      # gate from code that may predate the release entirely.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4 (pinned)
+        with:
+          ref: ${{ steps.artifact.outputs.git-sha }}
           fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4 (pinned)
         with:
@@ -96,7 +126,7 @@ jobs:
           POSTSWITCH_BASE_URL: ${{ inputs.base-url || 'https://nongkatistore.com' }}
           PLESK_SSH_HOST: ${{ secrets.PLESK_SSH_HOST }}
           PLESK_SSH_USER: ${{ vars.PLESK_SSH_USER }}
-          EXPECTED_BUILD_ID: ${{ inputs.build-id }}
+          EXPECTED_BUILD_ID: ${{ inputs.build-id || steps.artifact.outputs.build-id }}
         run: |
           if [ "${{ inputs.check-only }}" = "true" ]; then
             bash scripts/ci-postswitch-gate.sh --check-only --base="$POSTSWITCH_BASE_URL"

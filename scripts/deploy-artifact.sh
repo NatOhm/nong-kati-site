@@ -121,6 +121,14 @@ else
   export GIT_INDEX_FILE="$TMP_INDEX"
   git read-tree --empty
   git add -f "$BUNDLE"
+  # GitHub only starts a `push` workflow when that workflow's file is present in the
+  # pushed commit's own tree. This branch is otherwise just the tarball, so the
+  # post-switch gate's workflow must travel with it or the gate can never fire
+  # (measured 2026-11-15: without this, nothing runs on the push at all). The job
+  # checks the source commit named in the subject out, never this tree.
+  if [ -f .github/workflows/postswitch-gate.yml ]; then
+    git add -f .github/workflows/postswitch-gate.yml
+  fi
   TREE="$(git write-tree)"
   COMMIT="$(git commit-tree "$TREE" -m "deploy bundle $BUILD_ID (git $START_SHA)")"
   unset GIT_INDEX_FILE
