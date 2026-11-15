@@ -380,8 +380,32 @@ scp -r ./tmp/media/* nongka@thsv93.hostatom.com:httpdocs/storage/media/
 
 **Checkpoints:** the dry run reports every row decoded and verified; `--apply` then prints
 `rows deleted: 31` and re-running it says `nothing to do`; `SELECT COUNT(*) FROM SiteSetting
-WHERE key LIKE 'image:%'` is **0** while `slip:` rows are untouched (they stay in the database —
-private evidence, covered by the retention job).
+WHERE key LIKE 'image:%'` is **0**.
+
+**Payment slips move too — separately.** Slips are financial documents (account numbers,
+amounts, PDPA), so they go to their own private directory, never the public image namespace:
+
+```bash
+DATABASE_URL="mysql://nk_app:DBPASS@127.0.0.1:3307/nong_kati" \
+  node scripts/extract-slips-to-files.mjs           # dry run
+DATABASE_URL="mysql://nk_app:DBPASS@127.0.0.1:3307/nong_kati" \
+  node scripts/extract-slips-to-files.mjs --apply
+scp -r ./tmp/slips/* nongka@thsv93.hostatom.com:httpdocs/storage/media/private/slips/
+```
+
+Files land in `<NK_MEDIA_DIR>/private/slips` (or `NK_SLIP_DIR` when set) — a SUBdirectory, so
+`/api/v1/images/<key>` can never serve one; only
+`/api/v1/payments/slip-download/<key>` (admin `orders:read`, or the order's own upload token)
+reads them. The download route checks the file first and falls back to a legacy `slip:` row, so
+links written before this run keep working.
+
+**Checkpoints:** the dry run lists every row it would move and writes the files without deleting
+anything; `--apply` reports `rows deleted: N` and `✔ every slip row has a verified file on disk`;
+re-running says `nothing to do`; `SELECT COUNT(*) FROM SiteSetting WHERE key LIKE 'slip:%'` drops
+to whatever the script reports as skipped (a row whose key is not 32 hex is unreachable by the
+download route — it can be deleted by hand). Rehearsed on the `:3307` copy on 2026-11-15:
+**45 rows / 9.6 MB** moved out of `SiteSetting`, 45 files written and SHA-256 verified, one
+unreachable `slip:livechecknew` row reported and left alone.
 
 Why the files go up by `scp` instead of running the script on the server: the Plesk chroot has no
 `node` on PATH, and the app reads whatever `NK_MEDIA_DIR` names — so the extractor runs where
@@ -582,6 +606,7 @@ agent cannot read that project, so **?** rows are unverified, not missing.
 | `NK_SLIP2GO_BASE` | `slip2go.ts` | unset ⇒ `https://connect.slip2go.com` | **?** (leave unset) |
 | `NK_SLIP_TOKEN_SECRET` | slip status tokens | unset ⇒ reuses `NK_JWT_SECRET` | **?** (optional) |
 | `NK_MEDIA_DIR` | `src/lib/imageStore.ts` (uploads + `GET /api/v1/images/[key]`) | absolute path for uploaded images; unset ⇒ `<cwd>/storage/media`. Set it to `/httpdocs/storage/media` so a deploy (which rewrites the docroot) cannot shadow it | **new** — add at cutover |
+| `NK_SLIP_DIR` | `src/lib/slipStore.ts` (payment-slip evidence) | where slip files live; unset ⇒ `<NK_MEDIA_DIR>/private/slips`, which is what you want. Only set it to move slips to a different disk — the directory must not be web-served | unchanged (optional) |
 | `NK_RESEND_API_KEY` | `src/lib/email/config.ts` | `re_…`; absent ⇒ outbox rows stay failed, no customer email | **?** |
 | `NK_RESEND_FROM_EMAIL` | `src/lib/email/config.ts` | a verified sender on the Resend domain | **?** |
 | `NK_RESEND_API_URL` | `src/lib/email/config.ts` | override only; leave unset | **?** (optional) |

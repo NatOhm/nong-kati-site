@@ -23,6 +23,7 @@ import { isSlip2GoEnabled, verifySlip2Go } from '@/lib/payment/slip2go';
 import { checkReceiverMatch, storeReceiverDigits } from '@/lib/payment/receiverPolicy';
 import { isSlipVerificationEnabled, verifySlip } from '@/lib/payment/slipok';
 import { isValidSlipUploadToken, mintSlipStorageKey, slipImageRoute } from '@/lib/slipSecurity';
+import { writeSlip } from '@/lib/slipStore';
 
 export const dynamic = 'force-dynamic';
 
@@ -87,16 +88,6 @@ const RETRYABLE_ON_FALLBACK = new Set([
   'NOT_CONFIGURED',
 ]);
 
-/** Best-effort MIME from the image bytes — used only for the stored data URL. */
-function sniffImageMime(imageBase64: string): string {
-  const head = Buffer.from(imageBase64.slice(0, 32), 'base64');
-  if (head.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) {
-    return 'image/png';
-  }
-  if (head[0] === 0xff && head[1] === 0xd8) return 'image/jpeg';
-  if (head.subarray(0, 4).toString('latin1') === 'RIFF') return 'image/webp';
-  return 'image/png';
-}
 
 /** GET — feature probe for the checkout page (panel renders only when on). */
 export async function GET(): Promise<NextResponse> {
@@ -223,9 +214,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   let slipStored = false;
   try {
     const key = mintSlipStorageKey();
-    await prisma.siteSetting.create({
-      data: { key, value: `data:${sniffImageMime(imageBase64)};base64,${imageBase64}` },
-    });
+    // A private file under NK_SLIP_DIR, not a `slip:` settings row — the
+    // evidence is a financial document and up to ~6.7 MB of base64.
+    await writeSlip(key, Buffer.from(imageBase64, 'base64'));
     await prisma.order.update({
       where: { id: order.id },
       data: { slipImageUrl: slipImageRoute(key), slipUploadedAt: new Date() },

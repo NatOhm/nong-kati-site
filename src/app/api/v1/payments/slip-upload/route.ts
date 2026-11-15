@@ -4,6 +4,7 @@ import { getOrderById } from '@/api/orders';
 import { prisma } from '@/lib/db';
 import { getClientIp, checkRateLimit } from '@/lib/rateLimit';
 import { isValidSlipUploadToken, mintSlipStorageKey, slipImageRoute } from '@/lib/slipSecurity';
+import { writeSlip } from '@/lib/slipStore';
 import { notifyPaymentPending } from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
@@ -94,10 +95,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // Private storage: random key in the `slip:` namespace (finding: slips
   // must not ride the public, year-cached image namespace). Every upload
   // gets a NEW key so previous evidence is preserved, not overwritten.
+  //
+  // The bytes go to a PRIVATE SUBDIRECTORY of NK_MEDIA_DIR
+  // (`private/slips`, src/lib/slipStore.ts), not into a settings row: slips
+  // were up to ~6.7 MB of base64 in the table every page reads, and the
+  // setting rows are still served as a read fallback for evidence written
+  // before the move.
   const key = mintSlipStorageKey();
-  await prisma.siteSetting.create({
-    data: { key, value: dataUrl },
-  });
+  await writeSlip(key, bytes);
   const imagePath = slipImageRoute(key);
 
   await prisma.order.update({

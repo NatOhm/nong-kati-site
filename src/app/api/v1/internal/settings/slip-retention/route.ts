@@ -12,6 +12,12 @@
  * the download route answers 404 — the accepted trade-off, since dispute
  * evidence gets reviewed in the first days.
  *
+ * Since 2026-11-15 slips are also written as private files (`NK_SLIP_DIR`,
+ * src/lib/slipStore.ts), and the same tick prunes both halves on one cutoff:
+ * rows by `updatedAt`, files by mtime (every attempt mints a new key, so the
+ * mtime is the upload time). Evidence therefore has ONE lifetime — a row
+ * deleted here cannot leave a file behind, and a file cannot outlive its row.
+ *
  * Auth mirrors the sibling expiry sweeps (NK_CRON_SECRET via x-cron-token or
  * Bearer, timing-safe, unconfigured secret = 503 fail-closed); no admin-JWT
  * fallback because no panel action needs this sweep.
@@ -24,6 +30,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { constantTimeEquals } from '@/lib/crypto';
 import { prisma } from '@/lib/db';
+import { pruneSlipFiles } from '@/lib/slipStore';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,6 +61,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const { count } = await prisma.siteSetting.deleteMany({
     where: { key: { startsWith: 'slip:' }, updatedAt: { lt: cutoff } },
   });
+  const files = await pruneSlipFiles(cutoff);
 
-  return NextResponse.json({ ok: true, deleted: count, cutoff: cutoff.toISOString() });
+  return NextResponse.json({
+    ok: true,
+    deleted: count,
+    filesDeleted: files.deleted,
+    filesScanned: files.scanned,
+    filesFreedBytes: files.freedBytes,
+    cutoff: cutoff.toISOString(),
+  });
 }

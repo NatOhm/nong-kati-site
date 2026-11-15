@@ -8,7 +8,11 @@
  * updatedAt is older than 30 days, with the sibling sweeps' fail-closed
  * NK_CRON_SECRET auth.
  */
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const h = vi.hoisted(() => {
@@ -45,9 +49,20 @@ const tick = (token?: string) =>
     headers: token ? { 'x-cron-token': token } : {},
   });
 
-afterEach(() => {
+// The tick now prunes slip FILES as well as rows; keep it off the repo's own
+// media tree and in a throwaway directory per test.
+let slipDir = '';
+
+beforeEach(async () => {
+  slipDir = await fs.mkdtemp(path.join(os.tmpdir(), 'nk-slip-retention-'));
+  process.env['NK_SLIP_DIR'] = slipDir;
+});
+
+afterEach(async () => {
   if (ORIGINAL_SECRET === undefined) delete process.env['NK_CRON_SECRET'];
   else process.env['NK_CRON_SECRET'] = ORIGINAL_SECRET;
+  delete process.env['NK_SLIP_DIR'];
+  await fs.rm(slipDir, { recursive: true, force: true });
   h.rows.length = 0;
   vi.clearAllMocks();
 });
@@ -87,5 +102,32 @@ describe('slip evidence retention', () => {
 
     const remaining = h.rows.map((r) => r.key).sort();
     expect(remaining).toEqual(['slip:fresh1d', 'slip:justnow', 'store:info']);
+  });
+
+  it('prunes old slip FILES on the same cutoff and reports both halves', async () => {
+    process.env['NK_CRON_SECRET'] = SECRET;
+    const day = 86_400_000;
+    h.rows.push({ key: 'slip:oldrow', updatedAt: new Date(Date.now() - 31 * day) });
+
+    const write = async (name: string, ageDays: number) => {
+      const file = path.join(slipDir, name);
+      await fs.writeFile(file, Buffer.from('slip bytes'));
+      const when = new Date(Date.now() - ageDays * day);
+      await fs.utimes(file, when, when);
+      return file;
+    };
+    const oldFile = await write('a'.repeat(32), 45);
+    const freshFile = await write('b'.repeat(32), 2);
+    const notAKey = await write('operator-note.txt', 45);
+
+    const res = await POST(tick(SECRET));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({ ok: true, deleted: 1, filesDeleted: 1, filesScanned: 2 });
+    expect(body.filesFreedBytes).toBe('slip bytes'.length);
+
+    await expect(fs.stat(oldFile)).rejects.toThrow();
+    await expect(fs.stat(freshFile)).resolves.toBeTruthy();
+    await expect(fs.stat(notAKey)).resolves.toBeTruthy();
   });
 });

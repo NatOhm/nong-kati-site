@@ -14,8 +14,10 @@
  *     the order's own upload token)
  *   - the checkout flow itself right after upload
  *
- * Storage still lives in the DB (SiteSetting) as today; moving blobs to a
- * private object store (Supabase Storage) can later reuse these helpers.
+ * Since 2026-11-15 the bytes are private FILES under `NK_SLIP_DIR`
+ * (src/lib/slipStore.ts) — a subdirectory of the media root, so the public
+ * image route can never reach them. Legacy `slip:` settings rows are still
+ * read as a fallback until scripts/extract-slips-to-files.mjs has run.
  */
 
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';

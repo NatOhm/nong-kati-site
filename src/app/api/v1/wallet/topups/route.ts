@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { getCustomerFromToken } from '@/api/customerAuth';
 import { prisma } from '@/lib/db';
+import { decodeDataUrl } from '@/lib/imageStore';
 import { mintSlipStorageKey, slipImageRoute } from '@/lib/slipSecurity';
+import { writeSlip } from '@/lib/slipStore';
 import { roundThb } from '@/lib/walletCredit';
 
 export const dynamic = 'force-dynamic';
@@ -87,9 +89,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // earlier evidence.
   let reference: string | null = null;
   if (slipDataUrl) {
-    const key = mintSlipStorageKey();
-    await prisma.siteSetting.create({ data: { key, value: slipDataUrl } });
-    reference = slipImageRoute(key);
+    // Private file under NK_SLIP_DIR (src/lib/slipStore.ts), not a settings
+    // row: same evidence rules as an order slip.
+    const decoded = decodeDataUrl(slipDataUrl);
+    if (decoded) {
+      const key = mintSlipStorageKey();
+      await writeSlip(key, decoded.bytes);
+      reference = slipImageRoute(key);
+    }
   }
   if (note) {
     // The reference column is the only free-text slot on the ledger row; keep

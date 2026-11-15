@@ -58,6 +58,10 @@ const h = vi.hoisted(() => {
     notifyStockLow: vi.fn(async () => undefined),
     notifyStockOutOf: vi.fn(async () => undefined),
   };
+  const slipStore = {
+    // Slip bytes go to a private file now (src/lib/slipStore.ts), not a row.
+    writeSlip: vi.fn(async (_key: string, _bytes: Buffer) => undefined),
+  };
   const slipSec = {
     isValidSlipUploadToken: vi.fn(() => true),
     mintSlipStorageKey: vi.fn(() => 'slip:abc123'),
@@ -116,7 +120,7 @@ const h = vi.hoisted(() => {
   const codes = {
     getDeliveredCodes: vi.fn(async (_orderId: string): Promise<Row[]> => []),
   };
-  return { prisma, orders, fulfil, notify, slipSec, slipok, slip2go, rate, manualTransfer, codes };
+  return { prisma, orders, fulfil, notify, slipSec, slipStore, slipok, slip2go, rate, manualTransfer, codes };
 });
 
 vi.mock('@/lib/db', () => ({ prisma: h.prisma }));
@@ -124,6 +128,7 @@ vi.mock('@/api/orders', () => h.orders);
 vi.mock('@/lib/fulfilment', () => h.fulfil);
 vi.mock('@/lib/notify', () => h.notify);
 vi.mock('@/lib/slipSecurity', () => h.slipSec);
+vi.mock('@/lib/slipStore', () => h.slipStore);
 vi.mock('@/lib/delivery/customerCodes', () => h.codes);
 vi.mock('@/lib/payment/slipok', () => h.slipok);
 vi.mock('@/lib/payment/slip2go', () => h.slip2go);
@@ -190,7 +195,7 @@ beforeEach(() => {
   h.prisma.paymentAttempt.findFirst.mockResolvedValue({ id: 'att-flow' });
   h.prisma.paymentAttempt.update.mockResolvedValue({});
   h.prisma.order.update.mockResolvedValue({});
-  h.prisma.siteSetting.create.mockResolvedValue({});
+  h.slipStore.writeSlip.mockResolvedValue(undefined);
   h.manualTransfer.getManualTransferInfo.mockResolvedValue({
     enabled: true,
     accountName: 'ร้านนกกะทา',
@@ -435,7 +440,7 @@ describe('provider dispatch in POST /api/v1/payments/slip-verify', () => {
         gatewayStatusCode: 'slip2go',
       }),
     });
-    expect(h.prisma.siteSetting.create).toHaveBeenCalledTimes(1);
+    expect(h.slipStore.writeSlip).toHaveBeenCalledTimes(1);
   });
 
   it('closes the SlipOK-fallback gap: wrong receiver on the fallback path 422s too', async () => {
@@ -492,12 +497,11 @@ describe('evidence + admin fallback', () => {
 
     // The image went to the private slip: namespace and is linked to the
     // order — the admin's จัดการคำสั่งซื้อ panel shows it during manual review.
-    expect(h.prisma.siteSetting.create).toHaveBeenCalledTimes(1);
-    const created = (
-      h.prisma.siteSetting.create.mock.calls[0]![0] as { data: { key: string; value: string } }
-    ).data;
-    expect(created.key.startsWith('slip:')).toBe(true);
-    expect(created.value.startsWith('data:image/png;base64,')).toBe(true);
+    expect(h.slipStore.writeSlip).toHaveBeenCalledTimes(1);
+    const [storedKey, storedBytes] = h.slipStore.writeSlip.mock.calls[0]! as [string, Buffer];
+    expect(storedKey.startsWith('slip:')).toBe(true);
+    // PNG magic bytes — the file holds the image itself, not a data URL.
+    expect(storedBytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))).toBe(true);
     expect(h.prisma.order.update).toHaveBeenCalledWith({
       where: { id: ORDER.id },
       data: {
@@ -520,7 +524,7 @@ describe('evidence + admin fallback', () => {
 
     const res = await callVerify();
     expect(res.status).toBe(200);
-    expect(h.prisma.siteSetting.create).toHaveBeenCalledTimes(1);
+    expect(h.slipStore.writeSlip).toHaveBeenCalledTimes(1);
     // Confirmed payments do not need the manual-review ping.
     expect(h.notify.notifyPaymentPending).not.toHaveBeenCalled();
     expect(h.notify.notifyPaymentConfirmed).toHaveBeenCalled();
@@ -536,7 +540,7 @@ describe('evidence + admin fallback', () => {
     const body = (await res.json()) as { status: string; slipImageUrl: string };
     expect(body.status).toBe('slip_received');
     expect(body.slipImageUrl).toContain('/slip-download/');
-    expect(h.prisma.siteSetting.create).toHaveBeenCalledTimes(1);
+    expect(h.slipStore.writeSlip).toHaveBeenCalledTimes(1);
     expect(h.notify.notifyPaymentPending).toHaveBeenCalledWith({
       orderNumber: ORDER.orderNumber,
       totalThb: 300,
@@ -552,7 +556,7 @@ describe('evidence + admin fallback', () => {
     >;
     const res = await route['POST']!(postUpload());
     expect(res.status).toBe(403);
-    expect(h.prisma.siteSetting.create).not.toHaveBeenCalled();
+    expect(h.slipStore.writeSlip).not.toHaveBeenCalled();
     expect(h.notify.notifyPaymentPending).not.toHaveBeenCalled();
   });
 });
@@ -577,7 +581,7 @@ describe('entry-point boundaries (adversarial pass, 30 ต.ค.)', () => {
     // Ordering: an order ID alone must not be able to spend quota or make
     // us store arbitrary images.
     expect(h.slip2go.verifySlip2Go).not.toHaveBeenCalled();
-    expect(h.prisma.siteSetting.create).not.toHaveBeenCalled();
+    expect(h.slipStore.writeSlip).not.toHaveBeenCalled();
     expect(h.prisma.order.update).not.toHaveBeenCalled();
   });
 
@@ -591,7 +595,7 @@ describe('entry-point boundaries (adversarial pass, 30 ต.ค.)', () => {
     expect(res.status).toBe(409);
     expect(((await res.json()) as { error: string }).error).toBe('ORDER_NOT_PAYABLE');
     expect(h.slip2go.verifySlip2Go).not.toHaveBeenCalled();
-    expect(h.prisma.siteSetting.create).not.toHaveBeenCalled();
+    expect(h.slipStore.writeSlip).not.toHaveBeenCalled();
   });
 
   it('maps a duplicate slip (provider 200501 → INVALID_SLIP) to 422 without fulfilling', async () => {
@@ -632,7 +636,7 @@ describe('entry-point boundaries (adversarial pass, 30 ต.ค.)', () => {
     expect(((await res.json()) as { error: string }).error).toBe('FILE_TOO_LARGE');
     // Never buffered into the evidence row, never forwarded upstream.
     expect(h.slip2go.verifySlip2Go).not.toHaveBeenCalled();
-    expect(h.prisma.siteSetting.create).not.toHaveBeenCalled();
+    expect(h.slipStore.writeSlip).not.toHaveBeenCalled();
   });
 
   it('keeps checking when the evidence write fails — slipStored:false, verdict still returned', async () => {
@@ -642,7 +646,7 @@ describe('entry-point boundaries (adversarial pass, 30 ต.ค.)', () => {
       code: 'AMOUNT_MISMATCH',
       detail: 'slip 250 vs order 300',
     });
-    h.prisma.siteSetting.create.mockRejectedValueOnce(new Error('db down'));
+    h.slipStore.writeSlip.mockRejectedValueOnce(new Error('disk full'));
 
     const res = await callVerify();
     expect(res.status).toBe(422);
