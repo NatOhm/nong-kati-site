@@ -233,9 +233,13 @@ Three things this checkout gets wrong by default, all caught before the window o
   (`ssh -N -L 3308:localhost:3306 …`) and point `TARGET_DATABASE_URL` at `:3308`. The driver warns
   when something is already listening on the target port; it cannot tell the tunnel from the
   container, so check which one it is.
-- **The Plesk panel (`https://nongkatistore.com:8443`) serves a certificate Chromium will not
-  accept** — the automation browser stops on it. Drive the panel in a normal browser, or consider
-  it a deliberate human-only surface; `curl -k` reaches it for read-only checks.
+- **Do not open `https://nongkatistore.com:8443` directly** — that certificate is rejected and the
+  browser stops on it. Go through the clientarea SSO instead (clientarea → product 74879 →
+  **MySQL® Databases**), which lands on `https://thsv93.hostatom.com:8443/smb/…` and works.
+- **Plesk prefixes every database and user with the subscription prefix.** The panel's Add Database
+  form shows `nongka_` as a fixed prefix, so the database created here is
+  `nongka_nongkati_nongkatistore` (the runbook's `nong_kati` predates that discovery). Check the
+  name on `/smb/database/list` before pasting it into any URL.
 
 In a second terminal, prove the tunnel reaches MariaDB (you will be prompted for the DB password):
 
