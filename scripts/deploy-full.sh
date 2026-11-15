@@ -17,6 +17,10 @@
 #                     touch tmp/restart.txt. Any failure rolls .next back.
 #   5. verify       — poll /api/v1/version until the new BUILD_ID serves, then
 #                     check extract-check.txt + health.
+#   6. certify      — run scripts/postswitch-check.mjs against the live site and
+#                     the target database. A release that is live but fails this
+#                     gate exits non-zero and says so; SKIP_POSTSWITCH=1 opts out
+#                     (pre-cutover only) and prints that the release is UNVERIFIED.
 #
 # If SSH auth fails, the script prints the panel Run-Now one-liner (GitHub raw
 # path) so the deploy can still be finished by hand — nothing is left half-done
@@ -28,6 +32,9 @@
 #   bash scripts/deploy-full.sh                 # full loop, password prompt
 #   SKIP_BUILD=1 bash scripts/deploy-full.sh    # reuse fresh build/bundle
 #   DRY_RUN=1 bash scripts/deploy-full.sh       # everything except ssh + push
+#   bash scripts/deploy-full.sh --postswitch-only   # just re-run the gate (e.g. after a
+#                                                  # panel deploy); needs SITE_URL +
+#                                                  # TARGET_DATABASE_URL, changes nothing
 #
 # Env overrides:
 #   HOSTATOM_SSH_HOST (thsv93.hostatom.com)  HOSTATOM_SSH_USER (nongka)
@@ -58,6 +65,50 @@ STAGE=".deploy-stage"
 command -v tar  >/dev/null || die "tar not found (run from Git Bash)."
 command -v git  >/dev/null || die "git not found."
 command -v ssh  >/dev/null || die "ssh not found."
+
+START_EPOCH="$(date +%s)"
+
+# ── Post-switch certification ────────────────────────────────────────────────
+# "Live" is not "working". This runs the Phase 7 gate against the release that
+# is actually serving and exits non-zero when it fails — a deploy that ships a
+# broken shop must not look like a green deploy.
+run_postswitch() {
+  local base="$1" max_uptime="$2"
+
+  if [ "${SKIP_POSTSWITCH:-0}" = "1" ]; then
+    warn "POST-SWITCH CHECK SKIPPED (SKIP_POSTSWITCH=1) — this release is live but UNVERIFIED."
+    return 0
+  fi
+
+  if [ -z "${TARGET_DATABASE_URL:-}" ] && [ -f .env.cutover ]; then
+    set -a; . ./.env.cutover; set +a
+  fi
+  if [ -z "${TARGET_DATABASE_URL:-}" ]; then
+    printf '\n\033[1;31m✖ POST-SWITCH CHECK COULD NOT RUN — TARGET_DATABASE_URL is not set.\033[0m\n' >&2
+    printf '  The release is live but UNVERIFIED: nothing certified the running app against the\n' >&2
+    printf '  database it is supposed to be reading.\n' >&2
+    printf '  Set TARGET_DATABASE_URL (or put it in .env.cutover), then re-run:\n' >&2
+    printf '    SITE_URL=%s bash scripts/deploy-full.sh --postswitch-only\n' "$base" >&2
+    printf '  A pre-cutover deploy that genuinely cannot certify may pass SKIP_POSTSWITCH=1.\n' >&2
+    return 1
+  fi
+
+  say "Certify: running the post-switch check against $base (max uptime ${max_uptime}s)…"
+  if node scripts/postswitch-check.mjs --base="$base" --max-uptime="$max_uptime"; then
+    printf '\n\033[1;32m✅ POST-SWITCH CHECK PASSED — the live release is certified against the target database.\033[0m\n'
+    return 0
+  fi
+  printf '\n\033[1;31m✖ POST-SWITCH CHECK FAILED — %s is serving the build but is NOT certified.\033[0m\n' "$base" >&2
+  printf '  The failing check is named above. The build stays live; fix the cause and re-run:\n' >&2
+  printf '    SITE_URL=%s bash scripts/deploy-full.sh --postswitch-only\n' "$base" >&2
+  return 1
+}
+
+# Re-run only the gate (after a panel deploy, or after fixing a failed one).
+if [ "${1:-}" = "--postswitch-only" ]; then
+  run_postswitch "$SITE_URL" "${POSTSWITCH_MAX_UPTIME:-1800}"
+  exit $?
+fi
 
 # ── 1. Build (or reuse) ──────────────────────────────────────────────────────
 BUILD_ID=""
@@ -212,4 +263,31 @@ $([ "$LIVE" = "$BUILD_ID" ] && echo "✅ DEPLOY LANDED — production is serving
 ──────────────────────────────────────────────────────────────────────────────
 SUMMARY
 
-[ "$LIVE" = "$BUILD_ID" ]
+if [ "$LIVE" != "$BUILD_ID" ]; then
+  exit 1
+fi
+
+# ── 6. Certify ───────────────────────────────────────────────────────────────
+# The build is live; now prove it works against the target database. Uptime is
+# bounded by how long this deploy took, so a process older than that (i.e. the
+# old build, or a pooled connection) fails the restart check.
+POSTSWITCH_MAX_UPTIME="$(( $(date +%s) - START_EPOCH + 300 ))"
+if ! run_postswitch "$SITE_URL" "$POSTSWITCH_MAX_UPTIME"; then
+  cat <<FAILED
+
+──────────────────────────────────────────────────────────────────────────────
+ ❌ DEPLOY IS LIVE BUT NOT CERTIFIED
+──────────────────────────────────────────────────────────────────────────────
+ BUILD_ID live  : $LIVE
+ post-switch    : FAILED (see the failing check above)
+
+ The new build is serving; the shop has not been proven to work against the
+ database. Treat this release as broken until it passes:
+   SITE_URL=$SITE_URL bash scripts/deploy-full.sh --postswitch-only
+ Rollback if it cannot be made green: re-run Run-Now for the previous build.
+──────────────────────────────────────────────────────────────────────────────
+FAILED
+  exit 3
+fi
+
+exit 0

@@ -250,6 +250,32 @@ curl -s https://nongkatistore.com/ | grep -c turbopack    # 0 = new build (old b
 The `turbopack` grep is the fastest build fingerprint: the broken old build (`vXkxrhTAsXOw2NRxcrQ_1`)
 loads `turbopack-*.js`; the Turbopack-less production build never does.
 
+## Step 5b — Certify (the post-switch check)
+
+"Live" is not "working": the steps above prove the right bytes are being served, not that the shop
+runs against its database. `scripts/postswitch-check.mjs` is the 22-check Phase 7 gate — health, a
+real table query through the app's schema, migrations applied, a restarted process, catalogue
+counts against MariaDB, admin password + 2FA + cookie, one real order, one code redemption, media
+and the storefront HTML. It writes fixtures and restores them, so two runs leave the shop
+identical.
+
+```bash
+export TARGET_DATABASE_URL="mysql://…@127.0.0.1:3307/nong_kati"   # the DB the app should read
+export SITE_URL=https://nongkatistore.com
+
+# after a manual panel deploy (Steps 1–4 above), run the gate on its own:
+bash scripts/deploy-full.sh --postswitch-only
+```
+
+**It fails loudly.** A failing check exits non-zero and names itself (`catalogue`, `admin login`,
+`order`, …); the release stays live but unreported as verified — treat it as broken until it
+passes. `bash scripts/deploy-full.sh` (the SSH deploy loop) runs the same gate automatically as its
+last step, bounded by how long the deploy took so a stale process fails the restart check.
+
+`SKIP_POSTSWITCH=1` skips it and prints `this release is live but UNVERIFIED` in the output — the
+only legitimate use is a pre-cutover deploy whose database does not exist yet. Do not make it the
+habit: without the gate a green deploy means only that the bundle extracted.
+
 ## Step 6 — Cleanup
 
 File Manager → delete `extract-check.txt` (and any debug files the run created). Keep
