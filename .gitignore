@@ -67,3 +67,4 @@ deploy-bundle.tar.gz
 
 # Runtime image store (uploads land here; NK_MEDIA_DIR in production)
 /storage/
+.env.phase5.local

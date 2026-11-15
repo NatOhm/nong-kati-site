@@ -82,7 +82,9 @@ raw `@` or `/` in a password silently truncates the host or the database name. I
 symbol, it has to be percent-encoded everywhere, which is a needless trap.
 
 **Collation:** the database must be `utf8mb4`. Plesk creates MariaDB databases `utf8mb4` by
-default, but check it in phpMyAdmin:
+default, **but not on this server**: the database created on 2026-11-15 came out
+`utf8mb3_general_ci`, so the `ALTER` below is a required step here, not a contingency. Check it
+in phpMyAdmin:
 
 ```sql
 SELECT DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME
