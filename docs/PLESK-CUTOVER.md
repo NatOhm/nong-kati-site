@@ -614,9 +614,10 @@ reference (both literal keys and the ones resolved through constants, e.g. `NK_R
 `NK_GIFT_CODE_ENCRYPTION_KEY`), so this is the real set, not the `.env.example` wish list.
 
 **Status legend:** **I** = recorded in `docs/hostatom-live.md` as an Infisical-prod secret ·
-**P** = recorded as a Plesk panel variable · **?** = not recorded anywhere in this repo; **check
-Infisical** (`project 80151198-f2df-…`, env `prod`) before assuming it exists or is absent. The
-agent cannot read that project, so **?** rows are unverified, not missing.
+**P** = recorded as a Plesk panel variable · **A** = **absent from Infisical prod, audited
+2026-11-15** · **?** = not recorded anywhere in this repo before that audit (see the inventory
+below). The audit read the project's key list with values hidden — no secret value was revealed
+or copied.
 
 | Key | Read by | Format / what happens if absent | Status |
 | --- | --- | --- | --- |
@@ -629,50 +630,84 @@ agent cannot read that project, so **?** rows are unverified, not missing.
 | `NK_GIFT_CODE_ENCRYPTION_KEY` | `src/lib/crypto/giftCode.ts` | 64 hex; **copy, never regenerate** (§2) | **I** |
 | `NK_GIFT_CODE_ENCRYPTION_KEY_V2` | `giftCode.ts` | 64 hex, or absent (falls back to the key above) | **I** |
 | `NK_GIFT_CODE_ENCRYPTION_KEY_V1` | nothing — this build never reads it | the historical duplicate; harmless, ignorable | **I** |
-| `NK_GIFT_CODE_ACTIVE_KEY_VERSION` | `giftCode.ts` | `1` or `2`, unset ⇒ 1; leave unset | **?** (leave unset) |
+| `NK_GIFT_CODE_ACTIVE_KEY_VERSION` | `giftCode.ts` | `1` or `2`, unset ⇒ 1; leave unset | **A** (leave unset) |
 | `NK_SLIP2GO_SECRET` | `src/lib/payment/slip2go.ts` | bearer secret; absent ⇒ `isSlip2GoConfigured()` is false and the SlipOK path is used instead — with neither configured, slips are checked by hand | **I** |
-| `NK_SLIP2GO_BASE` | `slip2go.ts` | unset ⇒ `https://connect.slip2go.com` | **?** (leave unset) |
-| `NK_SLIP_TOKEN_SECRET` | slip status tokens | unset ⇒ reuses `NK_JWT_SECRET` | **?** (optional) |
+| `NK_SLIP2GO_BASE` | `slip2go.ts` | unset ⇒ `https://connect.slip2go.com` | **A** (leave unset) |
+| `NK_SLIP_TOKEN_SECRET` | slip status tokens | unset ⇒ reuses `NK_JWT_SECRET` | **A** (optional) |
 | `NK_MEDIA_DIR` | `src/lib/imageStore.ts` (uploads + `GET /api/v1/images/[key]`) | absolute path for uploaded images; unset ⇒ `<cwd>/storage/media`. Set it to `/httpdocs/storage/media` so a deploy (which rewrites the docroot) cannot shadow it | **new** — add at cutover |
 | `NK_SLIP_DIR` | `src/lib/slipStore.ts` (payment-slip evidence) | where slip files live; unset ⇒ `<NK_MEDIA_DIR>/private/slips`, which is what you want. Only set it to move slips to a different disk — the directory must not be web-served | unchanged (optional) |
-| `NK_RESEND_API_KEY` | `src/lib/email/config.ts` | `re_…`; absent ⇒ outbox rows stay failed, no customer email | **?** |
-| `NK_RESEND_FROM_EMAIL` | `src/lib/email/config.ts` | a verified sender on the Resend domain | **?** |
-| `NK_RESEND_API_URL` | `src/lib/email/config.ts` | override only; leave unset | **?** (optional) |
-| `NK_CRON_SECRET` | internal sweeps (order expiry, outbox drain) | random hex header value; absent ⇒ those routes 401 (fail-closed), orders never auto-expire | **?** |
-| `NK_INTERNAL_TOKEN` | `/api/v1/internal/*` | random hex; absent ⇒ internal routes refuse non-admin callers | **?** |
+| `NK_RESEND_API_KEY` | `src/lib/email/config.ts` | `re_…`; absent ⇒ outbox rows stay failed, no customer email | **I** ✓ prod + dev |
+| `NK_RESEND_FROM_EMAIL` | `src/lib/email/config.ts` | a verified sender on the Resend domain | **I** ✓ prod + dev |
+| `NK_RESEND_API_URL` | `src/lib/email/config.ts` | override only; leave unset | **A** (correct — unset in prod) |
+| `NK_CRON_SECRET` | internal sweeps (order expiry, outbox drain) | random hex header value; absent ⇒ those routes 401 (fail-closed), orders never auto-expire | **A** |
+| `NK_INTERNAL_TOKEN` | `/api/v1/internal/*` | random hex; absent ⇒ internal routes refuse non-admin callers | **A** |
 | `NK_PAYMENT_MOCK` | `src/lib/payment/omise.ts` | mock only when `NODE_ENV !== production`; **must not be `true` in prod** | **I** (leave false) |
-| `NK_OMISE_SECRET_KEY` | card gateway path | unused on the manual-transfer checkout | **?** (optional) |
-| `NK_OMISE_WEBHOOK_SECRET` | card webhook | unused today | **?** (optional) |
-| `NK_OMISE_API_BASE` | Omise client base | unset ⇒ Omise default | **?** (optional) |
-| `NK_TICKET_SECRET` | `src/api/supportTickets.ts` | HMAC secret; falls back to `NK_ORDER_SECRET`, `NEXTAUTH_SECRET`, then a hardcoded dev string | **?** |
-| `NK_ORDER_SECRET` | same fallback chain | as above | **?** (optional) |
-| `NEXTAUTH_SECRET` | same fallback chain | as above | **?** (optional) |
-| `UPSTASH_REDIS_REST_URL` | `src/lib/rateLimit.ts` | shared limiter; absent ⇒ in-process limiter | **?** |
-| `UPSTASH_REDIS_REST_TOKEN` | `src/lib/rateLimit.ts` | paired with the URL | **?** |
-| `NK_RATE_LIMIT_STRICT` | `rateLimit.ts` | `true` only once Upstash is configured; strict mode fails closed on Redis errors | **?** (leave unset) |
-| `NK_CSP_REPORT_ONLY` | CSP middleware | unset ⇒ enforce with nonce; never `true` in prod | **?** (leave unset) |
-| `NK_CSP_UNSAFE_INLINE` | CSP middleware | relaxation hatch; leave unset in prod | **?** (leave unset) |
-| `NK_GOOGLE_CLIENT_ID` / `NK_GOOGLE_CLIENT_SECRET` | `src/lib/oauth.ts` | customer Google login; absent ⇒ button unusable | **?** (optional) |
-| `NK_FB_APP_ID` / `NK_FB_APP_SECRET` | `src/lib/oauthFacebook.ts` | Facebook login | **?** (optional) |
-| `LINE_CHANNEL_ID` / `LINE_CHANNEL_SECRET` (and `LINE_CLIENT_ID` / `LINE_CLIENT_SECRET`) | `src/lib/oauth.ts` | LINE login | **?** (optional) |
-| `FACEBOOK_APP_ID` / `FACEBOOK_APP_SECRET`, `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | `oauth*.ts` legacy fallbacks | only if the `NK_*` names are unset | **?** (optional) |
-| `NK_TWILIO_ACCOUNT_SID` / `NK_TWILIO_AUTH_TOKEN` / `NK_TWILIO_FROM_NUMBER` | `src/lib/sms/otpSms.ts` | SMS OTP; absent ⇒ SMS codes are not sent | **?** (optional) |
-| `NK_OTP_DEV_MODE` | `otpSms.ts` | `1` logs the OTP instead of sending — **must not be `1` in prod** | **?** (leave unset) |
-| `NK_DISCORD_WEBHOOK_URL` | alerting helpers | webhook URL | **?** (optional) |
-| `NEXT_PUBLIC_API_URL` | client API base override | unset ⇒ same-origin | **?** (leave unset) |
-| `SLIP_VERIFY_BASE_OVERRIDE` | slip verification | **test hook — must be unset in production** | **?** (must be unset) |
+| `NK_OMISE_SECRET_KEY` | card gateway path | unused on the manual-transfer checkout | **A** (optional) |
+| `NK_OMISE_WEBHOOK_SECRET` | card webhook | unused today | **A** (optional) |
+| `NK_OMISE_API_BASE` | Omise client base | unset ⇒ Omise default | **A** (optional) |
+| `NK_TICKET_SECRET` | `src/api/supportTickets.ts` | HMAC secret; falls back to `NK_ORDER_SECRET`, `NEXTAUTH_SECRET`, then a hardcoded dev string | **A** |
+| `NK_ORDER_SECRET` | same fallback chain | as above | **A** (optional) |
+| `NEXTAUTH_SECRET` | same fallback chain | as above | **A** (optional) |
+| `UPSTASH_REDIS_REST_URL` | `src/lib/rateLimit.ts` | shared limiter; absent ⇒ in-process limiter | **A** |
+| `UPSTASH_REDIS_REST_TOKEN` | `src/lib/rateLimit.ts` | paired with the URL | **A** |
+| `NK_RATE_LIMIT_STRICT` | `rateLimit.ts` | `true` only once Upstash is configured; strict mode fails closed on Redis errors | **A** (leave unset) |
+| `NK_CSP_REPORT_ONLY` | CSP middleware | unset ⇒ enforce with nonce; never `true` in prod | **A** (leave unset) |
+| `NK_CSP_UNSAFE_INLINE` | CSP middleware | relaxation hatch; leave unset in prod | **A** (leave unset) |
+| `NK_GOOGLE_CLIENT_ID` / `NK_GOOGLE_CLIENT_SECRET` | `src/lib/oauth.ts` | customer Google login; absent ⇒ button unusable | **A** (optional) |
+| `NK_FB_APP_ID` / `NK_FB_APP_SECRET` | `src/lib/oauthFacebook.ts` | Facebook login | **A** (optional) |
+| `LINE_CHANNEL_ID` / `LINE_CHANNEL_SECRET` (and `LINE_CLIENT_ID` / `LINE_CLIENT_SECRET`) | `src/lib/oauth.ts` | LINE login | **A** (optional) |
+| `FACEBOOK_APP_ID` / `FACEBOOK_APP_SECRET`, `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | `oauth*.ts` legacy fallbacks | only if the `NK_*` names are unset | **A** (optional) |
+| `NK_TWILIO_ACCOUNT_SID` / `NK_TWILIO_AUTH_TOKEN` / `NK_TWILIO_FROM_NUMBER` | `src/lib/sms/otpSms.ts` | SMS OTP; absent ⇒ SMS codes are not sent | **A** (optional) |
+| `NK_OTP_DEV_MODE` | `otpSms.ts` | `1` logs the OTP instead of sending — **must not be `1` in prod** | **A** (leave unset) |
+| `NK_DISCORD_WEBHOOK_URL` | alerting helpers | webhook URL | **A** (optional) |
+| `NEXT_PUBLIC_API_URL` | client API base override | unset ⇒ same-origin | **A** (leave unset) |
+| `SLIP_VERIFY_BASE_OVERRIDE` | slip verification | **test hook — must be unset in production** | **A** (must be unset) |
 | `NK_SLIP_OK_KEY` / `NK_SLIP_OK_BRANCH` | SlipOK variant | not used by the Slip2Go path | documented as local-only |
 | `GIT_SHA` | `/api/v1/version`, build-info | `scripts/stamp-git-sha.mjs` writes `.next/GIT_SHA` during `npm run build`; the env var is only the fallback | **I** |
 | `GIT_REF` / `VERCEL_GIT_COMMIT_REF` / `VERCEL_GIT_COMMIT_SHA` | version/build-info | release identity only | **I** / **P** |
 | `NODE_ENV` / `PORT` | Next.js + Passenger | supplied by the runtime; do not set in the panel | runtime |
 | `NK_SENTRY_DSN` | nothing in `src/` | appears in `.env.example` only; not read by this build | not used |
 
-**What to do with this today:** open Infisical prod and confirm every **?** row that the shop
-actually depends on — `NK_RESEND_API_KEY`, `NK_RESEND_FROM_EMAIL`, `NK_CRON_SECRET`,
-`NK_INTERNAL_TOKEN`, the Upstash pair, and `NK_TICKET_SECRET` are the ones whose absence is felt
-by customers or by operations. Add nothing with a *new* value: a corrected secret takes effect
-at the next Passenger respawn, which can be minutes later and at random, so treat every value
-edit as a mini-cutover of its own.
+#### Infisical prod — audited 2026-11-15
+
+The **?** rows are now answered. The project's own key list (`nong-kati`,
+`80151198-f2df-4917-a8b4-bbfb315cb0c2`, environment **Production**, values left hidden) holds
+exactly **13 keys**, and every one of them was already documented as **I**:
+
+`DATABASE_DIRECT_URL`, `DATABASE_URL`, `GIT_REF`, `GIT_SHA`, `NEXT_PUBLIC_SITE_URL`,
+`NK_GIFT_CODE_ENCRYPTION_KEY`, `NK_GIFT_CODE_ENCRYPTION_KEY_V1`, `NK_GIFT_CODE_ENCRYPTION_KEY_V2`,
+`NK_JWT_SECRET`, `NK_PAYMENT_MOCK`, `NK_RESEND_API_KEY`, `NK_RESEND_FROM_EMAIL`,
+`NK_SLIP2GO_SECRET`.
+
+Every other row marked **A** is **absent from Infisical prod** — 25 rows that used to read **?**,
+plus the optional integrations under them. The Development environment holds only the two
+`NK_RESEND_*` keys, so it is not a second copy of production.
+
+What that changes before the cutover:
+
+- **`NK_CRON_SECRET` and `NK_INTERNAL_TOKEN` are not in Infisical.** They must come from the
+  Plesk panel or the sweeps answer 401: unpaid orders never expire and the outbox never drains.
+  `server.js` mirrors `NK_CRON_SECRET` into `tmp/cron-curl.conf` for the scheduler, but only from
+  an env it actually received — mirroring a variable nobody supplies writes nothing. Confirm both
+  in the panel; do not assume Infisical fills them.
+- **The Upstash pair is absent**, so rate limiting stays in-process (per Passenger worker, not
+  shared). That is the current behaviour, not a regression — but it is not a global limiter.
+- **`NK_TICKET_SECRET` is absent** and falls back to `NK_ORDER_SECRET` → `NEXTAUTH_SECRET` → a
+  hardcoded dev string, none of which exist in prod, so ticket links are signed with the fallback
+  constant. Set a real value if support tickets matter.
+- **`NK_PAYMENT_MOCK` is present** (as documented, **I**). Its *value* was deliberately not read;
+  the code mocks only when `NODE_ENV !== production`, so a `true` here is inert in prod — worth
+  one glance in the UI, not a cutover risk.
+- **Nothing that must stay unset is set**: `NK_OTP_DEV_MODE`, `NK_CSP_REPORT_ONLY`,
+  `NK_CSP_UNSAFE_INLINE`, `NK_RATE_LIMIT_STRICT`, `SLIP_VERIFY_BASE_OVERRIDE` and
+  `NEXT_PUBLIC_API_URL` are absent, and `NK_RESEND_API_URL` is unset as required.
+- **Optional integrations are genuinely not configured**: no Google/Facebook/LINE login, no
+  Twilio SMS, no Omise keys, no Discord webhook. Their buttons and paths stay inert — expected,
+  since the shop sells by manual transfer.
+
+Add nothing with a *new* value on audit day: a corrected secret takes effect at the next
+Passenger respawn, which can be minutes later and at random, so treat every value edit as a
+mini-cutover of its own.
 
 #### At cutover — the two database keys
 
