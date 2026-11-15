@@ -248,7 +248,16 @@ Confirm a real file by listing (`ls -l tmp/`) through the task.
 **What this does not fix.** `internal/settings/slip-retention` is daily and
 stays on the GitHub cron (`17 3 * * *`); GitHub still runs the whole workflow
 4–5 times a day, so its housekeeping step is now redundant rather than load
-bearing.
+bearing. The media-orphan sweep (`internal/media/sweep?apply=1`) sits on the
+same daily branch for the same reason — it reads a directory, not a row.
+
+**Media orphans by hand.** `POST /api/v1/internal/media/sweep` with the cron
+header and no `apply` is a **report only**: it answers `scanned`, `orphans`
+(names, capped at 50, with `truncated` when there are more) and `deleted: 0`,
+so a first look costs nothing.
+Add `?apply=1` to delete. Both only consider files whose name is a valid image
+key and which are older than 24 hours, and a file any product or non-`image:`
+setting points at is never touched.
 
 **Verify by effect.** `tmp/sweep-last.json` holds the last orders sweep's
 counters (`scanned`, `expired`, `cutoff`, `timeoutMinutes`); `cutoff` advancing

@@ -47,6 +47,7 @@ describe('housekeeping cron wiring (prod-health-monitor.yml)', () => {
       'internal/promotions/expire',
       'internal/email-outbox/drain',
       'internal/settings/slip-retention',
+      'internal/media/sweep?apply=1',
     ]) {
       expect(workflow, `${ep} must be called by the housekeeping step`).toContain(ep);
     }
@@ -57,9 +58,10 @@ describe('housekeeping cron wiring (prod-health-monitor.yml)', () => {
   it('H3: adds slip retention only off the 10-minute tick', () => {
     const branchAt = workflow.indexOf('if [ "${{ github.event.schedule }}"');
     expect(branchAt, 'schedule branch for endpoint selection missing').toBeGreaterThan(-1);
-    expect(workflow.slice(branchAt)).toContain(
-      'endpoints="$endpoints internal/settings/slip-retention"',
-    );
+    expect(workflow.slice(branchAt)).toContain('internal/settings/slip-retention');
+    // The media sweep is destructive, so the scheduler must pass `apply=1`:
+    // without it the endpoint only reports orphans and never deletes.
+    expect(workflow.slice(branchAt)).toContain('internal/media/sweep?apply=1');
   });
 
   it('H4: an unset secret fails the step loudly instead of failing silently', () => {
@@ -76,6 +78,7 @@ describe('housekeeping cron wiring (prod-health-monitor.yml)', () => {
       'internal/promotions/expire/route.ts',
       'internal/email-outbox/drain/route.ts',
       'internal/settings/slip-retention/route.ts',
+      'internal/media/sweep/route.ts',
     ];
     for (const r of routes) {
       const src = readFileSync(path.join(process.cwd(), 'src/app/api/v1', r), 'utf8');

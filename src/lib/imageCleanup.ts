@@ -91,6 +91,43 @@ export async function pruneOrphanImageRows(
 }
 
 export type ImageFilePruneResult = { scanned: number; deleted: number; freedBytes: number };
+export type OrphanImageFile = { name: string; bytes: number };
+
+/**
+ * List the image files nobody references any more, without touching them.
+ *
+ * Rules shared with the row pruner: a file whose name is not a valid image key
+ * is never a candidate (a stray `.partial` or an operator's own note is not
+ * ours to delete), and anything modified within the last 24 hours is kept
+ * because the admin may still be saving the product that will point at it.
+ */
+export async function findOrphanImageFiles(
+  client: Client,
+  dir: string = mediaDir(),
+  now: Date = new Date(),
+): Promise<{ scanned: number; orphans: OrphanImageFile[] }> {
+  let entries: string[];
+  try {
+    entries = await fs.readdir(dir);
+  } catch {
+    return { scanned: 0, orphans: [] }; // no media dir yet
+  }
+  const candidates = entries.filter((name) => IMAGE_KEY_RE.test(name));
+  if (candidates.length === 0) return { scanned: 0, orphans: [] };
+
+  const referenced = await collectReferencedKeys(client);
+  const cutoffMs = now.getTime() - IMAGE_ORPHAN_MIN_AGE_MS;
+
+  const orphans: OrphanImageFile[] = [];
+  for (const name of candidates) {
+    if (referenced.has(name)) continue;
+    const file = path.join(dir, name);
+    const stat = await fs.stat(file).catch(() => null);
+    if (!stat?.isFile() || stat.mtimeMs > cutoffMs) continue;
+    orphans.push({ name, bytes: stat.size });
+  }
+  return { scanned: candidates.length, orphans };
+}
 
 /**
  * Delete image files nobody references any more.
@@ -105,32 +142,69 @@ export async function pruneOrphanImageFiles(
   dir: string = mediaDir(),
   now: Date = new Date(),
 ): Promise<ImageFilePruneResult> {
-  let entries: string[];
-  try {
-    entries = await fs.readdir(dir);
-  } catch {
-    return { scanned: 0, deleted: 0, freedBytes: 0 }; // no media dir yet
+  const { scanned, orphans } = await findOrphanImageFiles(client, dir, now);
+  let deleted = 0;
+  let freedBytes = 0;
+  for (const orphan of orphans) {
+    const removed = await fs.unlink(path.join(dir, orphan.name)).then(() => true).catch(() => false);
+    if (removed) {
+      deleted += 1;
+      freedBytes += orphan.bytes;
+    }
   }
-  const candidates = entries.filter((name) => IMAGE_KEY_RE.test(name));
-  if (candidates.length === 0) return { scanned: 0, deleted: 0, freedBytes: 0 };
+  return { scanned, deleted, freedBytes };
+}
 
-  const referenced = await collectReferencedKeys(client);
-  const cutoffMs = now.getTime() - IMAGE_ORPHAN_MIN_AGE_MS;
+export type MediaSweepResult = {
+  /** Image files in the directory that look like ours (valid key names). */
+  scanned: number;
+  /** Names of the orphans, capped for a readable cron response. */
+  orphans: string[];
+  /** True when `orphans` is shorter than the number actually found. */
+  truncated: boolean;
+  deleted: number;
+  freedBytes: number;
+  apply: boolean;
+};
+
+/**
+ * The sweep an operator/cron runs: find every unreferenced image file and, with
+ * `apply`, delete it.
+ *
+ * The upload route already prunes opportunistically, but that only runs when an
+ * admin uploads something — a shop nobody edits never reclaims a replaced
+ * photo. This is the same rule set exposed as a standalone operation, dry by
+ * default so a first run can be read before anything is removed.
+ */
+export async function sweepMediaOrphans(
+  client: Client,
+  options: { dir?: string; now?: Date; apply?: boolean; listLimit?: number } = {},
+): Promise<MediaSweepResult> {
+  const apply = options.apply === true;
+  const dir = options.dir ?? mediaDir();
+  const { scanned, orphans } = await findOrphanImageFiles(client, dir, options.now ?? new Date());
+  const limit = options.listLimit ?? 50;
 
   let deleted = 0;
   let freedBytes = 0;
-  for (const name of candidates) {
-    if (referenced.has(name)) continue;
-    const file = path.join(dir, name);
-    const stat = await fs.stat(file).catch(() => null);
-    if (!stat?.isFile() || stat.mtimeMs > cutoffMs) continue;
-    const removed = await fs.unlink(file).then(() => true).catch(() => false);
-    if (removed) {
-      deleted += 1;
-      freedBytes += stat.size;
+  if (apply) {
+    for (const orphan of orphans) {
+      const removed = await fs.unlink(path.join(dir, orphan.name)).then(() => true).catch(() => false);
+      if (removed) {
+        deleted += 1;
+        freedBytes += orphan.bytes;
+      }
     }
   }
-  return { scanned: candidates.length, deleted, freedBytes };
+
+  return {
+    scanned,
+    orphans: orphans.slice(0, limit).map((orphan) => orphan.name),
+    truncated: orphans.length > limit,
+    deleted,
+    freedBytes,
+    apply,
+  };
 }
 
 /** Row GC + file GC in one call — what an upload runs after the bytes are stored. */

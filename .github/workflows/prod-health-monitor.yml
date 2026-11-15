@@ -167,8 +167,12 @@ jobs:
             exit 1
           fi
           endpoints="internal/orders/expire internal/promotions/expire internal/email-outbox/drain"
+          # Daily (not every 10 minutes): both of these are storage housekeeping
+          # that scans a table or a directory, so a tick per day is the right
+          # cadence. `?apply=1` is what turns the media sweep from a report into
+          # a deletion — without it the endpoint only lists orphans.
           if [ "${{ github.event.schedule }}" != "*/10 * * * *" ]; then
-            endpoints="$endpoints internal/settings/slip-retention"
+            endpoints="$endpoints internal/settings/slip-retention internal/media/sweep?apply=1"
           fi
           fail=0
           failed=""
