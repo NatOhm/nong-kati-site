@@ -35,11 +35,17 @@ Sessions expire in minutes — re-SSO right before each Plesk step.
 
 ## Step 0 — Build + stage the bundle (local, Git Bash)
 
-> **Automated:** `bash scripts/deploy-artifact.sh` does Step 0 **and** Step 1 in one go, prints
-> the BUILD_ID fingerprint, the Step-2 one-liner with the raw URL already filled in, and the
-> verification curls. Variants: `SKIP_BUILD=1` (reuse a fresh build), `DRY_RUN=1`
-> (build + stage only, no push). The commands below are the same flow spelled out manually —
-> use them as fallback or to understand what the script does.
+> **One command for the whole path: `bash scripts/deploy-manual.sh`.** It publishes the bundle
+> (Step 0 + 1), prints the Run-Now instruction, waits until the live site serves the BUILD_ID it
+> just published (Steps 2–5 happen while it watches), and then **certifies the release automatically**
+> with the post-switch gate (Step 5b). A failed certification prints the ❌ banner and exits 3; a
+> switch that never lands exits 1. You click Run Now once and type one command.
+>
+> `bash scripts/deploy-artifact.sh` is the publish-only half (Step 0 **and** Step 1): it prints the
+> BUILD_ID fingerprint, the Step-2 one-liner and the verification curls. Variants: `SKIP_BUILD=1`
+> (reuse a fresh build), `DRY_RUN=1` (build + stage only, no push — and nothing gets certified).
+> The commands below are the same flow spelled out manually — use them as fallback or to
+> understand what the scripts do.
 
 ```bash
 cd "<project root>"                       # webapp/nong-kati/nong-kati
@@ -259,22 +265,39 @@ counts against MariaDB, admin password + 2FA + cookie, one real order, one code 
 and the storefront HTML. It writes fixtures and restores them, so two runs leave the shop
 identical.
 
+**Certification is not a step you remember — it is part of the deploy.**
+
 ```bash
 export TARGET_DATABASE_URL="mysql://…@127.0.0.1:3307/nong_kati"   # the DB the app should read
-export SITE_URL=https://nongkatistore.com
+                                # (or keep it in .env.cutover, which is gitignored)
 
-# after a manual panel deploy (Steps 1–4 above), run the gate on its own:
-bash scripts/deploy-full.sh --postswitch-only
+export SITE_URL=https://nongkatistore.com
+bash scripts/deploy-manual.sh        # publish → you click Run Now → wait → certify
 ```
 
-**It fails loudly.** A failing check exits non-zero and names itself (`catalogue`, `admin login`,
-`order`, …); the release stays live but unreported as verified — treat it as broken until it
-passes. `bash scripts/deploy-full.sh` (the SSH deploy loop) runs the same gate automatically as its
-last step, bounded by how long the deploy took so a stale process fails the restart check.
+That one command does Steps 0–5b. It refuses to start if `TARGET_DATABASE_URL` is missing (exit 2,
+before it publishes anything), waits up to `DEPLOY_WAIT_SECONDS` (default 900) for the live site to
+answer with the BUILD_ID it published, then runs the gate. `bash scripts/deploy-full.sh` (the SSH
+loop) runs the same gate as its own last step — both paths source `scripts/lib/certify.sh`, so the
+checks, the banners and the exit codes are the same code.
 
-`SKIP_POSTSWITCH=1` skips it and prints `this release is live but UNVERIFIED` in the output — the
-only legitimate use is a pre-cutover deploy whose database does not exist yet. Do not make it the
-habit: without the gate a green deploy means only that the bundle extracted.
+| exit | meaning |
+| --- | --- |
+| `0` | the live release passed the gate, or `SKIP_POSTSWITCH=1` said so out loud |
+| `1` | the switch never landed — the site still serves another build |
+| `2` | nothing could certify it (`TARGET_DATABASE_URL` missing); refused before publishing |
+| `3` | **live but not certified** — the ❌ banner names the failing check |
+
+**It fails loudly.** A failing check exits non-zero and names itself (`catalogue`, `admin login`,
+`order`, …), followed by the ❌ DEPLOY IS LIVE BUT NOT CERTIFIED box. The release stays live but is
+not done — treat it as broken until the gate passes. The uptime bound is derived from how long the
+deploy took, so a process older than the deploy fails the restart check.
+
+After fixing the cause, re-run just the gate: `bash scripts/deploy-full.sh --postswitch-only`.
+
+`SKIP_POSTSWITCH=1` skips it and prints `this release is live but UNVERIFIED` — the only legitimate
+use is a pre-cutover deploy whose database does not exist yet. Do not make it the habit: without
+the gate a green deploy means only that the bundle extracted.
 
 ## Step 6 — Cleanup
 
@@ -355,10 +378,23 @@ ship code that uses it.
 
 ## Quick reference — full flow per deploy
 
+**The short version (one command, one click):**
+
+```bash
+export TARGET_DATABASE_URL="mysql://…"        # or .env.cutover
+bash scripts/deploy-manual.sh                 # publish → wait → certify
+# → Run Now in Plesk when it asks; it continues by itself
+# exit 0 = certified · 1 = never landed · 2 = cannot certify · 3 = live but NOT certified
+```
+
+**What that command does, step by step:**
+
 1. Step 0: build + bundle + note `BUILD_ID` (and update Infisical `GIT_SHA`/`GIT_REF`).
 2. Step 1: force-push bundle to `deploy-artifact`.
-3. Step 2: Scheduled Task one-liner → **Run Now** (don't save).
+3. Step 2: Scheduled Task one-liner → **Run Now** (don't save) — the only manual click.
 4. Step 3: `extract-check.txt` == `BUILD_ID` (add deps task only if deps changed).
 5. Step 4: restart if needed (Restart App → console kill fallback).
 6. Step 5: version / health / products / turbopack-grep all green.
-7. Step 6: delete `extract-check.txt`.
+7. **Step 5b: the post-switch gate runs automatically** — 22 checks against the live site and the
+   target database; failure is exit 3 and the ❌ banner, never a silent pass.
+8. Step 6: delete `extract-check.txt`.
