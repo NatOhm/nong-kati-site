@@ -326,7 +326,28 @@ async function pickFixtures() {
       break;
     }
   }
-  if (!variant) throw new Error('no active variant with stock >= 4 and >= 3 available codes');
+
+  // A sold-out shop is a normal state, not a reason to refuse the cutover check: when no
+  // variant qualifies, pick one and stock it through the admin route (which is itself part of
+  // what this gate tests). Cleanup puts the stock counter back exactly where it was.
+  let seeded = false;
+  if (!variant) {
+    const fallback = await prisma.productVariant.findFirst({
+      where: { isActive: true, product: { isActive: true } },
+      select: {
+        id: true,
+        label: true,
+        price: true,
+        stock: true,
+        product: { select: { id: true, name: true, description: true, slug: true } },
+      },
+      orderBy: { id: 'asc' },
+    });
+    if (!fallback) throw new Error('no active product variant to test with — the catalogue is empty');
+    variant = fallback;
+    seeded = true;
+    console.log('  ! no variant has stock + available codes — this run will stock one and restore it');
+  }
 
   const setting = await prisma.siteSetting.findUnique({ where: { key: 'manual-transfer' } });
   let storeAccount = '';
@@ -337,11 +358,14 @@ async function pickFixtures() {
   }
   receiverDigitsForStub = storeAccount;
 
-  return { admin, variant, storeAccount };
+  return { admin, variant, storeAccount, seeded };
 }
 
 // ── the paths ──────────────────────────────────────────────────────────────
 const state = { orders: [], codes: [], imageKeys: [], coupon: null, customer: null };
+// Everything this run creates is timestamped after this, which lets cleanup delete its own
+// stock moves without touching the shop's older history.
+const RUN_STARTED = new Date();
 // Throwaway media root for the image path; NK_MEDIA_DIR is pointed here at boot.
 const MEDIA_DIR = path.join(ROOT, 'tmp', 'precutover-media');
 // 1×1 PNG — small enough to be harmless, real enough to pass the upload's magic-byte
@@ -624,6 +648,33 @@ async function pathImages(ctx) {
     `expected the old file gone and the new one present (A=${aliveA}, B=${aliveB})`);
 }
 
+async function seedStock(ctx) {
+  if (!ctx.seeded) return;
+  console.log('\n0. seed the sold-out fixture (stocked through the admin route, restored afterwards)');
+  const nonce = Date.now().toString(36).toUpperCase();
+  const payload = Array.from({ length: 6 }, (_, i) => `PRECHECK-SEED-${nonce}-${i + 1}`);
+  const res = await api('POST', '/api/v1/admin/stock/bulk', {
+    body: {
+      productId: ctx.variant.product.id,
+      variantId: ctx.variant.id,
+      format: 'short',
+      separator: 'newline',
+      raw: payload.join('\n'),
+      apply: true,
+    },
+    token: ctx.token,
+  });
+  if (res.status !== 200) return fail('seed', `stock upload HTTP ${res.status} ${JSON.stringify(res.json).slice(0, 200)}`);
+
+  const after = await prisma.productVariant.findUnique({ where: { id: ctx.variant.id }, select: { stock: true } });
+  const available = await prisma.giftCode.count({ where: { variantId: ctx.variant.id, status: 'available' } });
+  check('seed',
+    (after?.stock ?? 0) >= 4 && available >= 3,
+    `fixture stocked: stock ${ctx.stockBefore} → ${after?.stock}, ${available} available code(s)`);
+  const hashes = payload.map((p) => createHash('sha256').update(p.trim().toUpperCase()).digest());
+  ctx.seededCodes = hashes;
+}
+
 // ── cleanup ────────────────────────────────────────────────────────────────
 async function cleanup(ctx) {
   if (KEEP) {
@@ -687,10 +738,19 @@ async function cleanup(ctx) {
     const { ids, variantId, count } = ctx.uploadedCodes;
     await quiet('uploaded codes', () => prisma.giftCode.deleteMany({ where: { id: { in: ids } } }));
     await quiet('upload stock moves', () =>
-      prisma.stockMove.deleteMany({ where: { variantId, reason: 'restock', refType: 'upload' } }));
-    await quiet('variant stock', () =>
-      prisma.productVariant.update({ where: { id: variantId }, data: { stock: { decrement: count } } }));
+      prisma.stockMove.deleteMany({
+        where: { variantId, reason: 'restock', refType: 'upload', createdAt: { gte: RUN_STARTED } },
+      }));
   }
+  if (ctx.seededCodes?.length) {
+    await quiet('seeded fixture codes', () =>
+      prisma.giftCode.deleteMany({ where: { codeHash: { in: ctx.seededCodes } } }));
+    await quiet('seeded stock moves', () =>
+      prisma.stockMove.deleteMany({
+        where: { variantId: ctx.variant.id, reason: 'restock', createdAt: { gte: RUN_STARTED } },
+      }));
+  }
+
   if (state.imageKeys.length > 0) {
     await quiet('uploaded images', () =>
       prisma.siteSetting.deleteMany({ where: { key: { in: state.imageKeys.map((k) => `image:${k}`) } } }));
@@ -707,6 +767,12 @@ async function cleanup(ctx) {
         data: { name: ctx.originalProduct.name, description: ctx.originalProduct.description },
       }));
   }
+  // Absolute restore, not increment/decrement: however many codes the run stocked or consumed,
+  // the tested variant's counter ends exactly where it started, so repeated runs cannot drift.
+  if (ctx.variant?.id && typeof ctx.stockBefore === 'number') {
+    await quiet('stock counter restored', () =>
+      prisma.productVariant.update({ where: { id: ctx.variant.id }, data: { stock: ctx.stockBefore } }));
+  }
   console.log('  · test rows removed (nothing from the shop was modified)');
 }
 
@@ -720,12 +786,13 @@ try {
   await startApp(port);
 
   const fixtures = await pickFixtures();
-  ctx = { ...fixtures, token: adminToken(fixtures.admin) };
+  ctx = { ...fixtures, token: adminToken(fixtures.admin), stockBefore: fixtures.variant.stock };
   console.log(`→ fixtures: admin ${fixtures.admin.email}, variant ${fixtures.variant.id} (${fixtures.variant.label}), store account ${fixtures.storeAccount || 'not configured'}`);
   if (!fixtures.storeAccount) {
     console.log('  ! manual-transfer has no account number — receiver policy check is skipped by the app');
   }
 
+  await seedStock(ctx);
   await pathProductSave(ctx);
   await pathCartAndOrder(ctx);
   await pathCouponAndWallet(ctx);
