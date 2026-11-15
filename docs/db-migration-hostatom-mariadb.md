@@ -156,7 +156,7 @@ It derives its fixtures from the target database (an active super_admin, a varia
 and codes, the store's receiving account), boots the real app on a free port with that database,
 drives every path over HTTP, reads the rows back with Prisma, restores the inventory and deletes
 its own test rows, and exits non-zero on any mismatch. Last run against the MariaDB copy:
-**31/31 checks passed** (the image-store path was added last: upload → disk → served bytes → no
+**32/32 checks passed** (the image-store path was added last: upload → disk → served bytes → no
 row → orphan-file GC), three consecutive runs left the copy's numbers identical
 (49 available codes / 167 total / 220 orders).
 
@@ -240,7 +240,7 @@ docker run -d --name nk-mariadb -e MARIADB_ROOT_PASSWORD=… -e MARIADB_DATABASE
 DATABASE_URL="mysql://…" DATABASE_DIRECT_URL="mysql://…" npx prisma migrate deploy   # baseline applied
 TARGET_DATABASE_URL="mysql://…" node scripts/migrate-supabase-to-mariadb.mjs         # 38 tables, 2576 rows, all counts match
 DATABASE_URL="mysql://…" npm run build                                              # compiled
-TARGET_DATABASE_URL="mysql://…" node scripts/precutover-check.mjs                     # 31/31
+TARGET_DATABASE_URL="mysql://…" node scripts/precutover-check.mjs                     # 32/32
 ```
 
 After the check removed its own rows the copy matched the ETL exactly: `Order` 216,
@@ -252,7 +252,7 @@ until Phase 8, so this is a two-minute revert.
 
 ### Phase 7 — verification
 
-- [ ] `TARGET_DATABASE_URL=… node scripts/precutover-check.mjs` → 31/31 against the **production**
+- [ ] `TARGET_DATABASE_URL=… node scripts/precutover-check.mjs` → 32/32 against the **production**
       MariaDB (this is the automated version of the bullets below; they stay as the human
       sanity pass on live traffic).
 - [ ] `/api/v1/version` returns the expected `BUILD_ID`; `/api/v1/health` `database: ok`.

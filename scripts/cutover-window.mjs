@@ -7,6 +7,9 @@
  * build. This script runs the sequence the runbook prescribes and refuses to continue past a
  * failure, so "did we actually do it in the right order" stops being a memory question.
  *
+ * The ETL step empties every target table before copying, so the app must already be stopped
+ * when this runs — the driver does not stop it and cannot tell whether you did.
+ *
  * What it does NOT do: it never touches the running shop. Stopping the app, writing the two
  * DATABASE_URL panel variables, restarting, and the real Slip2Go slip stay human steps
  * (runbook §3 Steps 3 and 6–7). Everything here is idempotent or read-only against the source.
@@ -20,7 +23,7 @@
  *   --skip-etl            schema only (target already has the data)
  *   --skip-images         skip scripts/extract-images-to-files.mjs --apply
  *   --skip-build          skip `npm run build` (the gate needs a build of the target schema)
- *   --skip-check          skip the 31-check gate
+ *   --skip-check          skip the 32-check gate
  *   --backup-dir=DIR      where backup-supabase-db.mjs should write (default: ./db-backups)
  *   --from=STEP           start at a named step (backup|schema|etl|verify|images|build|check)
  *   --allow-dirty         let the window run from a dirty working tree (not advised)
@@ -196,7 +199,7 @@ if (stepEnabled('build')) {
 
 // ── 7. the gate ────────────────────────────────────────────────────────────
 if (stepEnabled('check')) {
-  run('run the 31-check cutover gate', process.execPath, ['scripts/precutover-check.mjs'], {
+  run('run the 32-check cutover gate', process.execPath, ['scripts/precutover-check.mjs'], {
     TARGET_DATABASE_URL: TARGET,
   });
 }

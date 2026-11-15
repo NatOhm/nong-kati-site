@@ -20,7 +20,7 @@ project are untouched, and this branch is not pushed.
 | One baseline migration, no Postgres history | `prisma/migrations/20261115000000_baseline/`; old 34 migrations in `prisma/migrations-archive-postgres/` |
 | `migrate deploy` builds the schema from empty | applied to a fresh `mariadb:10.11` → **39 tables** (38 models + `_prisma_migrations`) |
 | The ETL copies everything | `38 tables, 2576 rows, every count matches` on a pristine target |
-| The write paths work on MariaDB | `scripts/precutover-check.mjs` → **31/31** (run against the `:3307` copy on build `d15dab0`) |
+| The write paths work on MariaDB | `scripts/precutover-check.mjs` → **32/32** (run against the `:3307` copy on build `d15dab0`) |
 | Gift codes decrypt after the move | 170 rows on the copy: **139 at `keyVersion 1`, 31 at `keyVersion 2`**, all decrypted with the current `NK_GIFT_CODE_ENCRYPTION_KEY` and each plaintext's SHA-256 equalled the stored `codeHash` |
 | Nightly backup tooling | `scripts/backup-mariadb.sh`, restore-verified (39 tables, matching counts), retention proven |
 
@@ -253,9 +253,14 @@ TARGET_DATABASE_URL="mysql://nk_app:DBPASS@127.0.0.1:3307/nong_kati" \
   node scripts/migrate-supabase-to-mariadb.mjs --verify-only
 ```
 
-**Checkpoint:** the copy prints `38 tables — 2576 rows copied, every count matches the source`
-(2026-11-14 numbers; they will be slightly higher on the night) and `--verify-only` re-confirms
-with zero differences. Any difference is exit 1 — stop here, nothing has been switched.
+**Checkpoint:** the copy prints `cleared 38 table(s) on the target` followed by
+`✔ verified 38 tables — … rows copied, every count matches the source`, and `--verify-only`
+re-confirms with zero differences. Any difference is exit 1 — stop here, nothing has been switched.
+
+The ETL empties every table it is about to write before inserting, which is what makes a retry
+safe (a run interrupted half-way can simply be run again). That also means **the app must be
+stopped first** — with a live app, a customer could read an empty catalogue during the copy, and
+the clear can fail against rows written mid-run.
 
 ### Step 4 — build the artifact against the target (T−10)
 
@@ -275,10 +280,15 @@ TARGET_DATABASE_URL="mysql://nk_app:DBPASS@127.0.0.1:3307/nong_kati" \
   node scripts/precutover-check.mjs
 ```
 
-**Checkpoint:** `RESULT: 31/31 checks passed`. It writes real rows and real image files (into a
+**Checkpoint:** `RESULT: 32/32 checks passed`. It writes real rows and real image files (into a
 throwaway `tmp/precutover-media`, never your media directory), reads them back, restores
 inventory and deletes its own rows — and refuses to run against a Supabase host. If it is not
-31/31, go to **Rollback A**; production is still on Supabase.
+32/32, go to **Rollback A**; production is still on Supabase.
+
+When no variant has stock (production is sold out as this is written — `SUM(stock) = 0`, 13
+available codes on no variant), the check does not refuse: it stocks one variant through
+`POST /api/v1/admin/stock/bulk` and asserts the result as check `0. seed`. Cleanup sets that
+variant's counter back to its exact pre-run value, so the shop's numbers are unchanged.
 
 ### Step 6 — switch (T−0)
 
