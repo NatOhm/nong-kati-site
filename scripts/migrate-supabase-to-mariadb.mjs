@@ -147,25 +147,42 @@ const counts = {};
 async function writeTable(model, rows) {
   const delegate = prisma[model.model];
 
-  // Idempotence: a table can be attempted several times (FK deferral, the
-  // self-reference passes below). Clearing the rows this run owns first means a
-  // retry can never collide with its own earlier partial insert.
-  const ids = rows.map((r) => r.id).filter((v) => typeof v === 'string');
-  if (ids.length > 0) {
-    for (let i = 0; i < ids.length; i += CHUNK) {
-      await delegate.deleteMany({ where: { id: { in: ids.slice(i, i + CHUNK) } } });
+  if (process.env.ETL_DEBUG) {
+    const distinct = new Set(rows.map((r) => r.id).filter((v) => typeof v === 'string')).size;
+    if (distinct !== rows.length) {
+      console.error(`  [debug] ${model.model}: ${rows.length} rows but only ${distinct} distinct ids`);
     }
   }
 
+  // The table was already emptied in the clear phase below, so this is a pure
+  // insert. Clearing here too would fight foreign keys: a Category cannot be
+  // deleted while its Products still exist, so every retry would collide with
+  // its own earlier rows (that is what made a second run on a populated target
+  // fail with "Invalid `prisma.category.deleteMany()` invocation").
   try {
+    // One transaction for the whole table. Without it a chunked insert that fails
+    // half-way leaves rows behind, and the FK retry then dies on PRIMARY — which is
+    // exactly what turned a transient FK failure into a run that could not be retried.
+    const calls = [];
     for (let i = 0; i < rows.length; i += CHUNK) {
-      await delegate.createMany({ data: rows.slice(i, i + CHUNK) });
+      calls.push(delegate.createMany({ data: rows.slice(i, i + CHUNK) }));
     }
+    if (calls.length > 0) await prisma.$transaction(calls, { timeout: 120_000 });
     counts[model.model] = rows.length;
     return;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
+    if (process.env.ETL_DEBUG) {
+      console.error('  [debug]', msg.split('\n').filter(Boolean)[0]);
+      console.error('  [debug] code=', e?.code, 'meta=', JSON.stringify(e?.meta));
+      console.error('  [debug] rows in payload=', rows.length,
+        '| rows now in table=', await delegate.count().catch(() => 'n/a'));
+    }
     if (!/foreign key|P2003/i.test(msg)) throw e;
+    // A failed chunked insert can leave rows behind (the transaction above is meant to
+    // prevent that, but a partial commit must never turn a retry into PRIMARY). Clear
+    // what we can before the retry; if children exist, the clear phase handles it later.
+    await delegate.deleteMany({}).catch(() => undefined);
   }
 
   // A table that references itself (Category.parentId) cannot satisfy its own
@@ -188,7 +205,15 @@ async function writeTable(model, rows) {
     }
   }
   if (remaining.length > 0) {
-    throw new Error(`${remaining.length} row(s) still violate a foreign key after retries (self-reference or a missing parent)`);
+    const sample = remaining[0];
+    const field = Object.entries(sample).find(([, v]) => v === undefined)?.[0];
+    // Do not leave the rows this loop did insert behind: the outer retry would collide
+    // on PRIMARY and hide the real foreign-key failure.
+    await delegate.deleteMany({}).catch(() => undefined);
+    throw new Error(
+      `${remaining.length} row(s) still violate a foreign key after retries (self-reference or a missing parent)` +
+        ` — first stuck row id=${sample.id ?? '?'}${field ? ` field=${field}` : ''}`,
+    );
   }
   counts[model.model] = rows.length;
 }
@@ -221,6 +246,38 @@ try {
   }
 
   const pending = models.filter((m) => !ONLY || m.model === ONLY);
+
+  // ── clear phase ─────────────────────────────────────────────────────────
+  // Empty every table this run will write, before inserting anything. A table
+  // cannot be emptied while a child still points at it, so failures are
+  // expected here and the loop keeps going: each pass removes what it can, and
+  // children before parents is exactly the order this converges to. Without
+  // this phase a re-run on a populated target dies on the first parent table.
+  if (!ONLY) {
+    const pendingClear = [...pending];
+    let clearing = true;
+    while (pendingClear.length > 0 && clearing) {
+      clearing = false;
+      for (let i = 0; i < pendingClear.length; i++) {
+        const model = pendingClear[i];
+        try {
+          await prisma[model.model].deleteMany({});
+          pendingClear.splice(i--, 1);
+          clearing = true;
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          if (!/foreign key|FOREIGN KEY|P2003/i.test(msg)) throw e;
+        }
+      }
+    }
+    if (pendingClear.length > 0) {
+      console.error('✖ could not empty: ' + pendingClear.map((m) => m.model).join(', '));
+      console.error('  a table that still has children cannot be cleared; is something writing to the target?');
+      process.exit(1);
+    }
+    console.log(`  cleared ${pending.length} table(s) on the target`);
+  }
+
   let progress = true;
   const failures = new Map(); // model -> last error
   while (pending.length > 0 && progress) {
