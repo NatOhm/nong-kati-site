@@ -230,6 +230,18 @@ secret, so it runs only inside the agreed window.
 5. [ ] Start the app; watch `/api/v1/health` → `database: ok`.
 6. [ ] Verify (Phase 7) before touching anything else.
 
+Steps 3–4 plus the image extraction, the build and the gate are one command — the driver runs
+them in this order and stops at the first failure, with a log in `reports/`:
+
+```bash
+TARGET_DATABASE_URL="mysql://nk_app:DBPASS@127.0.0.1:3307/nong_kati" \
+  bash scripts/phase6-cutover.sh --yes
+```
+
+It refuses a non-`mysql://` target, a Supabase host, and a non-loopback target without `--yes`.
+`--dry-run` prints the plan, `--with-backup` takes and verifies a fresh dump first, `--from=etl`
+resumes after a fixed failure. It never stops or starts the app: step 2 stays manual.
+
 **Dry run executed 2026-11-14 21:43** on a pristine MariaDB 10.11 container, in exactly this
 order — the sequence works end to end:
 

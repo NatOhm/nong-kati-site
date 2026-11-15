@@ -195,6 +195,21 @@ backup scripts and the ETL read Postgres through `postgres:17-alpine`), SSH to t
 The server's MariaDB listens on `localhost` only, so the workstation reaches it through an SSH
 tunnel on `127.0.0.1:3307`. Do **not** enable remote database access in Plesk for this.
 
+**One command for Steps 2–5.** The five commands below are the *contract*; the driver runs them in
+that order and stops at the first non-zero exit, so a half-run window cannot look like a finished
+one. Prefer it in the window and keep the individual steps for reading and for a resume:
+
+```bash
+TARGET_DATABASE_URL="mysql://nk_app:DBPASS@127.0.0.1:3307/nong_kati" \
+  bash scripts/phase6-cutover.sh --yes          # migrate deploy → ETL → images → build → gate
+```
+
+`--dry-run` prints the resolved plan and touches nothing; `--with-backup` takes and verifies a
+fresh source dump first; `--from=etl` (or `images|build|check`) resumes after a fixed failure;
+every run leaves `reports/phase6-<stamp>.log`. It refuses a non-`mysql://` target, a Supabase host,
+and — for a non-loopback target — anything without `--yes`. It does **not** stop the Node app: do
+Step 1 by hand first.
+
 ### Pre-flight (T−60 min)
 
 ```bash
