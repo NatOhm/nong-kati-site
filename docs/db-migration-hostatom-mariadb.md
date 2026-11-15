@@ -224,6 +224,11 @@ secret, so it runs only inside the agreed window.
 
 ### Phase 6 — cutover (one window, ~30 min)
 
+Rehearse the driver itself before the window, against the local MariaDB copy —
+`bash scripts/rehearse-phase6.sh` runs the plan, a trimmed plan, the real 32-check gate and a
+deliberate failure, and asserts from the logs that the steps still fire in order
+(`--plan-only` does the two plan cases without a database).
+
 1. [ ] Put the shop to sleep if the window is not already quiet (the app can stay up; the
        risk is writes during the export).
 2. [ ] Freeze writes: stop the Node app from the Plesk Node.js panel.

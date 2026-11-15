@@ -195,7 +195,12 @@ if [ "$DRY_RUN" = "1" ]; then
   say "Dry run — plan only, nothing is executed"
   [ "$WITH_BACKUP" = "1" ] || warn "Phase 6 assumes a verified dump taken immediately before it — see docs/db-backup-restore.md."
   printf '  1. prisma migrate deploy  &&  prisma migrate status      (DATABASE_URL=target)\n'
-  printf '  2. node scripts/migrate-supabase-to-mariadb.mjs          (source from .env.local)\n'
+  if [ "$SKIP_ETL" = "1" ]; then
+    printf '  2. ETL copy                                              (skipped by --skip-etl)\n'
+  else
+    printf '  2. node scripts/migrate-supabase-to-mariadb.mjs          (source from .env.local)\n'
+  fi
+  # Reconcile is NOT gated by --skip-etl: it runs unless --from starts later.
   printf '     node scripts/migrate-supabase-to-mariadb.mjs --verify-only\n'
   if [ "$SKIP_IMAGES" = "1" ]; then
     printf '  3. image extraction                                      (skipped by --skip-images)\n'
