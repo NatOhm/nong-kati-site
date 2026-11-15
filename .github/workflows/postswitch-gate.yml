@@ -107,6 +107,18 @@ jobs:
       # postinstall runs `prisma generate`, which the gate's PrismaClient needs.
       - run: npm ci
 
+      # The gate must not regress silently. This replays its git steps and every
+      # refusal path against a throwaway git fixture and a local stub site — no
+      # network, no database. Older releases predate the file; they are skipped
+      # rather than failed for a test they never shipped.
+      - name: Prove the gate still refuses a bad release (offline)
+        run: |
+          if [ -f tests/deploy-artifact-selftest.test.ts ]; then
+            npx vitest run tests/deploy-artifact-selftest.test.ts
+          else
+            echo "::notice::this release predates the artifact self-test — nothing to run"
+          fi
+
       - name: Write the tunnel key
         env:
           PLESK_SSH_KEY_VALUE: ${{ secrets.PLESK_SSH_KEY }}

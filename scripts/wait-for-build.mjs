@@ -65,7 +65,12 @@ while (Date.now() < deadline) {
   if (attempt % 5 === 1) {
     console.log(`  … attempt ${attempt}: serving ${lastSeen}${lastError ? ` (${lastError})` : ''}, waiting for ${WANT}`);
   }
-  await sleep(INTERVAL * 1000);
+  // Never sleep past the deadline: a --timeout shorter than the interval would
+  // otherwise report the timeout a whole interval late (a 2 s budget costing 17 s),
+  // which is the difference between a gate that answers and one that looks hung.
+  const remaining = deadline - Date.now();
+  if (remaining <= 0) break;
+  await sleep(Math.min(INTERVAL * 1000, remaining));
 }
 
 console.error(`✖ ${WANT} never went live at ${BASE} within ${TIMEOUT}s (${attempt} attempts).`);

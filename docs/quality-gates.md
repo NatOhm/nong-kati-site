@@ -127,6 +127,7 @@
 | MOB-OVL | Overlay บนมือถือ — ปุ่มย้อนกลับ/สไวป์กลับปิด overlay และล็อกการเลื่อนแบบ iOS (13 พ.ย. 2569): หนึ่ง history entry ต่อ overlay, ซ้อนกันแล้วถอยออกจากตัวในก่อน, ปิดจาก UI ไม่ทิ้ง entry ค้าง, body ถูก freeze ที่ -scrollY และคืนค่าเดิมเป๊ะ | `tests/mobile-overlay.test.tsx` | `npm test` (vitest) | Unit Tests |
 | TOPUP-REF | การอนุมัติ/ปฏิเสธเติมเงินต้องไม่เขียนทับสลิป (13 พ.ย. 2569) — `TopUpLog.reference` เก็บ path สลิปที่แอดมินตรวจ แต่ route เขียน `note` ทับทั้งคอลัมน์ ทำให้หลักฐานการโอนหายจากประวัติเติมเงิน · ต้องต่อท้ายเป็น "สลิป + หมายเหตุ" ตามที่ `ReferenceCell` แยกคอลัมน์ด้วยอักขระ pipe | `tests/admin-topup-review.test.ts` | `npm test` (vitest) | Unit Tests |
 | ORDER-LABEL | รายการย่อยในออเดอร์ต้องบอกชื่อแพ็กเกจ (13 พ.ย. 2569) — `OrderItem.skuCode` เก็บ **label ของ variant** (pricing engine เขียน label ลงคอลัมน์นี้) ไม่ใช่รหัสสินค้า แต่ทุกหน้าออเดอร์พิมพ์เป็น `skuCode × จำนวน` ออเดอร์ NK-2026-000203 จึงขึ้นเป็น "2 × 3" ซึ่งแยกรายการที่ชื่อสินค้าเดียวกันไม่ออก · ต้องพิมพ์ "แพ็กเกจ {label} · จำนวน {n}" และตัด label ที่ว่างหรือ `default` ทิ้ง · การ์ดออเดอร์ลูกค้า หน้าสรุปการชำระเงิน รายละเอียดออเดอร์ฝั่งแอดมิน dialog เปิดโค้ด และประวัติลูกค้า ใช้ตัวจัดรูปแบบเดียวกัน | `tests/order-line-label.test.tsx` | `npm test` (vitest, jsdom) | Unit Tests |
+| ARTIFACT-GATE | เกตต์หลังสลับต้องไม่ถอยเงียบ ๆ (15 พ.ย. 2569) — เส้นทางดีพลอยคือ force-push ไปที่ `deploy-artifact` และ CI รู้ว่ามีรีลีสจาก subject ของคอมมิตนั้นเท่านั้น: workflow จะเริ่มก็ต่อเมื่อไฟล์ workflow อยู่ในคอมมิตที่ถูก push · เกตต์ต้องรันสคริปต์จากคอมมิตที่ subject ระบุ ไม่ใช่ master ที่อาจยังไม่มีสคริปต์ · และทุกกรณีล้มต้อง exit 1/2 พร้อมบอกว่าอะไรทำไม่ได้ ไม่ใช่ข้ามเงียบ ๆ แล้วดูเหมือน certify · เทสต์นี้สร้าง git fixture ท้องถิ่น (bare remote + clone ที่ master ไม่มีสคริปต์) เผยแพร่ด้วย `scripts/deploy-artifact.sh` ตัวจริง แล้วรัน `scripts/ci-postswitch-gate.sh` ตัวจริงกับเว็บ stub: 0 เมื่อเว็บเสิร์ฟบิลด์นั้น, 1 เมื่อไม่เคยเสิร์ฟ (พร้อมชื่อ BUILD_ID), 2 เมื่อไม่มี ref เลย, และ 2 เมื่อไม่มี URL ฐานข้อมูล (ห้ามอ้างว่า certify) | `tests/deploy-artifact-selftest.test.ts` | `npm test` (vitest + git fixture) | Unit Tests |
 
 **วิธีรัน:**
 
@@ -1445,3 +1446,15 @@ W1–W3 ข้างบนพิสูจน์แค่ "route ถามคำ�
 ## สรุป audit มือถือทั้งฉบับ (13 พ.ย. 2569)
 
 ภาพรวม iOS/Android ทุกข้อ — safe-area/`viewport-fit=cover`, touch targets, HEIC และรายการที่ต้องทดสอบบนเครื่องจริง — อยู่ใน [mobile-audit.md](./mobile-audit.md) ตารางนี้ยังเป็นเจ้าของ gate; เคสใหม่สองตัว (`audit round 5: ...`, `safe-area plumbing ...`) อยู่ใน `e2e/touch-targets.spec.ts` และรันด้วย `npm run test:e2e` (e2e ไม่อยู่ใน inventory ของ `npm test` ตามดีไซน์) โดย safe-area พิสูจน์ด้วยการตั้ง `--nk-safe-bottom: 34px` แล้ววัดว่า taskbar และ content spacer โตตาม 34px พร้อมกัน
+
+## เกตต์โพสต์สวิตช์ต้องไม่ถอยเงียบ ๆ (15 พ.ย. 2569) — `tests/deploy-artifact-selftest.test.ts`
+
+เส้นทางดีพลอยมีสามจุดที่พังเฉพาะบน GitHub และเคยพิสูจน์ได้ด้วยแฮนด์ฮาร์เนสใน `tmp/` เท่านั้น:
+workflow จะไม่เริ่มถ้าไฟล์ของตัวเองไม่อยู่ในคอมมิตที่ push, เกตต์ต้องรันจากคอมมิตที่ subject ระบุ
+(`master` อาจยังไม่มีสคริปต์) และทุกความล้มเหลวต้อง exit พร้อมชื่อสิ่งที่ทำไม่ได้
+
+เทสต์นี้ปิดช่องนั้นแบบถาวร: สร้าง git fixture ชั่วคราว (bare remote + clone ที่ `master` ไม่มีสคริปต์
+และ `release` มี), เผยแพร่ด้วย `scripts/deploy-artifact.sh` ตัวจริง, ทำตามขั้นตอน git ของ workflow
+แล้วรัน `scripts/ci-postswitch-gate.sh` ตัวจริงกับ HTTP stub ท้องถิ่นที่เล่นเป็นเว็บจริง —
+ไม่ต่อเน็ต ไม่ใช้ฐานข้อมูล ไม่ใช้ credential ตรวจว่าคอมมิตอาร์ติแฟกต์มีแค่ tarball + ไฟล์ workflow,
+success = 0, บิลด์ที่ไม่เคยเสิร์ฟ = 1, ไม่มี ref = 2, ไม่มี DB URL = 2 และไม่มีการกล่าวอ้างว่า certify
