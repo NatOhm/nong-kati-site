@@ -8,6 +8,10 @@
 # scheduled-task one-liner and the verification curls.
 #
 # The Plesk half stays manual on purpose (panel session, Run-Now, don't-save).
+# Publishing is NOT releasing: this script stops before the switch and before the
+# post-switch gate. Use scripts/deploy-manual.sh when you actually want a release —
+# it publishes, waits for your one Run-Now click, then certifies the result and
+# exits non-zero if the gate fails.
 #
 # Usage (Git Bash on Windows / any POSIX shell):
 #   bash scripts/deploy-artifact.sh                # build + push + print handoff
