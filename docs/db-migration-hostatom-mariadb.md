@@ -240,7 +240,9 @@ TARGET_DATABASE_URL="mysql://nk_app:DBPASS@127.0.0.1:3307/nong_kati" \
 
 It refuses a non-`mysql://` target, a Supabase host, and a non-loopback target without `--yes`.
 `--dry-run` prints the plan, `--with-backup` takes and verifies a fresh dump first, `--from=etl`
-resumes after a fixed failure. It never stops or starts the app: step 2 stays manual.
+resumes after a fixed failure, and `--skip-images` leaves the base64 `image:` rows in place —
+the run then covers exactly **migrate deploy → ETL → build → gate**. It never stops or starts the
+app: step 2 stays manual.
 
 **Dry run executed 2026-11-14 21:43** on a pristine MariaDB 10.11 container, in exactly this
 order — the sequence works end to end:

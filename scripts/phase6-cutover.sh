@@ -4,7 +4,8 @@
 #
 #   1. migrate deploy   prisma migrate deploy + migrate status on the target
 #   2. ETL              copy every row from the Supabase source into the target
-#   3. image extraction base64 `image:` rows out of the table onto disk
+#   3. image extraction base64 `image:` rows out of the table onto disk (--skip-images drops it,
+#                       leaving exactly the four steps the phase requires)
 #   4. build            next build + git-sha stamp, against the target database
 #   5. the gate         32-check precutover-check.mjs against the target
 #
@@ -27,7 +28,8 @@
 #   --dry-run           print the resolved plan and exit 0 — touches nothing
 #   --with-backup       also take + verify a fresh source dump (docs/db-backup-restore.md)
 #   --from=STEP         resume at backup|schema|etl|verify|images|build|check
-#   --skip-etl --skip-images --skip-build --skip-check   pass through, for a resume
+#   --skip-images       leave the base64 `image:` rows in the table — the four-step run
+#   --skip-etl --skip-build --skip-check                for a resume; each one prints as skipped
 #   --allow-dirty       run from a dirty working tree (not advised)
 #
 # Every run writes reports/phase6-<stamp>.log and prints it on failure.
@@ -44,18 +46,81 @@ die()  { printf '\n\033[1;31m✖ %s\033[0m\n' "$*" >&2; exit 1; }
 TARGET="${TARGET_DATABASE_URL:-}"
 DRY_RUN=0
 WITH_BACKUP=0
-PASSTHROUGH=()
+YES=0
+ALLOW_DIRTY=0
+SKIP_ETL=0
+SKIP_IMAGES=0
+SKIP_BUILD=0
+SKIP_CHECK=0
+FROM=""
 
 for arg in "$@"; do
   case "$arg" in
     --dry-run)     DRY_RUN=1 ;;
     --with-backup) WITH_BACKUP=1 ;;
-    --from=*|--skip-etl|--skip-images|--skip-build|--skip-check|--allow-dirty|--yes)
-      PASSTHROUGH+=("$arg") ;;
-    -h|--help)     sed -n '2,38p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --yes)         YES=1 ;;
+    --allow-dirty) ALLOW_DIRTY=1 ;;
+    --skip-etl)    SKIP_ETL=1 ;;
+    --skip-images) SKIP_IMAGES=1 ;;
+    --skip-build)  SKIP_BUILD=1 ;;
+    --skip-check)  SKIP_CHECK=1 ;;
+    --from=*)      FROM="$arg" ;;
+    -h|--help)     awk 'NR>2 && /^# ─/{exit} NR>2{sub(/^# ?/,""); print}' "${BASH_SOURCE[0]}"; exit 0 ;;
     *)             die "unknown argument: $arg (try --help)" ;;
   esac
 done
+
+# Re-assembled in a fixed order so the driver's command line is always readable.
+PASSTHROUGH=()
+[ "$YES" = "1" ] && PASSTHROUGH+=(--yes)
+[ "$ALLOW_DIRTY" = "1" ] && PASSTHROUGH+=(--allow-dirty)
+[ -n "$FROM" ] && PASSTHROUGH+=("$FROM")
+[ "$SKIP_ETL" = "1" ] && PASSTHROUGH+=(--skip-etl)
+[ "$SKIP_IMAGES" = "1" ] && PASSTHROUGH+=(--skip-images)
+[ "$SKIP_BUILD" = "1" ] && PASSTHROUGH+=(--skip-build)
+[ "$SKIP_CHECK" = "1" ] && PASSTHROUGH+=(--skip-check)
+
+# What will actually run, so the banner cannot promise a step a flag or --from removed.
+ORDER=(schema etl images build check)
+FROM_INDEX=0
+if [ -n "$FROM" ]; then
+  for i in "${!ORDER[@]}"; do
+    if [ "${ORDER[$i]}" = "${FROM#--from=}" ]; then FROM_INDEX=$i; fi
+  done
+fi
+
+STEPS_DESC=""
+STEP_TOTAL=0
+SKIPPED=""
+for i in "${!ORDER[@]}"; do
+  step="${ORDER[$i]}"
+  [ "$i" -ge "$FROM_INDEX" ] || continue
+  case "$step" in
+    etl)    skip="$SKIP_ETL" ;;
+    images) skip="$SKIP_IMAGES" ;;
+    build)  skip="$SKIP_BUILD" ;;
+    check)  skip="$SKIP_CHECK" ;;
+    *)      skip=0 ;;
+  esac
+  if [ "$skip" = "1" ]; then
+    SKIPPED="$SKIPPED $step"
+  else
+    case "$step" in
+      schema) label="migrate deploy" ;;
+      etl)    label="ETL" ;;
+      images) label="image extraction" ;;
+      build)  label="build" ;;
+      check)  label="gate" ;;
+      *)      label="$step" ;;
+    esac
+    STEPS_DESC="$STEPS_DESC $label ·"
+    STEP_TOTAL=$((STEP_TOTAL + 1))
+  fi
+done
+STEPS_DESC="$(printf '%s' "$STEPS_DESC" | sed 's/ *·$//;s/^ *//')"
+SKIPPED="$(printf '%s' "${SKIPPED:-nothing}" | sed 's/^ *//')"
+STEP_WORD="$([ "$STEP_TOTAL" = "1" ] && echo step || echo steps)"
+[ -n "$STEPS_DESC" ] || STEPS_DESC="(nothing)"
 
 # Phase 6 has its own backup decision (docs: take one immediately before the
 # window), so the driver leaves the backup step out unless it is asked for.
@@ -83,7 +148,7 @@ mkdir -p reports
 say "Phase 6 — cutover sequence  ($(date '+%Y-%m-%d %H:%M:%S'))"
 printf '  target : %s\n' "$SAFE_TARGET"
 printf '  log    : %s\n' "$LOG"
-printf '  steps  : 1 migrate deploy · 2 ETL · 3 image extraction · 4 build · 5 gate\n'
+printf '  steps  : %s\n' "$STEPS_DESC"
 printf '  stop at the first failure; %s\n' \
   "$([ "$WITH_BACKUP" = "1" ] && echo 'backup + verify runs first' || echo 'no backup step (pass --with-backup to take one)')"
 
@@ -93,10 +158,15 @@ if [ "$DRY_RUN" = "1" ]; then
   printf '  1. prisma migrate deploy  &&  prisma migrate status      (DATABASE_URL=target)\n'
   printf '  2. node scripts/migrate-supabase-to-mariadb.mjs          (source from .env.local)\n'
   printf '     node scripts/migrate-supabase-to-mariadb.mjs --verify-only\n'
-  printf '  3. node scripts/extract-images-to-files.mjs --apply      (DATABASE_URL=target)\n'
+  if [ "$SKIP_IMAGES" = "1" ]; then
+    printf '  3. image extraction                                      (skipped by --skip-images)\n'
+  else
+    printf '  3. node scripts/extract-images-to-files.mjs --apply      (DATABASE_URL=target)\n'
+  fi
   printf '  4. next build  &&  node scripts/stamp-git-sha.mjs        (NEXT_PUBLIC_SITE_URL required)\n'
   printf '  5. node scripts/precutover-check.mjs                     (32 checks)\n'
-  printf '\n  the driver: node scripts/cutover-window.mjs %s %s\n' "${STEP_ARGS[*]}" "${PASSTHROUGH[*]:-}"
+  printf '\n  skipped: %s\n' "$SKIPPED"
+  printf '  the driver: node scripts/cutover-window.mjs %s %s\n' "${STEP_ARGS[*]}" "${PASSTHROUGH[*]:-}"
   printf '  human steps this does not do: Plesk → Node.js → Stop before the ETL; add DATABASE_URL +\n'
   printf '  DATABASE_DIRECT_URL, Restart App, then /api/v1/health and one real slip (runbook Phase 6).\n'
   exit 0
@@ -116,7 +186,7 @@ if [ "$STATUS" != "0" ]; then
   exit "$STATUS"
 fi
 
-say "Phase 6 sequence complete — all five steps passed"
+say "Phase 6 sequence complete — $STEP_TOTAL $STEP_WORD passed: $STEPS_DESC"
 printf '  evidence : %s\n' "$LOG"
 printf '  next     : 1. read the gate output above (32/32)\n'
 printf '             2. Plesk → Node.js → add DATABASE_URL + DATABASE_DIRECT_URL → Restart App\n'

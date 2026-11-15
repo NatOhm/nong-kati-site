@@ -204,9 +204,10 @@ TARGET_DATABASE_URL="mysql://nk_app:DBPASS@127.0.0.1:3307/nong_kati" \
   bash scripts/phase6-cutover.sh --yes          # migrate deploy → ETL → images → build → gate
 ```
 
-`--dry-run` prints the resolved plan and touches nothing; `--with-backup` takes and verifies a
-fresh source dump first; `--from=etl` (or `images|build|check`) resumes after a fixed failure;
-every run leaves `reports/phase6-<stamp>.log`. It refuses a non-`mysql://` target, a Supabase host,
+`--dry-run` prints the resolved plan (including what the flags removed) and touches nothing;
+`--with-backup` takes and verifies a fresh source dump first; `--from=etl` (or `images|build|check`)
+resumes after a fixed failure; `--skip-images` drops the image extraction, leaving exactly
+**migrate deploy → ETL → build → gate**; every run leaves `reports/phase6-<stamp>.log`. It refuses a non-`mysql://` target, a Supabase host,
 and — for a non-loopback target — anything without `--yes`. It does **not** stop the Node app: do
 Step 1 by hand first.
 
