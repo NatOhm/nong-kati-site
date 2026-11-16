@@ -127,6 +127,7 @@
 | MOB-OVL | Overlay บนมือถือ — ปุ่มย้อนกลับ/สไวป์กลับปิด overlay และล็อกการเลื่อนแบบ iOS (13 พ.ย. 2569): หนึ่ง history entry ต่อ overlay, ซ้อนกันแล้วถอยออกจากตัวในก่อน, ปิดจาก UI ไม่ทิ้ง entry ค้าง, body ถูก freeze ที่ -scrollY และคืนค่าเดิมเป๊ะ | `tests/mobile-overlay.test.tsx` | `npm test` (vitest) | Unit Tests |
 | TOPUP-REF | การอนุมัติ/ปฏิเสธเติมเงินต้องไม่เขียนทับสลิป (13 พ.ย. 2569) — `TopUpLog.reference` เก็บ path สลิปที่แอดมินตรวจ แต่ route เขียน `note` ทับทั้งคอลัมน์ ทำให้หลักฐานการโอนหายจากประวัติเติมเงิน · ต้องต่อท้ายเป็น "สลิป + หมายเหตุ" ตามที่ `ReferenceCell` แยกคอลัมน์ด้วยอักขระ pipe | `tests/admin-topup-review.test.ts` | `npm test` (vitest) | Unit Tests |
 | ORDER-LABEL | รายการย่อยในออเดอร์ต้องบอกชื่อแพ็กเกจ (13 พ.ย. 2569) — `OrderItem.skuCode` เก็บ **label ของ variant** (pricing engine เขียน label ลงคอลัมน์นี้) ไม่ใช่รหัสสินค้า แต่ทุกหน้าออเดอร์พิมพ์เป็น `skuCode × จำนวน` ออเดอร์ NK-2026-000203 จึงขึ้นเป็น "2 × 3" ซึ่งแยกรายการที่ชื่อสินค้าเดียวกันไม่ออก · ต้องพิมพ์ "แพ็กเกจ {label} · จำนวน {n}" และตัด label ที่ว่างหรือ `default` ทิ้ง · การ์ดออเดอร์ลูกค้า หน้าสรุปการชำระเงิน รายละเอียดออเดอร์ฝั่งแอดมิน dialog เปิดโค้ด และประวัติลูกค้า ใช้ตัวจัดรูปแบบเดียวกัน | `tests/order-line-label.test.tsx` | `npm test` (vitest, jsdom) | Unit Tests |
+| DEPLOY-ART | Deploy artifact ต้องพา gate ไปเองและปิดสัญญาณปลอม (15 พ.ย. 2569) — ที่เก็บ release คือ force-push ไป branch orphan `deploy-artifact` และ CI รู้ว่า "มี release" จาก subject ของ commit นั้นเท่านั้น · เทสต์ปั้น bare remote + clone จริง (master ไม่มีสคริปต์ gate, release มี) แล้วรัน `scripts/deploy-artifact.sh` ตัวจริง: tree ที่ publish ต้องมี `deploy-bundle.tar.gz` + workflow + สคริปต์ gate ที่ artifact พาไปเอง (ไม่งั้น release เก่าที่ source commit ไม่มี gate จะ certify ไม่ได้เลย) และ subject ต้อง parse ได้ · จากนั้น replay ขั้น git ของ workflow เพื่อพิสูจน์ว่า gate รันจาก commit ที่ subject ระบุ ไม่ใช่ default branch · และทุกทางล้มต้อง exit ไม่ใช่ศูนย์ (site ไม่เสิร์ฟ build นั้น, ไม่มี artifact ref, ไม่มี DB) — gate ที่ skip ตัวเองดูเหมือน release ที่ผ่าน | `tests/deploy-artifact-selftest.test.ts` | `npm test` (vitest) | Unit Tests |
 
 **วิธีรัน:**
 
@@ -1445,3 +1446,16 @@ W1–W3 ข้างบนพิสูจน์แค่ "route ถามคำ�
 ## สรุป audit มือถือทั้งฉบับ (13 พ.ย. 2569)
 
 ภาพรวม iOS/Android ทุกข้อ — safe-area/`viewport-fit=cover`, touch targets, HEIC และรายการที่ต้องทดสอบบนเครื่องจริง — อยู่ใน [mobile-audit.md](./mobile-audit.md) ตารางนี้ยังเป็นเจ้าของ gate; เคสใหม่สองตัว (`audit round 5: ...`, `safe-area plumbing ...`) อยู่ใน `e2e/touch-targets.spec.ts` และรันด้วย `npm run test:e2e` (e2e ไม่อยู่ใน inventory ของ `npm test` ตามดีไซน์) โดย safe-area พิสูจน์ด้วยการตั้ง `--nk-safe-bottom: 34px` แล้ววัดว่า taskbar และ content spacer โตตาม 34px พร้อมกัน
+
+## Deploy artifact ต้องพา gate ไปเองด้วย (15 พ.ย. 2569) — `tests/deploy-artifact-selftest.test.ts`
+
+ผลจาก P0-2: release ที่ live อยู่ (`206a6a2`) อยู่บน branch ไหนก็ไม่รู้ และสคริปต์ gate เกิดมาหลัง release บางตัว
+
+- **ปัญหาจริง** — การ publish คือ force-push ไป orphan branch `deploy-artifact` ที่มีแค่ tarball · GitHub ไม่เริ่ม workflow `push` ถ้าไฟล์ workflow ไม่ได้อยู่ใน tree ที่ push ไป (วัดแล้ว 15 พ.ย. 2569: ไม่มีอะไรทำงานเลย) และ job จะ checkout commit ที่ subject ระบุ ซึ่งอาจเก่ากว่าตัวสคริปต์ gate
+- **ตอนนี้** — `scripts/deploy-artifact.sh` ยัด workflow + `scripts/ci-postswitch-gate.sh` + `scripts/wait-for-build.mjs` (และ `postswitch-check.mjs` ถ้ามี) ลง artifact tree ด้วยเหตุผลเดียวกัน: release เก่าต้อง certify ได้ · subject ยังเป็น `deploy bundle <BUILD_ID> (git <40-hex>)` ซึ่ง workflow parse
+- **สิ่งที่เทสต์พิสูจน์** — tree ที่ publish มี 4 ไฟล์ตามที่สคริปต์ตั้งใจ (ไม่มากกว่านั้น) · gate รันจาก commit ที่ subject ระบุ ไม่ใช่ default branch ที่ไม่มีสคริปต์ · ทางล้มทุกทาง exit ไม่เป็นศูนย์และบอกสิ่งที่ทำไม่ได้ (site ไม่เสิร์ฟ build นั้น, ไม่มี artifact ref, ไม่มี DB)
+- **ทำไมต้องกัน** — gate ที่ skip ตัวเองให้ผลเหมือน release ที่ผ่าน: ไม่มีอะไรแดงและไม่มีใครรู้ว่ายังไม่ได้ตรวจ
+
+## `scripts/target-db-check.mjs` — ถามก่อนว่า "ฐานปลายทางมีอยู่แล้วหรือยัง" (15 พ.ย. 2569)
+
+`prisma migrate deploy` **สร้าง** ฐาน MySQL ที่ยังไม่มีให้เอง (วัดแล้ว 15 พ.ย. 2569) คำผิดใน `TARGET_DATABASE_URL` จึงไม่พัง แต่จะ migrate ฐานเปล่าแล้ว ETL เทข้อมูลจริงลงไป · สคริปต์นี้เช็คก่อน step 1 ของห่วงโซ่ย้ายฐาน และแยก "ฐานไม่มี" (exit 3) ออกจาก "ต่อเซิร์ฟเวอร์ไม่ได้" (exit 4) เพราะ driver บอกให้สร้างฐานทั้งที่แค่ tunnel ล่ม
