@@ -1454,8 +1454,5 @@ W1–W3 ข้างบนพิสูจน์แค่ "route ถามคำ�
 - **ปัญหาจริง** — การ publish คือ force-push ไป orphan branch `deploy-artifact` ที่มีแค่ tarball · GitHub ไม่เริ่ม workflow `push` ถ้าไฟล์ workflow ไม่ได้อยู่ใน tree ที่ push ไป (วัดแล้ว 15 พ.ย. 2569: ไม่มีอะไรทำงานเลย) และ job จะ checkout commit ที่ subject ระบุ ซึ่งอาจเก่ากว่าตัวสคริปต์ gate
 - **ตอนนี้** — `scripts/deploy-artifact.sh` ยัด workflow + `scripts/ci-postswitch-gate.sh` + `scripts/wait-for-build.mjs` (และ `postswitch-check.mjs` ถ้ามี) ลง artifact tree ด้วยเหตุผลเดียวกัน: release เก่าต้อง certify ได้ · subject ยังเป็น `deploy bundle <BUILD_ID> (git <40-hex>)` ซึ่ง workflow parse
 - **สิ่งที่เทสต์พิสูจน์** — tree ที่ publish มี 4 ไฟล์ตามที่สคริปต์ตั้งใจ (ไม่มากกว่านั้น) · gate รันจาก commit ที่ subject ระบุ ไม่ใช่ default branch ที่ไม่มีสคริปต์ · ทางล้มทุกทาง exit ไม่เป็นศูนย์และบอกสิ่งที่ทำไม่ได้ (site ไม่เสิร์ฟ build นั้น, ไม่มี artifact ref, ไม่มี DB)
+- **ของคู่กัน** — `scripts/target-db-check.mjs` ตอบคำถามก่อน step แรกของ cutover ว่า "ฐานปลายทางมีอยู่แล้วหรือยัง": `prisma migrate deploy` สร้างฐาน MySQL ที่ไม่มีให้เอง คำผิดใน `TARGET_DATABASE_URL` จึงไม่ล้ม แต่ migrate ฐานเปล่าแล้ว ETL เทข้อมูลจริงลงไป · แยก "ฐานไม่มี" (exit 3) ออกจาก "ต่อเซิร์ฟเวอร์ไม่ได้" (exit 4)
 - **ทำไมต้องกัน** — gate ที่ skip ตัวเองให้ผลเหมือน release ที่ผ่าน: ไม่มีอะไรแดงและไม่มีใครรู้ว่ายังไม่ได้ตรวจ
-
-## `scripts/target-db-check.mjs` — ถามก่อนว่า "ฐานปลายทางมีอยู่แล้วหรือยัง" (15 พ.ย. 2569)
-
-`prisma migrate deploy` **สร้าง** ฐาน MySQL ที่ยังไม่มีให้เอง (วัดแล้ว 15 พ.ย. 2569) คำผิดใน `TARGET_DATABASE_URL` จึงไม่พัง แต่จะ migrate ฐานเปล่าแล้ว ETL เทข้อมูลจริงลงไป · สคริปต์นี้เช็คก่อน step 1 ของห่วงโซ่ย้ายฐาน และแยก "ฐานไม่มี" (exit 3) ออกจาก "ต่อเซิร์ฟเวอร์ไม่ได้" (exit 4) เพราะ driver บอกให้สร้างฐานทั้งที่แค่ tunnel ล่ม

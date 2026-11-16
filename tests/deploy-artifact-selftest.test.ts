@@ -239,7 +239,7 @@ afterAll(async () => {
 
 describe.skipIf(!HAS_BASH)('deploy-artifact → post-switch gate, offline', () => {
   it(
-    'publishes the bundle, the workflow and the gate scripts, under a parseable subject',
+    'publishes only the bundle, the workflow and the gate scripts, under a parseable subject',
     { timeout: 60_000 },
     () => {
       const f = makeFixture();
@@ -247,13 +247,10 @@ describe.skipIf(!HAS_BASH)('deploy-artifact → post-switch gate, offline', () =
       const published = publish(f, buildId);
 
       expect(published.subject).toBe(`deploy bundle ${buildId} (git ${f.releaseSha})`);
-      // The artifact tree carries the gate scripts on purpose, and it is the
-      // only way an old release can be certified: `deploy-artifact.sh` stages
-      // `scripts/ci-postswitch-gate.sh` + `scripts/wait-for-build.mjs` so the
-      // job can run the gate against a source commit that predates them (see
-      // the two comments above its `git add -f` block). `postswitch-check.mjs`
-      // is in the same staging list but this fixture does not ship it, so the
-      // expected set stays exact — anything else appearing here is a leak.
+      // Four files, not two: postswitch-gate.yml tells a release that predates
+      // the gate to borrow `scripts/` from `deploy-artifact`, so the artifact
+      // must carry them ("which carries them since 2026-11-15"). The fixture
+      // ships no `scripts/postswitch-check.mjs`, so this set stays exact.
       expect(
         git(f.work, 'ls-tree', '-r', '--name-only', published.sha).trim().split('\n').sort(),
       ).toEqual([
