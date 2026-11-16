@@ -40,6 +40,15 @@ build-ok.flag
 # Data backups (contain customer PII — never commit)
 backups/
 
+# …and the same data if it ever escapes that one folder: a pg_dump, a mysqldump,
+# or a customer/shop export. `backups/` alone only protects the path we know.
+*.dump
+*.dump.gz
+*.sql.gz
+*.pgdump
+shop-*.json
+customers-*.json
+
 # Deploy artifacts (deploy-hostatom.sh)
 .deploy-stage/
 deploy-bundle.tar.gz
