@@ -4,6 +4,11 @@ Durable record of a backend fix and the audit behind it. Every line number below
 re-verified against the tree on 2026-10-03; they drift as code moves, so re-check before
 relying on them.
 
+> ⚠️ **2026-11-15:** the production database is MariaDB now (`prisma/schema.prisma` is
+> `provider = "mysql"`), so the "real Postgres" runs described here describe the 2026-10-03
+> state. `tests/coupon-cap-concurrency.test.ts` still exists but needs a database the current
+> schema can talk to — read this as the record, not as a runnable plan.
+
 **Status:** fixed in the working tree, not yet committed.
 **Scope:** one correctness bug (coupon cap could be over-granted) plus the reasoning that
 ruled out the first proposed fix.

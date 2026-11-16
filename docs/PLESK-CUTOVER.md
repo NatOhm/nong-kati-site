@@ -143,11 +143,17 @@ So both of these work, and they have very different rollback costs:
 
 | Option | How | Rollback |
 | --- | --- | --- |
-| **A — Plesk panel override (recommended for the window)** | Node.js → **Custom environment variables** → add `DATABASE_URL` and `DATABASE_DIRECT_URL` with the MariaDB strings | delete those two rows → Restart App → Infisical's Supabase values are back in force |
+| **A — Plesk panel override (recommended for the window)** | Node.js → **Custom environment variables** → add `DATABASE_URL` and `DATABASE_DIRECT_URL` with the MariaDB strings | at the time: deleting those two rows and restarting put Infisical's Supabase values back in force — **window only.** From 2026-11-15 the pair lives in **Secrets**, Infisical holds the MariaDB URL, and there is no Environment row to delete: use §4 rollback C |
 | B — Infisical | Project `80151198-f2df-…`, env `prod` → edit `DATABASE_URL` / `DATABASE_DIRECT_URL` | edit them back, Restart App |
 
 Option A is recommended precisely because rollback is "delete two rows"; edits in Infisical are
 harder to un-do accurately under pressure and affect anything else that reads that project.
+
+⚠️ **Written 2026-11-14, and the storage moved on 2026-11-15:** the two URLs now live in
+Node.js → **Secrets** (write-only, each with a **Replace** button), not in the Environment table —
+editing those Environment rows does not reach the app. Infisical's copies were also overwritten with
+the MariaDB URL during the password rotation, so "delete the rows and Infisical wins" no longer
+brings Supabase back. The current procedure is **§4 rollback C**.
 
 `src/lib/db.ts` constructs the single `PrismaClient` from `DATABASE_URL` at process start, so
 **Restart App** (Node.js panel) is part of the switch, not an optional extra.
@@ -164,6 +170,11 @@ table of formats.
 The panel holds only `INFISICAL_CLIENT_ID`, `INFISICAL_CLIENT_SECRET`, `INFISICAL_PROJECT_ID`,
 `INFISICAL_ENV` (+ `VERCEL_GIT_COMMIT_REF`); everything else arrives from Infisical at boot. That
 is why column "today" says Infisical.
+
+⚠️ **True on 2026-11-14, no longer true from 2026-11-15:** the panel now also holds
+`DATABASE_URL` and `DATABASE_DIRECT_URL` as **Secrets**, so the "today" column below is history —
+the live database strings are the panel's secrets, and the Infisical rows of the same name carry
+the MariaDB URL.
 
 | Variable | Read by | Today | At cutover | Supplied by |
 | --- | --- | --- | --- | --- |
@@ -362,7 +373,9 @@ variant's counter back to its exact pre-run value, so the shop's numbers are unc
 
 ### Step 6 — switch (T−0)
 
-1. Plesk → Node.js → **Custom environment variables** → add, with the **server-side** host:
+1. Plesk → Node.js → **Custom environment variables** → add, with the **server-side** host (when
+   this was actually run on 2026-11-15 the pair went into **Secrets** instead, which is where it
+   still lives — the Environment table has no row for either name):
    ```
    DATABASE_URL=mysql://nongka_nongkati_nongkatistore:DBPASS@localhost:3306/nongka_nongkati_nongkatistore
    DATABASE_DIRECT_URL=mysql://nongka_nongkati_nongkatistore:DBPASS@localhost:3306/nongka_nongkati_nongkatistore
@@ -508,7 +521,9 @@ Supabase stays untouched and paused only after the soak (§5). Do not delete it.
 
 ## 4. Rollback
 
-Two cases, because the state left behind differs.
+Three cases, because the state left behind differs. **Read the case for the state you are
+actually in:** A and B were written for the cutover window, and two of B's steps stopped being
+true the moment the window closed (rollback C says which).
 
 **Rollback A — any checkpoint before Step 6 fails (production never moved)**
 
@@ -520,10 +535,12 @@ Two cases, because the state left behind differs.
 
 Left behind: a MariaDB database with some or all rows, no traffic, no secret changes.
 
-**Rollback B — Step 6 or 7 fails (traffic is on MariaDB)**
+**Rollback B — Step 6 or 7 fails (traffic is on MariaDB, same night)**
 
-1. Plesk → Node.js → Custom environment variables → **delete** the two rows you added (or set
-   them back to the Supabase strings).
+1. Point the database back at Supabase. In the window that is the two **Environment** rows you
+   added: delete them (or set both back to the Supabase strings). **After 2026-11-15 those rows
+   no longer exist** — the strings are Plesk **Secrets** and Infisical's copies were overwritten
+   with the MariaDB URL during the password rotation, so use rollback C instead of this step.
 2. **Restart App**.
 3. `curl -s https://nongkatistore.com/api/v1/health` → `database: ok`, uptime reset.
 
@@ -554,19 +571,86 @@ empty database there, `pg_restore --no-owner --no-privileges` the same dump into
 script again against it — a second run compares the restored tables to the recorded fingerprints,
 which is what proves the target; `pg_restore`'s exit code alone does not.
 
+**Rollback C — going back to Postgres once MariaDB is the live database (state on 2026-11-15)**
+
+Use this after the window has closed and the shop has been serving from MariaDB. It is no longer
+"delete two rows": three things changed when the cutover finished.
+
+1. **The strings live in Plesk → Node.js → Secrets**, `DATABASE_URL` and `DATABASE_DIRECT_URL`,
+   both write-only. The Environment table has no row for either and editing it changes nothing
+   (`AGENTS.md` → "Rotating a database password"). Use each secret row's **Replace**; the save
+   restarts Passenger by itself.
+2. **Infisical no longer holds the Supabase strings.** `DATABASE_URL` / `DATABASE_DIRECT_URL`
+   were overwritten with the MariaDB URL in the same rotation, so "delete the panel rows and
+   Infisical wins" cannot bring Postgres back. Take the strings from the Supabase dashboard
+   (Project Settings → Database → Connection string; password from the password manager), with
+   the field shapes in `docs/supabase-setup.md`: pooler `:6543` +
+   `?pgbouncer=true&connection_limit=1` for `DATABASE_URL`, direct `:5432` for
+   `DATABASE_DIRECT_URL`.
+3. **The running bundle is MariaDB-typed.** Its Prisma client was generated from
+   `provider = "mysql"`, so a Postgres URL under this build repeats the cutover's own symptom:
+   every query fails. `master` / `origin/master` still declares `provider = "postgresql"` (the
+   port lives on `db/mariadb-port` and was never merged), so the Postgres build is
+   `git checkout master && npm ci && npm run build`; the bundle ships `prisma/` and the server
+   runs `npx prisma generate` at install, which is what swaps the client back. The
+   `deploy-rollback` branch (`_0GS5kG9XKF6ZJSMf9vG6`, 2026-10-26) predates the port, so its
+   bundled client is Postgres-typed and it is reachable — but it is three weeks older than
+   `master`, i.e. it is a rollback of the code as well as of the database.
+
+Order matters, and expect a real 500 window of a minute or two — the URL and the build cannot
+both be right at the same moment:
+
+1. **Dump MariaDB first:**
+   `BACKUP_ENV_FILE=/var/backups/nong-kati/.env /bin/sh /httpdocs/scripts/backup-mariadb.sh`.
+   Everything written since the switch exists only there.
+2. **Account for those writes** before they disappear from view: `SELECT id, orderNumber,
+   createdAt FROM \`Order\` WHERE createdAt > '<switch time>'`, and the same for
+   `PaymentAttempt`, `Refund`, `GiftCode`, `TopUpLog`. Replay them into Postgres or refund the
+   customers — a rollback that silently drops a paid order is what this step exists to prevent.
+3. **Replace both secrets** with the Supabase strings (step 1 above tells you where).
+4. **Deploy the Postgres build** (`docs/deploy-hostatom-manual.md`, Step 2). Do not run
+   `migrate deploy` against MariaDB on the way. Postgres still carries its own migration history in
+   `_prisma_migrations`, and the Postgres bundle ships `prisma/migrations/` (the 34 forward
+   migrations, not the MariaDB baseline), overwriting the baseline that is on the host now —
+   that, plus `prisma generate`, is what makes the two sides agree again.
+5. **Verify:** `/api/v1/health` → `database: ok` with a fresh `uptime`; `/api/v1/products` 200
+   with the pre-cutover count; one admin edit persists after reload *and* shows up in the
+   Supabase table editor. **`scripts/postswitch-check.mjs` cannot do this one** — it exits 2 with
+   *"refusing to run against a Supabase host: this script writes fixture rows"* for any
+   `supabase`/`pooler` `TARGET_DATABASE_URL`, so it certifies MariaDB only. Do what it would have
+   done by hand: from the `master` checkout (its schema is the Postgres one),
+   `DATABASE_URL=<supabase direct> DATABASE_DIRECT_URL=<supabase direct> npx prisma migrate status`
+   → `Database schema is up to date!`; then walk one real order end to end — that is what proves
+   the write path is on Postgres and not silently still on MariaDB.
+6. **Unpause Supabase** if it was paused (Project Settings → General). Keeping the project alive
+   through the §5 soak is what makes this path minutes, not hours.
+7. **If the project is gone instead of paused**, restore the artifact rather than pointing at an
+   empty database: `node scripts/verify-supabase-backup.mjs
+   --dump=backups/db-full-2026-11-14T20-36-47.dump --keep` proves it into a throwaway
+   `postgres:17-alpine`, then `pg_restore --no-owner --no-privileges` the same dump into a stock
+   Postgres, point both secrets at it, and drop any `?schema=store` suffix (that parameter was
+   only a Postgres schema selector; on MariaDB it was a lie).
+
+What does not move: **files**. `storage/media` (images and the private slips) stays on the vhost
+and is in neither database, so a rollback keeps it. Slips uploaded after Step 7b exist as files
+there plus rows in MariaDB; the Postgres copy still has its own older `slip:` rows, and the
+download route's legacy fallback is what keeps those links working.
+
 **What "rolled back correctly" looks like** (check these in order, 5 minutes):
 
 1. `curl -s https://nongkatistore.com/api/v1/health` → `200`, `"status":"healthy"`,
    `"database":"ok"`, and an `uptime` that reset with the restart.
-2. `curl -s https://nongkatistore.com/api/v1/version` → the build from before the switch (no
-   rebuild was needed; the app was always database-agnostic).
+2. `curl -s https://nongkatistore.com/api/v1/version` → the pre-switch build. In the window this
+   needed no rebuild; **from 2026-11-15 on it does** — the live client is MariaDB-typed and
+   `buildId` must change to the Postgres bundle's own ID (see rollback C step 3).
 3. `GET /api/v1/products` returns the catalogue with the pre-switch product count.
 4. An admin login still works and one product edit persists after a reload (the write path is
    back on Postgres, not silently still on MariaDB — check the order row you just edited in the
    Supabase table editor).
-5. `node scripts/postswitch-check.mjs --base=https://nongkatistore.com --max-uptime=600` with
-   `TARGET_DATABASE_URL` pointing at **Supabase** → 22/22. Its `database` and `catalogue` checks
-   are what catch a half-rollback (URLs back, app still holding MariaDB connections).
+5. `node scripts/postswitch-check.mjs` is **not** the rollback gate: it refuses a
+   `supabase`/`pooler` target because it writes fixture rows. A half-rollback (URLs back, app
+   still holding MariaDB connections) shows up in item 1 as `database: error`; confirm the rest
+   with `npx prisma migrate status` on the direct `:5432` URL and one real order.
 6. Writes made while on MariaDB are enumerated (`Order`, `PaymentAttempt`, `Refund`, `GiftCode`
    by `createdAt` after the switch time) and either replayed into Supabase or refunded to the
    customers — the reconciliation described above.
@@ -788,9 +872,13 @@ Writing step 3 before step 2 is the one mistake this runbook exists to prevent.
 
 **Where:** Plesk → `nongkatistore.com` → **Node.js** → **Custom environment variables** →
 *Add variable* twice — this is the field that ends up in the process environment, which is all
-`server.js` reads. Whether the panel's separate *Secrets* store also surfaces values as
-environment variables is **not verified from this checkout**: use Custom environment variables,
-and, if you prefer Secrets, prove it with the PROCESSLIST check below.
+`server.js` reads.
+
+✅ **That open question is now answered (2026-11-15), and the answer inverts the advice below:** the
+*Secrets* store **does** surface values to the app — the live `DATABASE_URL` and
+`DATABASE_DIRECT_URL` are Secrets and the shop boots on them, while the Environment table holds
+**no** row for either name. Secrets are write-only (Replace to change), which is why a rotation
+touches the secret, not this table. Do not plan a cutover on Environment rows again.
 
 | Name | Value |
 | --- | --- |
@@ -837,15 +925,18 @@ Supabase URL and the panel edit did not apply (wrong field, or no restart).
 
 **Rollback of just the env change** (production is on MariaDB and you want it back on Supabase):
 
-1. Node.js → Custom environment variables → **delete `DATABASE_URL`** → delete
-   `DATABASE_DIRECT_URL`.
-2. **Restart App**.
-3. `curl -s https://nongkatistore.com/api/v1/health` → `database: ok`; reload
-   `/api/v1/products` → catalogue; the PROCESSLIST query above now returns nothing for `nongka_nongkati_nongkatistore`.
+⛔ **Do not follow the old "delete the two rows" version of this step after 2026-11-15.** There are
+no `DATABASE_URL` / `DATABASE_DIRECT_URL` rows in the Environment table to delete — the strings
+are Plesk **Secrets** — and Infisical's copies were overwritten with the MariaDB URL during the
+password rotation, so deleting anything would leave the app with **no** database URL at all, not
+with Supabase back. The current procedure is **§4 rollback C** (Replace both secrets with the
+Supabase strings, deploy a Postgres-typed bundle, then verify).
 
-Deleting the rows restores Infisical's Supabase values exactly, because Infisical was never
-edited. Anything written to MariaDB during the detour stays only in MariaDB — see §4 Rollback B
-for the reconciliation list before any retry.
+What this step said while the window was open, kept for the record: delete the two Environment
+rows, Restart App, confirm `database: ok` and the catalogue, and the PROCESSLIST query above
+returns nothing for `nongka_nongkati_nongkatistore`. That worked only because Infisical had not
+yet been edited. Anything written to MariaDB during the detour stays only in MariaDB — see
+§4 Rollback B for the reconciliation list before any retry.
 
 ## 7. What the user must authorise
 

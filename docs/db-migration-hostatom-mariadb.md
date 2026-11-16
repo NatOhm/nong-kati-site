@@ -22,6 +22,10 @@ the ~200 ms remote round trip from every query.
 
 Checked on 14 Nov 2026, so a later run does not have to re-derive it.
 
+⚠️ **Superseded 2026-11-15 — read it as the pre-cutover record.** Production now runs MariaDB on
+this host, the deployed bundle's Prisma client is MySQL-typed, and the connection strings are Plesk
+Secrets rather than Infisical values; the live state is [PLESK-CUTOVER.md](PLESK-CUTOVER.md).
+
 | Fact | How it was verified |
 | --- | --- |
 | Production DB is **Postgres on Supabase** | `prisma/schema.prisma` is `provider = "postgresql"`; a `mysql://` URL would make Prisma fail every query, and the shop serves traffic. `docs/hostatom-live.md` lists `DATABASE_URL` / `DATABASE_DIRECT_URL` as Supabase pooler/direct strings. |
@@ -301,6 +305,12 @@ until Phase 8, so this is a two-minute revert.
 ### Phase 8 — retire Supabase, then housekeeping
 
 The soak checklist and the pause step are in **[PLESK-CUTOVER.md §5](PLESK-CUTOVER.md)**.
+
+**Going back to Postgres is [PLESK-CUTOVER.md §4, rollback C](PLESK-CUTOVER.md).** It is not
+"delete two rows" any more: from 2026-11-15 the strings are Plesk **Secrets**, Infisical's copies
+were overwritten with the MariaDB URL during the password rotation, and the live bundle's Prisma
+client is MySQL-typed, so the build has to come from a Postgres-typed commit (`master` still is
+one). Dump MariaDB and account for the orders written since the switch before you start.
 
 - [ ] Run clean for 7–14 days, then **pause** the Supabase project (pausing stops egress and
       is what actually answers the quota email). Delete only after that. Keep the

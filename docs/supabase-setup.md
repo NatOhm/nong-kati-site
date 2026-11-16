@@ -1,5 +1,10 @@
 # Supabase Setup Guide for Nong-Kati
 
+> ⚠️ **Historical from 2026-11-15.** Production is MariaDB on the Hostatom vhost; this guide is
+> kept for the connection-string shapes (pooler `:6543` vs direct `:5432`) and for a return to
+> Postgres, which [PLESK-CUTOVER.md §4 rollback C](PLESK-CUTOVER.md) documents. `prisma/schema.prisma`
+> on the deployed line is `provider = "mysql"`; only `master` still declares `postgresql`.
+
 This guide walks you through setting up Supabase as your production PostgreSQL database with Prisma.
 
 ---

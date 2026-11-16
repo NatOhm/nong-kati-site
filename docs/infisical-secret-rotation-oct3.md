@@ -147,5 +147,11 @@ Diagnose calmly after the site is green again. The common causes:
 Rotation is the first item only. Still open, in
 [secret-rotation-checklist.md](secret-rotation-checklist.md): the database password (Supabase →
 `DATABASE_URL` in Infisical → Restart App), `NK_JWT_SECRET` (invalidates all sessions — announce
-it), and the panel passwords. Neither the database password nor the JWT secret has been exposed in
+it), and the panel passwords.
+
+⚠️ **Database-password half superseded 2026-11-15:** production runs MariaDB and the live URLs are
+Plesk **Secrets** (Replace, then Save restarts Passenger); Infisical's copies were overwritten with
+the MariaDB URL in that rotation, so editing Infisical no longer moves the app. Current procedure:
+[PLESK-CUTOVER.md §4 rollback C](PLESK-CUTOVER.md) and the rotation section in the workspace
+`AGENTS.md`. Neither the database password nor the JWT secret has been exposed in
 the ways described here, so those are hygiene rather than emergencies.

@@ -171,7 +171,11 @@ pair immediately before Phase 6 of the runbook, and verify it — an unverified 
 
 ## Superseded artifacts
 
-`backups/db-2026-11-14T19-43-04.dump` and the September dumps inside the app repo were produced
-with `pg_dump --schema public`: they contain **no** `auth`, `storage`, `realtime` or `vault`
-schema, and predate the last writes before the cutover. Keep them if you like, but the
-`db-backups/db-full-*` artifacts are the ones to restore from.
+`backups/db-2026-11-14T19-43-04.dump` was produced with `pg_dump --schema public`: it contains
+**no** `auth`, `storage`, `realtime` or `vault` schema, and predates the last writes before the
+cutover. It is the only other dump in the app repo today — the September files kept there
+(`shop-2026-09-28T20-23-33.json`, `customers-2026-09-28T20-13-27.json`) are JSON exports, not
+dumps. Keep it if you like, but the `db-backups/db-full-*` artifacts are the ones to restore from:
+`db-full-2026-11-14T21-12-33.dump` is 34,260,713 B, sha256 `4c08d972…ea8e` (verified on disk
+2026-11-15), and `backups/db-full-2026-11-14T20-36-47.dump` is the 33 MB earlier run that
+PLESK-CUTOVER.md §1 and §4 cite.

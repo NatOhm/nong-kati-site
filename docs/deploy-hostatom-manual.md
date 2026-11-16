@@ -371,10 +371,18 @@ The extract step wipes `.next` before unpacking, so keep the previous bundle rea
 
 ## Migrations
 
-`prisma migrate deploy` cannot run through the pgbouncer pooler URL. Since
-`DATABASE_DIRECT_URL` was removed from Infisical, run migrations **locally** against the direct
-:5432 URL (session mode) — never from the scheduled task. Deploy the schema change first, then
-ship code that uses it.
+`prisma migrate deploy` cannot run through the pgbouncer pooler URL, so in the Postgres days
+migrations ran **locally** against the direct `:5432` URL (session mode) — never from the scheduled
+task. Deploy the schema change first, then ship code that uses it.
+
+⚠️ **The live database has been MariaDB on this host since 2026-11-15**, and both URLs exist there
+as Plesk **Secrets** (write-only). The two paths that work now: the deploy script's `DO_MIGRATE=1`,
+which runs `npx prisma migrate deploy` on the server with `DATABASE_DIRECT_URL`; or by hand in the
+Run Node.js console, `npm explore next -- node --env-file=…/gate.env
+…/node_modules/prisma/build/index.js migrate deploy --schema=…/prisma/schema.prisma` (that env
+file needs **both** URLs — `schema.prisma` declares `directUrl`). From a workstation, through the
+tunnel `ssh -N -L 3307:localhost:3306 nongka@thsv93.hostatom.com` with both variables pointed at
+`127.0.0.1:3307`. Still never from the scheduled task.
 
 ## Quick reference — full flow per deploy
 

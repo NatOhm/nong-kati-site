@@ -5,6 +5,10 @@ before writing (Oct 1, 2026):
 
 - **Prisma uses only `DATABASE_URL`** (`prisma/schema.prisma` datasource). `DATABASE_DIRECT_URL` was
   deleted from Infisical on Sep 30 and the app boots + passes health checks — nothing needs it today.
+  ⚠️ **Superseded 2026-11-15:** `schema.prisma` now declares `directUrl = env("DATABASE_DIRECT_URL")`
+  and the live database is MariaDB, so both names exist again as Plesk **Secrets** on the server
+  (and in Infisical, holding the MariaDB URL). A missing `DATABASE_DIRECT_URL` costs nothing at
+  runtime but breaks every `prisma migrate` command — see [PLESK-CUTOVER.md §4](PLESK-CUTOVER.md).
 - **JWT**: `src/lib/jwt.ts` — min 32 chars, throws in production if missing (fail-closed). Rotation
   invalidates every existing session (admin + customers) — announced, expected.
 - **Gift codes**: `src/lib/crypto/giftCode.ts` reads **one** key (`NK_GIFT_CODE_ENCRYPTION_KEY`) via
