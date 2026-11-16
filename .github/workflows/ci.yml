@@ -1,14 +1,17 @@
 # ─── Nong-Kati — CI Pipeline ────────────────────────────
 # Default (and deployed) branch is `master` — Vercel Git
 # integration handles deployments; CI gates every push/PR.
+# `db/mariadb-port` carries the MariaDB port and has no upstream yet, so without
+# it in this list none of the suites below could ever run against the branch
+# that will become production (2026-11-16).
 
 name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [master, db/mariadb-port]
   pull_request:
-    branches: [master]
+    branches: [master, db/mariadb-port]
 
 jobs:
   # ─── Lint & Typecheck ────────────────────────────────
