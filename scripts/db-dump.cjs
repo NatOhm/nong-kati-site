@@ -157,6 +157,7 @@ RESTORE (only if disaster strikes — into a fresh Supabase project or local Pos
     backups/${path.basename(outFile)}
 
   Then: npx prisma generate   (client is code, not data)
-        node scripts/verify-rls.cjs --url "<restored-url>"   (re-check RLS baseline)
+        see docs/db-backup-restore.md   (this is the legacy Postgres fallback only — production
+                                        runs MariaDB since 2026-11-15, and the RLS check retired with it)
 
 Keep a copy of this file OFF this machine before the Hostatom cutover.`);

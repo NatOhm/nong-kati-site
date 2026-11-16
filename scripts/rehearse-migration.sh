@@ -194,8 +194,9 @@ check "OrderItem CHECK constraints applied (>=6)" \
 check "OrderItem has at least the model's 26 columns" \
   "SELECT count(*) >= 26 FROM information_schema.columns WHERE table_name='OrderItem'" "t"
 
-# Same rule as the migration's own pre-flight guard and scripts/verify-rls.cjs:
-# deny-by-default RLS is only safe because the connecting role owns the tables.
+# Same rule as the migration's own pre-flight guard (the standalone
+# scripts/verify-rls.cjs check retired with the MariaDB move): deny-by-default
+# RLS is only safe because the connecting role owns the tables.
 # When it does not, reads silently return zero rows instead of failing.
 check "connecting role bypasses RLS on the two new tables" \
   "SELECT count(*) = 0 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace JOIN pg_roles o ON o.oid = c.relowner WHERE n.nspname = 'public' AND c.relname IN ('Promotion','PromotionProduct') AND o.rolname IS DISTINCT FROM current_user AND NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = current_user AND (rolsuper OR rolbypassrls))" "t"
