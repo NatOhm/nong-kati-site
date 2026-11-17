@@ -22,8 +22,10 @@
  *   node scripts/stock-reconcile.mjs              # human report, exit 1 on real drift
  *   node scripts/stock-reconcile.mjs --json       # same data as JSON
  *   node scripts/stock-reconcile.mjs --variant=<id>   # one variant, verbose
+ *   node scripts/stock-reconcile.mjs --url=<mysql://…> # read this URL instead of $DATABASE_URL
  *
- * Needs DATABASE_URL in the environment (on the host: the documented
+ * Takes `--url=<value>` — the same flag as `scripts/db-report.mjs`, so a one-off
+ * read needs no env-var prefix — or DATABASE_URL from the environment (on the host: the documented
  * `npm explore next -- node --env-file=… scripts/stock-reconcile.mjs` path). It never writes:
  * every query is a findMany, so it is safe to point at production.
  */
@@ -33,14 +35,23 @@ import { pathToFileURL } from 'node:url';
 import { openTunnel, tunnelPlan } from './lib/plesk-tunnel.mjs';
 
 const argv = process.argv.slice(2);
-const JSON_OUT = argv.includes('--json');
-const VARIANT = (argv.find((a) => a.startsWith('--variant=')) || '').slice('--variant='.length) || null;
+const has = (name) => argv.includes(`--${name}`);
+const argOf = (name) => {
+  const hit = argv.find((a) => a.startsWith(`--${name}=`));
+  return hit ? hit.slice(name.length + 3) : '';
+};
+
+const JSON_OUT = has('json');
+const VARIANT = argOf('variant') || null;
+/** Same `--url=<value>` the sibling `scripts/db-report.mjs` takes; falls back to DATABASE_URL. */
+const URL_ARG = argOf('url');
 
 if (argv.includes('--help') || argv.includes('-h')) {
   console.log(
     [
       'stock-reconcile — compare StockMove against ProductVariant.stock (read-only)',
       '',
+      '  --url=<mysql://…>   database to read (default: $DATABASE_URL)',
       '  --json              machine-readable report',
       '  --variant=<id>      only this variant (shows every move)',
       '  --help              this text',
@@ -54,7 +65,7 @@ if (argv.includes('--help') || argv.includes('-h')) {
       '  PLESK_SSH_USER      default nongka',
       '  PLESK_SSH_BIN       ssh client path, default ssh',
       '',
-      'Exit: 0 consistent · 1 real drift · 2 cannot run (no DATABASE_URL / tunnel / DB unreachable)',
+      'Exit: 0 consistent · 1 real drift · 2 cannot run (no --url/DATABASE_URL, tunnel, DB unreachable)',
     ].join('\n'),
   );
   process.exit(0);
@@ -64,6 +75,14 @@ const die = (msg) => {
   console.error(`✖ ${msg}`);
   process.exit(2);
 };
+
+// A typo in a flag must not silently fall back to "whatever DATABASE_URL holds":
+// that is how a read meant for one database lands on another.
+for (const a of argv) {
+  if (['--json', '--help', '-h', '-?'].includes(a)) continue;
+  if (a.startsWith('--url=') || a.startsWith('--variant=')) continue;
+  die(`unknown flag ${a}.`);
+}
 
 /* ─── Optional SSH tunnel ───────────────────────────────────────────────────
  * The forward itself lives in scripts/lib/plesk-tunnel.mjs, shared with
@@ -110,6 +129,7 @@ export function reconcile({ variants, moves }) {
     let prev = 0; // the counter before the first recorded move
     let sumDelta = 0;
     let clamps = 0;
+    let clampOvershoot = 0; // how much Σ(delta) the clamps swallowed, not how many there were
     let chainBreaks = 0;
 
     for (const m of v.moves) {
@@ -117,8 +137,11 @@ export function reconcile({ variants, moves }) {
       sumDelta += m.delta;
       if (expected !== m.stockAfter) {
         if (expected < 0 && m.stockAfter === 0) {
-          // Recorded as -n, applied as "down to zero": the documented clamp.
+          // Recorded as -n, applied as "down to zero": the documented clamp. Its
+          // effect on Σ(delta) is the overshoot (0 − expected), which is 1 for a
+          // single-unit void and n − prev for a bulk one.
           clamps += 1;
+          clampOvershoot += -expected;
         } else {
           chainBreaks += 1;
           breaks.push({
@@ -150,11 +173,18 @@ export function reconcile({ variants, moves }) {
       sumDelta,
       lastStockAfter,
       clamps,
+      clampOvershoot,
       chainBreaks,
       // true when the ledger tail and the counter agree (the authoritative comparison)
       tailMatchesCounter: hasMoves ? lastStockAfter === v.stock : null,
-      // true when there is no Σ(delta) gap, or the gap is exactly what clamps ate
-      shortfallExplainedByClamps: hasMoves ? shortfall === 0 || shortfall === -clamps : null,
+      // true when there is no Σ(delta) gap, or the gap is exactly what the clamps
+      // absorbed. Compare against the OVERSHOOT, never the count: a bulk void of 5
+      // against 2 in stock takes 5 off the ledger and only 2 off the counter, so one
+      // clamp accounts for 3 — comparing to the count reported DRIFT on a correct
+      // ledger (reproduced 2026-11-16, fixed 2026-11-17).
+      shortfallExplainedByClamps: hasMoves
+        ? shortfall === 0 || shortfall === -clampOvershoot
+        : null,
       shortfall,
       firstMoveAt: hasMoves ? v.moves[0].createdAt : null,
       lastMoveAt: hasMoves ? v.moves[v.moves.length - 1].createdAt : null,
@@ -173,6 +203,7 @@ export function reconcile({ variants, moves }) {
       variantsWithMoves: withMoves.length,
       moves: moves.length,
       clamps: rows.reduce((a, r) => a + r.clamps, 0),
+      clampOvershoot: rows.reduce((a, r) => a + r.clampOvershoot, 0),
       chainBreaks: rows.reduce((a, r) => a + r.chainBreaks, 0),
       tailMismatch: withMoves.filter((r) => r.tailMatchesCounter === false).length,
       ledgerShortfall: withMoves.filter((r) => r.shortfall !== 0).length,
@@ -195,6 +226,7 @@ export function reconcile({ variants, moves }) {
       stock: r.stock,
       sumDelta: r.sumDelta,
       clamps: r.clamps,
+      clampOvershoot: r.clampOvershoot,
       shortfall: r.shortfall,
     })),
     stockWithoutLedger: stockWithoutLedger.map((r) => ({ id: r.id, label: r.label, stock: r.stock })),
@@ -261,7 +293,7 @@ export function printReport(report) {
   for (const u of report.unexplained) {
     console.log(
       `\n  ✖ ${short(u.id)} ${u.label}: Σ(delta) ${u.sumDelta} vs stock ${u.stock} ` +
-        `— ${u.shortfall} off, and ${u.clamps} clamp(s) do not explain it`,
+        `— ${u.shortfall} off, while ${u.clamps} clamp(s) absorb only ${u.clampOvershoot}`,
     );
   }
   for (const s of report.stockWithoutLedger) {
@@ -272,14 +304,15 @@ export function printReport(report) {
 }
 
 async function main() {
-  if (!process.env.DATABASE_URL) {
+  const url = URL_ARG || process.env.DATABASE_URL || '';
+  if (!url) {
     die(
-      'DATABASE_URL is not set — this script reads the live schema, it cannot guess it.\n' +
+      'no database URL — pass --url=mysql://… or set DATABASE_URL; this script reads the live schema, it cannot guess it.\n' +
         '  On the host: npm explore next -- node --env-file=/var/www/vhosts/nongkatistore.com/httpdocs/tmp/nk6/gate.env …/scripts/stock-reconcile.mjs',
     );
   }
 
-  const tunnel = await openTunnel(process.env.DATABASE_URL, die);
+  const tunnel = await openTunnel(url, die);
   const { PrismaClient } = await import('@prisma/client');
   const prisma = new PrismaClient({ datasources: { db: { url: tunnel.url } } });
   try {

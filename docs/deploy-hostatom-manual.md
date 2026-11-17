@@ -455,6 +455,19 @@ DATABASE_URL='mysql://nongka:<pass>@localhost:3306/nongka_nongkati_nongkatistore
 node scripts/stock-reconcile.mjs
 ```
 
+The URL is also a flag, exactly as in the sibling `scripts/db-report.mjs`:
+
+```bash
+PLESK_SSH_HOST=thsv93.hostatom.com \
+node scripts/stock-reconcile.mjs --url='mysql://nongka:<pass>@localhost:3306/nongka_nongkati_nongkatistore'
+```
+
+so a one-off read needs no env prefix — `DATABASE_URL` still works and is what the host's
+`--env-file` invocation uses. The value must ride on the `=`: a bare `--url <value>` is refused as
+`✖ unknown flag --url.`, and any other unknown flag dies the same way rather than silently falling
+back to whatever `DATABASE_URL` happens to hold. (Added 2026-11-17 after a live run had to wrap the
+script in an env-var prefix to work around the missing flag.)
+
 | Variable | Default | Notes |
 | --- | --- | --- |
 | `PLESK_SSH_HOST` | — | set it to `thsv93.hostatom.com`; with no host the script dials `DATABASE_URL` directly |
@@ -471,7 +484,7 @@ database and query string survive, and the URL itself is never printed (the one 
 normal exit, on `SIGINT`/`SIGTERM` and on every error path.
 
 Exit codes match the gate's contract: `0` consistent, `1` real drift, `2` cannot run (no
-`DATABASE_URL`, tunnel refused, database unreachable). A refused key prints the Plesk SSH-Access
+`--url`/`DATABASE_URL`, tunnel refused, database unreachable). A refused key prints the Plesk SSH-Access
 fix, not a bare `Permission denied`.
 
 One sharp edge until it is fixed: a host set with **no readable key** currently falls back to a
