@@ -131,12 +131,21 @@ const UPSTASH_TOKEN = process.env['UPSTASH_REDIS_REST_TOKEN'];
 const SHARED_ENABLED = Boolean(UPSTASH_URL && UPSTASH_TOKEN);
 
 // ─── Strict mode (production review MEDIUM-1) ──────────────────────────
-// When NK_RATE_LIMIT_STRICT=true (set it in Vercel prod once Upstash is
-// configured), a HIGH-RISK route that cannot reach the shared store is
-// FAILED CLOSED with a controlled 503 instead of silently degrading to a
-// per-instance memory counter. Low-risk storefront reads keep the memory
-// fallback — an outage must not take the catalogue down.
-const STRICT_MODE = process.env['NK_RATE_LIMIT_STRICT'] === 'true';
+// A HIGH-RISK route that cannot reach the shared store is FAILED CLOSED with a
+// controlled 503 instead of silently degrading to a per-instance memory
+// counter. Low-risk storefront reads keep the memory fallback — an outage must
+// not take the catalogue down.
+//
+// This used to require NK_RATE_LIMIT_STRICT=true, which meant the protection
+// existed only for an operator who remembered to set it: forgetting the
+// variable reopened the exact bypass it was written to close, silently. It is
+// now ON by default and the variable is an explicit ESCAPE HATCH
+// (`NK_RATE_LIMIT_STRICT=off`) for a deployment that would rather degrade than
+// answer 503. It only matters when a shared store is configured at all — with
+// no Upstash credentials there is nothing to be unavailable, and the per-process
+// store is simply the limit (see SHARED_ENABLED).
+const STRICT_SETTING = (process.env['NK_RATE_LIMIT_STRICT'] ?? '').trim().toLowerCase();
+const STRICT_MODE = !['off', 'false', '0', 'no'].includes(STRICT_SETTING);
 
 const HIGH_RISK_ROUTE_PREFIXES = [
   '/api/v1/auth/',

@@ -320,6 +320,96 @@ describe('strict rate limiting (MEDIUM-1)', () => {
       delete process.env['UPSTASH_REDIS_REST_TOKEN'];
     }
   });
+
+  // The protection used to depend on an operator setting NK_RATE_LIMIT_STRICT.
+  // Anything unset meant "degrade silently", which is the bypass MEDIUM-1
+  // describes — these two cases pin the new default and its escape hatch.
+  it('fails closed by DEFAULT when the variable is not set at all', async () => {
+    vi.resetModules();
+    delete process.env['NK_RATE_LIMIT_STRICT'];
+    process.env['UPSTASH_REDIS_REST_URL'] = 'https://upstash.example';
+    process.env['UPSTASH_REDIS_REST_TOKEN'] = 't';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('redis down');
+      }),
+    );
+    try {
+      const { applyRateLimit, checkRateLimit } = await import('@/lib/rateLimit');
+      const res = await applyRateLimit('/api/v1/auth/admin/login', '1.2.3.4');
+      expect(res.status).toBe(503);
+      const body = (await res.json()) as { error: { code: string } };
+      expect(body.error.code).toBe('RATE_LIMITER_UNAVAILABLE');
+      // Every high-risk prefix, not just the one route that happens to be
+      // tested: a missing entry is a silent hole in the policy.
+      for (const route of [
+        '/api/v1/auth/login',
+        '/api/v1/auth/admin/2fa',
+        '/api/v1/orders',
+        '/api/v1/payments/slip-verify',
+        '/api/v1/admin/orders',
+        '/api/v1/cart',
+        '/api/v1/legal/data-requests',
+      ]) {
+        const r = await checkRateLimit(route, `default-${route}`);
+        expect(r.allowed, `${route} must fail closed on a dead limiter`).toBe(false);
+        expect(r.degraded).toBe(true);
+      }
+    } finally {
+      vi.unstubAllGlobals();
+      delete process.env['UPSTASH_REDIS_REST_URL'];
+      delete process.env['UPSTASH_REDIS_REST_TOKEN'];
+    }
+  });
+
+  it('keeps an explicit escape hatch: NK_RATE_LIMIT_STRICT=off degrades instead of 503', async () => {
+    vi.resetModules();
+    process.env['NK_RATE_LIMIT_STRICT'] = 'off';
+    process.env['UPSTASH_REDIS_REST_URL'] = 'https://upstash.example';
+    process.env['UPSTASH_REDIS_REST_TOKEN'] = 't';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('redis down');
+      }),
+    );
+    try {
+      const { applyRateLimit } = await import('@/lib/rateLimit');
+      const res = await applyRateLimit('/api/v1/orders', '1.2.3.4');
+      // Degraded, not blocked, and not a fake lockout: the request is allowed
+      // once and the response says the counter is per-process.
+      expect(res.status).toBe(200);
+      expect(res.headers.get('X-RateLimit-Degraded')).toBe('memory-fallback');
+    } finally {
+      vi.unstubAllGlobals();
+      delete process.env['NK_RATE_LIMIT_STRICT'];
+      delete process.env['UPSTASH_REDIS_REST_URL'];
+      delete process.env['UPSTASH_REDIS_REST_TOKEN'];
+    }
+  });
+
+  it('fails closed when the store answers 500 rather than throwing', async () => {
+    vi.resetModules();
+    delete process.env['NK_RATE_LIMIT_STRICT'];
+    process.env['UPSTASH_REDIS_REST_URL'] = 'https://upstash.example';
+    process.env['UPSTASH_REDIS_REST_TOKEN'] = 't';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('upstream exploded', { status: 500 })),
+    );
+    try {
+      const { applyRateLimit } = await import('@/lib/rateLimit');
+      const res = await applyRateLimit('/api/v1/payments/slip-upload', '1.2.3.4');
+      expect(res.status).toBe(503);
+      const body = (await res.json()) as { error: { code: string } };
+      expect(body.error.code).toBe('RATE_LIMITER_UNAVAILABLE');
+    } finally {
+      vi.unstubAllGlobals();
+      delete process.env['UPSTASH_REDIS_REST_URL'];
+      delete process.env['UPSTASH_REDIS_REST_TOKEN'];
+    }
+  });
 });
 
 describe('build diagnostics (HIGH-4)', () => {
