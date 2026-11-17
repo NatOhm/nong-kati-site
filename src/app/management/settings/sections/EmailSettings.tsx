@@ -1,21 +1,20 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Save, CheckCircle2, AlertTriangle, RefreshCw, Loader2 } from 'lucide-react';
+import { Save, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 import { adminFetch } from '@/lib/adminSession';
 import { cn } from '@/utils/cn';
 import { safeJson } from '@/lib/json';
-import type { SmtpProbeResult } from '@/lib/email/smtpProbe';
 
-import { useSettingsSaver, type RegisterSaver, Section, Field, ToggleSwitch } from '../shared';
+import { useSettingsSaver, type RegisterSaver, Section, ToggleSwitch } from '../shared';
 
 // ─── Email Settings — wired to SiteSetting('email') ──────
+// Transport is NOT configured here. The sender and the Resend key come from the
+// environment (Infisical → server.js) and are read through '@/lib/email/config',
+// so this screen only DISPLAYS them. A second editable copy is exactly what made
+// an admin's "saved" sender invisible on the wire (audit finding 2, 2026-10-31).
 export interface EmailSettingsData {
-  smtpHost?: string | null;
-  smtpPort?: number;
-  smtpUser?: string | null;
-  smtpPasswordEnv?: string | null;
   /** Read-only: the From header the mailer actually sends with. */
   liveSender?: string | null;
   emailConfigured?: boolean;
@@ -40,10 +39,6 @@ export function EmailSettings({
 }: {
   registerSaver: RegisterSaver;
 }): React.JSX.Element {
-  const [smtpHost, setSmtpHost] = useState('');
-  const [smtpPort, setSmtpPort] = useState('587');
-  const [smtpUser, setSmtpUser] = useState('');
-  const [smtpPasswordEnv, setSmtpPasswordEnv] = useState('');
   const [liveSender, setLiveSender] = useState<string | null>(null);
   const [emailConfigured, setEmailConfigured] = useState(false);
   const [templates, setTemplates] = useState<Record<string, boolean>>({
@@ -63,10 +58,6 @@ export function EmailSettings({
       .then(async (r): Promise<EmailSettingsData> => (r.ok ? r.json() : {}))
       .then((data) => {
         if (cancelled) return;
-        setSmtpHost(data.smtpHost ?? '');
-        setSmtpPort(String(data.smtpPort ?? 587));
-        setSmtpUser(data.smtpUser ?? '');
-        setSmtpPasswordEnv(data.smtpPasswordEnv ?? '');
         setLiveSender(data.liveSender ?? null);
         setEmailConfigured(Boolean(data.emailConfigured));
         setTemplates((t) => ({ ...t, ...(data.emailTemplates ?? {}) }));
@@ -80,13 +71,7 @@ export function EmailSettings({
     };
   }, []);
 
-  const valuesRef = useSettingsSaver(registerSaver, {
-    smtpHost,
-    smtpPort,
-    smtpUser,
-    smtpPasswordEnv,
-    templates,
-  }, saveToApi);
+  const valuesRef = useSettingsSaver(registerSaver, { templates }, saveToApi);
 
   async function saveToApi(): Promise<void> {
     const v = valuesRef.current;
@@ -96,23 +81,11 @@ export function EmailSettings({
       const res = await adminFetch('/api/v1/admin/settings/email', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          smtpHost: v.smtpHost.trim() === '' ? null : v.smtpHost.trim(),
-          smtpPort: Number(v.smtpPort) || 0,
-          smtpUser: v.smtpUser.trim() === '' ? null : v.smtpUser.trim(),
-          smtpPasswordEnv: v.smtpPasswordEnv.trim(),
-          emailTemplates: v.templates,
-        }),
+        body: JSON.stringify({ emailTemplates: v.templates }),
       });
       if (!res.ok) {
         const data = await safeJson<{ error?: string }>(res);
-        throw new Error(
-          data.error === 'INVALID_SMTP_PORT'
-            ? 'SMTP Port ต้องเป็นตัวเลข 1-65535'
-            : data.error === 'INVALID_ENV_VAR_NAME'
-                ? 'ชื่อ environment variable ต้องเป็น A-Z ตัวใหญ่ ตัวเลข และ _ เท่านั้น'
-                : 'บันทึกไม่สำเร็จ',
-        );
+        throw new Error(data.error === 'INVALID_EMAIL_TEMPLATES' ? 'เทมเพลตไม่ถูกต้อง' : 'บันทึกไม่สำเร็จ');
       }
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -124,93 +97,22 @@ export function EmailSettings({
     }
   }
 
-  // ── Test connection (SMTP probe) — uses the values TYPED in the form;
-  // no save required. The route fills gaps from the saved settings.
-  const [probe, setProbe] = useState<SmtpProbeResult | null>(null);
-  const [testing, setTesting] = useState(false);
-  const [testError, setTestError] = useState<string | null>(null);
-
-  async function runConnectionTest(): Promise<void> {
-    setTesting(true);
-    setTestError(null);
-    setProbe(null);
-    try {
-      const res = await adminFetch('/api/v1/admin/settings/email-test', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          smtpHost: smtpHost.trim() || undefined,
-          smtpPort: Number(smtpPort) || undefined,
-          smtpUser: smtpUser.trim() || undefined,
-          smtpPasswordEnv: smtpPasswordEnv.trim() || undefined,
-        }),
-      });
-      const data = await safeJson<Record<string, unknown>>(res);
-      if (!res.ok) {
-        setTestError(
-          data['error'] === 'SMTP_NOT_CONFIGURED'
-            ? 'กรอก SMTP Host และ Port ก่อนทดสอบ'
-            : data['error'] === 'INVALID_SMTP_HOST'
-              ? 'ชื่อโฮสต์ไม่ถูกต้อง'
-              : data['error'] === 'INVALID_ENV_VAR_NAME'
-                ? 'ชื่อ environment variable ต้องเป็น A-Z ตัวใหญ่ ตัวเลข และ _ เท่านั้น'
-                : 'ทดสอบไม่สำเร็จ',
-        );
-        return;
-      }
-      setProbe(data as unknown as SmtpProbeResult);
-    } catch {
-      setTestError('เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ');
-    } finally {
-      setTesting(false);
-    }
-  }
-
   if (loading) {
     return (
-      <Section title="การตั้งค่าอีเมล" subtitle="ตั้งค่า SMTP และรูปแบบอีเมลที่ส่งให้ลูกค้า">
+      <Section
+        title="การตั้งค่าอีเมล"
+        subtitle="ผู้ส่งที่ระบบใช้จริง และเทมเพลตอีเมลที่ส่งให้ลูกค้า"
+      >
         <p className="py-6 text-center text-sm text-fg-muted">กำลังโหลด...</p>
       </Section>
     );
   }
 
   return (
-    <Section title="การตั้งค่าอีเมล" subtitle="ตั้งค่า SMTP และรูปแบบอีเมลที่ส่งให้ลูกค้า">
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="SMTP Host">
-          <input
-            value={smtpHost}
-            onChange={(e) => setSmtpHost(e.target.value)}
-            placeholder="smtp.resend.com"
-            className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 font-mono text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
-          />
-        </Field>
-        <Field label="SMTP Port">
-          <input
-            value={smtpPort}
-            onChange={(e) => setSmtpPort(e.target.value.replace(/[^0-9]/g, ''))}
-            className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 font-mono text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
-          />
-        </Field>
-      </div>
-      <Field label="SMTP Username">
-        <input
-          value={smtpUser}
-          onChange={(e) => setSmtpUser(e.target.value)}
-          className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
-        />
-      </Field>
-      <Field label="ชื่อ Environment Variable ของรหัสผ่าน SMTP">
-        <input
-          value={smtpPasswordEnv}
-          onChange={(e) => setSmtpPasswordEnv(e.target.value)}
-          placeholder="SMTP_PASSWORD"
-          className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 font-mono text-sm text-fg placeholder:text-clay-400 focus:ring-2 focus:ring-peach-500"
-        />
-        <p className="mt-1 text-xs text-clay-400">
-          รหัสผ่าน SMTP ไม่ถูกเก็บในฐานข้อมูล — ระบบอ่านจาก environment variable ที่ระบุชื่อไว้
-        </p>
-      </Field>
+    <Section
+      title="การตั้งค่าอีเมล"
+      subtitle="ผู้ส่งที่ระบบใช้จริง และเทมเพลตอีเมลที่ส่งให้ลูกค้า"
+    >
       <div className="rounded-lg border border-line-subtle bg-surface p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
@@ -235,74 +137,10 @@ export function EmailSettings({
         <p className="mt-3 rounded-md bg-surface-sunken px-3 py-2 font-mono text-sm text-fg">
           {liveSender ?? 'NK_RESEND_FROM_EMAIL ยังไม่ได้ตั้งค่า'}
         </p>
-      </div>
-
-      <div className="rounded-lg border border-line-subtle bg-surface p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h3 className="text-sm font-semibold text-fg-secondary">ทดสอบการเชื่อมต่อ SMTP</h3>
-            <p className="mt-0.5 text-xs text-clay-400">
-              ทดสอบ DNS → TCP → Greeting → EHLO ด้วยค่าในฟอร์ม (ไม่ต้องบันทึกก่อน) —
-              ไม่มีการส่งอีเมลจริง
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => void runConnectionTest()}
-            disabled={testing}
-            className="flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm font-semibold text-fg transition-colors hover:border-peach-400 disabled:opacity-50"
-          >
-            {testing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-            {testing ? 'กำลังทดสอบ…' : 'ทดสอบการเชื่อมต่อ'}
-          </button>
-        </div>
-        {testError && (
-          <p className="mt-3 rounded-md bg-coral-500/10 px-3 py-2 text-sm text-fg-error">
-            {testError}
-          </p>
-        )}
-        {probe && (
-          <div className="mt-3 space-y-2">
-            <div className="flex items-center gap-2 text-sm">
-              {probe.ok ? (
-                <span className="flex items-center gap-1.5 font-semibold text-fg-success">
-                  <CheckCircle2 size={16} /> เชื่อมต่อสำเร็จ ({probe.latencyMs} ms)
-                </span>
-              ) : (
-                <span className="flex items-center gap-1.5 font-semibold text-fg-error">
-                  <AlertTriangle size={16} /> เชื่อมต่อไม่สำเร็จ
-                  {probe.error ? ` — ${probe.error}` : ''}
-                </span>
-              )}
-            </div>
-            <ul className="grid grid-cols-2 gap-1.5 text-xs sm:grid-cols-4">
-              {(
-                [
-                  ['DNS', probe.steps.dns],
-                  ['TCP', probe.steps.tcp],
-                  ['Greeting', probe.steps.greeting],
-                  ['EHLO', probe.steps.ehlo],
-                ] as const
-              ).map(([label, passed]) => (
-                <li
-                  key={label}
-                  className={cn(
-                    'flex items-center gap-1.5 rounded-md px-2.5 py-1.5',
-                    passed ? 'bg-jade-500/15 text-fg-success' : 'bg-coral-500/15 text-fg-error',
-                  )}
-                >
-                  {passed ? <CheckCircle2 size={12} /> : <AlertTriangle size={12} />} {label}
-                </li>
-              ))}
-            </ul>
-            {probe.ok && (
-              <p className="text-xs text-clay-400">
-                STARTTLS: {probe.capabilities.starttls ? 'รองรับ' : 'ไม่รองรับ'} · AUTH:{' '}
-                {probe.capabilities.auth ? 'รองรับ' : 'ไม่รองรับ'}
-              </p>
-            )}
-          </div>
-        )}
+        <p className="mt-3 text-xs text-clay-400">
+          ระบบส่งอีเมลผ่าน Resend (HTTP) ไม่ใช่ SMTP — จึงไม่มีช่องกรอก SMTP หรือปุ่มทดสอบ
+          การเชื่อมต่อให้ตั้งค่าผิด: การทดสอบที่เชื่อมต่อได้แต่ไม่ได้ส่งอะไรจริงเคยทำให้เข้าใจผิด
+        </p>
       </div>
 
       <div className="rounded-lg border border-line-subtle bg-surface p-4">

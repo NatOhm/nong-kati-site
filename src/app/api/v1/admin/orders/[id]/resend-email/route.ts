@@ -50,7 +50,7 @@ export async function POST(
     // `msg.includes('EMAIL_SEND_FAILED')` branch could never match, so every
     // outage fell through to the generic "try again" and the specific message
     // written for it was unreachable. Normalise the code here and keep the
-    // provider text in `detail`, the way settings/email-test does.
+    // provider text in `detail`, so the modal can show both.
     const detail = (result.error ?? 'unknown email failure').slice(0, 300);
     console.error(`[resend-email] ${order.orderNumber} → ${detail}`);
     return NextResponse.json({ error: 'EMAIL_SEND_FAILED', detail }, { status: 502 });

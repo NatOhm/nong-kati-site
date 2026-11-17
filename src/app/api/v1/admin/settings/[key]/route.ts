@@ -242,34 +242,11 @@ export async function PUT(
       next['accountNumber'] = v === '' ? null : v;
     }
   } else if (key === 'email') {
-    // Outbound-mail configuration. The SMTP password is intentionally NOT
-    // stored here: like the Omise secret, only the ENV VAR NAME is persisted
-    // and the credential itself never reaches the database.
+    // Only the template toggles live here. The transport (sender + API key)
+    // comes from the environment via '@/lib/email/config', and the SMTP fields
+    // went with the dead probe (ported 2026-11-17): nothing in this app ever
+    // sent over SMTP, so persisting them only made the screen lie.
     next = {};
-    if (b['smtpHost'] === null) {
-      next['smtpHost'] = null;
-    } else if (typeof b['smtpHost'] === 'string') {
-      next['smtpHost'] = (b['smtpHost'] as string).trim().slice(0, 253) || null;
-    }
-    if (b['smtpPort'] !== undefined) {
-      const p = Number(b['smtpPort']);
-      if (!Number.isInteger(p) || p < 1 || p > 65535) {
-        return NextResponse.json({ error: 'INVALID_SMTP_PORT' }, { status: 400 });
-      }
-      next['smtpPort'] = p;
-    }
-    if (b['smtpUser'] === null) {
-      next['smtpUser'] = null;
-    } else if (typeof b['smtpUser'] === 'string') {
-      next['smtpUser'] = (b['smtpUser'] as string).trim().slice(0, 120) || null;
-    }
-    if (b['smtpPasswordEnv'] !== undefined) {
-      const v = String(b['smtpPasswordEnv']).trim();
-      if (v !== '' && !/^[A-Z][A-Z0-9_]{2,63}$/.test(v)) {
-        return NextResponse.json({ error: 'INVALID_ENV_VAR_NAME' }, { status: 400 });
-      }
-      next['smtpPasswordEnv'] = v === '' ? null : v;
-    }
     // fromName / fromEmail are NOT accepted: the sender comes from
     // NK_RESEND_FROM_EMAIL via '@/lib/email/config'. Persisting a second
     // copy here is what made an admin's "saved" edit invisible on the wire

@@ -259,8 +259,6 @@ const ROUTE_COVERAGE: MatrixRow[] = [
     perm: 'settings:write',
     body: { enabled: false },
   },
-  // SMTP connectivity probe for the email settings panel (no save, no send)
-  { method: 'POST', path: '/settings/email-test', perm: 'settings:write', body: {} },
   // Discord webhook probe — sends ONE test embed, reports the outcome
   { method: 'POST', path: '/settings/discord-test', perm: 'settings:write', body: {} },
   // Slip2Go account-info probe — read-only no-purchase connectivity check
