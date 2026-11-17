@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * scripts/backup-supabase-db.mjs — full logical backup of the production Supabase database.
+ * scripts/archive-postgres/backup-supabase-db.mjs — full logical backup of the production Supabase database.
  *
  * `backups/db-*.dump` (the earlier artifacts) were made with `--schema public`, so they
  * silently left out `auth`, `storage` and every other schema. This script dumps the whole
@@ -16,10 +16,10 @@
  *      database, schema list, server version) with the user and password redacted.
  *
  * Usage
- *   node scripts/backup-supabase-db.mjs            # reads DATABASE_DIRECT_URL/.env.local
- *   SOURCE_DATABASE_URL="postgres://…" node scripts/backup-supabase-db.mjs
+ *   node scripts/archive-postgres/backup-supabase-db.mjs            # reads DATABASE_DIRECT_URL/.env.local
+ *   SOURCE_DATABASE_URL="postgres://…" node scripts/archive-postgres/backup-supabase-db.mjs
  *
- * Then prove the artifact with `node scripts/verify-supabase-backup.mjs`.
+ * Then prove the artifact with `node scripts/archive-postgres/verify-supabase-backup.mjs`.
  *
  * The password only travels in a 0600 env file that is deleted on exit; the URL is never
  * printed. Read-only: the source is queried with SELECTs and pg_dump only.
@@ -245,7 +245,7 @@ const manifest = {
     },
   ],
   totals: { tables: tableCount, rows: rowCount, populatedTables: Object.values(tables).filter((t) => t.rows > 0).length },
-  restoreHint: `node scripts/verify-supabase-backup.mjs --dump=backups/${dumpName} (see docs/db-backup-restore.md)`,
+  restoreHint: `node scripts/archive-postgres/verify-supabase-backup.mjs --dump=backups/${dumpName} (see docs/db-backup-restore.md)`,
   covers: [
     'rows and DDL of every non-system schema in this database (public, auth, storage, and Supabase bookkeeping schemas)',
     'table data, indexes, constraints, sequences, and the _prisma_migrations history',

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * scripts/cutover-window.mjs — the pre-switch half of docs/PLESK-CUTOVER.md §3, in order.
+ * scripts/archive-postgres/cutover-window.mjs — the pre-switch half of docs/PLESK-CUTOVER.md §3, in order.
  *
  * The dangerous part of a cutover is not any single command, it is running them out of
  * order — an ETL before a verified backup, a build before the data exists, a gate before the
@@ -16,7 +16,7 @@
  *
  * Usage
  *   TARGET_DATABASE_URL="mysql://nk_app:…@127.0.0.1:3307/nong_kati" \
- *     node scripts/cutover-window.mjs --yes
+ *     node scripts/archive-postgres/cutover-window.mjs --yes
  *
  *   --yes                 required for a non-loopback target (this writes to a real database)
  *   --skip-backup         the backup+verify step (only when a verified fresh backup already exists)
@@ -148,14 +148,14 @@ console.log(`steps:  ${STEPS.filter(stepEnabled).join(' → ') || '(none)'}`);
 if (stepEnabled('backup')) {
   fs.mkdirSync(BACKUP_DIR, { recursive: true });
   const before = new Set(fs.readdirSync(BACKUP_DIR).filter((f) => f.endsWith('.dump')));
-  run('backup the source database', process.execPath, ['scripts/backup-supabase-db.mjs', `--out-dir=${BACKUP_DIR}`]);
+  run('backup the source database', process.execPath, ['scripts/archive-postgres/backup-supabase-db.mjs', `--out-dir=${BACKUP_DIR}`]);
   const fresh = fs.readdirSync(BACKUP_DIR).filter((f) => f.endsWith('.dump') && !before.has(f));
   if (fresh.length !== 1) {
     console.error(`✖ expected exactly one new dump in ${BACKUP_DIR}, found ${fresh.length}`);
     process.exit(1);
   }
   const dump = path.join(BACKUP_DIR, fresh[0]);
-  run('verify the backup restores', process.execPath, ['scripts/verify-supabase-backup.mjs', `--dump=${dump}`]);
+  run('verify the backup restores', process.execPath, ['scripts/archive-postgres/verify-supabase-backup.mjs', `--dump=${dump}`]);
 }
 
 // ── 2. schema on the target ────────────────────────────────────────────────
@@ -166,12 +166,12 @@ if (stepEnabled('schema')) {
 
 // ── 3–4. ETL, then reconcile ───────────────────────────────────────────────
 if (stepEnabled('etl')) {
-  run('copy every row from the source into the target', process.execPath, ['scripts/migrate-supabase-to-mariadb.mjs'], {
+  run('copy every row from the source into the target', process.execPath, ['scripts/archive-postgres/migrate-supabase-to-mariadb.mjs'], {
     TARGET_DATABASE_URL: TARGET,
   });
 }
 if (stepEnabled('verify')) {
-  run('reconcile the copy against the source', process.execPath, ['scripts/migrate-supabase-to-mariadb.mjs', '--verify-only'], {
+  run('reconcile the copy against the source', process.execPath, ['scripts/archive-postgres/migrate-supabase-to-mariadb.mjs', '--verify-only'], {
     TARGET_DATABASE_URL: TARGET,
   });
 }
@@ -199,7 +199,7 @@ if (stepEnabled('build')) {
 
 // ── 7. the gate ────────────────────────────────────────────────────────────
 if (stepEnabled('check')) {
-  run('run the 32-check cutover gate', process.execPath, ['scripts/precutover-check.mjs'], {
+  run('run the 32-check cutover gate', process.execPath, ['scripts/archive-postgres/precutover-check.mjs'], {
     TARGET_DATABASE_URL: TARGET,
   });
 }

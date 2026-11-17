@@ -8,8 +8,8 @@
 # and reports whether the data model and the migration history still agree.
 #
 # Usage:
-#   bash scripts/rehearse-migration.sh              # full rehearsal
-#   bash scripts/rehearse-migration.sh --dry-run    # print the plan, touch nothing
+#   bash scripts/archive-postgres/rehearse-migration.sh              # full rehearsal
+#   bash scripts/archive-postgres/rehearse-migration.sh --dry-run    # print the plan, touch nothing
 #   NK_PG_IMAGE=postgres:17-alpine bash scripts/... # match the deployment's PG major
 #   NK_KEEP=1 bash scripts/...                      # leave the container for inspection
 #   NK_RUN_TESTS=1 bash scripts/...                 # also run the vitest suite

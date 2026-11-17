@@ -20,9 +20,9 @@ project are untouched, and this branch is not pushed.
 | One baseline migration, no Postgres history | `prisma/migrations/20261115000000_baseline/`; old 34 migrations in `prisma/migrations-archive-postgres/` |
 | `migrate deploy` builds the schema from empty | applied to a fresh `mariadb:10.11` → **39 tables** (38 models + `_prisma_migrations`) |
 | The ETL copies everything | `38 tables, 2497 rows, every count matches` on a pristine target, and again on a re-run over a populated one (`cleared 38 table(s) on the target`) |
-| The write paths work on MariaDB | `scripts/precutover-check.mjs` → **32/32** (run against the `:3307` copy on build `619e79e`, twice in a row, ending at identical inventory) |
+| The write paths work on MariaDB | `scripts/archive-postgres/precutover-check.mjs` → **32/32** (run against the `:3307` copy on build `619e79e`, twice in a row, ending at identical inventory) |
 | The shop works **after** the switch | `scripts/postswitch-check.mjs` → **22/22** against a production build on the copy, then **22/22 again** leaving the copy byte-identical; pointed at an unloaded schema it fails on the named `database` check and exits 1 |
-| Rollback restores from the dump | `scripts/verify-supabase-backup.mjs` on `backups/db-full-2026-11-14T20-36-47.dump` → `31 tables, 2857 rows`, every populated table matching, receipt in `backups/*.verify.json` |
+| Rollback restores from the dump | `scripts/archive-postgres/verify-supabase-backup.mjs` on `backups/db-full-2026-11-14T20-36-47.dump` → `31 tables, 2857 rows`, every populated table matching, receipt in `backups/*.verify.json` |
 | Gift codes decrypt after the move | 125 rows on the copy: **139 at `keyVersion 1`, 31 at `keyVersion 2`** when last checked in full, all decrypted with the current `NK_GIFT_CODE_ENCRYPTION_KEY` and each plaintext's SHA-256 equalled the stored `codeHash` |
 | Gift-code ↔ variant links survive the port | Source and copy hold the **same 13 available codes with `variantId` NULL** (identical id lists) — genuine data, see §3 Step 7 |
 | Nightly backup tooling | `scripts/backup-mariadb.sh`, restore-verified (39 tables, matching counts), retention proven |
@@ -243,7 +243,7 @@ one. Prefer it in the window and keep the individual steps for reading and for a
 ```bash
 TARGET_DATABASE_URL="mysql://nongka_nongkati_nongkatistore:DBPASS@127.0.0.1:3307/nongka_nongkati_nongkatistore" \
 NEXT_PUBLIC_SITE_URL="https://nongkatistore.com" \
-  bash scripts/phase6-cutover.sh --yes          # migrate deploy → ETL → images → build → gate
+  bash scripts/archive-postgres/phase6-cutover.sh --yes          # migrate deploy → ETL → images → build → gate
 ```
 
 `--dry-run` prints the resolved plan (including what the flags removed) and touches nothing;
@@ -293,8 +293,8 @@ mysql -h 127.0.0.1 -P 3307 -u nongka_nongkati_nongkatistore -p -e "SELECT 1" non
 ### Step 1 — fresh backup, and prove it (T−40)
 
 ```bash
-node scripts/backup-supabase-db.mjs --out-dir="E:/งานนะจ๊ะ/2569/Nong-kati/db-backups"
-node scripts/verify-supabase-backup.mjs --dump="E:/งานนะจ๊ะ/2569/Nong-kati/db-backups/<new dump>.dump"
+node scripts/archive-postgres/backup-supabase-db.mjs --out-dir="E:/งานนะจ๊ะ/2569/Nong-kati/db-backups"
+node scripts/archive-postgres/verify-supabase-backup.mjs --dump="E:/งานนะจ๊ะ/2569/Nong-kati/db-backups/<new dump>.dump"
 ```
 
 **Checkpoint:** the verify run restores into a scratch `postgres:17-alpine` on `:5544` and prints
@@ -328,10 +328,10 @@ writes the target you name:
 ```bash
 # .env.local DATABASE_URL must be the Supabase DIRECT (:5432) string at this point
 TARGET_DATABASE_URL="mysql://nongka_nongkati_nongkatistore:DBPASS@127.0.0.1:3307/nongka_nongkati_nongkatistore" \
-  node scripts/migrate-supabase-to-mariadb.mjs
+  node scripts/archive-postgres/migrate-supabase-to-mariadb.mjs
 
 TARGET_DATABASE_URL="mysql://nongka_nongkati_nongkatistore:DBPASS@127.0.0.1:3307/nongka_nongkati_nongkatistore" \
-  node scripts/migrate-supabase-to-mariadb.mjs --verify-only
+  node scripts/archive-postgres/migrate-supabase-to-mariadb.mjs --verify-only
 ```
 
 **Checkpoint:** the copy prints `cleared 38 table(s) on the target` followed by
@@ -358,7 +358,7 @@ building it against the target is what makes "prerendered" output honest.
 
 ```bash
 TARGET_DATABASE_URL="mysql://nongka_nongkati_nongkatistore:DBPASS@127.0.0.1:3307/nongka_nongkati_nongkatistore" \
-  node scripts/precutover-check.mjs
+  node scripts/archive-postgres/precutover-check.mjs
 ```
 
 **Checkpoint:** `RESULT: 32/32 checks passed`. It writes real rows and real image files (into a
@@ -555,8 +555,8 @@ The Supabase project is not paused or deleted until §5, so rollback is minutes,
 **The dump restore was executed on 2026-11-15**, so this is a path that has run at least once:
 
 ```bash
-node scripts/verify-supabase-backup.mjs                                     # newest backup
-node scripts/verify-supabase-backup.mjs --dump=backups/db-full-2026-11-14T20-36-47.dump --keep
+node scripts/archive-postgres/verify-supabase-backup.mjs                                     # newest backup
+node scripts/archive-postgres/verify-supabase-backup.mjs --dump=backups/db-full-2026-11-14T20-36-47.dump --keep
 ```
 
 It restores the artifact into a throwaway `postgres:17-alpine` container and recomputes the
@@ -625,7 +625,7 @@ both be right at the same moment:
 6. **Unpause Supabase** if it was paused (Project Settings → General). Keeping the project alive
    through the §5 soak is what makes this path minutes, not hours.
 7. **If the project is gone instead of paused**, restore the artifact rather than pointing at an
-   empty database: `node scripts/verify-supabase-backup.mjs
+   empty database: `node scripts/archive-postgres/verify-supabase-backup.mjs
    --dump=backups/db-full-2026-11-14T20-36-47.dump --keep` proves it into a throwaway
    `postgres:17-alpine`, then `pg_restore --no-owner --no-privileges` the same dump into a stock
    Postgres, point both secrets at it, and drop any `?schema=store` suffix (that parameter was

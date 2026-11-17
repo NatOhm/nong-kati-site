@@ -4,7 +4,7 @@
  * after the panel switch, from outside the app, against a URL.
  *
  * This is the one check that runs AFTER `DATABASE_URL` changed in the Plesk panel. It is
- * deliberately different from scripts/precutover-check.mjs: that one boots a server itself and
+ * deliberately different from scripts/archive-postgres/precutover-check.mjs: that one boots a server itself and
  * proves the write paths are correct before the switch; this one is pointed at whatever is
  * already running (`--base=https://nongkatistore.com`) and proves the running process is talking
  * to the database the ETL filled — not to a stale pool, not to the old host, not to an empty

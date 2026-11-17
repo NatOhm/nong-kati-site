@@ -63,7 +63,7 @@ promotions with nothing in the logs.
    every RLS-enabled table in `public`. This turns the silent zero-rows mode into a named
    failure in any environment the script is run against (CI runs it right after
    `migrate deploy`).
-3. `scripts/rehearse-migration.sh` — the same predicate is asserted locally, so the disposable
+3. `scripts/archive-postgres/rehearse-migration.sh` — the same predicate is asserted locally, so the disposable
    database rehearsal and the CI gate agree.
 
 Deliberately **not** changed: no `FORCE ROW LEVEL SECURITY` (would break the app), no
@@ -118,7 +118,7 @@ Note for future parity checks: `migrate diff --from-migrations` **cannot be used
 repo**. It replays the history into a shadow database, and `20260927200000_rls_baseline`
 enables RLS on `_prisma_migrations`, which a shadow database does not have — it fails with
 P1014 every time. Compare the migrated database instead (`--from-url`), which is what
-`scripts/rehearse-migration.sh` now does.
+`scripts/archive-postgres/rehearse-migration.sh` now does.
 
 ### Adjacent drift found by the same verification
 

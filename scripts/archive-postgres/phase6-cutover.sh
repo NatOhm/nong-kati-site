@@ -13,7 +13,7 @@
 # that ordering is the whole point of the phase: an ETL before a migrated schema,
 # a build before the data, or a gate before the build all "succeed" while proving
 # nothing. The steps themselves (and their env handling, CLI paths, dirty-tree
-# guard and per-step reporting) live in scripts/cutover-window.mjs, so there is
+# guard and per-step reporting) live in scripts/archive-postgres/cutover-window.mjs, so there is
 # one implementation of the sequence and this file cannot drift from it.
 #
 # Phase 6 does NOT start or stop the app. Stop Node.js in the Plesk panel before
@@ -22,7 +22,7 @@
 #
 # Usage
 #   TARGET_DATABASE_URL="mysql://nk_app:…@localhost:3306/nong_kati" \
-#     bash scripts/phase6-cutover.sh --yes
+#     bash scripts/archive-postgres/phase6-cutover.sh --yes
 #
 #   --yes               required for a non-loopback target (this writes a real database)
 #   --dry-run           print the resolved plan and exit 0 — touches nothing
@@ -138,7 +138,7 @@ case "$TARGET" in
 esac
 command -v node >/dev/null 2>&1 || die "node is not on PATH — Phase 6 drives node scripts."
 [ -d node_modules ] || die "node_modules missing — run 'npm ci' first."
-[ -f scripts/cutover-window.mjs ] || die "scripts/cutover-window.mjs is missing — it is the implementation of these steps."
+[ -f scripts/archive-postgres/cutover-window.mjs ] || die "scripts/archive-postgres/cutover-window.mjs is missing — it is the implementation of these steps."
 
 # ── Preflight: the build-time public URL ─────────────────────────────────────
 # NEXT_PUBLIC_SITE_URL is baked into the artifact by `next build`, and .env.local in a
@@ -198,26 +198,26 @@ if [ "$DRY_RUN" = "1" ]; then
   if [ "$SKIP_ETL" = "1" ]; then
     printf '  2. ETL copy                                              (skipped by --skip-etl)\n'
   else
-    printf '  2. node scripts/migrate-supabase-to-mariadb.mjs          (source from .env.local)\n'
+    printf '  2. node scripts/archive-postgres/migrate-supabase-to-mariadb.mjs          (source from .env.local)\n'
   fi
   # Reconcile is NOT gated by --skip-etl: it runs unless --from starts later.
-  printf '     node scripts/migrate-supabase-to-mariadb.mjs --verify-only\n'
+  printf '     node scripts/archive-postgres/migrate-supabase-to-mariadb.mjs --verify-only\n'
   if [ "$SKIP_IMAGES" = "1" ]; then
     printf '  3. image extraction                                      (skipped by --skip-images)\n'
   else
     printf '  3. node scripts/extract-images-to-files.mjs --apply      (DATABASE_URL=target)\n'
   fi
   printf '  4. next build  &&  node scripts/stamp-git-sha.mjs        (NEXT_PUBLIC_SITE_URL required)\n'
-  printf '  5. node scripts/precutover-check.mjs                     (32 checks)\n'
+  printf '  5. node scripts/archive-postgres/precutover-check.mjs                     (32 checks)\n'
   printf '\n  skipped: %s\n' "$SKIPPED"
-  printf '  the driver: node scripts/cutover-window.mjs %s %s\n' "${STEP_ARGS[*]}" "${PASSTHROUGH[*]:-}"
+  printf '  the driver: node scripts/archive-postgres/cutover-window.mjs %s %s\n' "${STEP_ARGS[*]}" "${PASSTHROUGH[*]:-}"
   printf '  human steps this does not do: Plesk → Node.js → Stop before the ETL; add DATABASE_URL +\n'
   printf '  DATABASE_DIRECT_URL, Restart App, then /api/v1/health and one real slip (runbook Phase 6).\n'
   exit 0
 fi
 
 set +e
-node scripts/cutover-window.mjs ${STEP_ARGS[@]+"${STEP_ARGS[@]}"} ${PASSTHROUGH[@]+"${PASSTHROUGH[@]}"} 2>&1 | tee "$LOG"
+node scripts/archive-postgres/cutover-window.mjs ${STEP_ARGS[@]+"${STEP_ARGS[@]}"} ${PASSTHROUGH[@]+"${PASSTHROUGH[@]}"} 2>&1 | tee "$LOG"
 STATUS=${PIPESTATUS[0]}
 set -e
 

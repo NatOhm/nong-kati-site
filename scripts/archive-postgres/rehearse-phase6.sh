@@ -9,7 +9,7 @@
 # (nk-mariadb, 127.0.0.1:3307) and asserts the order from the driver's own log,
 # so a reordered or silently-trimmed sequence fails here instead of in the window.
 #
-# It runs four cases against `scripts/phase6-cutover.sh` — the real entry point,
+# It runs four cases against `scripts/archive-postgres/phase6-cutover.sh` — the real entry point,
 # not a re-implementation:
 #
 #   1. plan             --dry-run                        assert the full order
@@ -29,10 +29,10 @@
 # rows (docs/db-migration-hostatom-mariadb.md, "Pre-cutover check").
 #
 # Usage
-#   bash scripts/rehearse-phase6.sh                  # all four cases
-#   bash scripts/rehearse-phase6.sh --plan-only      # cases 1–2, no database needed
-#   bash scripts/rehearse-phase6.sh --dry-run        # print what would run
-#   bash scripts/rehearse-phase6.sh --allow-dirty    # pass the driver's dirty-tree
+#   bash scripts/archive-postgres/rehearse-phase6.sh                  # all four cases
+#   bash scripts/archive-postgres/rehearse-phase6.sh --plan-only      # cases 1–2, no database needed
+#   bash scripts/archive-postgres/rehearse-phase6.sh --dry-run        # print what would run
+#   bash scripts/archive-postgres/rehearse-phase6.sh --allow-dirty    # pass the driver's dirty-tree
 #                                                    # guard through (not advised)
 #   NK_REHEARSAL_TARGET="mysql://root:ci@127.0.0.1:3307/ci" bash scripts/…
 #
@@ -70,7 +70,7 @@ for arg in "$@"; do
   esac
 done
 
-DRIVER="scripts/phase6-cutover.sh"
+DRIVER="scripts/archive-postgres/phase6-cutover.sh"
 [ -f "$DRIVER" ] || die "$DRIVER is missing — it is the entry point this rehearses."
 [ -d node_modules ] || die "node_modules is missing — run 'npm ci' first."
 command -v node >/dev/null 2>&1 || die "node is not on PATH."
@@ -192,10 +192,10 @@ present "Dry run — plan only, nothing is executed" "dry run announced"
 present "steps  : migrate deploy · ETL · image extraction · build · gate" "banner lists the five steps in order"
 order \
   "1. prisma migrate deploy" \
-  "2. node scripts/migrate-supabase-to-mariadb.mjs" \
+  "2. node scripts/archive-postgres/migrate-supabase-to-mariadb.mjs" \
   "3. node scripts/extract-images-to-files.mjs --apply" \
   "4. next build" \
-  "5. node scripts/precutover-check.mjs"
+  "5. node scripts/archive-postgres/precutover-check.mjs"
 finish_case "plan"
 
 # ── Case 2: flags trim the plan without reordering it ─────────────────────
@@ -204,10 +204,10 @@ run_case plan-trimmed --dry-run --skip-etl --skip-images
 assert_exit 0
 present "steps  : migrate deploy · build · gate" "banner keeps only the enabled steps"
 present "skipped: etl images" "banner names what it dropped"
-absent "2. node scripts/migrate-supabase-to-mariadb.mjs" "ETL plan line is gone"
+absent "2. node scripts/archive-postgres/migrate-supabase-to-mariadb.mjs" "ETL plan line is gone"
 present "(skipped by --skip-etl)" "the plan says the ETL is skipped instead of hiding it"
 absent "3. node scripts/extract-images-to-files.mjs --apply" "image plan line is gone"
-order "1. prisma migrate deploy" "4. next build" "5. node scripts/precutover-check.mjs"
+order "1. prisma migrate deploy" "4. next build" "5. node scripts/archive-postgres/precutover-check.mjs"
 finish_case "plan-trimmed"
 
 if [ "$PLAN_ONLY" = "1" ]; then

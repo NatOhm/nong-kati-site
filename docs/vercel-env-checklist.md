@@ -1,5 +1,9 @@
 # Vercel Production Fix Checklist — env, migrations, DNS
 
+> **Historical (Vercel + Supabase era).** Production has run on the Hostatom Plesk vhost since
+> 2026-10-26 and on MariaDB since 2026-11-15, so none of these env shapes apply to the live site;
+> the connection strings below are the pre-cutover pooler/direct pair, kept for the record.
+
 > สำหรับ: prod deploy พังตั้งแต่ commit `5d9ebad` (27 ก.ย.) — prod ยัง serve build เก่า `faa515a`
 >
 > **Root cause จากโค้ดจริง:** `5d9ebad` แก้ HIGH-1 โดยเปลี่ยน `siteUrl()`

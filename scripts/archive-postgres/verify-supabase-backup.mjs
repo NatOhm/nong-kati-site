@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * scripts/verify-supabase-backup.mjs — restore rehearsal for a `db-full-*.dump` artifact.
+ * scripts/archive-postgres/verify-supabase-backup.mjs — restore rehearsal for a `db-full-*.dump` artifact.
  *
  * A backup nobody has restored is a hope. This script restores the artifact into a throwaway
  * Postgres 17 database (a container that is deleted afterwards, so no scratch state is left
@@ -8,9 +8,9 @@
  * fingerprint that `backup-supabase-db.mjs` recorded from the source, and compares them.
  *
  * Usage
- *   node scripts/verify-supabase-backup.mjs                          # newest db-full-*.dump
- *   node scripts/verify-supabase-backup.mjs --dump=backups/db-full-2026-11-15T02-10-00.dump
- *   node scripts/verify-supabase-backup.mjs --keep                   # leave the container up
+ *   node scripts/archive-postgres/verify-supabase-backup.mjs                          # newest db-full-*.dump
+ *   node scripts/archive-postgres/verify-supabase-backup.mjs --dump=backups/db-full-2026-11-15T02-10-00.dump
+ *   node scripts/archive-postgres/verify-supabase-backup.mjs --keep                   # leave the container up
  *
  * Exit codes: 0 every populated table matched · 1 a mismatch or a populated table did not
  * come back · 2 usage/setup problem.

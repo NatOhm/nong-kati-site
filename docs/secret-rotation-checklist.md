@@ -117,27 +117,42 @@ This is the credential that was displayed in the Plesk panel and chat. Highest p
 
 ---
 
-## Step 2 — Rotate the database password (Supabase)
+## Step 2 — Rotate the database password (MariaDB on Plesk)
 
-Prisma uses only `DATABASE_URL` (pooler :6543). No staging, no second consumer.
+Since 2026-11-15 production is MariaDB `nongka_nongkati_nongkatistore`, and the two URLs are
+**Plesk Secrets**, not Environment rows — editing the Environment table changes nothing
+(see `AGENTS.md` → "Rotating a database password").
 
-**Supabase:**
-1. supabase.com/dashboard → your project (the one `DATABASE_URL` points at) → **Project Settings → Database →
-   Database password** → **Reset database password** → generate → copy.
-   ⚠️ This instantly invalidates the old password; the live app keeps its pooled connections
-   (open connections survive), but new connections fail until step 4 — do 2–4 quickly.
-2. Copy the **Connection string (pooler, port 6543)** and substitute the new password.
+1. **Plesk → Databases → Users** → the shop user (`nongka_nongkati_nongkatistore`) → change the
+   password. Generate it in the browser, keep it only long enough to finish this step.
+2. **Plesk → Websites & Domains → nongkatistore.com → Node.js → Environment → Secrets** → the
+   **Replace** button on `DATABASE_URL`, then on `DATABASE_DIRECT_URL`. Paste the full URL, both
+   keys identical:
+   `mysql://nongka_nongkati_nongkatistore:<url-encoded-password>@localhost:3306/nongka_nongkati_nongkatistore?connection_limit=5`
+   — percent-encode `@ : / # %` in the password; an unencoded `@` fails exactly like a wrong
+   password. **Never** use the bulk-paste Environment textarea (it deletes every other row).
+3. **Save.** That alone restarts Passenger (~15 s, health `uptime` drops). No Restart App click
+   is needed, and a *second* restart will not fix a stale secret.
+4. Verify by behaviour, not by the panel: `/api/v1/health` → `healthy` + `database: ok`,
+   `/api/v1/products` → **200**, then read health four times 30 s apart and confirm `uptime`
+   climbs past 90 s with no reset (a single green reading does not prove the process stopped
+   respawning). Full runbook with the exact curls: `TODAY.md` → P0-0.
 
-**Infisical:**
-3. Project **nong-kati** → Production → `DATABASE_URL` row → pencil icon → paste the new full URL
-   (keep `?pgbouncer=true`) → **Save commit**.
+> If health still says `database: error` while the new password works from the host, the app is
+> holding an old secret: repeat the Replace, do not touch the database.
 
-**Plesk:**
-4. Node.js → **Restart App** → verify the three curls **and** log in as a test customer / open
-   `/products` (exercises real queries).
+<details>
+<summary>Old path (Supabase era, pre-2026-11-15) — kept as history</summary>
 
-> If anything stalls: reset the password back in Supabase (set it to the previous value — you kept
-> it in your password manager) → restart → investigate calmly.
+Prisma used only `DATABASE_URL` (pooler :6543) and the pair lived in Infisical; `DATABASE_DIRECT_URL`
+was added later for `prisma migrate`.
+
+**Supabase:** dashboard → project → **Project Settings → Database → Database password** → reset →
+copy. **Infisical:** project **nong-kati** → Production → `DATABASE_URL` → paste the pooler URL
+(keep `?pgbouncer=true`) → Save commit. **Plesk:** **Restart App** → verify the curls and open
+`/products`.
+
+</details>
 
 ---
 

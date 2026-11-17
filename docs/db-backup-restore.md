@@ -1,10 +1,45 @@
-# Database backup and restore (production Supabase)
+# Database backup and restore (production MariaDB)
 
-How the live database is backed up, where the artifacts live, what they do and do not contain,
-and the exact commands that were executed to prove a restore. Companion to
-`docs/db-migration-hostatom-mariadb.md` (the cutover runbook that consumes these artifacts).
+**Production has run MariaDB 10.11 (`nongka_nongkati_nongkatistore`) since 2026-11-15.** The live
+path is the nightly `mariadb-dump` task below. Everything that mentions Supabase, `pg_dump` or
+`psql` is the pre-cutover record — kept deliberately, because those artifacts are how the MariaDB
+copy was made and what proves the rows survived the move. Companion runbook:
+`docs/db-migration-hostatom-mariadb.md`.
 
-## Where the artifacts live
+## Current path — MariaDB (production)
+
+Nightly, from a Plesk scheduled task on the host (`scripts/backup-mariadb.sh`):
+
+```bash
+mariadb-dump --single-transaction --hex-blob --routines --triggers \
+  -h 127.0.0.1 -u "$DB_USER" -p"$DB_PASS" nongka_nongkati_nongkatistore | gzip > <dump>.sql.gz
+# then: gzip -t (a truncated file must never be published), a .sha256 sidecar, and
+# count/age pruning that never deletes the newest surviving dump.
+```
+
+Restore, into an **empty** schema (never over the live one without a fresh pre-restore dump):
+
+```bash
+gunzip -c <dump>.sql.gz | mariadb -h 127.0.0.1 -u <user> -p <db>
+```
+
+Verify the restore with counts rather than trust — `node scripts/db-report.mjs --url=mysql://…`
+reports **39 tables with exact counts**; the cutover copy was validated this way (4 pruning runs
+kept exactly 3 files and removed the oldest, the newest restored into an empty MariaDB with the
+same per-table counts, and a wrong password exited 1 leaving no file behind).
+
+The nightly task runs in the vhost chroot, which has `mariadb-dump`/`gzip` but **no `node`** — that
+is why the backup is a shell task and the *verification* is the Node script run over SSH or from
+the panel's Node console. `mariadb-dump` output holds `GiftCode.codeEncrypted` ciphertext,
+`nonce`, `keyVersion` and `codeHash` as stored; nothing is decrypted into a dump.
+
+⚠️ **Product images are not in the database.** They are files under `NK_MEDIA_DIR`
+(`/httpdocs/storage/media`), so a row-level restore brings back a catalogue whose images 404 —
+Plesk's Backup Manager (files + database together) is what covers the media directory.
+
+## Historical (Supabase era) — how the pre-cutover copy was taken
+
+## Where the artifacts live (Supabase-era dumps, kept as the cutover source)
 
 Outside both repositories, on this machine:
 
@@ -103,7 +138,7 @@ docker rm -f nk-restore
 The scripted form of the same thing (what was used, and is repeatable):
 
 ```bash
-node scripts/verify-supabase-backup.mjs \
+node scripts/archive-postgres/verify-supabase-backup.mjs \
   --dump="E:/งานนะจ๊ะ/2569/Nong-kati/db-backups/db-full-2026-11-14T21-12-33.dump"
 ```
 
@@ -142,28 +177,16 @@ timestamp, a rounded decimal all change it. Restore, recompute, compare. The ver
 a non-zero exit on any populated-table mismatch, a populated table that did not come back, or a
 table that appears only in the restore.
 
-## Nightly backups once the shop is on MariaDB
+## Install steps for the nightly task
 
-From Phase 8 of the runbook onwards, `scripts/backup-mariadb.sh` runs nightly from a Plesk
-scheduled task: `mariadb-dump --single-transaction --hex-blob … | gzip`, a `gzip -t` gate before
-the file is published, a `.sha256` sidecar, and count/age pruning that never deletes the newest
-surviving dump. Install steps, the exact task command and the retention variables are in
+`scripts/backup-mariadb.sh` install, the exact task command and the retention variables are in
 `docs/db-migration-hostatom-mariadb.md` → Phase 8.
 
-Verified against the MariaDB copy: 4 runs with `RETENTION_COUNT=3` kept exactly 3 and removed
-the oldest; the newest restored into an empty MariaDB with 39 tables and the same per-table
-counts; a wrong password exited 1 and left no file behind.
-
-⚠️ **Uploaded product images are no longer in the database.** They are files under
-`NK_MEDIA_DIR` (`/httpdocs/storage/media` on the server), so a database dump alone will restore a
-catalogue whose images 404. The nightly dump covers rows; Plesk's Backup Manager (files + database)
-is what covers the media directory. Restore both together.
-
-## Taking a new backup (the Postgres source, before the cutover)
+## Taking a new backup (historical: the Postgres source, before the cutover)
 
 ```bash
-node scripts/backup-supabase-db.mjs --out-dir="E:/งานนะจ๊ะ/2569/Nong-kati/db-backups"
-node scripts/verify-supabase-backup.mjs --dump="<the new dump>"
+node scripts/archive-postgres/backup-supabase-db.mjs --out-dir="E:/งานนะจ๊ะ/2569/Nong-kati/db-backups"
+node scripts/archive-postgres/verify-supabase-backup.mjs --dump="<the new dump>"
 ```
 
 New date-stamped artifacts; nothing is overwritten. Read-only against the source. Take a fresh

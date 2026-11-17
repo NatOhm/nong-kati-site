@@ -1,5 +1,10 @@
 # Pre-Launch Checklist — Nong-Kati
 
+> **Reading note (2026-11-17):** wherever this checklist says Supabase or Vercel, read "MariaDB on
+> the Hostatom Plesk vhost" — the host moved on 2026-10-26 and the database on 2026-11-15, so the
+> Supabase-advisor and PITR items below can no longer be executed as written. The rest of the
+> checklist (payments, PDPA, content, smoke) is still the launch gate.
+
 Consolidated from:
 
 - `13-security.md §17` — Pre-Launch Security Checklist

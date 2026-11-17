@@ -113,9 +113,9 @@ the gates are green.
 
 ### Phase 3 — ETL (source: Supabase, target: local MariaDB)
 
-Never `pg_dump`: it produces Postgres SQL. Write `scripts/migrate-supabase-to-mariadb.mjs`:
+Never `pg_dump`: it produces Postgres SQL. Write `scripts/archive-postgres/migrate-supabase-to-mariadb.mjs`:
 
-- [x] `scripts/migrate-supabase-to-mariadb.mjs` reads every model through `json_agg` in a
+- [x] `scripts/archive-postgres/migrate-supabase-to-mariadb.mjs` reads every model through `json_agg` in a
       throwaway `postgres:17-alpine` container (no local psql on this machine) and writes with
       the MySQL Prisma client to `TARGET_DATABASE_URL`.
 - [x] Inserts follow the schema's model order with an FK retry loop; self-referencing tables
@@ -146,14 +146,14 @@ Never `pg_dump`: it produces Postgres SQL. Write `scripts/migrate-supabase-to-ma
 - [x] Write paths driven for real (not unit stubs) against the MariaDB copy through the
       running app — cart, order, fulfilment, refund/void, admin product save, gift-code
       upload + decrypt, plus coupon redemption, wallet payment and slip verification. This is
-      now a committed, repeatable gate: `scripts/precutover-check.mjs` (see below).
+      now a committed, repeatable gate: `scripts/archive-postgres/precutover-check.mjs` (see below).
 
 **Done when:** the same numbers pass as on Postgres, and the code decrypts.
 
-### Pre-cutover check (`scripts/precutover-check.mjs`)
+### Pre-cutover check (`scripts/archive-postgres/precutover-check.mjs`)
 
 ```bash
-TARGET_DATABASE_URL="mysql://…/nongka_nongkati_nongkatistore" node scripts/precutover-check.mjs
+TARGET_DATABASE_URL="mysql://…/nongka_nongkati_nongkatistore" node scripts/archive-postgres/precutover-check.mjs
 ```
 
 It derives its fixtures from the target database (an active super_admin, a variant with stock
@@ -229,7 +229,7 @@ secret, so it runs only inside the agreed window.
 ### Phase 6 — cutover (one window, ~30 min)
 
 Rehearse the driver itself before the window, against the local MariaDB copy —
-`bash scripts/rehearse-phase6.sh` runs the plan, a trimmed plan, the real 32-check gate and a
+`bash scripts/archive-postgres/rehearse-phase6.sh` runs the plan, a trimmed plan, the real 32-check gate and a
 deliberate failure, and asserts from the logs that the steps still fire in order
 (`--plan-only` does the two plan cases without a database).
 
@@ -254,7 +254,7 @@ them in this order and stops at the first failure, with a log in `reports/`:
 
 ```bash
 TARGET_DATABASE_URL="mysql://nongka_nongkati_nongkatistore:DBPASS@127.0.0.1:3307/nongka_nongkati_nongkatistore" \
-  bash scripts/phase6-cutover.sh --yes
+  bash scripts/archive-postgres/phase6-cutover.sh --yes
 ```
 
 It refuses a non-`mysql://` target, a Supabase host, and a non-loopback target without `--yes`.
@@ -271,9 +271,9 @@ order — the sequence works end to end:
 docker run -d --name nk-mariadb -e MARIADB_ROOT_PASSWORD=… -e MARIADB_DATABASE=… \
   -p 3307:3306 mariadb:10.11
 DATABASE_URL="mysql://…" DATABASE_DIRECT_URL="mysql://…" npx prisma migrate deploy   # baseline applied
-TARGET_DATABASE_URL="mysql://…" node scripts/migrate-supabase-to-mariadb.mjs         # 38 tables, 2497 rows, all counts match
+TARGET_DATABASE_URL="mysql://…" node scripts/archive-postgres/migrate-supabase-to-mariadb.mjs         # 38 tables, 2497 rows, all counts match
 DATABASE_URL="mysql://…" npm run build                                              # compiled
-TARGET_DATABASE_URL="mysql://…" node scripts/precutover-check.mjs                     # 32/32
+TARGET_DATABASE_URL="mysql://…" node scripts/archive-postgres/precutover-check.mjs                     # 32/32
 TARGET_DATABASE_URL="mysql://…" node scripts/postswitch-check.mjs --base=http://127.0.0.1:3314  # 22/22, after the switch
 ```
 
@@ -290,7 +290,7 @@ until Phase 8, so this is a two-minute revert.
       --max-uptime=600` → 22/22. This is the one that proves the *running* process reads the new
       database (health, schema head, catalogue counts, admin login + cookie, order, code
       redemption, media); see the Plesk runbook Step 7a for what each named check means.
-- [ ] `TARGET_DATABASE_URL=… node scripts/precutover-check.mjs` → 32/32 against the **production**
+- [ ] `TARGET_DATABASE_URL=… node scripts/archive-postgres/precutover-check.mjs` → 32/32 against the **production**
       MariaDB (this is the automated version of the bullets below; they stay as the human
       sanity pass on live traffic).
 - [ ] `/api/v1/version` returns the expected `BUILD_ID`; `/api/v1/health` `database: ok`.

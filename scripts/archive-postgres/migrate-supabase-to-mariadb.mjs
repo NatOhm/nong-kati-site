@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * scripts/migrate-supabase-to-mariadb.mjs — Phase 3 of docs/db-migration-hostatom-mariadb.md
+ * scripts/archive-postgres/migrate-supabase-to-mariadb.mjs — Phase 3 of docs/db-migration-hostatom-mariadb.md
  *
  * Copies every row out of the production Postgres database and into the MariaDB
  * database the app now points at. `pg_dump` cannot be used for this: it emits
@@ -20,7 +20,7 @@
  *
  * Usage
  *   TARGET_DATABASE_URL="mysql://user:pass@localhost:3306/nong_kati" \
- *     node scripts/migrate-supabase-to-mariadb.mjs
+ *     node scripts/archive-postgres/migrate-supabase-to-mariadb.mjs
  *
  *   --verify-only   skip the copy, just compare what is already there
  *   --table=Foo     copy only one table (debugging; children are not followed)

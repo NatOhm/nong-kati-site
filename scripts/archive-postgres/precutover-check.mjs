@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * scripts/precutover-check.mjs — the Phase 6/7 gate: prove the app's write paths work on the
+ * scripts/archive-postgres/precutover-check.mjs — the Phase 6/7 gate: prove the app's write paths work on the
  * target database before the shop is cut over to it.
  *
  * Everything is derived from the database it is pointed at — the admin account, the product and
@@ -22,7 +22,7 @@
  *                     (boots the app with NK_MEDIA_DIR pointed at a throwaway tmp/ directory)
  *
  * Usage
- *   TARGET_DATABASE_URL="mysql://user:pass@host:3306/db" node scripts/precutover-check.mjs
+ *   TARGET_DATABASE_URL="mysql://user:pass@host:3306/db" node scripts/archive-postgres/precutover-check.mjs
  *     --keep      leave the test rows behind (debugging)
  *     --port=3231 use a specific port for the app under test
  *
