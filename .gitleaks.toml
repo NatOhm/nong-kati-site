@@ -1,0 +1,86 @@
+# gitleaks — secret scanning for the working tree AND git history.
+#
+# Run with `npm run secret:scan` (scripts/secret-scan.mjs), which scans the
+# INDEX tree rather than the raw working directory: build output, local
+# `.env*` files, `backups/`, `.worktrees/` and `tmp/` are gitignored and are
+# therefore never scanned-and-suppressed here — they simply are not part of what
+# could be committed. That keeps the allowlist honest: nothing below exists to
+# hide a live credential that git could carry.
+#
+# CI runs the same script (.github/workflows/secret-scan.yml) on every push/PR
+# and weekly across all history.
+#
+# Context: this repo's real incidents (a production MySQL URL, a Resend key, a
+# Slip2Go key) leaked through terminal output and chat, never into git. This
+# gate exists to stop the next one from being committed.
+
+[extend]
+useDefault = true
+
+# ── Rules this repo actually needs ───────────────────────────────────────────
+# The default ruleset does NOT match a database URL carrying an inline password,
+# and that is exactly what leaked here (the production MySQL URL). Same for the
+# Resend token shape. Both are added explicitly so the gate covers the incident
+# class this project has already had.
+
+[[rules]]
+id = "database-url-with-password"
+description = "connection URL with an inline password (mysql/mariadb/postgres/mongo/redis)"
+# Password segment is 8+ characters. gitleaks runs Go's RE2, so no lookaheads:
+# the length floor is what keeps short documented stand-ins (`SECRET`, `xxxxxx`)
+# out of scope, and the three remaining local-dev URLs are allowlisted by their
+# exact shape below rather than by loosening this rule.
+regex = '''\b(?:mysql|mariadb|postgres|postgresql|mongodb(?:\+srv)?|redis|rediss)://[^\s:@/"'`]+:[^\s:@/"'`]{8,}@[^\s/"'`]+'''
+keywords = ["://"]
+
+[[rules]]
+id = "resend-api-key"
+description = "Resend API key"
+regex = '''\bre_[A-Za-z0-9_]{20,}\b'''
+keywords = ["re_"]
+
+# ── CI test constants ────────────────────────────────────────────────────────
+# .github/workflows/ci.yml sets these for throwaway service containers. They are
+# literals in a public workflow, useless outside CI.
+[[allowlists]]
+description = "CI workflow test constants (JWT/GIFT_CODE keys, ci/ci database)"
+regexTarget = "secret"
+regexes = [
+  '''ci-test-secret-[0-9a-f]+''',
+  '''(0123456789abcdef){2,}''',
+  '''ci:ci@(127\.0\.0\.1|localhost)(:3306)?/ci''',
+]
+
+# Placeholders a reader is meant to replace must not trip the URL rule above:
+# `<password>` in guides, `:xxxx@` in the Supabase example, `${VAR}` interpolation.
+[[allowlists]]
+description = "database-URL placeholders and local dev/rehearsal credentials"
+regexTarget = "secret"
+regexes = [
+  ''':(password|PASSWORD|pass|secret|xxxx|your[-_]?password|<[^>]+>|\$\{[^}]+\})@''',
+  ''':ci@(127\.0\.0\.1|localhost)''',
+  # docker-compose.yml: the compose-only Postgres pair, bound to the `db` service.
+  '''nongkati:nongkati@db:5432''',
+  # scripts/rehearse-migration.sh: throwaway Postgres the rehearsal spins up.
+  '''postgres:postgres@127\.0\.0\.1''',
+]
+
+# ── Documentation placeholders ───────────────────────────────────────────────
+# Two guides print stand-in credentials so a reader can fill them in:
+# `docs/supabase-setup.md` (`postgres.xxxx:password@…`, `https://xxxxx.supabase.co`)
+# and `docs/admin-login-test.md` (a curl with `Bearer bogus.token.here`).
+# Scoped to those two files, not to `docs/`: a real key pasted into any other
+# doc still fails.
+[[allowlists]]
+description = "placeholder credentials in setup guides"
+paths = [
+  '''^docs/supabase-setup\.md$''',
+  '''^docs/admin-login-test\.md$''',
+]
+
+# ── Test fixture ─────────────────────────────────────────────────────────────
+# One suite builds a fake slip whose secret is slug-shaped. Scoped to that file
+# alone — a real credential pasted into another test must still fail the scan.
+[[allowlists]]
+description = "slip-retention fixture secret (fake by construction)"
+paths = ['''^tests/slip-retention\.test\.ts$''']

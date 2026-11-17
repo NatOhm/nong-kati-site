@@ -16,7 +16,8 @@
     "patch-notes": "node scripts/patch-notes.mjs",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "monitor:health": "node scripts/monitor-health.mjs"
+    "monitor:health": "node scripts/monitor-health.mjs",
+    "secret:scan": "node scripts/secret-scan.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
