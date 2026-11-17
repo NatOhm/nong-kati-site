@@ -286,6 +286,11 @@ describe('void — the honest inverse of restock', () => {
     expect(audit['action']).toBe('inventory.code_void');
     // …and it rides in the SAME transaction as the mutation.
     expect(audit['tx']).toBeDefined();
+    // The marker states plainly that this was an ATTACHED code, so nobody
+    // reading the audit has to infer it from a missing variant.
+    const meta = audit['metadata'] as Record<string, unknown>;
+    expect(meta['detached']).toBe(false);
+    expect(meta['variantId']).toBe('var_1');
   });
 
   it('CAS: a second void matches 0 rows and never double-decrements', async () => {
@@ -322,6 +327,83 @@ describe('void — the honest inverse of restock', () => {
     );
     expect(res.status).toBe(409);
     expect(prismaMock.productVariant.update).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * A code detached from its product (`variantId` null, migration 20261025150000)
+ * used to be refused with CODE_DETACHED — while still counting as `available`
+ * and being sellable by nothing (13 rows in production, 2026-11-17). Retiring
+ * one is a status flip plus an audit row and nothing else: there is no
+ * variant, so a stock decrement or a StockMove would be invented data.
+ *
+ * These assertions are the difference between that claim and the claim being
+ * true — the previous pass could only compile it.
+ */
+describe('void — a detached code is RETIRED, not refused', () => {
+  const patch = async (body: unknown = {}): Promise<Response> => {
+    const mod = (await import(/* @vite-ignore */ VOID)) as Record<string, unknown>;
+    const fn = mod['PATCH'] as (r: NextRequest, c: unknown) => Promise<Response>;
+    return fn(
+      new NextRequest('http://localhost/x', {
+        method: 'PATCH',
+        headers: { cookie: `nk_admin_at=${superToken}`, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      }),
+      { params: Promise.resolve({ id: 'gc_1' }) },
+    );
+  };
+
+  it('flips status with who/why/when, audits the detached marker, moves no stock', async () => {
+    prismaMock.giftCode.findUnique.mockResolvedValue(
+      await codeRow({ variantId: null, variant: null, status: 'available' }),
+    );
+
+    const res = await patch({ reason: 'โค้ดไม่มีสินค้า (detached)' });
+    expect(res.status).toBe(200);
+    expect((await res.json()) as object).toMatchObject({ ok: true, detached: true });
+
+    // 1. the flip — same CAS as an attached void, but on a row with no variant
+    const flip = argOf(prismaMock.giftCode.updateMany) as unknown as {
+      where: Record<string, unknown>;
+      data: Record<string, unknown>;
+    };
+    expect(flip.where).toMatchObject({ id: 'gc_1', status: 'available' });
+    expect(flip.data).toMatchObject({ status: 'voided' });
+    expect(flip.data['voidedById']).toBe('adm_root');
+    expect(flip.data['voidReason']).toBe('โค้ดไม่มีสินค้า (detached)');
+    expect(flip.data['voidedAt']).toBeInstanceOf(Date);
+
+    // 2. the trail — one row, carrying the marker that distinguishes it
+    expect(auditMock.writeAuditLog).toHaveBeenCalledTimes(1);
+    const audit = argOf(auditMock.writeAuditLog);
+    expect(audit['action']).toBe('inventory.code_void');
+    expect(audit['recordId']).toBe('gc_1');
+    expect(audit['tableName']).toBe('GiftCode');
+    const meta = audit['metadata'] as Record<string, unknown>;
+    expect(meta['detached']).toBe(true);
+    expect(meta['variantId']).toBeNull();
+    expect(audit['tx']).toBeDefined();
+
+    // 3. and NOTHING that touches stock — the reason the branch exists
+    expect(prismaMock.productVariant.findUnique).not.toHaveBeenCalled();
+    expect(prismaMock.productVariant.update).not.toHaveBeenCalled();
+    expect(prismaMock.stockMove.create).not.toHaveBeenCalled();
+  });
+
+  it('names the case itself when the admin supplies no reason', async () => {
+    prismaMock.giftCode.findUnique.mockResolvedValue(
+      await codeRow({ variantId: null, variant: null, status: 'available' }),
+    );
+
+    expect((await patch()).status).toBe(200);
+
+    const flip = argOf(prismaMock.giftCode.updateMany) as unknown as {
+      data: Record<string, unknown>;
+    };
+    // An unstated reason must not fall back to the attached-code wording.
+    expect(flip.data['voidReason']).toBe('ยกเลิกโค้ดที่ไม่มีสินค้า');
+    expect(prismaMock.stockMove.create).not.toHaveBeenCalled();
   });
 });
 
@@ -577,6 +659,20 @@ describe('manual assignment — send a chosen account to a chosen customer', () 
     const res = await post({ codeId: 'gc_1' });
     expect(res.status).toBe(422);
     expect(prismaMock.giftCode.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('refuses a DETACHED account with CODE_DETACHED — the boundary the retire keeps', async () => {
+    // Detaching exists for history (codes handed out before a purge). Such a
+    // code must never be delivered, even though it is still `available` and
+    // the void route will now retire it: retiring is not selling.
+    prismaMock.giftCode.findUnique.mockResolvedValue(
+      await codeRow({ variantId: null, variant: null, status: 'available' }),
+    );
+    const res = await post({ codeId: 'gc_1' });
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: string }).error).toBe('CODE_DETACHED');
+    expect(prismaMock.giftCode.updateMany).not.toHaveBeenCalled();
+    expect(prismaMock.stockMove.create).not.toHaveBeenCalled();
   });
 
   it('refuses an already-delivered account', async () => {
