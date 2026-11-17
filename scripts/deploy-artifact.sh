@@ -61,6 +61,23 @@ git diff --quiet || warn "Working tree has uncommitted changes — the build sta
 
 START_SHA="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
 
+# ── Guard: the release commit must be reachable from a branch ───────────────
+# The build the site served for two days was `206a6a2`, a commit on NO branch
+# (P0-2): live code that cannot be rebuilt from source, and nothing noticed.
+# A detached HEAD is exactly how that happens, so refuse to publish one. Local
+# branches and remote-tracking ones both count — the commit has to be somewhere
+# a `git checkout` can find it. (This asks the local clone on purpose: the CI
+# clone is shallow and this repo's history is ~2.6 GB, so an ancestry question
+# is only answerable at publish time, not in CI.)
+# `for-each-ref`, not `git branch --contains`: on a detached HEAD the latter prints
+# the pseudo-entry "(HEAD detached from …)" even with --format, which reads as a
+# branch and would let the exact build this guard exists to stop straight through
+# (measured: the first version of this guard passed a detached commit).
+ON_BRANCH="$(git for-each-ref --contains "$START_SHA" --format='%(refname:short)' \
+               refs/heads refs/remotes 2>/dev/null | head -1 || true)"
+[ -n "$ON_BRANCH" ] || die "git $START_SHA is on no branch, so this release could never be rebuilt from source. Check it out on a branch (or tag it and record the tag) and rebuild — refusing to publish a detached build (P0-2)."
+say "Release commit is on ${ON_BRANCH}"
+
 # ── Step 0: build ────────────────────────────────────────────────────────────
 if [ "${SKIP_BUILD:-0}" = "1" ]; then
   [ -f .next/BUILD_ID ] || die "SKIP_BUILD=1 but .next/BUILD_ID missing — run a build first."

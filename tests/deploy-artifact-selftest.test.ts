@@ -26,7 +26,16 @@
  * against the copy), and the SSH-tunnel branch, which needs a real host.
  */
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -259,6 +268,41 @@ describe.skipIf(!HAS_BASH)('deploy-artifact → post-switch gate, offline', () =
         'scripts/ci-postswitch-gate.sh',
         'scripts/wait-for-build.mjs',
       ]);
+    },
+  );
+
+  it(
+    'carries the gate scripts byte-for-byte, so a stale copy cannot certify a release',
+    { timeout: 60_000 },
+    () => {
+      const f = makeFixture();
+      const published = publish(f, 'selftest-identical-1');
+
+      // Only what the artifact actually ships: the bundle, the workflow and the
+      // gate scripts. A future staging change that adds another script belongs
+      // in this comparison, not outside it.
+      const shipped = git(f.work, 'ls-tree', '-r', '--name-only', published.sha)
+        .trim()
+        .split('\n')
+        .filter((path) => path.startsWith('scripts/'))
+        .sort();
+      expect(shipped).toEqual(['scripts/ci-postswitch-gate.sh', 'scripts/wait-for-build.mjs']);
+
+      // The whole point of staging these is that an old release runs THIS gate.
+      // If the artifact carries an older copy, the release is certified by a
+      // gate whose rules nobody in this tree can point at — the failure the
+      // 2026-11-15 artifact tree was built to prevent, one layer down.
+      const sha256 = (bytes: Buffer): string => createHash('sha256').update(bytes).digest('hex');
+      for (const rel of shipped) {
+        const inArtifact = execFileSync('git', ['cat-file', '-p', `${published.sha}:${rel}`], {
+          cwd: f.work,
+          env: GIT_ENV,
+        });
+        expect(
+          sha256(inArtifact),
+          `${rel} in the artifact is not the file in this worktree`,
+        ).toBe(sha256(readFileSync(join(REPO, rel))));
+      }
     },
   );
 
