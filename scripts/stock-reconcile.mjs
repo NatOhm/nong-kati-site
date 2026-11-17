@@ -28,12 +28,9 @@
  * every query is a findMany, so it is safe to point at production.
  */
 
-import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
-import net from 'node:net';
 import { pathToFileURL } from 'node:url';
+
+import { openTunnel, tunnelPlan } from './lib/plesk-tunnel.mjs';
 
 const argv = process.argv.slice(2);
 const JSON_OUT = argv.includes('--json');
@@ -69,152 +66,14 @@ const die = (msg) => {
 };
 
 /* ─── Optional SSH tunnel ───────────────────────────────────────────────────
- * The shop's MariaDB listens on the host's loopback only — Plesk creates the
- * user `@localhost`, so this workstation is refused even though port 3306 is
- * open (measured 2026-11-16). `scripts/ci-postswitch-gate.sh` already solves
- * that with a tunnel keyed on PLESK_SSH_KEY; this script reads the same three
- * variables, so the reconciliation does not have to be run on the host.
- * Nothing here is written to disk and no secret is printed: the URL keeps its
- * credentials, only the host and port it dials are rewritten.
+ * The forward itself lives in scripts/lib/plesk-tunnel.mjs, shared with
+ * scripts/db-report.mjs so there is one place to fix a key path or a failure
+ * message. The database user is `@localhost`, so this workstation is
+ * refused even though 3306 is open (measured 2026-11-16); setting
+ * PLESK_SSH_HOST (and PLESK_SSH_KEY, or the gate's own ~/.ssh/plesk_ci) makes
+ * the script dial the database through the host instead.
  */
-const SSH_HOST = process.env.PLESK_SSH_HOST || '';
-// The gate's key is a CI secret that workflow writes to `$HOME/.ssh/plesk_ci` and
-// then names in PLESK_SSH_KEY (postswitch-gate.yml). Same filename here, so a
-// workstation holding that file needs no extra wiring — but only when a host is
-// named, never just because a stray file exists.
-const CI_KEY_PATH = join(homedir(), '.ssh', 'plesk_ci');
-const SSH_KEY =
-  process.env.PLESK_SSH_KEY || (SSH_HOST && existsSync(CI_KEY_PATH) ? CI_KEY_PATH : '');
-const SSH_USER = process.env.PLESK_SSH_USER || 'nongka';
-// Only for hosts where the client is not on PATH (and for exercising the
-// forward without a key); everything normal keeps plain `ssh`.
-const SSH_BIN = process.env.PLESK_SSH_BIN || 'ssh';
-const LOOPBACK = new Set(['localhost', '127.0.0.1', '::1']);
-
-const freePort = () =>
-  new Promise((resolve, reject) => {
-    const server = net.createServer();
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const { port } = server.address();
-      server.close(() => resolve(port));
-    });
-  });
-
-const portAccepts = (port) =>
-  new Promise((resolve) => {
-    const socket = net.connect(port, '127.0.0.1');
-    socket.setTimeout(800);
-    socket.once('connect', () => {
-      socket.destroy();
-      resolve(true);
-    });
-    socket.once('timeout', () => {
-      socket.destroy();
-      resolve(false);
-    });
-    socket.once('error', () => resolve(false));
-  });
-
-/**
- * Pure: what to forward, and the URL to dial once it is up. A loopback URL means
- * "the database on the host itself"; anything else forwards to where it points.
- */
-export function tunnelPlan(targetUrl, { key, host, user, port }) {
-  const parsed = new URL(targetUrl);
-  const remoteHost = LOOPBACK.has(parsed.hostname) ? '127.0.0.1' : parsed.hostname;
-  const remotePort = parsed.port || '3306';
-  const forwarded = new URL(targetUrl);
-  forwarded.hostname = '127.0.0.1';
-  forwarded.port = String(port);
-  return {
-    username: user,
-    destination: `${user}@${host}`,
-    forward: `127.0.0.1:${port}:${remoteHost}:${remotePort}`,
-    remote: `${remoteHost}:${remotePort}`,
-    url: forwarded.href,
-    args: [
-      '-i', key,
-      // BatchMode: a missing/mistrusted key must fail, not prompt inside a script.
-      '-o', 'BatchMode=yes',
-      '-o', 'StrictHostKeyChecking=accept-new',
-      '-o', 'ExitOnForwardFailure=yes',
-      '-N',
-      '-L', `127.0.0.1:${port}:${remoteHost}:${remotePort}`,
-      `${user}@${host}`,
-    ],
-  };
-}
-
-/** Opens the forward and waits for it to answer; throws with ssh's own words. */
-async function openTunnel(targetUrl) {
-  if (!SSH_KEY) return { url: targetUrl, close: () => {} };
-  if (!SSH_HOST) die('PLESK_SSH_KEY is set but PLESK_SSH_HOST is not.');
-
-  const parsed = new URL(targetUrl);
-  if (!/^mysqls?:$/.test(parsed.protocol)) {
-    die(`PLESK_SSH_KEY is set, so DATABASE_URL must be a mysql:// URL — got ${parsed.protocol}//…`);
-  }
-  const localPort = await freePort();
-  const plan = tunnelPlan(targetUrl, {
-    key: SSH_KEY,
-    host: SSH_HOST,
-    user: SSH_USER,
-    port: localPort,
-  });
-
-  const child = spawn(SSH_BIN, plan.args, { stdio: ['ignore', 'ignore', 'pipe'] });
-
-  let stderr = '';
-  child.stderr.setEncoding('utf8').on('data', (chunk) => {
-    stderr = (stderr + chunk).slice(-800);
-  });
-  let spawnError = null;
-  child.once('error', (error) => {
-    spawnError = error;
-  });
-
-  const close = () => {
-    if (!child.killed) child.kill();
-  };
-  // A script that dies between here and disconnect must not leave ssh behind.
-  process.once('exit', close);
-  for (const signal of ['SIGINT', 'SIGTERM']) {
-    process.once(signal, () => {
-      close();
-      process.exit(130);
-    });
-  }
-
-  const deadline = Date.now() + 15_000;
-  for (;;) {
-    if (spawnError) {
-      close();
-      die(`cannot run ssh: ${spawnError.message}. Is an OpenSSH client on PATH?`);
-    }
-    if (child.exitCode !== null) {
-      close();
-      // The two failures that look identical from here have different fixes, so
-      // say which one this is instead of leaving a bare "Permission denied".
-      const hint = /Permission denied \(publickey/i.test(stderr)
-        ? '\n  ssh reached the host and refused the key: Plesk → Websites & Domains → SSH Access'
-          + ' must be enabled, and the public half of PLESK_SSH_KEY must be in that account\'s'
-          + ' ~/.ssh/authorized_keys.'
-        : '';
-      die(`the SSH tunnel died (ssh exit ${child.exitCode}): ${stderr.trim() || 'no output'}${hint}`);
-    }
-    if (await portAccepts(localPort)) break;
-    if (Date.now() > deadline) {
-      close();
-      die(`the tunnel never answered on 127.0.0.1:${localPort} — ssh is up but the forward is not (${stderr.trim() || 'no output'})`);
-    }
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  }
-
-  console.error(`  tunnel   : 127.0.0.1:${localPort} → ${plan.destination} ${plan.remote}`);
-
-  return { url: plan.url, close };
-}
+export { tunnelPlan };
 
 /**
  * Pure reconciliation — no database, no I/O, so it can be exercised against a captured export.
@@ -420,7 +279,7 @@ async function main() {
     );
   }
 
-  const tunnel = await openTunnel(process.env.DATABASE_URL);
+  const tunnel = await openTunnel(process.env.DATABASE_URL, die);
   const { PrismaClient } = await import('@prisma/client');
   const prisma = new PrismaClient({ datasources: { db: { url: tunnel.url } } });
   try {

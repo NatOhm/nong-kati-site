@@ -440,3 +440,40 @@ host of the URL.
 is deliberate: a release nobody certified must not look green. To check the live build alone without
 a database, dispatch the workflow with `check-only: true`; by hand it is
 `bash scripts/ci-postswitch-gate.sh --check-only --build-id=<BUILD_ID>`.
+
+### The same tunnel, by hand, for the stock reconciler
+
+`scripts/stock-reconcile.mjs` needs the same forward, because the shop's MariaDB user is
+`@localhost` and refuses a workstation even though 3306 answers. It reads the same three
+variables as the gate, so nothing new has to be configured:
+
+```bash
+PLESK_SSH_HOST=thsv93.hostatom.com \
+PLESK_SSH_KEY="$HOME/.ssh/plesk_ci" \
+PLESK_SSH_USER=nongka \
+DATABASE_URL='mysql://nongka:<pass>@localhost:3306/nongka_nongkati_nongkatistore' \
+node scripts/stock-reconcile.mjs
+```
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `PLESK_SSH_HOST` | — | set it to `thsv93.hostatom.com`; with no host the script dials `DATABASE_URL` directly |
+| `PLESK_SSH_KEY` | `~/.ssh/plesk_ci` **when a host is set** | the gate workflow's own filename, so a workstation holding that file needs no extra wiring; never used just because a stray file exists |
+| `PLESK_SSH_USER` | `nongka` | |
+| `PLESK_SSH_BIN` | `ssh` | only for a host whose client is not on `PATH` |
+
+What it does: spawns `ssh -i <key> -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o
+ExitOnForwardFailure=yes -N -L 127.0.0.1:<free port>:<db host>:<db port>`, waits until that port
+actually accepts (15 s cap), then dials it. The port is chosen by the OS, so a hand-run and a gate
+run cannot collide on 3306, and only the host and port of the URL are rewritten — user, password,
+database and query string survive, and the URL itself is never printed (the one line it emits is
+`tunnel : 127.0.0.1:<port> → nongka@thsv93.hostatom.com 127.0.0.1:3306`). The ssh child is killed on
+normal exit, on `SIGINT`/`SIGTERM` and on every error path.
+
+Exit codes match the gate's contract: `0` consistent, `1` real drift, `2` cannot run (no
+`DATABASE_URL`, tunnel refused, database unreachable). A refused key prints the Plesk SSH-Access
+fix, not a bare `Permission denied`.
+
+One sharp edge until it is fixed: a host set with **no readable key** currently falls back to a
+direct connection, so the failure you see is Prisma's "Can't reach database server" rather than the
+missing key. If that happens, check `PLESK_SSH_KEY` / `~/.ssh/plesk_ci` before the database.
