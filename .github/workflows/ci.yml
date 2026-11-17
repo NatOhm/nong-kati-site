@@ -141,31 +141,42 @@ jobs:
   # exactly once). Needs a live server, so it spins one up against a real
   # Postgres service; the test file itself skips when NK_TEST_BASE_URL is
   # absent, so local `npm test` stays green without a server.
-  concurrency-tests:
-    name: Concurrency (DB races)
+  # ─── Concurrency Tests on MariaDB (the engine production runs) ──
+  # This is the only DB-race job: its `postgres:16` twin was deleted on
+  # 2026-11-17 because it ran the SAME tests/admin-concurrency.test.ts file, so
+  # it was superseded rather than complementary. The shop has run MariaDB since
+  # the 2026-11-15 cutover, and the two engines are not interchangeable —
+  # collation (production is `utf8mb3_general_ci`), Decimal rounding and row
+  # locking under REPEATABLE READ all differ, and the RLS guarantees the
+  # Postgres job half-checked do not exist here at all.
+  #
+  # The engine probe below still earns its keep: on any ref that has not taken
+  # the port it turns "mysql URL against a postgres schema" into a named
+  # ::notice:: instead of a red P1012.
+  concurrency-tests-mariadb:
+    name: Concurrency (MariaDB)
     runs-on: ubuntu-latest
     needs: [test]
     services:
-      postgres:
-        image: postgres:16
+      mariadb:
+        image: mariadb:10.11
         env:
-          POSTGRES_USER: ci
-          POSTGRES_PASSWORD: ci
-          POSTGRES_DB: ci
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: ci
+          MARIADB_USER: ci
+          MARIADB_PASSWORD: ci
         ports:
-          - 5432:5432
+          - 3306:3306
         options: >-
-          --health-cmd "pg_isready -U ci"
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
     env:
-      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
-      # prisma/schema.prisma declares directUrl, and Prisma's CLI resolves it
-      # before it connects — without this the migrate deploy step exits P1012
-      # ("Environment variable not found"). PrismaClient itself reads only
-      # DATABASE_URL at runtime, which is why the app never needed it.
-      DATABASE_DIRECT_URL: postgresql://ci:ci@localhost:5432/ci
+      DATABASE_URL: mysql://ci:ci@127.0.0.1:3306/ci
+      # schema.prisma declares directUrl; Prisma's CLI resolves it before it
+      # connects (the Postgres job hit P1012 without it).
+      DATABASE_DIRECT_URL: mysql://ci:ci@127.0.0.1:3306/ci
       NK_JWT_SECRET: ci-test-secret-0123456789abcdef0123456789abcdef
       NK_GIFT_CODE_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
       NK_OTP_DEV_MODE: '1'
@@ -177,25 +188,58 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npx prisma generate
-      - run: npx prisma migrate deploy
-      - name: Start dev server
+      - name: Read the schema's engine
+        id: engine
         run: |
-          nohup npx next dev -p 4200 > dev-server.log 2>&1 &
+          provider=$(grep -oE 'provider[[:space:]]*=[[:space:]]*"(mysql|postgresql)"' prisma/schema.prisma \
+            | head -1 | grep -oE '(mysql|postgresql)' || true)
+          if [ -z "$provider" ]; then
+            echo "::error title=engine probe::no datasource provider found in prisma/schema.prisma"
+            exit 1
+          fi
+          echo "provider=$provider" >> "$GITHUB_OUTPUT"
+          if [ "$provider" != "mysql" ]; then
+            echo "::notice title=MariaDB race run skipped::prisma/schema.prisma is '$provider' on this branch, so MariaDB is not the engine under test (P1-4 is still blocked)."
+          fi
+      - name: prisma generate
+        if: steps.engine.outputs.provider == 'mysql'
+        run: npx prisma generate
+      - name: Apply migrations
+        if: steps.engine.outputs.provider == 'mysql'
+        run: npx prisma migrate deploy
+      - name: Report the server (drift stays visible)
+        if: steps.engine.outputs.provider == 'mysql'
+        run: |
+          # Printed, not asserted: production runs utf8mb3_general_ci while this
+          # image defaults to utf8mb4, and a red job over a default nobody chose
+          # would be noise. A silent difference would be worse.
+          node -e '
+            const { PrismaClient } = require("@prisma/client");
+            const p = new PrismaClient();
+            p.$queryRawUnsafe("SELECT VERSION() AS v, @@collation_server AS c")
+              .then(([r]) => console.log(`engine ${r.v}, collation ${r.c}`))
+              .finally(() => p.$disconnect());
+          '
+      - name: Start dev server
+        if: steps.engine.outputs.provider == 'mysql'
+        run: |
+          nohup npx next dev -p 4200 > dev-server-mariadb.log 2>&1 &
           for i in $(seq 1 60); do
             sleep 2
             code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:4200/ || true)
             if [ "$code" = "200" ]; then echo "dev server up (attempt $i)"; exit 0; fi
           done
-          echo "dev server did not become ready"; tail -50 dev-server.log; exit 1
+          echo "dev server did not become ready"; tail -50 dev-server-mariadb.log; exit 1
       - name: Run concurrency tests
+        if: steps.engine.outputs.provider == 'mysql'
         run: NK_TEST_BASE_URL=http://127.0.0.1:4200 npx vitest run tests/admin-concurrency.test.ts
       - name: Upload dev server log
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4 (pinned)
         with:
-          name: dev-server-log
-          path: dev-server.log
+          name: dev-server-log-mariadb
+          path: dev-server-mariadb.log
+          if-no-files-found: ignore
 
   # ─── Browser Smoke (roadmap §7/§8) ─────────────────
   # Minimal production smoke against a REAL database and a REAL production
@@ -212,22 +256,23 @@ jobs:
     runs-on: ubuntu-latest
     needs: [lint, test]
     services:
-      postgres:
-        image: postgres:16
+      mariadb:
+        image: mariadb:10.11
         env:
-          POSTGRES_USER: ci
-          POSTGRES_PASSWORD: ci
-          POSTGRES_DB: ci
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: ci
+          MARIADB_USER: ci
+          MARIADB_PASSWORD: ci
         ports:
-          - 5432:5432
+          - 3306:3306
         options: >-
-          --health-cmd "pg_isready -U ci"
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
     env:
-      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
-      DATABASE_DIRECT_URL: postgresql://ci:ci@localhost:5432/ci
+      DATABASE_URL: mysql://ci:ci@127.0.0.1:3306/ci
+      DATABASE_DIRECT_URL: mysql://ci:ci@127.0.0.1:3306/ci
       NEXT_PUBLIC_SITE_URL: http://127.0.0.1:4200
       GIT_SHA: ${{ github.sha }}
       GIT_REF: ${{ github.ref_name }}
@@ -377,7 +422,7 @@ jobs:
     # Production review MEDIUM-2: the build (and the deploy that follows it)
     # must be gated by EVERY other check — a failing security audit or DB
     # concurrency/RLS run must not promote an artifact.
-    needs: [lint, test, doc-consistency, audit, concurrency-tests, browser-smoke]
+    needs: [lint, test, doc-consistency, audit, concurrency-tests-mariadb, browser-smoke]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4 (pinned)
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4 (pinned)
@@ -394,5 +439,6 @@ jobs:
           # under 32 — a throw this job only avoided by never reaching it.
           NK_JWT_SECRET: ci-test-secret-0123456789abcdef0123456789abcdef
           NK_CSP_REPORT_ONLY: 'true'
-          # Prerendering never queries these — CI has no database.
-          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+          # Prerendering never queries this — CI has no database. The shape is
+          # MariaDB's so the file never claims an engine this build cannot use.
+          DATABASE_URL: mysql://ci:ci@127.0.0.1:3306/ci
