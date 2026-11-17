@@ -56,6 +56,21 @@ interface InventoryItem {
   isFeatured: boolean;
 }
 
+/**
+ * `available` codes whose product was hard-deleted (`variantId` null).
+ *
+ * They appear in no product row, so they used to appear nowhere at all while
+ * still counting as sellable stock. The list is masked like every other
+ * account; retiring one is a status flip with no stock movement.
+ */
+interface OrphanSummary {
+  /** Every detached code, any status. */
+  total: number;
+  /** Still `available` — the actionable set. */
+  available: number;
+  codes: { id: string; masked: string; createdAt: string }[];
+}
+
 interface StockMoveRow {
   id: string;
   variantLabel: string;
@@ -108,6 +123,8 @@ function newDraft(item: InventoryItem): EditDraft {
 export default function AdminInventoryPage(): React.JSX.Element {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [moves, setMoves] = useState<StockMoveRow[]>([]);
+  const [orphans, setOrphans] = useState<OrphanSummary | null>(null);
+  const [retiringCode, setRetiringCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -142,11 +159,14 @@ export default function AdminInventoryPage(): React.JSX.Element {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await adminJson<{ items: InventoryItem[]; moves: StockMoveRow[] }>(
-        '/api/v1/admin/inventory',
-      );
+      const data = await adminJson<{
+        items: InventoryItem[];
+        moves: StockMoveRow[];
+        orphans?: OrphanSummary;
+      }>('/api/v1/admin/inventory');
       setItems(data.items);
       setMoves(data.moves);
+      setOrphans(data.orphans ?? null);
     } catch {
       setErr('โหลดสต๊อกไม่สำเร็จ');
     } finally {
@@ -157,6 +177,51 @@ export default function AdminInventoryPage(): React.JSX.Element {
   useEffect(() => {
     void load();
   }, [load]);
+
+  /**
+   * Retire one detached code.
+   *
+   * Goes through the ordinary void endpoint, which now distinguishes a code
+   * with no variant: status flip + audit row, no stock decrement and no
+   * StockMove. Asking before acting is deliberate — `voided` is terminal.
+   */
+  const retireOrphan = useCallback(
+    async (row: OrphanSummary['codes'][number]) => {
+      if (
+        !confirm(
+          `ปิดใช้งานโค้ด ${row.masked}?\nโค้ดนี้ไม่มีสินค้าอยู่แล้ว — สต๊อกจะไม่ถูกแตะและย้อนกลับไม่ได้`,
+        )
+      ) {
+        return;
+      }
+      setRetiringCode(row.id);
+      setErr(null);
+      try {
+        await adminJson<{ ok: boolean; detached?: boolean }>(
+          `/api/v1/admin/inventory/codes/${row.id}/void`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reason: 'โค้ดไม่มีสินค้า (detached)' }),
+          },
+        );
+        setMsg(`ปิดใช้งานโค้ด ${row.masked} แล้ว`);
+        await load();
+      } catch (e) {
+        const code = e instanceof Error ? e.message : '';
+        setErr(
+          code.includes('FORBIDDEN')
+            ? 'ไม่มีสิทธิ์ปิดใช้งานโค้ด'
+            : code.includes('CODE_NOT_VOIDABLE')
+              ? 'โค้ดนี้ถูกปิดใช้งานไปแล้ว'
+              : 'ปิดใช้งานโค้ดไม่สำเร็จ',
+        );
+      } finally {
+        setRetiringCode(null);
+      }
+    },
+    [load],
+  );
 
   /** Undo one bulk paste from its stock-history row (batchId correlation). */
   const [voidingBatch, setVoidingBatch] = useState<string | null>(null);
@@ -353,6 +418,50 @@ export default function AdminInventoryPage(): React.JSX.Element {
           >
             {err ?? msg}
           </div>
+        )}
+
+        {/* ── Detached codes ──
+            `available` codes whose product was hard-deleted count toward the
+            totals but appear in no product row, so this is the only place they
+            can be seen — and retired. */}
+        {orphans && orphans.available > 0 && (
+          <section className="rounded-xl border border-oat-200 bg-oat/40 p-4">
+            <h2 className="flex items-center gap-1.5 text-sm font-semibold text-fg-warning">
+              <AlertTriangle size={14} /> โค้ดที่ไม่มีสินค้า {orphans.available} รหัส
+            </h2>
+            <p className="mt-1 text-xs text-fg-secondary">
+              โค้ดเหล่านี้ยังนับว่า “พร้อมขาย” แต่ไม่มีตัวเลือกสินค้าให้ขายแล้ว (สินค้าถูกลบถาวร)
+              ปิดใช้งานได้โดยไม่กระทบสต๊อก · ทั้งระบบมีโค้ดแบบนี้ {orphans.total} รหัส
+              {orphans.codes.length < orphans.available &&
+                ` · แสดง ${orphans.codes.length} รายการแรก`}
+            </p>
+            <ul className="mt-3 space-y-1.5">
+              {orphans.codes.map((c) => (
+                <li
+                  key={c.id}
+                  className="flex flex-wrap items-center gap-2 rounded-lg border border-line-subtle bg-surface px-3 py-1.5"
+                >
+                  <code className="font-mono text-xs text-fg-secondary">{c.masked}</code>
+                  <span className="text-[11px] text-fg-placeholder">
+                    {new Date(c.createdAt).toLocaleDateString('th-TH')}
+                  </span>
+                  <span className="flex-1" />
+                  {/* Every role with `inventory:read` also holds
+                      `inventory:void`, so this button needs no permission
+                      branch — the API still enforces it. */}
+                  <button
+                    type="button"
+                    disabled={retiringCode === c.id}
+                    onClick={() => void retireOrphan(c)}
+                    className="inline-flex min-h-[32px] items-center gap-1 rounded-md border border-line px-2.5 text-xs font-medium text-fg-error transition-colors hover:border-error disabled:opacity-50"
+                    title="ปิดใช้งานโค้ดนี้ (ไม่กระทบสต๊อก)"
+                  >
+                    {retiringCode === c.id ? '…' : 'ปิดใช้งาน'}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
 
         {/* ── Filters ── */}

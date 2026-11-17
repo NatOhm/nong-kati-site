@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { checkPermission } from '@/lib/rbac';
 import { getAdminToken } from '@/lib/adminRequest';
+import { decryptCode, maskCode } from '@/lib/crypto/giftCode';
 
 export const dynamic = 'force-dynamic';
 
@@ -77,8 +78,41 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     include: { variant: { select: { label: true, product: { select: { name: true } } } } },
   });
 
+  // Codes detached from their product (a purge nulls `variantId`, migration
+  // 20261025150000) belong to no product row, so before this they appeared in
+  // NO admin list at all — while still counting as `available` stock and being
+  // sellable by nothing. Production held 13 of them on 2026-11-17. They are
+  // listed here, MASKED like every other account, so they can be retired
+  // deliberately instead of being invisible.
+  const [orphanTotal, orphanAvailable, orphanRows] = await Promise.all([
+    prisma.giftCode.count({ where: { variantId: null } }),
+    prisma.giftCode.count({ where: { variantId: null, status: 'available' } }),
+    prisma.giftCode.findMany({
+      where: { variantId: null, status: 'available' },
+      orderBy: { createdAt: 'asc' },
+      take: 200,
+    }),
+  ]);
+
   return NextResponse.json({
     items,
+    orphans: {
+      /** Every detached code, whatever its status — the honesty line. */
+      total: orphanTotal,
+      /** The ones that still claim to be sellable: the actionable set. */
+      available: orphanAvailable,
+      codes: orphanRows.map((r) => {
+        let masked: string;
+        try {
+          masked = maskCode(decryptCode(r.codeEncrypted, r.nonce, r.keyVersion));
+        } catch {
+          // Same rule as the per-variant list: one unreadable row must not
+          // blank the section that exists to show it.
+          masked = '(อ่านไม่ได้)';
+        }
+        return { id: r.id, masked, createdAt: r.createdAt.toISOString() };
+      }),
+    },
     moves: moves.map((m) => ({
       id: m.id,
       variantLabel: m.variant.label,

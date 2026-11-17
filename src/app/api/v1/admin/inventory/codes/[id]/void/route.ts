@@ -17,6 +17,14 @@
  * same transaction — a void that decremented stock without leaving a trail
  * (or vice versa) is exactly the drift this endpoint exists to remove.
  *
+ * One row type has no stock to move: a code DETACHED from its product (the
+ * catalog purge nulls `variantId`, migration 20261025150000). Before this,
+ * such a code could not be retired at all — the endpoint answered
+ * CODE_DETACHED — while still counting as `available` and being sellable by
+ * nothing (13 of them in production, 2026-11-17). For those the flip and the
+ * audit row still happen, and the stock decrement + StockMove deliberately do
+ * not: there is no variant, so inventing a movement would corrupt the ledger.
+ *
  * Idempotent and safe under concurrency: the status flip is a CAS
  * (`id + status: 'available'`), so two simultaneous voids cannot both
  * decrement, and re-voiding returns 409 rather than double-counting.
@@ -73,14 +81,18 @@ export async function PATCH(
       if (!VOIDABLE.has(code.status)) {
         return { status: 409 as const, error: 'CODE_NOT_VOIDABLE', codeStatus: code.status };
       }
-      // A detached code (its product was hard-deleted; variantId nulled by
-      // migration 20261025150000) has no variant stock left to decrement —
-      // it is not inventory anymore. Unreachable for `available` codes today
-      // (the purge deletes unsold codes and only detaches reserved/delivered
-      // ones), but the FK is nullable now, so state it instead of assuming.
-      if (!code.variantId || !code.variant) {
-        return { status: 409 as const, error: 'CODE_DETACHED' };
-      }
+      // A detached code belongs to no variant, so there is no stock to
+      // decrement and no StockMove to write. It is still `available` though,
+      // which is why it counts toward the code totals while being sellable by
+      // nothing. Retiring one is a status flip plus an audit row and
+      // deliberately nothing else.
+      const target =
+        code.variantId && code.variant
+          ? { variantId: code.variantId, variant: code.variant }
+          : null;
+      // The reason lands on the row and in the trail, so it is resolved once.
+      const voidReason =
+        reason || (target ? 'ยกเลิกโดยแอดมิน' : 'ยกเลิกโค้ดที่ไม่มีสินค้า');
 
       // CAS: the status predicate is what stops two concurrent voids from
       // both decrementing stock for one code.
@@ -89,7 +101,7 @@ export async function PATCH(
         data: {
           status: 'voided',
           voidedById: actor.sub,
-          voidReason: reason || 'ยกเลิกโดยแอดมิน',
+          voidReason,
           voidedAt: new Date(),
         },
       });
@@ -97,31 +109,35 @@ export async function PATCH(
         return { status: 409 as const, error: 'CODE_NOT_VOIDABLE', codeStatus: code.status };
       }
 
-      const variant = await tx.productVariant.findUnique({
-        where: { id: code.variantId },
-        select: { stock: true },
-      });
-      const stockAfter = Math.max((variant?.stock ?? 0) - 1, 0);
-      await tx.productVariant.update({
-        where: { id: code.variantId },
-        data: { stock: stockAfter },
-      });
+      // Stock work only exists when the code has a variant. Movement and audit
+      // stay in the SAME transaction as the flip and the decrement: count,
+      // ledger and trail cannot disagree.
+      let stockAfter: number | null = null;
+      if (target) {
+        const variant = await tx.productVariant.findUnique({
+          where: { id: target.variantId },
+          select: { stock: true },
+        });
+        stockAfter = Math.max((variant?.stock ?? 0) - 1, 0);
+        await tx.productVariant.update({
+          where: { id: target.variantId },
+          data: { stock: stockAfter },
+        });
+        await tx.stockMove.create({
+          data: {
+            variantId: target.variantId,
+            delta: -1,
+            reason: 'void',
+            refType: 'manual',
+            note: voidReason,
+            stockAfter,
+            actorType: 'admin',
+            actorId: actor.sub,
+          },
+        });
+      }
 
-      // Movement + audit in the SAME transaction as the flip and the
-      // decrement — that is the whole point: count, ledger and trail cannot
-      // disagree.
-      await tx.stockMove.create({
-        data: {
-          variantId: code.variantId,
-          delta: -1,
-          reason: 'void',
-          refType: 'manual',
-          note: reason || 'ยกเลิกโดยแอดมิน',
-          stockAfter,
-          actorType: 'admin',
-          actorId: actor.sub,
-        },
-      });
+      // One trail row either way — `detached` is what says whether stock moved.
       await writeAuditLog({
         actorType: 'admin',
         actorId: actor.sub,
@@ -132,21 +148,23 @@ export async function PATCH(
         diff: { before: { status: code.status }, after: { status: 'voided' } },
         ipAddress: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
         metadata: {
-          variantId: code.variantId,
-          variantLabel: code.variant.label,
-          productName: code.variant.product.name,
-          reason: reason || 'ยกเลิกโดยแอดมิน',
+          variantId: target?.variantId ?? null,
+          variantLabel: target?.variant.label ?? '—',
+          productName: target?.variant.product.name ?? '—',
+          detached: target === null,
+          reason: voidReason,
         },
         tx,
       });
 
+      if (!target) return { status: 200 as const, ok: true, id: code.id, detached: true };
       return {
         status: 200 as const,
         ok: true,
         id: code.id,
         stockAfter,
-        productName: code.variant.product.name,
-        variantLabel: code.variant.label,
+        productName: target.variant.product.name,
+        variantLabel: target.variant.label,
       };
     });
 

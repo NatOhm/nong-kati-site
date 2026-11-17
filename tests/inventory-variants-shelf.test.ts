@@ -39,6 +39,9 @@ const { prismaMock, auditMock } = vi.hoisted(() => {
     },
     giftCode: {
       findMany: vi.fn(async () => [] as Record<string, unknown>[]),
+      // GET /admin/inventory reports the detached-code block as well; this suite
+      // only cares about the per-variant shelf, so both counts stay at zero.
+      count: vi.fn(async (_w?: unknown) => 0),
       createMany: vi.fn(async (_d: Record<string, unknown>) => ({ count: 0 })),
     },
     // Phase 2: every applied paste plan records a batch row for correlation.
