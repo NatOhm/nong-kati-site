@@ -291,8 +291,12 @@ jobs:
         run: node scripts/seed-smoke.mjs
       - name: Seed management smoke fixtures (admin + stranded order + completed order + codes)
         run: node scripts/seed-management-smoke.mjs
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Install Playwright browsers
+        # webkit is required, not optional: the iphone-safari project is
+        # devices['iPhone 14'], which launches WebKit. Installing chromium alone
+        # made every iphone-safari test die in ~1 ms with "Executable doesn't
+        # exist", so that project had never actually run in CI.
+        run: npx playwright install --with-deps chromium webkit
       - name: Build production bundle
         run: |
           set -o pipefail

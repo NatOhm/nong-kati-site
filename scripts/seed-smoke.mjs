@@ -16,6 +16,10 @@
 
 import { execSync } from 'node:child_process';
 import { PrismaClient } from '@prisma/client';
+import { encryptCode, hashCode } from '../src/lib/crypto/giftCode.ts';
+
+/** Codes the smoke variant needs before the checkout test can buy one. */
+const SMOKE_CODES = 10;
 
 const MANUAL_TRANSFER = {
   enabled: true,
@@ -59,7 +63,38 @@ async function main() {
       select: { id: true, price: true, stock: true },
     });
     if (!variant) throw new Error(`expected smoke variant ${smokeVariantId} missing`);
-    console.log(`[smoke-seed] smoke variant ok (฿${variant.price}, stock ${variant.stock}) ✔`);
+
+    // Stock is not sellable on its own: src/lib/promotions.ts gates every line
+    // on min(stock, available gift codes) — "Sell only units that gift codes
+    // can actually deliver" (391c376). Without codes this variant is sold out
+    // however high `stock` reads, and seed-management-smoke parks an unpaid
+    // order that holds a unit on top of that, so one code was starving the
+    // checkout test in all three browser projects. Top the codes up to the
+    // smoke stock instead of touching the gate.
+    const existingCodes = await prisma.giftCode.count({
+      where: { variantId: smokeVariantId, status: 'available' },
+    });
+    const missing = Math.max(0, SMOKE_CODES - existingCodes);
+    if (missing > 0) {
+      const data = Array.from({ length: missing }, (_, i) => {
+        const plain = `SMOKE-${Date.now().toString(36).toUpperCase()}-${i}`;
+        const { ciphertext, nonce } = encryptCode(plain);
+        return {
+          variantId: smokeVariantId,
+          codeEncrypted: ciphertext,
+          nonce,
+          codeHash: hashCode(plain),
+          status: 'available',
+        };
+      });
+      await prisma.giftCode.createMany({ data });
+    }
+    const availableCodes = await prisma.giftCode.count({
+      where: { variantId: smokeVariantId, status: 'available' },
+    });
+    console.log(
+      `[smoke-seed] smoke variant ok (฿${variant.price}, stock ${variant.stock}, ${availableCodes} available codes) ✔`,
+    );
   } finally {
     await prisma.$disconnect();
   }
