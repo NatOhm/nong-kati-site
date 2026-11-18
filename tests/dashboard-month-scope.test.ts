@@ -26,6 +26,7 @@ const { prismaMock } = vi.hoisted(() => {
 
 vi.mock('@/lib/db', () => ({ prisma: prismaMock }));
 
+import { bangkokMonthStart } from '@/lib/bangkokTime';
 import { issueAdminJwt } from '@/lib/jwt';
 import { ROLE_PERMISSIONS, type AdminRole } from '@/types/auth';
 
@@ -36,13 +37,16 @@ const PROMPTPAY_SHARE = 66; // round(642 / 972 * 100)
 
 type OrderWhere = Record<string, unknown>;
 
+/**
+ * The route scopes the month panel with `bangkokMonthStart()` — the shop's
+ * clock, UTC+7, as its own doc says cutoffs must follow. Reading the LOCAL
+ * calendar fields here made this mock agree with the route only on a UTC+7
+ * machine: the 1st at Bangkok midnight is still the previous day in UTC, so
+ * CI got the day/week shape (50) where the month shape (312) was expected.
+ * Compare the instant the route actually builds, not the fields around it.
+ */
 function isMonthStart(d: Date): boolean {
-  const now = new Date();
-  return (
-    d.getDate() === 1 &&
-    d.getMonth() === now.getMonth() &&
-    d.getFullYear() === now.getFullYear()
-  );
+  return d.getTime() === bangkokMonthStart().getTime();
 }
 
 beforeEach(() => {
