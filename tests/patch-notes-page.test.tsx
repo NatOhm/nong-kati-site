@@ -169,7 +169,9 @@ describe('patch notes page — renders the Thai release detail', () => {
       NEWEST.buildId
     );
     // Collapsed rows keep their text out of sight, not out of the DOM.
-    const other = rows.find((li) => li.textContent?.includes(must(NOTES[1], 'no second build').buildId));
-    expect(must(other, 'no second row').querySelector('details')?.hasAttribute('open')).toBe(false);
+    // By position, for the reason above: this row's body names the build it is
+    // waiting for, so a text match lands on the open row instead.
+    const other = must(rows[1], 'no second row');
+    expect(other.querySelector('details')?.hasAttribute('open')).toBe(false);
   });
 });
