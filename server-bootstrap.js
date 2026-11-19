@@ -113,10 +113,100 @@ function registerProcessGuards(proc, log) {
   });
 }
 
+// ── Boot resilience (2026-11-18) ─────────────────────────────────────────
+//
+// Every Passenger respawn does a Universal Auth login. A respawn loop is
+// therefore also a login loop, and Infisical rate-limits / locks an identity
+// that logs in too often — which would turn a restart loop into an outage that
+// cannot self-heal, because the old policy was "no Infisical, no boot".
+//
+// The cache is the last good secret set, written 0600 into `tmp/` beside the
+// existing cron-curl.conf (same disk, same vhost user, 403-served). It is only
+// a fallback: fresh data always wins, and it expires so a rotated secret cannot
+// be resurrected indefinitely. Rotating a secret means deleting the file —
+// docs/secret-rotation-checklist.md says so.
+
+/** How long a cached secret set may still boot the app. */
+const SECRET_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Keys the process cannot serve without. Absent after Infisical + panel
+ * overrides + cache ⇒ exit, which keeps the fail-closed promise for a genuinely
+ * unbootable state while letting a transient Infisical outage through.
+ */
+const REQUIRED_ENV_KEYS = ['DATABASE_URL', 'NK_JWT_SECRET'];
+
+/**
+ * Decide whether the last good secret set may stand in for a failed fetch.
+ *
+ * @param {{ now: number, fetchedAt?: number, ttlMs?: number, cached?: unknown }} input
+ * @returns {{ usable: false, reason: string, ageMs: number | null }
+ *   | { usable: true, ageMs: number }} 
+ */
+function planCachedSecrets({ now, fetchedAt, ttlMs = SECRET_CACHE_TTL_MS, cached }) {
+  const rows = Array.isArray(cached) ? cached : [];
+  if (rows.length === 0) return { usable: false, reason: 'no cached secret set', ageMs: null };
+  if (!Number.isFinite(fetchedAt)) {
+    return { usable: false, reason: 'cache carries no fetch timestamp', ageMs: null };
+  }
+  const ageMs = Number(now) - Number(fetchedAt);
+  if (ageMs < 0) return { usable: false, reason: 'cache timestamp is in the future', ageMs: null };
+  if (ageMs > ttlMs) {
+    return { usable: false, reason: `cache is ${Math.round(ageMs / 60000)} min old (limit ${Math.round(ttlMs / 60000)} min)`, ageMs };
+  }
+  return { usable: true, ageMs };
+}
+
+/** Required keys absent or empty. Empty is missing: `DATABASE_URL=` cannot boot either. */
+function missingRequiredKeys(env, required = REQUIRED_ENV_KEYS) {
+  return required.filter((key) => !env[key]);
+}
+
+/**
+ * Serialise the fetched rows for the fallback cache. Only the two fields
+ * planInjection reads are kept — never Infisical metadata, never a log line.
+ */
+function formatSecretCache(secrets, fetchedAt) {
+  const rows = (Array.isArray(secrets) ? secrets : [])
+    .filter((s) => s && s.secretKey && typeof s.secretValue === 'string')
+    .map((s) => ({ secretKey: s.secretKey, secretValue: s.secretValue }));
+  return `${JSON.stringify({ version: 1, fetchedAt, secrets: rows }, null, 0)}\n`;
+}
+
+/**
+ * Parse the cache file. Anything unexpected is "no cache" — a corrupt fallback
+ * must never be half-trusted.
+ *
+ * @param {string} text
+ * @returns {{ fetchedAt: number, secrets: Array<{ secretKey: string, secretValue: string }> } | null}
+ */
+function parseSecretCache(text) {
+  let parsed;
+  try {
+    parsed = JSON.parse(String(text));
+  } catch {
+    return null;
+  }
+  if (!parsed || parsed.version !== 1) return null;
+  if (!Number.isFinite(parsed.fetchedAt)) return null;
+  if (!Array.isArray(parsed.secrets)) return null;
+  const secrets = parsed.secrets.filter(
+    (s) => s && typeof s.secretKey === 'string' && s.secretKey && typeof s.secretValue === 'string',
+  );
+  if (secrets.length === 0) return null;
+  return { fetchedAt: Number(parsed.fetchedAt), secrets };
+}
+
 module.exports = {
   resolveInfisicalConfig,
   planInjection,
   planCronTokenFile,
   formatCronCurlConfig,
   registerProcessGuards,
+  planCachedSecrets,
+  missingRequiredKeys,
+  formatSecretCache,
+  parseSecretCache,
+  REQUIRED_ENV_KEYS,
+  SECRET_CACHE_TTL_MS,
 };

@@ -15,24 +15,35 @@
  *      overrides) — Infisical only fills what is missing.
  *   2. Then (and only then) the Next.js server starts.
  *
- * Failure policy: fail-closed. If credentials are provided but Infisical
- * cannot be reached or rejects them, the process exits — a production
- * server must not boot with a partial secret set. Local/dev runs without
- * those variables skip the step entirely.
+ * Failure policy: fail-closed on a partial set, not on a transient outage.
+ * If credentials are provided and Infisical cannot be reached or rejects them,
+ * the last good secret set from `tmp/infisical-cache.json` (0600, ≤ 24 h old)
+ * stands in, so a restart loop cannot exhaust the identity's login budget and
+ * leave the shop unbootable. The process still exits when a required key
+ * (DATABASE_URL, NK_JWT_SECRET) is absent — a production server must never
+ * serve with a partial secret set. Local/dev runs without those variables skip
+ * the step entirely.
  *
  * SECURITY: secret values are never logged. Only counts and error statuses.
  */
 
+const fs = require('fs');
 const { createServer } = require('http');
+const path = require('path');
 const { parse } = require('url');
 const next = require('next');
 
 const {
   resolveInfisicalConfig,
   planInjection,
+  planCachedSecrets,
+  missingRequiredKeys,
+  formatSecretCache,
+  parseSecretCache,
   planCronTokenFile,
   formatCronCurlConfig,
   registerProcessGuards,
+  REQUIRED_ENV_KEYS,
 } = require('./server-bootstrap');
 
 // A promise nobody awaited used to kill the worker (Node exits on unhandled
@@ -44,14 +55,30 @@ const hostname = 'localhost';
 const port = parseInt(process.env.PORT || '3000', 10);
 
 // ── Infisical bootstrap (Universal Auth machine identity) ────────────────
-async function loadSecretsFromInfisical() {
-  const config = resolveInfisicalConfig(process.env);
-  if (!config.wired) {
-    console.log('[infisical] not wired (INFISICAL_CLIENT_ID / INFISICAL_CLIENT_SECRET absent) — using environment as-is');
-    return;
-  }
-  const { clientId, clientSecret, base, envSlug, projectId } = config;
+const SECRET_CACHE_PATH = path.join(__dirname, 'tmp', 'infisical-cache.json');
 
+function readSecretCache() {
+  try {
+    return parseSecretCache(fs.readFileSync(SECRET_CACHE_PATH, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function writeSecretCache(secrets) {
+  try {
+    fs.mkdirSync(path.dirname(SECRET_CACHE_PATH), { recursive: true });
+    fs.writeFileSync(SECRET_CACHE_PATH, formatSecretCache(secrets, Date.now()), { mode: 0o600 });
+    // mode only applies on creation; an existing file keeps its old bits.
+    fs.chmodSync(SECRET_CACHE_PATH, 0o600);
+  } catch (err) {
+    // A cache that cannot be written is not a boot failure: live secrets booted.
+    console.error('[infisical] could not write the secret cache:', err.message);
+  }
+}
+
+/** The network half: Universal Auth login, then the raw secret read. */
+async function fetchInfisicalSecrets({ clientId, clientSecret, base, envSlug, projectId }) {
   const timeout = (ms) => AbortSignal.timeout(ms);
 
   // 1. Exchange client credentials for a short-lived access token.
@@ -77,14 +104,57 @@ async function loadSecretsFromInfisical() {
   if (!secRes.ok) {
     throw new Error(`secrets read failed: HTTP ${secRes.status} (check identity is added to the project with a secrets-read role)`);
   }
-  const { secrets } = await secRes.json();
-  if (!Array.isArray(secrets)) throw new Error('secrets response had no secrets array');
+  const body = await secRes.json();
+  if (!Array.isArray(body.secrets)) throw new Error('secrets response had no secrets array');
+  return body.secrets;
+}
+
+async function loadSecretsFromInfisical() {
+  const config = resolveInfisicalConfig(process.env);
+  if (!config.wired) {
+    console.log('[infisical] not wired (INFISICAL_CLIENT_ID / INFISICAL_CLIENT_SECRET absent) — using environment as-is');
+    return;
+  }
+
+  let secrets;
+  let fromCache = false;
+  try {
+    secrets = await fetchInfisicalSecrets(config);
+  } catch (err) {
+    const cached = readSecretCache();
+    const plan = planCachedSecrets({
+      now: Date.now(),
+      fetchedAt: cached ? cached.fetchedAt : undefined,
+      cached: cached ? cached.secrets : [],
+    });
+    if (!plan.usable) {
+      throw new Error(`${err.message} — and no usable cached secret set (${plan.reason})`);
+    }
+    // Degraded, not dead: a restart loop must not take the shop down with it.
+    console.error(
+      `[infisical] DEGRADED — ${err.message}; booting from the cache written ${Math.round(plan.ageMs / 60000)} min ago`,
+    );
+    secrets = cached.secrets;
+    fromCache = true;
+  }
 
   // 3. Inject WITHOUT clobbering: panel-provided vars are per-instance
   //    overrides and win (decided by planInjection). Values are never logged.
   const plan = planInjection(secrets, process.env);
   for (const [key, value] of plan.entries) process.env[key] = value;
-  console.log(`[infisical] loaded ${plan.entries.length} secret(s) from ${envSlug}${plan.kept ? ` (${plan.kept} kept from panel override)` : ''}`);
+  console.log(
+    `[infisical] loaded ${plan.entries.length} secret(s) from ${config.envSlug}` +
+      `${plan.kept ? ` (${plan.kept} kept from panel override)` : ''}${fromCache ? ' (cached)' : ''}`,
+  );
+
+  // 4. Never serve a partial set. This is the fail-closed half that stays: a
+  //    missing DATABASE_URL or JWT secret is not a transient outage.
+  const missing = missingRequiredKeys(process.env, REQUIRED_ENV_KEYS);
+  if (missing.length > 0) {
+    throw new Error(`missing required secret(s): ${missing.join(', ')} — refusing to boot with a partial set`);
+  }
+
+  if (!fromCache) writeSecretCache(secrets);
 }
 
 // ── Cron token hand-off (docs/production-health-monitoring.md §3b) ───────
@@ -109,13 +179,12 @@ function writeCronCurlConfig() {
     console.log('[cron-token] NK_CRON_SECRET absent — no curl config written');
     return;
   }
-  const fs = require('fs');
-  const path = require('path').join(__dirname, 'tmp', 'cron-curl.conf');
+  const file = path.join(__dirname, 'tmp', 'cron-curl.conf');
   try {
-    fs.mkdirSync(require('path').dirname(path), { recursive: true });
-    fs.writeFileSync(path, formatCronCurlConfig(plan.token), { mode: 0o600 });
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, formatCronCurlConfig(plan.token), { mode: 0o600 });
     // mode only applies on creation; an existing file keeps its old bits.
-    fs.chmodSync(path, 0o600);
+    fs.chmodSync(file, 0o600);
     console.log('[cron-token] wrote tmp/cron-curl.conf (0600) for the Plesk sweeper');
   } catch (err) {
     console.error('[cron-token] could not write curl config:', err.message);

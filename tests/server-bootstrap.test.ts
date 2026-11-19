@@ -34,12 +34,29 @@ type TokenPlan = { write: false } | { write: true; token: string };
 
 type Proc = { on: (event: string, listener: (reason: unknown) => void) => unknown };
 
+type CachePlan =
+  | { usable: false; reason: string; ageMs: number | null }
+  | { usable: true; ageMs: number };
+
 const boot = requireCjs('../server-bootstrap.js') as {
   resolveInfisicalConfig: (env: Env) => Config;
   planInjection: (secrets: unknown[], env: Env) => Plan;
   planCronTokenFile: (env: Env) => TokenPlan;
   formatCronCurlConfig: (token: string) => string;
   registerProcessGuards: (proc: Proc, log: (line: string) => void) => void;
+  planCachedSecrets: (input: {
+    now: number;
+    fetchedAt?: number;
+    ttlMs?: number;
+    cached?: unknown;
+  }) => CachePlan;
+  missingRequiredKeys: (env: Env, required?: string[]) => string[];
+  formatSecretCache: (secrets: unknown[], fetchedAt: number) => string;
+  parseSecretCache: (
+    text: string,
+  ) => { fetchedAt: number; secrets: Array<{ secretKey: string; secretValue: string }> } | null;
+  REQUIRED_ENV_KEYS: string[];
+  SECRET_CACHE_TTL_MS: number;
 };
 
 describe('resolveInfisicalConfig', () => {
@@ -163,6 +180,103 @@ describe('registerProcessGuards', () => {
 
     handler!('plain-string-reason');
     expect(lines[1]).toContain('plain-string-reason');
+  });
+});
+
+describe('planCachedSecrets', () => {
+  // A restart loop is a login loop; without the cache, an Infisical rate-limit
+  // turns a churn problem into an outage that cannot self-heal (2026-11-18).
+  const TTL = 24 * 60 * 60 * 1000;
+  const now = Date.UTC(2026, 10, 18, 12, 0, 0);
+  const rows = [{ secretKey: 'NK_JWT_SECRET', secretValue: 'x' }];
+
+  it('uses a set that is inside the TTL, and reports its age', () => {
+    const plan = boot.planCachedSecrets({ now, fetchedAt: now - 90 * 60 * 1000, cached: rows });
+    expect(plan).toEqual({ usable: true, ageMs: 90 * 60 * 1000 });
+  });
+
+  it('refuses an expired set — a rotated secret must not be resurrected for ever', () => {
+    const plan = boot.planCachedSecrets({ now, fetchedAt: now - TTL - 1, ttlMs: TTL, cached: rows });
+    expect(plan.usable).toBe(false);
+    if (!plan.usable) expect(plan.reason).toContain('old');
+  });
+
+  it('refuses an empty set, a missing timestamp and a future timestamp', () => {
+    expect(boot.planCachedSecrets({ now, fetchedAt: now, cached: [] }).usable).toBe(false);
+    expect(boot.planCachedSecrets({ now, cached: rows }).usable).toBe(false);
+    expect(boot.planCachedSecrets({ now, fetchedAt: now + 60_000, cached: rows }).usable).toBe(
+      false,
+    );
+  });
+
+  it('treats a non-array cache as no cache', () => {
+    expect(boot.planCachedSecrets({ now, fetchedAt: now, cached: { nope: true } }).usable).toBe(
+      false,
+    );
+  });
+
+  it('defaults the TTL to 24 h', () => {
+    expect(boot.SECRET_CACHE_TTL_MS).toBe(TTL);
+  });
+});
+
+describe('missingRequiredKeys', () => {
+  // Fail-closed survives the cache: a DB URL or JWT secret that is absent is a
+  // refusal to boot, not a transient outage. Empty counts as absent.
+  it('reports DATABASE_URL and NK_JWT_SECRET as the required set', () => {
+    expect(boot.REQUIRED_ENV_KEYS).toEqual(['DATABASE_URL', 'NK_JWT_SECRET']);
+  });
+
+  it('names every absent or empty key', () => {
+    expect(
+      boot.missingRequiredKeys({ DATABASE_URL: '', NK_JWT_SECRET: 'secret' }),
+    ).toEqual(['DATABASE_URL']);
+    expect(boot.missingRequiredKeys({})).toEqual(['DATABASE_URL', 'NK_JWT_SECRET']);
+    expect(
+      boot.missingRequiredKeys({ DATABASE_URL: 'mysql://x', NK_JWT_SECRET: 'y' }),
+    ).toEqual([]);
+  });
+});
+
+describe('secret cache round-trip', () => {
+  const fetchedAt = Date.UTC(2026, 10, 18, 10, 0, 0);
+
+  it('keeps only the two fields planInjection reads', () => {
+    const text = boot.formatSecretCache(
+      [
+        { secretKey: 'A', secretValue: '1', secretComment: 'drop me', workspace: 'ws' },
+        { secretKey: 'B', secretValue: '2' },
+        null,
+        { secretValue: 'no key' },
+      ],
+      fetchedAt,
+    );
+    expect(JSON.parse(text)).toEqual({
+      version: 1,
+      fetchedAt,
+      secrets: [
+        { secretKey: 'A', secretValue: '1' },
+        { secretKey: 'B', secretValue: '2' },
+      ],
+    });
+  });
+
+  it('parses what it wrote', () => {
+    const text = boot.formatSecretCache([{ secretKey: 'A', secretValue: '1' }], fetchedAt);
+    expect(boot.parseSecretCache(text)).toEqual({
+      fetchedAt,
+      secrets: [{ secretKey: 'A', secretValue: '1' }],
+    });
+  });
+
+  it('returns null rather than half-trusting broken input', () => {
+    expect(boot.parseSecretCache('')).toBeNull();
+    expect(boot.parseSecretCache('{not json')).toBeNull();
+    expect(boot.parseSecretCache(JSON.stringify({ version: 2, fetchedAt, secrets: [] }))).toBeNull();
+    expect(boot.parseSecretCache(JSON.stringify({ version: 1, secrets: [] }))).toBeNull();
+    expect(
+      boot.parseSecretCache(JSON.stringify({ version: 1, fetchedAt, secrets: [{ secretValue: 'x' }] })),
+    ).toBeNull();
   });
 });
 
