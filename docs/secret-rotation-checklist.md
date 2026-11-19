@@ -263,3 +263,11 @@ SELECT keyVersion, count(*) FROM "GiftCode" GROUP BY keyVersion;
 4. `backups/` (customer PII JSONs): copy off-machine encrypted (§4.D of hostatom-live.md), then
    delete local copies.
 5. Mark this checklist done in hostatom-live.md §4.A (link to this doc).
+
+## Cache invalidation (2026-11-18)
+
+`server.js` caches the last good Infisical set in `tmp/infisical-cache.json` (0600, ≤ 24 h) so a
+restart loop cannot turn into a login-lockout outage. A rotated secret therefore has a second copy
+on the host for up to a day: after rotating anything Infisical supplies, **delete
+`tmp/infisical-cache.json` and restart** — otherwise the next boot may serve the old value while the
+panel and Infisical both look correct.

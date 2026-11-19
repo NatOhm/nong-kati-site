@@ -180,6 +180,11 @@ the MariaDB URL.
 | --- | --- | --- | --- | --- |
 | `DATABASE_URL` | Prisma runtime (every query) | Supabase pooler URL (Infisical prod) | `mysql://nongka_nongkati_nongkatistore:DBPASS@localhost:3306/nongka_nongkati_nongkatistore` | **you** (password is yours) |
 | `DATABASE_DIRECT_URL` | `prisma migrate deploy`, `directUrl` | Supabase direct `:5432` (Infisical) | the identical MariaDB URL | **you** |
+
+> **Source of truth since 2026-11-18:** the pair lives in Plesk **Secrets** (Node.js → Secrets,
+> write-only), not in Infisical. Panel values are applied to `process.env` before `server.js` runs
+> and `planInjection` never overwrites them, so the Infisical copies are dead weight — delete them
+> from `hostatom-prod` and rebuild any `gate.env` from the Plesk Secret instead.
 | `NK_GIFT_CODE_ENCRYPTION_KEY` | `src/lib/crypto/giftCode.ts` → `keyForVersion(1)`, and `keyForVersion(2)` when `_V2` is absent | 64-hex, Infisical prod (the v2 material) | **copy it byte-for-byte** — do not regenerate | **you** (agent does not hold it) |
 | `NK_GIFT_CODE_ENCRYPTION_KEY_V2` | `keyForVersion(2)` | Infisical (same material as above, kept as a hatch) | copy or omit — either is correct | **you** |
 | `NK_GIFT_CODE_ACTIVE_KEY_VERSION` | `activeKeyVersion()` | unset ⇒ 1 | **leave unset** (1). Setting `2` only makes sense mid-rotation | — |

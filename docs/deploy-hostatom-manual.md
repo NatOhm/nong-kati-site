@@ -24,7 +24,10 @@ below is what actually shipped the live build.
 > `server.js`, app mode production, app root `/httpdocs`), `node_modules` installed on the server
 > (Linux-native Prisma/SWC), Plesk env = 5 × `INFISICAL_*` + `VERCEL_GIT_COMMIT_REF=master`
 > (**required — two routes read it; do not "clean it up"**),
-> Infisical Production holds the real secrets. `server.js` is fail-closed: no Infisical, no boot.
+> Infisical Production holds the real secrets. `server.js` boots from Infisical, falls back to the
+> last good set cached in `tmp/infisical-cache.json` (0600, ≤ 24 h) when Infisical is unreachable,
+> and still refuses to boot when `DATABASE_URL` or `NK_JWT_SECRET` is missing — fail-closed on a
+> partial set, not on a transient outage (2026-11-18).
 > **There is no `.env` on the server** — a deploy that omits the `INFISICAL_*` vars breaks prod.
 
 **Servers:** app = `thsv93.hostatom.com` (**147.50.254.11**), Plesk at
