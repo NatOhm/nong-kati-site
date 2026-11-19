@@ -22,11 +22,14 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4 (pinned)
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4 (pinned)
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       # --max-warnings=0 lands once the 17 pre-existing warnings are cleaned up;
       # errors still fail the build.
+      # The host runs Node 20.20.2; CI must test that, not the runner's default.
+      - name: Node matches .nvmrc and engines
+        run: node scripts/check-node-version.mjs
       - run: npx eslint .
       - run: npx tsc --noEmit
 
@@ -42,7 +45,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4 (pinned)
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4 (pinned)
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - name: npm audit (report + gate)
@@ -105,7 +108,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4 (pinned)
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4 (pinned)
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - run: npx prisma generate
@@ -128,7 +131,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4 (pinned)
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4 (pinned)
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - name: Ledger, tally and shipped-capability gates
@@ -185,7 +188,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4 (pinned)
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4 (pinned)
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - name: Read the schema's engine
@@ -282,7 +285,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4 (pinned)
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4 (pinned)
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - run: npx prisma generate
@@ -431,7 +434,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4 (pinned)
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4 (pinned)
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - run: npx prisma generate
