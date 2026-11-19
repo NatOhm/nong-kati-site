@@ -1,0 +1,186 @@
+# ─── Nong-Kati — Post-switch gate (CI) ──────────────────────────────────────
+# Certifies the release that is ACTUALLY LIVE, from GitHub, so a deploy that
+# lands badly goes red here and not only in somebody's terminal.
+#
+# WHY THIS TRIGGER: deploys are not run by Actions. `scripts/deploy-artifact.sh`
+# publishes the bundle as a forced push to the `deploy-artifact` branch (an orphan
+# commit whose subject is `deploy bundle <BUILD_ID> (git <sha>)`), and Plesk pulls
+# that branch. A push there is therefore the only CI-visible "release was sent"
+# event; the switch itself is still a panel action, which is why the first step
+# waits for the live site to serve that BUILD_ID before it certifies anything.
+#
+# TWO THINGS THAT ONLY BREAK ON GITHUB, both handled below:
+#   1. A `push` workflow only starts if ITS OWN FILE is in the pushed commit's tree.
+#      `deploy-artifact` is an orphan holding the tarball, so deploy-artifact.sh
+#      carries this file in that commit — otherwise the gate never runs at all.
+#   2. The scripts are not on every branch. This repo's default branch can lag the
+#      release commit, so the job reads the source sha the artifact names and checks
+#      THAT out — the scripts that shipped with the release, not today's default.
+#
+# WHAT IT COSTS TO BE HONEST: the production database is created with local
+# connections only (Plesk "Allow remote access" unchecked), so a runner cannot
+# reach it directly. The gate therefore needs an SSH tunnel, which is exactly how
+# the runbook reaches it by hand:
+#
+#   secrets.POSTSWITCH_TARGET_DATABASE_URL   mysql://<user>:<pass>@localhost:3306/<db>
+#                                            (the URL as the SERVER sees it)
+#   secrets.PLESK_SSH_KEY                    private key whose public half is in
+#                                            the account's ~/.ssh/authorized_keys
+#   secrets.PLESK_SSH_HOST                   e.g. thsv93.hostatom.com
+#   vars/secrets PLESK_SSH_USER              defaults to `nongka`
+#
+# Until those exist the job FAILS with the exact missing name instead of skipping
+# itself — a release nobody certified must not look green.
+#
+# FOR A FAST CHECK with no database, run the workflow manually with check-only:
+# it proves the site is serving the shipped build and stops there.
+
+name: Post-switch gate
+
+on:
+  push:
+    branches: [deploy-artifact]
+  workflow_dispatch:
+    inputs:
+      base-url:
+        description: Site to certify
+        required: false
+        default: https://nongkatistore.com
+      build-id:
+        description: BUILD_ID to expect (blank = read it from the deploy commit)
+        required: false
+        default: ''
+      check-only:
+        description: Only prove the live build is the shipped one (no database)
+        required: false
+        type: boolean
+        default: false
+
+# One certification at a time; a second release must not race the first.
+concurrency:
+  group: postswitch-gate
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  certify:
+    name: Certify the live release
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      # A git directory to read the artifact commit from; replaced below by the
+      # source commit the artifact names.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4 (pinned)
+        with:
+          fetch-depth: 1
+
+      - name: Read the artifact commit
+        id: artifact
+        run: |
+          git fetch --depth=1 origin deploy-artifact
+          subject="$(git log -1 --format=%s FETCH_HEAD)"
+          echo "artifact subject: $subject"
+          build_id="$(printf '%s' "$subject" | sed -nE 's/^deploy bundle ([^ ]+) \(git ([0-9a-f]{40})\)$/\1/p')"
+          git_sha="$(printf '%s' "$subject" | sed -nE 's/^deploy bundle ([^ ]+) \(git ([0-9a-f]{40})\)$/\2/p')"
+          if [ -z "$build_id" ] || [ -z "$git_sha" ]; then
+            echo "::error::origin/deploy-artifact's tip does not look like a deploy bundle:"\\
+              "'$subject'. Expected 'deploy bundle <BUILD_ID> (git <40-hex sha>)'."
+            exit 1
+          fi
+          {
+            echo "build-id=$build_id"
+            echo "git-sha=$git_sha"
+          } >> "$GITHUB_OUTPUT"
+
+      # The release's own scripts. Checking out the default branch would run the
+      # gate from code that may predate the release entirely.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4 (pinned)
+        with:
+          ref: ${{ steps.artifact.outputs.git-sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4 (pinned)
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      # A release built before the gate existed cannot run it: its tree has no
+      # scripts/ci-postswitch-gate.sh, so the job would die on "no such file" and
+      # blame the release for the tooling's age. Such a release borrows the scripts
+      # from the default branch, then from the artifact commit itself (which carries
+      # them since 2026-11-15) — loudly, and only the scripts/ directory, so npm ci
+      # still installs the release's own dependencies.
+      - name: Confirm the release tree can run the gate
+        env:
+          RELEASE_SHA: ${{ steps.artifact.outputs.git-sha }}
+          FALLBACK_REF: ${{ github.event.repository.default_branch }}
+        run: |
+          needed="scripts/ci-postswitch-gate.sh scripts/wait-for-build.mjs scripts/postswitch-check.mjs"
+          missing=""
+          for p in $needed; do [ -f "$p" ] || missing="$missing $p"; done
+          if [ -z "$missing" ]; then
+            echo "release $RELEASE_SHA carries the gate scripts"
+            exit 0
+          fi
+          echo "::warning::release $RELEASE_SHA predates:${missing} — borrowing scripts/ instead"
+          for src in "$FALLBACK_REF" deploy-artifact; do
+            if ! git fetch --depth=1 origin "$src"; then
+              echo "  $src: cannot fetch"; continue; fi
+            if git checkout -q FETCH_HEAD -- scripts 2>/dev/null; then
+              complete=1
+              for p in $needed; do [ -f "$p" ] || complete=0; done
+              if [ "$complete" = "1" ]; then
+                echo "  gate scripts taken from $src ($(git log -1 --format=%h FETCH_HEAD))"
+                exit 0
+              fi
+            fi
+            echo "  $src: scripts/ incomplete"
+          done
+          echo "::error::no ref carries the gate scripts ($needed): not in release $RELEASE_SHA, $FALLBACK_REF or deploy-artifact"
+          exit 1
+
+      # postinstall runs `prisma generate`, which the gate's PrismaClient needs.
+      - run: npm ci
+
+      - name: Write the tunnel key
+        env:
+          PLESK_SSH_KEY_VALUE: ${{ secrets.PLESK_SSH_KEY }}
+        run: |
+          if [ -n "${PLESK_SSH_KEY_VALUE:-}" ]; then
+            install -d -m 700 "$HOME/.ssh"
+            printf '%s\n' "$PLESK_SSH_KEY_VALUE" > "$HOME/.ssh/plesk_ci"
+            chmod 600 "$HOME/.ssh/plesk_ci"
+            echo "PLESK_SSH_KEY=$HOME/.ssh/plesk_ci" >> "$GITHUB_ENV"
+          else
+            echo "PLESK_SSH_KEY is not set — the gate will fail with instructions." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Run the post-switch gate
+        env:
+          POSTSWITCH_TARGET_DATABASE_URL: ${{ secrets.POSTSWITCH_TARGET_DATABASE_URL }}
+          POSTSWITCH_BASE_URL: ${{ inputs.base-url || 'https://nongkatistore.com' }}
+          PLESK_SSH_HOST: ${{ secrets.PLESK_SSH_HOST }}
+          PLESK_SSH_USER: ${{ vars.PLESK_SSH_USER }}
+          EXPECTED_BUILD_ID: ${{ inputs.build-id || steps.artifact.outputs.build-id }}
+        run: |
+          if [ "${{ inputs.check-only }}" = "true" ]; then
+            bash scripts/ci-postswitch-gate.sh --check-only --base="$POSTSWITCH_BASE_URL"
+          else
+            bash scripts/ci-postswitch-gate.sh --base="$POSTSWITCH_BASE_URL"
+          fi
+
+      - name: Say what to do when it goes red
+        if: failure()
+        run: |
+          {
+            echo "### The live release was not certified"
+            echo
+            echo "The gate ran against \`$POSTSWITCH_BASE_URL\` and failed. The site keeps serving"
+            echo "whatever it has — nothing is rolled back automatically. Evidence is in the job log"
+            echo "(the script also writes \`reports/postswitch-gate-*.log\`)."
+            echo
+            echo "Typical reasons: the new BUILD_ID never served (Plesk pull or Restart App failed),"
+            echo "a missing \`POSTSWITCH_TARGET_DATABASE_URL\` / \`PLESK_SSH_KEY\`, or a real defect."
+            echo
+            echo "Same check by hand: \`bash scripts/ci-postswitch-gate.sh\`."
+          } >> "$GITHUB_STEP_SUMMARY"
