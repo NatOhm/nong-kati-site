@@ -28,6 +28,24 @@ reports **39 tables with exact counts**; the cutover copy was validated this way
 kept exactly 3 files and removed the oldest, the newest restored into an empty MariaDB with the
 same per-table counts, and a wrong password exited 1 leaving no file behind).
 
+## Restore drill — rehearse it, don't assume it
+
+`ls -l` proves a file exists; it does not prove the file restores. `scripts/restore-drill.mjs`
+loads the newest dump into a **scratch** database, diffs exact row counts against production, then
+drops the scratch schema again:
+
+```bash
+node scripts/restore-drill.mjs \
+  --dump=/var/backups/nong-kati/nong_kati-<stamp>.sql.gz \
+  --url="mysql://user:pass@127.0.0.1:3306/nongka_nongkati_nongkatistore"
+```
+
+It refuses a scratch name equal to production and refuses a scratch database that already exists,
+so it can never adopt — and then drop — a real one; it checks the `.sha256` sidecar when present;
+and it writes `db-backups/restore-drill-<stamp>.verify.json`. Exit 0 means every table matched.
+Run it after a schema change and before trusting the backup during an incident. It needs a
+`mariadb`/`mysql` client on PATH and a user allowed to CREATE/DROP a database.
+
 The nightly task runs in the vhost chroot, which has `mariadb-dump`/`gzip` but **no `node`** — that
 is why the backup is a shell task and the *verification* is the Node script run over SSH or from
 the panel's Node console. `mariadb-dump` output holds `GiftCode.codeEncrypted` ciphertext,
