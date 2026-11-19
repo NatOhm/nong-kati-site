@@ -1,5 +1,23 @@
 [
   {
+    "version": null,
+    "date": "2026-11-19",
+    "dateLabel": "Nov 19, 2026",
+    "gitSha": "5a70a0e",
+    "buildId": "hG0RHiUSkpldDxCrlAXQl",
+    "title": "Prepared for the panel switch — not yet deployed; nothing in this row happened on production.",
+    "detail": "Prepared for the panel switch — not yet deployed; nothing in this row happened on production. The MariaDB-port build is built and published: scripts/deploy-artifact.sh (SKIP_BUILD=1, reusing a clean 5a70a0e build — the workstation's Node 26.1.0, not the host's 20.20.2) force-pushed the bundle to deploy-artifact (9f97801 → 7bc1c75), the tar's own stamps were verified (BUILD_ID = the cell above, GIT_SHA = 5a70a0e777676df05228244789d6e7dfe5df9175, no -dirty), and the raw URL Plesk pulls answers HTTP 200, 14,279,346 bytes. Pending, and left empty rather than guessed: the switch itself (Plesk → Scheduled Tasks → Run Now), the live /api/v1/version read — still sXlN595fgEXujyWRQth6p / 206a6a2 / 1.2.2 across 24 samples 21:07:02–21:11:07Z — the four 30-second health reads, the postswitch-check.mjs certification, and the version number this build ships as. Certification no longer depends on the push run's 45-minute window: postswitch-gate.yml accepts workflow_dispatch with a build-id input, and run 44544659086 was dispatched against this BUILD_ID. Rollback if the switch lands badly: httpdocs/.next.old."
+  },
+  {
+    "version": "1.2.2",
+    "date": "2026-11-15",
+    "dateLabel": "Nov 15, 2026",
+    "gitSha": "206a6a2",
+    "buildId": "sXlN595fgEXujyWRQth6p",
+    "title": "The MariaDB cutover build, deployed to production.",
+    "detail": "1.2.2 — the MariaDB cutover build, deployed to production. This is still the build the shop serves: version 1.2.2 compiled with a mysql-typed Prisma client, shipped inside the 15 Nov Postgres→MariaDB window together with the tooling that window needed — scripts/target-db-check.mjs (refuses a target database that does not exist), scripts/phase6-cutover.sh, the reworked scripts/rehearse-phase6.sh, the scripts/wait-for-build.mjs budget clamp, and tests/deploy-artifact-selftest.test.ts. Recorded proof at the time: postswitch-check.mjs against https://nongkatistore.com → RESULT: 22/22 checks passed, health database: ok, /api/v1/products 200. Row added 2026-11-19, not on deploy day: the table had no entry for this build at all, so /api/v1/version reported a buildId this runbook could not name (P0-2's second half). The build is reproducible from the annotated tag live-1.2.2 (pushed 2026-11-18); it diverges from db/mariadb-port at 9ac0d2b, and the three commits it carries past that base touch docs/, scripts/ and tests/ only — no src/, so the application code is the same 1.2.2 as the rows above."
+  },
+  {
     "version": "1.2.2",
     "date": "2026-11-14",
     "dateLabel": "Nov 14, 2026",

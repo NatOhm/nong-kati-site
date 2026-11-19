@@ -1,4 +1,40 @@
 {
+  "hG0RHiUSkpldDxCrlAXQl": {
+    "title": "เตรียมปล่อยบิลด์ที่พอร์ตฐานข้อมูลไป MariaDB — ยังไม่ได้สลับขึ้น production",
+    "summary": "bundle ของบิลด์นี้ build และ publish ขึ้น branch deploy-artifact เรียบร้อยแล้ว แต่การสลับจริง (Run Now ใน Plesk) ยังไม่ได้ทำ ร้านยังเสิร์ฟบิลด์ sXlN595fgEXujyWRQth6p อยู่",
+    "problem": "commit 5a70a0e บน db/mariadb-port คือโค้ดที่พอร์ตทั้งระบบไป MariaDB และเป็นบิลด์ที่ทุกขั้นตอนที่เหลือของแผนปิดงาน (certify, ลบแถวฐานข้อมูลใน Infisical, drill การกู้คืน) รออยู่ แต่ตัวบิลด์ยังไม่เคยขึ้น production เลย ร้านจึงยังรันโค้ดชุดเดิม",
+    "change": [
+      "publish bundle เป็น orphan commit 7bc1c75 บน branch deploy-artifact แทนที่ 9f97801 เดิม (force-push ตามวิธีปกติของ repo)",
+      "ตรวจ stamp จากตัว tar เอง: BUILD_ID hG0RHiUSkpldDxCrlAXQl ตรงกับ .next/BUILD_ID และ GIT_SHA 5a70a0e777676df05228244789d6e7dfe5df9175 สะอาด ไม่มี suffix -dirty",
+      "ยืนยันว่า URL ที่ Plesk ใช้ดึง bundle ตอบ HTTP 200 ขนาด 14,279,346 ไบต์ และ git ls-remote ชี้ 7bc1c75",
+      "เปิดทาง certify ที่ไม่ผูกกับเวลาของ run ที่ยิงจาก push: workflow postswitch-gate รับ workflow_dispatch พร้อม input build-id จึงสั่ง certify บิลด์นี้ซ้ำได้ทุกเมื่อ"
+    ],
+    "proof": [
+      "อ่าน /api/v1/version ซ้ำ 24 ครั้งระหว่าง 21:07:02 ถึง 21:11:07 ยังได้ sXlN595fgEXujyWRQth6p / 206a6a2 / 1.2.2 ทุกครั้ง แปลว่ายังไม่มีอะไรถูกสลับ",
+      "/api/v1/health ตอบ healthy พร้อม database: ok ตลอดช่วงที่ publish และ /api/v1/products ตอบ 200",
+      "gh run list แสดง run 44544659086 (workflow_dispatch, build-id hG0RHiUSkpldDxCrlAXQl) เข้าคิวในกลุ่ม postswitch-gate แล้ว"
+    ],
+    "note": "แถวนี้ยังไม่ใช่ดีพลอย: ค่าที่เป็นของร้านจริง เช่น uptime หลังรีสตาร์ท ผล certify 22 ข้อ และเวลาที่สลับจริง จะถูกเติมหลังกด Run Now เท่านั้น ห้ามอ่านช่องพวกนี้ว่าบิลด์ขึ้นแล้ว — ถ้าบิลด์นี้ไม่ได้ขึ้นจริง ให้ลบแถวนี้ออก ไม่ปล่อยให้ค้างในบันทึก"
+  },
+  "sXlN595fgEXujyWRQth6p": {
+    "title": "บิลด์ที่ย้ายฐานข้อมูลไป MariaDB ขึ้น production และยังให้บริการอยู่ถึงวันนี้",
+    "summary": "ดีพลอยในหน้าต่าง cutover 15 พ.ย. 2569 — โค้ด 1.2.2 ที่คอมไพล์ Prisma client แบบ mysql พร้อมสคริปต์ที่ใช้ย้ายฐานข้อมูล และเป็นบิลด์ที่ร้านยังเสิร์ฟอยู่ (แถวนี้ถูกเพิ่มย้อนหลังในบันทึก deploy)",
+    "problem": "บันทึก deploy ไม่มีแถวของบิลด์นี้เลย ทั้งที่ /api/v1/version ของร้านตอบ buildId นี้มาตลอดตั้งแต่ 15 พ.ย. 2569 ทำให้ P0-2 ที่ขอให้เอกสาร deploy ระบุบิลด์ที่รันอยู่ปิดไม่ได้ และคนที่อ่าน runbook ก็หา buildId ที่เห็นบนหน้าเว็บไม่เจอ",
+    "change": [
+      "ย้ายฐานข้อมูลจาก Postgres/Supabase มาเป็น MariaDB 10.11 บนโฮสต์เดิม โดย Prisma client ใน bundle ถูกคอมไพล์แบบ mysql",
+      "เพิ่ม scripts/target-db-check.mjs ที่ปฏิเสธการ cutover ถ้าฐานข้อมูลปลายทางยังไม่มีอยู่จริง",
+      "ปรับ scripts/wait-for-build.mjs ให้ตัดเวลารอตามงบที่เหลือ และรื้อ scripts/rehearse-phase6.sh กับ scripts/phase6-cutover.sh ให้ตรงกับขั้นตอนที่ใช้จริง",
+      "เพิ่ม tests/deploy-artifact-selftest.test.ts ที่พิสูจน์เส้นทาง publish ของ deploy-artifact ใน CI แทนการทำมือ",
+      "เพิ่มแถวของบิลด์นี้ในบันทึก deploy ย้อนหลัง พร้อมชี้ว่า build นี้อยู่บนแท็ก live-1.2.2"
+    ],
+    "proof": [
+      "postswitch-check.mjs รันกับ https://nongkatistore.com แล้วได้ RESULT: 22/22 checks passed",
+      "/api/v1/health ตอบ healthy พร้อม checks.database ok และ /api/v1/products ตอบ 200 หลัง cutover",
+      "/api/v1/version ยังตอบ buildId sXlN595fgEXujyWRQth6p และ gitSha 206a6a2 (version 1.2.2) จนถึงวันที่เพิ่มแถวนี้",
+      "แท็ก live-1.2.2 (annotated, push 2026-11-18) ชี้ที่ 206a6a2 และ commit ที่เกินจาก base 9ac0d2b ไม่แตะ src/"
+    ],
+    "note": "บิลด์นี้ต่างจาก db/mariadb-port ที่ commit 9ac0d2b และสาม commit ที่เกินมาแตะเฉพาะ docs/ scripts/ tests/ ไม่มี src/ จึงเป็นโค้ด 1.2.2 ชุดเดียวกับแถวก่อนหน้า — แถวนี้เขียนย้อนหลัง ไม่ได้ดีพลอยใหม่ และ buildId ยังตรงกับที่ร้านตอบจริง"
+  },
   "ZOptAHxrWCPUpaPYJc2L0": {
     "title": "ตรวจทั้งเส้นทางลูกค้าบน iPhone (Safari) และ Android แล้วแก้จุดที่เจอจริง",
     "summary": "เปิด Playwright ให้ทุกหน้าจอที่ลูกค้าใช้รันบน iPhone 14 (WebKit) และ Pixel 7 (Chromium) แล้วแก้บั๊ก Safari ที่เจอ: HSTS ทำให้ Safari อัปเกรดไฟล์ทั้งหมดจนเว็บไม่มีสไตล์, แถบล่างถูกแถบที่อยู่บัง, คีย์บอร์ดทับช่องกรอก, อัปโหลดสลิปจาก Photos, long-press บนการ์ด, ตะกร้าหายในโหมดส่วนตัว และ viewport meta ซ้ำ",
