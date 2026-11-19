@@ -14,7 +14,7 @@
 # 3, so the release is explicitly not done. If the switch never lands it exits 1.
 #
 # Usage
-#   export TARGET_DATABASE_URL="mysql://…@127.0.0.1:3307/nong_kati"   # or .env.cutover
+#   bash scripts/make-gate-env.sh      # hidden prompt → tmp/nk6/gate.env (0600)
 #   bash scripts/deploy-manual.sh
 #
 #   SKIP_BUILD=1            reuse an existing fresh .next build

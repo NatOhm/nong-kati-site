@@ -33,8 +33,9 @@
 #   SKIP_BUILD=1 bash scripts/deploy-full.sh    # reuse fresh build/bundle
 #   DRY_RUN=1 bash scripts/deploy-full.sh       # everything except ssh + push
 #   bash scripts/deploy-full.sh --postswitch-only   # just re-run the gate (e.g. after a
-#                                                  # panel deploy); needs SITE_URL +
-#                                                  # TARGET_DATABASE_URL, changes nothing
+#                                                  # panel deploy); needs SITE_URL and a
+#                                                  # target — tmp/nk6/gate.env, written by
+#                                                  # scripts/make-gate-env.sh — changes nothing
 #
 # Env overrides:
 #   HOSTATOM_SSH_HOST (thsv93.hostatom.com)  HOSTATOM_SSH_USER (nongka)
@@ -85,6 +86,13 @@ START_EPOCH="$(date +%s)"
 if [ "${1:-}" = "--postswitch-only" ]; then
   certify_release "$SITE_URL" "${POSTSWITCH_MAX_UPTIME:-1800}"
   exit $?
+fi
+
+# Fail BEFORE the build/push/switch half if the gate's database route cannot be
+# proven: publishing a release nobody can certify is the expensive mistake, and a
+# URL that merely parses is not a working route (the shop user is @localhost).
+if [ "${DRY_RUN:-0}" != "1" ]; then
+  certify_precondition "$SITE_URL" || exit $?
 fi
 
 # ── 1. Build (or reuse) ──────────────────────────────────────────────────────

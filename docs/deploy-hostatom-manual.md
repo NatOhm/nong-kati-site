@@ -271,15 +271,36 @@ identical.
 **Certification is not a step you remember — it is part of the deploy.**
 
 ```bash
-export TARGET_DATABASE_URL="mysql://…@127.0.0.1:3307/nongka_nongkati_nongkatistore"   # the DB the app should read
-                                # (or keep it in .env.cutover, which is gitignored)
+bash scripts/make-gate-env.sh        # hidden prompt → tmp/nk6/gate.env (0600, gitignored)
 
 export SITE_URL=https://nongkatistore.com
 bash scripts/deploy-manual.sh        # publish → you click Run Now → wait → certify
 ```
 
+`make-gate-env.sh` never echoes a value and never puts one on a command line: it
+prompts with `read -s`, writes `TARGET_DATABASE_URL` + `NK_JWT_SECRET` into
+`tmp/nk6/gate.env` (mode 0600, under the ignored `tmp/` — never inside the
+checkout's tracked files) and prints only the parsed shape: user, host, port,
+database name and both lengths. The shop's MariaDB user is created `@'localhost'`
+with **Allow remote access unchecked**, so this workstation cannot reach
+`thsv93.hostatom.com:3306` with it however right the password is (checked
+2026-11-19: TCP 3306 answers, Prisma answers `P1000`). Open the forward first —
+`ssh -N -L 3307:localhost:3306 nongka@thsv93.hostatom.com` — and paste the shop
+URL rewritten to `127.0.0.1:3307`, with any password character outside
+`[A-Za-z0-9]` percent-encoded (`@`→`%40`, `:`→`%3A`, `#`→`%23`, `%`→`%25`,
+`&`→`%26`, `?`→`%3F`, `/`→`%2F`), keeping `?connection_limit=5`. `certify.sh`
+sources that file by itself when `TARGET_DATABASE_URL` is unset, so both deploy
+paths find it. And because `scripts/postswitch-check.mjs` prefers `.env.local` / `.env`
+over the environment, a gate failure at `admin login` means that file's
+`NK_JWT_SECRET` — not the panel.
+
 That one command does Steps 0–5b. It refuses to start if `TARGET_DATABASE_URL` is missing (exit 2,
-before it publishes anything), waits up to `DEPLOY_WAIT_SECONDS` (default 900) for the live site to
+before it publishes anything) **and, just as hard, if the route that credential names does not
+answer**: `scripts/lib/gate-reach.mjs` opens it and runs one read-only `SELECT 1`, so a closed SSH
+forward — the default state of `127.0.0.1:3307` — refuses here with exit 2 and prints the
+unreachable `host:port/database`, instead of publishing a bundle that only fails the gate later.
+A URL that parses is not a working route; this is the step that makes the difference. It then
+waits up to `DEPLOY_WAIT_SECONDS` (default 900) for the live site to
 answer with the BUILD_ID it published, then runs the gate. `bash scripts/deploy-full.sh` (the SSH
 loop) runs the same gate as its own last step — both paths source `scripts/lib/certify.sh`, so the
 checks, the banners and the exit codes are the same code.
@@ -392,7 +413,7 @@ tunnel `ssh -N -L 3307:localhost:3306 nongka@thsv93.hostatom.com` with both vari
 **The short version (one command, one click):**
 
 ```bash
-export TARGET_DATABASE_URL="mysql://…"        # or .env.cutover
+bash scripts/make-gate-env.sh                 # hidden prompt → tmp/nk6/gate.env
 bash scripts/deploy-manual.sh                 # publish → wait → certify
 # → Run Now in Plesk when it asks; it continues by itself
 # exit 0 = certified · 1 = never landed · 2 = cannot certify · 3 = live but NOT certified
