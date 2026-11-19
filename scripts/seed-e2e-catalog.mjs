@@ -13,7 +13,7 @@
  * column in step with them.
  *
  * Idempotent: upserts by slug and only tops codes up when they are missing.
- * Run: node scripts/seed-e2e-catalog.mjs
+ * Run: npx tsx scripts/seed-e2e-catalog.mjs   (it imports a .ts module)
  */
 import { PrismaClient } from '@prisma/client';
 import { encryptCode, hashCode } from '../src/lib/crypto/giftCode.ts';

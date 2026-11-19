@@ -11,7 +11,7 @@
  * DB access goes through the Prisma client only (same DATABASE_URL as the
  * server under test) — no psql dependency on the runner.
  *
- * Run: node scripts/seed-smoke.mjs
+ * Run: npx tsx scripts/seed-smoke.mjs   (it imports src/lib/crypto/giftCode.ts)
  */
 
 import { execSync } from 'node:child_process';

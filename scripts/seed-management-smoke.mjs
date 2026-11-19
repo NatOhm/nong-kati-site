@@ -29,7 +29,7 @@
  *    this exact string appears only after the audited reveal and that customer
  *    history never contains it. A random plaintext could prove neither.
  *
- * Run: node scripts/seed-management-smoke.mjs
+ * Run: npx tsx scripts/seed-management-smoke.mjs   (it imports a .ts fixture)
  */
 import crypto from 'node:crypto';
 import { PrismaClient } from '@prisma/client';

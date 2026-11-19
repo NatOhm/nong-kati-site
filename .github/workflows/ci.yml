@@ -290,10 +290,13 @@ jobs:
       - run: npm ci
       - run: npx prisma generate
       - run: npx prisma migrate deploy
+      # tsx, not bare node: these seeds import `.ts` modules (giftCode.ts, the
+      # management fixture), and Node 20 — the version production runs — has no
+      # native type stripping. `node` here worked only while CI ran 24.
       - name: Seed catalog + payment channel
-        run: node scripts/seed-smoke.mjs
+        run: npx tsx scripts/seed-smoke.mjs
       - name: Seed management smoke fixtures (admin + stranded order + completed order + codes)
-        run: node scripts/seed-management-smoke.mjs
+        run: npx tsx scripts/seed-management-smoke.mjs
       - name: Install Playwright browsers
         # webkit is required, not optional: the iphone-safari project is
         # devices['iPhone 14'], which launches WebKit. Installing chromium alone
