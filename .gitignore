@@ -5,6 +5,8 @@ node_modules/
 
 .vercel
 .env*
+# The template is not a credential file — a clone should get one.
+!.env.example
 
 # Dumped production credentials (deploy exports, env refreshes). These are
 # plaintext copies of NK_JWT_SECRET / NK_GIFT_CODE_ENCRYPTION_KEY / DATABASE_URL
