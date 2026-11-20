@@ -80,8 +80,15 @@ git push origin 'HEAD:deploy-artifact' --force && \
 git reset HEAD~1                       # unstage from your working branch again
 ```
 
-Raw URL (used in Step 2):
-`https://raw.githubusercontent.com/NatOhm/nong-kati-site/deploy-artifact/deploy-bundle.tar.gz`
+Raw URL — pin the **artifact commit**, never the branch (used in Step 2):
+`https://raw.githubusercontent.com/NatOhm/nong-kati-site/<artifact-commit-sha>/deploy-bundle.tar.gz`
+
+`<artifact-commit-sha>` is the orphan commit just force-pushed to `deploy-artifact`;
+`scripts/deploy-artifact.sh` prints the filled-in line. A commit can only ever serve the bytes it
+was pushed with, so no CDN copy of a _different_ release can arrive — the branch ref can serve one,
+which is how 1.1.1 reinstalled its predecessor. Re-pin at every release: each publish force-pushes
+the orphan branch, and an old sha eventually stops resolving — which `curl -f` turns into a refusal
+before anything is swapped, not a half-deploy.
 
 Commit the bundle file itself on that branch (this flow is build-artifact-as-branch; the branch
 holds only the tarball, force-pushed each deploy).
@@ -101,10 +108,12 @@ there** (2026-11-02: a `cat … | tr … | grep` stamp check died with `tr: comm
 took the deploy with it) — `grep`, `cat`, `tar`, `cp`, `mv`, `rm` all work.
 
 1. Plesk → **Websites & Domains** → **Scheduled Tasks** → **Add Task** → type **Run a command**.
-2. Command (one line, chroot-safe):
+2. Command (one line, chroot-safe). It names **one** release — the artifact commit in the URL and
+   both stamps literally — so it can only ever stage that build; refill both values from
+   `scripts/deploy-artifact.sh`'s output when the target bundle changes:
 
 ```
-cd httpdocs && rm -rf .next-stage && curl -fsSLk --max-time 180 -o deploy-bundle.tar.gz https://raw.githubusercontent.com/NatOhm/nong-kati-site/deploy-artifact/deploy-bundle.tar.gz?cb=$$ && mkdir -p .next-stage && tar -xzf deploy-bundle.tar.gz -C .next-stage && grep -Eq '^[A-Za-z0-9_-]{8,}$' .next-stage/.next/BUILD_ID && grep -Eq '^[0-9a-f]{40}(-dirty)?$' .next-stage/.next/GIT_SHA && rm -rf .next.old && if test -d .next; then mv .next .next.old; fi && mv .next-stage/.next .next && cp -a .next-stage/. . && rm -rf .next-stage deploy-bundle.tar.gz && { cat .next/BUILD_ID; echo; cat .next/GIT_SHA; echo; } > extract-check.txt && touch tmp/restart.txt
+cd httpdocs && rm -rf .next-stage && curl -fsSLk --max-time 180 -o deploy-bundle.tar.gz https://raw.githubusercontent.com/NatOhm/nong-kati-site/7bc1c753b89cf7ad1fba1833337c004884463778/deploy-bundle.tar.gz?cb=$$ && mkdir -p .next-stage && tar -xzf deploy-bundle.tar.gz -C .next-stage && grep -Fxq hG0RHiUSkpldDxCrlAXQl .next-stage/.next/BUILD_ID && grep -Fxq 5a70a0e777676df05228244789d6e7dfe5df9175 .next-stage/.next/GIT_SHA && rm -rf .next.old && if test -d .next; then mv .next .next.old; fi && mv .next-stage/.next .next && cp -a .next-stage/. . && rm -rf .next-stage deploy-bundle.tar.gz && { cat .next/BUILD_ID; echo; cat .next/GIT_SHA; echo; } > extract-check.txt && touch tmp/restart.txt
 ```
 
 > **⚠️ The command must contain ZERO double-quote characters.** The runner wraps it in a
@@ -118,11 +127,11 @@ cd httpdocs && rm -rf .next-stage && curl -fsSLk --max-time 180 -o deploy-bundle
 3. Click **Run Now**. **Do not click OK/Save** — leave the task unsaved so it doesn't fire
    on a schedule later. (If your Plesk build insists on saving, delete the task after the run.)
 
-What it does: download the bundle (180 s timeout) into `.next-stage` — **nothing live is touched
-yet** → verify it carries build stamps (8+ char `BUILD_ID`, 40-hex `GIT_SHA`; `-dirty` is only
-tolerated here as a backstop for a hand-built tar — `scripts/deploy-artifact.sh` refuses a dirty
-bundle before publishing); a truncated or foreign tarball fails HERE and
-exits before the swap → move the live `.next` aside to `.next.old`, move the staged one in, copy
+What it does: download the bundle (180 s timeout) from the pinned commit into `.next-stage` —
+**nothing live is touched yet** → compare both stamps to these literal values (`grep -Fxq`: the whole
+line must be exactly this `BUILD_ID` and exactly this 40-hex `GIT_SHA`); a truncated tarball, a
+stale CDN copy, a different release, or a `<sha>-dirty` build all fail HERE and exit before the
+swap → move the live `.next` aside to `.next.old`, move the staged one in, copy
 the rest over in place → drop the tarball → write both stamps into `httpdocs/extract-check.txt` →
 touch `tmp/restart.txt` (Passenger restart signal). `VERSION` is deliberately NOT required:
 `stamp-git-sha.mjs` only warns when it cannot stamp one, so demanding it here would block a deploy
@@ -130,8 +139,10 @@ the build itself allows.
 
 > **Why staging (2026-11-02).** The old line deleted the live build before it knew the download was
 > usable: a truncated tar left no `.next` at all, and a stale-but-valid CDN copy silently
-> reinstalled the previous build (1.1.1's first Run Now). `?cb=$$` is the cache-buster — the wrapper
-> expands `$$` to the run's PID, so each run asks a different URL. Swap is last, and `.next.old`
+> reinstalled the previous build (1.1.1's first Run Now). Two guards now stand in front of that:
+> the URL names a commit, and the stamps are compared by value, so a stale bundle cannot pass the
+> greps. `?cb=$$` stays as the cache-buster — the wrapper expands `$$` to the run's PID, so even a
+> ref-based URL would be fetched fresh. Swap is last, and `.next.old`
 > stays as the on-disk rollback (`cd httpdocs && rm -rf .next && mv .next.old .next && touch
 > tmp/restart.txt`). The `rm -rf .next.old` stays BEFORE the rename on purpose: `mv .next .next.old`
 > would nest `.next` inside an existing `.next.old`. A refused bundle leaves `.next-stage` and the
@@ -154,12 +165,13 @@ cd httpdocs && curl -fsSLk -o deploy-bundle.tar.gz https://raw.githubusercontent
 
 Design notes — do not "simplify" these away:
 
-- **Two one-liners on purpose.** The Step-2 command above stays UNGUARDED: a human deploy
-  intentionally changes what is live. It now verifies the bundle's own stamps, but it still
-  accepts whatever commit the artifact branch holds — only the nightly compares commits. The guard
-  belongs only on the AUTOMATED task, where "the artifact differs from production" always means
-  something is wrong (a deploy landed without updating the artifact branch, or the branch was
-  force-pushed with something else).
+- **Two one-liners on purpose.** The Step-2 command above names one release and nothing else: it
+  fetches that commit and refuses unless both stamps are exactly that build, so a human deploy
+  cannot stage anything but the release the line was written for. It never _reads_ the artifact
+  branch, so it also cannot be surprised by what the branch holds. Only the nightly compares the
+  artifact to what is live, because there "artifact differs from production" always means something
+  is wrong (a deploy landed without updating the artifact branch, or the branch was force-pushed
+  with something else).
 - **No `"` and no `$(...)` in the command.** The Plesk runner wraps it in a double-quoted
   string: an inner `"` truncates it (see the warning above), and a `$(...)` would be expanded
   by the wrapper's shell against the wrong working directory BEFORE the chroot shell runs.
@@ -193,10 +205,12 @@ session time hunting them** — they cannot fire from this scheduler and pose no
 ## Step 3 — Verify the extract
 
 File Manager → `httpdocs/extract-check.txt` → two lines: BUILD_ID, then git SHA — the first must
-equal the Step-0 BUILD_ID exactly, the second the `git sha` the script printed. A `-dirty` suffix
-there is correct, not a mismatch — it means the bundle was built from a tree with uncommitted
-changes (`stamp-git-sha.mjs`). A stale artifact is visible here even though its stamps were
-well-formed. (Last recorded live build, 2026-11-03:
+equal the Step-0 BUILD_ID exactly, the second the `git sha` the script printed. Both are the same
+literals the task compared before it swapped anything, so a `<sha>-dirty` build (or any other
+release) never reaches this point. **No file at all** means the task refused before the swap: the
+previous build is still live and `httpdocs/.next-stage` holds the refused bundle for inspection.
+A stale artifact used to be visible here even when its stamps were well-formed; the literal compare
+now refuses it upstream, before the swap. (Last recorded live build, 2026-11-03:
 `Cvm6k6VOEzORNV_BiJ7QN`, git SHA `a9c9472…`, v1.1.15 / #402 — see the deploy log in
 [hostatom-live.md](hostatom-live.md) §5; always trust the BUILD_ID the script just printed over
 that line.)
@@ -318,6 +332,63 @@ not done — treat it as broken until the gate passes. The uptime bound is deriv
 deploy took, so a process older than the deploy fails the restart check.
 
 After fixing the cause, re-run just the gate: `bash scripts/deploy-full.sh --postswitch-only`.
+
+### Re-running the gate from the Plesk console (the host has no bash)
+
+`bash scripts/deploy-full.sh --postswitch-only` is the workstation form. Do **not** paste it into
+Plesk → Node.js → **Run Node.js commands**: that console runs `npm <input>` in `httpdocs`, strips
+every quote and has no bash, so the wrapper cannot start. Its final step is the gate itself
+(`certify_release` ends in `scripts/postswitch-check.mjs`), so run that directly — one line, no quotes:
+
+```
+explore next -- node --env-file=/var/www/vhosts/nongkatistore.com/httpdocs/tmp/nk6/gate.env /var/www/vhosts/nongkatistore.com/httpdocs/scripts/postswitch-check.mjs --base=https://nongkatistore.com --max-uptime=600
+```
+
+`npm explore next -- …` is the only shell on that box with Node 20 on PATH (the panel prepends the
+`npm`). `--max-uptime` is what lets the `restart` check accept a fresh process: it must be **larger
+than the app's current `uptime`**, so run this within ten minutes of Run Now or raise it to `86400`.
+Omit it and the gate fails `restart` by design (it demands `--restart-cmd` or `--max-uptime`).
+
+**The file it reads** — `httpdocs/tmp/nk6/gate.env`, mode `0600`, two lines, no quotes:
+
+```
+TARGET_DATABASE_URL=mysql://nongka_nongkati_nongkatistore:<current password>@localhost:3306/nongka_nongkati_nongkatistore?connection_limit=5
+NK_JWT_SECRET=<32+ chars>
+```
+
+The host needs the **host's** route: `localhost:3306`, never `127.0.0.1:3307` (that port is the
+workstation's SSH forward and means nothing on the host). Where the two values come from:
+
+- **`TARGET_DATABASE_URL`** — the URL pasted into the Node.js **Secrets** at the 2026-11-18 rotation.
+  Shortest path is to rewrite the workstation copy and copy it over, which prints nothing:
+
+  ```
+  ssh nongka@thsv93.hostatom.com "mkdir -p httpdocs/tmp/nk6 && chmod 700 httpdocs/tmp/nk6"
+  sed 's#@127.0.0.1:3307/#@localhost:3306/#' tmp/nk6/gate.env > /tmp/gate.host.env
+  scp /tmp/gate.host.env nongka@thsv93.hostatom.com:httpdocs/tmp/nk6/gate.env
+  ssh nongka@thsv93.hostatom.com "chmod 600 httpdocs/tmp/nk6/gate.env" && rm -f /tmp/gate.host.env
+  ```
+
+- **`NK_JWT_SECRET`** — untouched by the rotation (it signs admin sessions, not the database); the
+  same copy that the `sed`/`scp` above carries. No separate errand.
+- **Do not rebuild this file from Infisical.** Since the rotation, Infisical's `DATABASE_URL` row
+  still holds the **pre-rotation** password (phase 4 deletes it), so a gate built from that value
+  authenticates nowhere and fails `database`/`catalogue` for the wrong reason.
+
+**Reading the result.** The last line is the verdict:
+
+```
+RESULT: 22/22 checks passed                     → exit 0, the live release is certified
+RESULT: 21/22 checks passed — 1 FAILED          → exit non-zero, then ✖ <check>: <detail>
+```
+
+Every check prints its own `✔`/`✖` line above it and names itself on failure (`database`,
+`migration`, `restart`, `catalogue`, `admin login`, `order`, `redeem`, `media`). Fix that cause and
+re-run the same line. If `admin login` is the one that fails, look at `httpdocs/.env.local` first:
+`postswitch-check.mjs` prefers that file's `NK_JWT_SECRET` over the environment, so a stale copy
+there wins over `gate.env`. If the console swallows the output, append
+`> /var/www/vhosts/nongkatistore.com/httpdocs/tmp/nk6/gate-out.txt 2>&1` to the command and read
+that file in File Manager. Delete `tmp/nk6/` once the phase is done.
 
 `SKIP_POSTSWITCH=1` skips it and prints `this release is live but UNVERIFIED` — the only legitimate
 use is a pre-cutover deploy whose database does not exist yet. Do not make it the habit: without
