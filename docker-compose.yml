@@ -1,23 +1,34 @@
 # ─── Nong-Kati — Docker Compose ─────────────────────────
-# Local development environment
-# Source: 16-devops.md §8.2
-
-version: '3.8'
+# Local development environment.
+# MariaDB 10.11, matching prisma/schema.prisma (provider "mysql") and the host
+# (10.11.18). A postgres:// URL here makes every PrismaClient query fail.
 
 services:
-  # ─── Next.js App ─────────────────────────────────────
+  # ─── Next.js App (dev server, not the production image) ──
+  # `next dev` compiles on demand, so an edit in the bind mount hot-reloads.
+  # The production Dockerfile is untouched: it serves .next/standalone.
   app:
-    build: .
+    # Full Debian base, not -alpine/-slim: Prisma needs both the openssl binary
+    # to pick its engine and libssl 3 to load it, and the small bases ship neither.
+    image: node:20
+    working_dir: /app
+    # Install once into the named volume; regenerate the client so a changed
+    # platform or schema.prisma never leaves a stale engine behind.
+    command: sh -c "[ -d node_modules/next ] || npm ci; npx prisma generate && exec npx next dev -H 0.0.0.0"
     ports:
       - "3000:3000"
     environment:
-      - DATABASE_URL=postgresql://nongkati:nongkati@db:5432/nong_kati?schema=store
-      - DATABASE_DIRECT_URL=postgresql://nongkati:nongkati@db:5432/nong_kati?schema=store
+      - DATABASE_URL=mysql://nongkati:nongkati@db:3306/nong_kati
+      - DATABASE_DIRECT_URL=mysql://nongkati:nongkati@db:3306/nong_kati
       - NEXT_PUBLIC_SITE_URL=http://localhost:3000
       - NODE_ENV=development
       # Must clear jwt.ts's >=32-char entropy floor or every sign/verify 500s.
       - NK_JWT_SECRET=compose-dev-secret-0123456789abcdef0123456789abcdef
       - NK_CSP_REPORT_ONLY=true
+      # A Windows bind mount delivers no inotify events into the container, so
+      # without polling an edit on the host is never seen by `next dev`.
+      - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
     depends_on:
       db:
         condition: service_healthy
@@ -25,25 +36,30 @@ services:
         condition: service_healthy
     volumes:
       - .:/app
-      - /app/node_modules
-      - /app/.next
+      # Deps survive `down` (only `down -v` reinstalls them), and the Linux
+      # build never mixes with the workstation's node_modules/.next.
+      - appnode_modules:/app/node_modules
+      - appnext:/app/.next
 
-  # ─── PostgreSQL ───────────────────────────────────────
+  # ─── MariaDB ─────────────────────────────────────────
   db:
-    image: postgres:15-alpine
+    image: mariadb:10.11
     ports:
-      - "5432:5432"
+      - "3306:3306"
     environment:
-      POSTGRES_USER: nongkati
-      POSTGRES_PASSWORD: nongkati
-      POSTGRES_DB: nong_kati
+      MARIADB_USER: nongkati
+      MARIADB_PASSWORD: nongkati
+      MARIADB_DATABASE: nong_kati
+      # Required: the entrypoint aborts unless a root password (or one of the
+      # empty/random alternatives) is set. The app itself connects as MARIADB_USER.
+      MARIADB_ROOT_PASSWORD: nongkati-root
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - mariadbdata:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U nongkati -d nong_kati"]
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   # ─── Redis (Upstash-compatible) ───────────────────────
   redis:
@@ -57,4 +73,6 @@ services:
       retries: 5
 
 volumes:
-  pgdata:
+  mariadbdata:
+  appnode_modules:
+  appnext:
