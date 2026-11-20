@@ -8,6 +8,7 @@ built, published and staged.
 | ---------------------- | -------------------------------------------------------------------- |
 | Target `BUILD_ID`      | `hG0RHiUSkpldDxCrlAXQl`                                              |
 | Target git sha         | `5a70a0e777676df05228244789d6e7dfe5df9175`                           |
+| Artifact commit (URL)  | `7bc1c753b89cf7ad1fba1833337c004884463778`                           |
 | Artifact branch tip    | `7bc1c75` — `deploy bundle hG0RHiUSkpldDxCrlAXQl (git 5a70a0e7776…)` |
 | Live before the switch | `sXlN595fgEXujyWRQth6p` / `206a6a2` / v1.2.2                         |
 | Rollback lives in      | `httpdocs/.next.old` (the `sXlN595…` build)                          |
@@ -24,8 +25,13 @@ built, published and staged.
    0 s with `unexpected EOF`):
 
 ```
-cd httpdocs && rm -rf .next-stage && curl -fsSLk --max-time 180 -o deploy-bundle.tar.gz https://raw.githubusercontent.com/NatOhm/nong-kati-site/deploy-artifact/deploy-bundle.tar.gz?cb=$$ && mkdir -p .next-stage && tar -xzf deploy-bundle.tar.gz -C .next-stage && grep -Eq '^[A-Za-z0-9_-]{8,}$' .next-stage/.next/BUILD_ID && grep -Eq '^[0-9a-f]{40}(-dirty)?$' .next-stage/.next/GIT_SHA && rm -rf .next.old && if test -d .next; then mv .next .next.old; fi && mv .next-stage/.next .next && cp -a .next-stage/. . && rm -rf .next-stage deploy-bundle.tar.gz && { cat .next/BUILD_ID; echo; cat .next/GIT_SHA; echo; } > extract-check.txt && touch tmp/restart.txt
+cd httpdocs && rm -rf .next-stage && curl -fsSLk --max-time 180 -o deploy-bundle.tar.gz https://raw.githubusercontent.com/NatOhm/nong-kati-site/7bc1c753b89cf7ad1fba1833337c004884463778/deploy-bundle.tar.gz?cb=$$ && mkdir -p .next-stage && tar -xzf deploy-bundle.tar.gz -C .next-stage && grep -Fxq hG0RHiUSkpldDxCrlAXQl .next-stage/.next/BUILD_ID && grep -Fxq 5a70a0e777676df05228244789d6e7dfe5df9175 .next-stage/.next/GIT_SHA && rm -rf .next.old && if test -d .next; then mv .next .next.old; fi && mv .next-stage/.next .next && cp -a .next-stage/. . && rm -rf .next-stage deploy-bundle.tar.gz && { cat .next/BUILD_ID; echo; cat .next/GIT_SHA; echo; } > extract-check.txt && touch tmp/restart.txt
 ```
+
+After pasting, scroll the field to the end and confirm it still ends `touch tmp/restart.txt`. The
+field is one line with a length cap nobody has measured (this line is 695 chars, the longest pasted
+so far), and a silently truncated command fails the same way the stripped quotes did: 0 s, or half
+a swap.
 
 4. File Manager → delete `httpdocs/extract-check.txt` if it is there. The control run below
    proves itself by _absence_, so a leftover from an earlier attempt would read as a pass.
@@ -43,9 +49,9 @@ this command on every schedule: re-downloading the bundle, moving the live `.nex
 restarting the app. If a Save happens by accident, reopen the task, untick **Active**, OK/Save, and
 confirm it is gone from Scheduled Tasks.
 
-The page stays on the form after the click — the toast is not the result. Watch the run at
-`/smb/task/task-progress`, or just go straight to step 2. Earlier Run Now runs on this box finished
-in seconds; the 180 s `--max-time` is the ceiling, not the expectation.
+The page stays on the form after the click, so confirm the run at `/smb/task/task-progress` or just
+go straight to step 2. Earlier runs on this box finished in seconds; the 180 s `--max-time` is the
+ceiling, not the expectation.
 
 ## 2 — The extract, on disk
 
@@ -54,21 +60,27 @@ File Manager → `httpdocs/extract-check.txt` → exactly two lines:
 - line 1 = `hG0RHiUSkpldDxCrlAXQl`
 - line 2 = `5a70a0e777676df05228244789d6e7dfe5df9175`
 
-**PASS** = both lines match exactly. Anything else is **not** one failure mode, and this file is
-written _after_ the swap. The two greps in the command check only the stamp's **shape**
-(`^[A-Za-z0-9_-]{8,}$` and `^[0-9a-f]{40}(-dirty)?$`), never its value, so they cannot tell this
-release from an older one:
+**PASS** = exactly those two lines. The command downloads from the commit pinned in its URL and
+compares both stamps to these literals (`grep -Fxq`) _before_ the swap, so a tarball from any other
+release — including a well-formed stale one, the failure that used to need a rollback — is refused
+with nothing moved.
 
-- **No `extract-check.txt`** (or a run that dies in 0 s with `unexpected EOF`) = the run refused
-  _before_ the swap: curl or tar failed, or a shape grep rejected the staged bundle. The live
-  `.next` was never moved, so the shop is still serving `sXlN595…`. Fix the cause and re-run the
-  click — this is the safe failure.
-- **Well-formed but wrong lines** = the swap did happen, and something other than
-  `hG0RHiUSkpldDxCrlAXQl` is now live. A stale `deploy-bundle.tar.gz` from an earlier release
-  sails through both greps and is swapped in silently. Re-running the click would just swap the
-  same wrong bundle again: restore first with the rollback in step 4 (`mv .next.old .next`, until
-  `/api/v1/version` reads `sXlN595…`), then fetch the tarball by hand and compare its
-  `.next/BUILD_ID` and `.next/GIT_SHA` with the table at the top before retrying.
+Everything else is “no swap happened”:
+
+- **No `extract-check.txt`** = refused before the swap. In the order worth checking: the field was
+  truncated (the paste check after step 3); the pinned commit no longer resolves, so `curl -f`
+  exits non-zero (each publish force-pushes the orphan branch); the download was cut off inside
+  180 s; or one stamp did not match. The live `.next` was never moved, the shop still serves
+  `sXlN595…`, and `.next-stage` is kept for inspection — nothing to undo, so read the run's
+  notification line and fix that cause before clicking again.
+- **Any other content** cannot come from this command — the greps run first and the swap copies
+  those same files — so it means something outside the task wrote `.next`, or the file is a leftover
+  from an earlier attempt (why step 4 deletes it first). Check `/api/v1/version` and roll back from
+  `.next.old` before retrying.
+
+The stamps and the pinned commit belong to one release. Pasting a previous release's line refuses
+before the swap — that is the check working, not a broken run; take both values from the table at
+the top (or from `scripts/deploy-artifact.sh`, which prints this line filled in).
 
 If `package.json` dependencies or `prisma/schema.prisma` changed in this bundle, see
 deploy-hostatom-manual.md §Step 3 (Run Node.js commands: `npm ci --omit=dev` /
