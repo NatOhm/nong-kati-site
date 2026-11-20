@@ -223,6 +223,40 @@ jobs:
               .then(([r]) => console.log(`engine ${r.v}, collation ${r.c}`))
               .finally(() => p.$disconnect());
           '
+      # ─── Production DB guards ─────────────────────────────
+      # `tests/giftcode-available-invariant.test.ts` (GV) and
+      # `tests/retire-detached-integration.test.ts` (DR) both gate themselves on
+      # a loopback `DATABASE_URL` — they refuse to touch any other host, on
+      # purpose. That left exactly ONE job able to run them, and it was not the
+      # one running them: the `test` job has no DATABASE_URL at all, so both
+      # reported `skipped` there and the two production guards — the
+      # available-code-requires-a-variant trigger, and the detached-code retire
+      # path — executed NOWHERE in CI (measured 2026-11-19).
+      #
+      # This job is the only one with a real MariaDB, and it already applies the
+      # migrations these need (`migrate deploy` above); both suites also drive
+      # DDL through Prisma's CLI, which the `test` job does not have.
+      #
+      # The count assertion is the point of the step: a SKIPPED suite is a GREEN
+      # suite, so without it this step would pass silently on the day the
+      # database env disappears — the exact failure it exists to prevent.
+      # 5 trigger cases + 2 retire cases = 7.
+      - name: Run production DB guards (GiftCode trigger + detached retire)
+        if: steps.engine.outputs.provider == 'mysql'
+        run: |
+          npx vitest run \
+            tests/giftcode-available-invariant.test.ts \
+            tests/retire-detached-integration.test.ts \
+            --reporter=default --reporter=json --outputFile.json=db-guards.json
+          node -e '
+            const r = require("./db-guards.json");
+            console.log(`db guards: ${r.numPassedTests} passed, ${r.numPendingTests} skipped, ${r.numFailedTests} failed`);
+            if (r.numPendingTests !== 0 || r.numFailedTests !== 0 || r.numPassedTests < 7) {
+              console.error("::error title=production DB guards did not run::expected 7 executed cases (5 GiftCode trigger + 2 detached retire) with 0 skipped. A skipped guard is a guard that does not exist.");
+              process.exit(1);
+            }
+          '
+
       - name: Start dev server
         if: steps.engine.outputs.provider == 'mysql'
         run: |
