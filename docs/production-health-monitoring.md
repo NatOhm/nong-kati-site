@@ -86,6 +86,39 @@ npm run monitor:health                    # against production, default paths
 node scripts/monitor-health.mjs --help
 ```
 
+### 2a. Is anything actually for sale?
+
+`/api/v1/health` answers "can the app reach the database", not "is there something
+to buy". On 2026-11-19 the shop served **29 published products with a sellable total
+of 0** while health reported `database: ok` on every check: every variant was out of
+stock and the last **13** `available` GiftCodes had no variant (`variantId IS NULL`),
+so they counted as inventory, appeared in no product row and could never be
+delivered. The storefront looked normal and nothing could be bought — and no check
+looked at it.
+
+`scripts/check-sellable.mjs` now runs on every monitor tick against
+`GET /api/v1/internal/sellable-health` (read-only, `x-cron-token`, fail-closed `503`
+when `NK_CRON_SECRET` is unset). The endpoint sums, over every active variant of
+every published product, `sellableStock(stock, availableCodes)` — the same number
+`src/lib/data.ts` serves the catalog and the pricing resolver accepts — and counts
+`available` GiftCodes with no variant.
+
+It fails (`exit 1`, red run, `::error` annotation, optional webhook) when either rule
+breaks:
+
+| Condition | Why it matters |
+|---|---|
+| `sellableUnits < 1` | Nothing in the shop can be handed over: every published variant is out of stock, has no deliverable code, or both. |
+| `detachedAvailableCodes > 0` | An `available` code belonging to no variant is inventory that can never ship. Migration `20261117093000_giftcode_available_requires_variant` blocks new ones; this catches rows that predate the trigger or arrive by a path it does not see. |
+
+Exit codes match the health monitor: **0** sellable · **1** not sellable · **2** the
+check could not run (no token, 401/503, a 404 because the deployed build predates the
+route, unreadable payload). `2` must never be read as a shop outage.
+
+The numbers are gross: units held by a `pending_payment` order are not subtracted,
+because a hold lasts minutes while this question is whether the catalog can sell at
+all. Run it by hand with `npm run monitor:sellable` and `NK_CRON_SECRET` in the env.
+
 ---
 
 ## 3. Alerting

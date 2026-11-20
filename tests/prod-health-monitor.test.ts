@@ -32,6 +32,14 @@
  *       A monitor that stops because its state file is ugly stops monitoring.
  *  G8 — the scheduled workflow exists and is wired to this script, so the
  *       monitoring cannot be deleted silently by a refactor.
+ *  G10 — the sellable summary counts what a customer can actually buy: Σ over
+ *       active variants of published products of min(stock, codes), counted once
+ *       per product. On 2026-11-19 health was green while that sum was 0.
+ *  G11 — the sellable verdict is the alerting contract: zero units or one
+ *       detached available code fails, and a payload with no numbers is
+ *       "unusable" (exit 2), never a shop outage.
+ *  G12 — the sellable check is wired to the endpoint it asserts on, and the
+ *       workflow fails loudly instead of skipping when the token is missing.
  *  G9 — every third-party action is pinned to a full 40-hex commit SHA. The
  *       monitor's first-ever run failed in 2s because `actions/cache` was
  *       pinned to a well-formed but NON-EXISTENT SHA, so the job could not
@@ -51,6 +59,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { summarizeSellable } from '@/lib/sellableHealth';
+import { evaluateSellability } from '../scripts/check-sellable.mjs';
 import { evaluateSample, parseArgs, readState, writeState } from '../scripts/monitor-health.mjs';
 
 const WORKFLOW = path.join(process.cwd(), '.github/workflows/prod-health-monitor.yml');
@@ -303,5 +313,146 @@ describe('G9 — action pins cannot be floating tags', () => {
     // A tag like `actions/cache@v4` is a supply-chain hole; a typo'd SHA is
     // what actually broke this monitor. Both are caught by the same shape.
     expect(unpinned).toEqual([]);
+  });
+});
+
+describe('G10 — the sellable summary counts what can actually be delivered', () => {
+  it('sums min(stock, available codes) per variant and counts a product once', () => {
+    const summary = summarizeSellable({
+      publishedProducts: 3,
+      detachedAvailableCodes: 0,
+      variants: [
+        { productId: 'p1', stock: 5, codesAvailable: 2 }, // codes are the limit
+        { productId: 'p1', stock: 3, codesAvailable: 7 }, // stock is the limit
+        { productId: 'p2', stock: 0, codesAvailable: 9 }, // nothing to hand over
+        { productId: 'p3', stock: 4, codesAvailable: 0 }, // codes ran out
+      ],
+    });
+    expect(summary.sellableUnits).toBe(5);
+    expect(summary.sellableProducts).toBe(1);
+    expect(summary.publishedProducts).toBe(3);
+    expect(summary.ok).toBe(true);
+  });
+
+  it('calls a shop with stock on the shelf but no codes unsellable', () => {
+    // The restock-without-an-upload state: `stock` says 40, delivery has 0.
+    const summary = summarizeSellable({
+      publishedProducts: 2,
+      detachedAvailableCodes: 0,
+      variants: [
+        { productId: 'p1', stock: 40, codesAvailable: 0 },
+        { productId: 'p2', stock: 0, codesAvailable: 0 },
+      ],
+    });
+    expect(summary.sellableUnits).toBe(0);
+    expect(summary.sellableProducts).toBe(0);
+    expect(summary.ok).toBe(false);
+  });
+
+  it('reproduces the 2026-11-19 live state: 69 variants at 0, 13 detached codes', () => {
+    // Health said `database: ok` while this was the whole shop.
+    const summary = summarizeSellable({
+      publishedProducts: 24,
+      detachedAvailableCodes: 13,
+      variants: Array.from({ length: 69 }, (_, i) => ({
+        productId: `p${i % 24}`,
+        stock: 0,
+        codesAvailable: 0,
+      })),
+    });
+    expect(summary.sellableUnits).toBe(0);
+    expect(summary.sellableProducts).toBe(0);
+    expect(summary.ok).toBe(false);
+  });
+});
+
+describe('G11 — the sellable verdict is the alerting contract', () => {
+  const sellable = {
+    sellableUnits: 12,
+    publishedProducts: 3,
+    sellableProducts: 2,
+    detachedAvailableCodes: 0,
+  };
+
+  it('passes a shop with deliverable units and no detached codes', () => {
+    const verdict = evaluateSellability(sellable);
+    expect(verdict.ok).toBe(true);
+    expect(verdict.problems).toEqual([]);
+  });
+
+  it('fails at zero units and names the published/sellable product counts', () => {
+    const verdict = evaluateSellability({ ...sellable, sellableUnits: 0, sellableProducts: 0 });
+    expect(verdict.ok).toBe(false);
+    expect(verdict.problems.join(' ')).toMatch(/sellable stock is 0/);
+    expect(verdict.problems.join(' ')).toMatch(/3 published products/);
+  });
+
+  it('fails on ONE detached available code even with sellable stock', () => {
+    const verdict = evaluateSellability({ ...sellable, detachedAvailableCodes: 1 });
+    expect(verdict.ok).toBe(false);
+    expect(verdict.problems.join(' ')).toMatch(/1 available GiftCode\(s\) are detached/);
+  });
+
+  it('does not trust the endpoint\'s own ok field', () => {
+    // The checker exists to catch a bug in the shop; a bug in the endpoint
+    // must not be able to silence it.
+    const verdict = evaluateSellability({ ...sellable, sellableUnits: 0, ok: true });
+    expect(verdict.ok).toBe(false);
+  });
+
+  it('treats a payload without numeric counts as unusable, not as an outage', () => {
+    const verdict = evaluateSellability({ ok: true });
+    expect(verdict.unusable).toBe(true);
+    expect(verdict.ok).toBe(false);
+  });
+
+  it('honours a raised --min-sellable', () => {
+    expect(evaluateSellability({ ...sellable, sellableUnits: 1 }, { minSellable: 5 }).ok).toBe(
+      false,
+    );
+    expect(evaluateSellability(sellable, { minSellable: 5 }).ok).toBe(true);
+  });
+});
+
+describe('G12 — the sellable check is wired to the endpoint it asserts on', () => {
+  const CHECKER = path.join(process.cwd(), 'scripts/check-sellable.mjs');
+  const ROUTE = path.join(
+    process.cwd(),
+    'src/app/api/v1/internal/sellable-health/route.ts',
+  );
+  const LIB = path.join(process.cwd(), 'src/lib/sellableHealth.ts');
+
+  it('ships the checker and the scheduled monitor runs it', () => {
+    expect(existsSync(CHECKER)).toBe(true);
+    expect(readFileSync(WORKFLOW, 'utf-8')).toContain('scripts/check-sellable.mjs');
+  });
+
+  it('defaults to the route this repo actually ships', () => {
+    expect(existsSync(ROUTE)).toBe(true);
+    expect(readFileSync(CHECKER, 'utf-8')).toContain("path: '/api/v1/internal/sellable-health'");
+    expect(readFileSync(ROUTE, 'utf-8')).toContain('SELLABLE_CHECK_DISABLED');
+  });
+
+  it('authenticates the way every other internal tick does', () => {
+    const route = readFileSync(ROUTE, 'utf-8');
+    expect(route).toContain("headers.get('x-cron-token')");
+    expect(route).toContain("process.env['NK_CRON_SECRET']");
+    expect(route).toContain('constantTimeEquals');
+  });
+
+  it('counts deliverable units and detached codes, not the raw stock column', () => {
+    const route = readFileSync(ROUTE, 'utf-8');
+    expect(readFileSync(LIB, 'utf-8')).toContain('sellableStock(');
+    expect(route).toContain("status: 'available'");
+    expect(route).toContain('variantId: null');
+    expect(route).toContain('product: { isActive: true }');
+  });
+
+  it('fails the job loudly when the token is missing instead of skipping', () => {
+    // A check that cannot authenticate and reports green is the bug this file
+    // exists to prevent — the same rule as the housekeeping step (H4).
+    const wf = readFileSync(WORKFLOW, 'utf-8');
+    expect(wf).toContain('the sellable-stock check needs');
+    expect(wf).toMatch(/NK_CRON_SECRET: \$\{\{ secrets\.NK_CRON_SECRET \}\}/);
   });
 });

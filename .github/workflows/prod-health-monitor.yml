@@ -198,6 +198,33 @@ jobs:
           fi
           exit $fail
 
+      # ─── Can the shop actually sell? ──────────────────────
+      # A green /api/v1/health only proves the app reached the database. On
+      # 2026-11-19 every check was green while the catalog served 29 published
+      # products with a sellable total of ZERO: every variant was out of stock
+      # and the last 13 `available` GiftCodes were detached from any variant,
+      # so they counted as inventory and appeared in no product row. Nothing
+      # could be bought and nothing reported it.
+      #
+      # AFTER the housekeeping step on purpose: a red check here must not skip
+      # the sweeps, because an empty shop still needs its unpaid orders to
+      # expire. The endpoint is read-only and takes the same cron token. The
+      # script recomputes the verdict from the numbers instead of trusting the
+      # endpoint's own `ok` field, exits 1 only for the shop and 2 for "the
+      # check could not run" (no token, 401/503, 404 before the build carrying
+      # the route is deployed, unreachable).
+      - name: Sellable-stock check (is anything for sale?)
+        env:
+          NK_CRON_SECRET: ${{ secrets.NK_CRON_SECRET }}
+        run: |
+          if [ -z "$NK_CRON_SECRET" ]; then
+            echo "::error title=NK_CRON_SECRET missing::the sellable-stock check needs the same value as the server .env, or it cannot authenticate. Skipping would report a shop with nothing for sale as fine."
+            exit 1
+          fi
+          node scripts/check-sellable.mjs \
+            --url https://nongkatistore.com \
+            --webhook "$PRODUCTION_ALERT_WEBHOOK"
+
       # Dead-man's switch. The job can be perfectly GREEN while the SCHEDULE
       # is dead — cron disabled, repo inactive, Actions quota spent. Only an
       # external watchdog notices "nothing has pinged in 20 minutes".
