@@ -59,8 +59,11 @@ regexTarget = "secret"
 regexes = [
   ''':(password|PASSWORD|pass|secret|xxxx|your[-_]?password|<[^>]+>|\$\{[^}]+\})@''',
   ''':ci@(127\.0\.0\.1|localhost)''',
-  # docker-compose.yml: the compose-only Postgres pair, bound to the `db` service.
-  '''nongkati:nongkati@db:5432''',
+  # docker-compose.yml: the compose-only throwaway pair, bound to the `db`
+  # service. MariaDB's 3306 is the shape the file carries today; 5432 stays
+  # named because the Postgres compose file it replaced is still in history,
+  # and the history scan would flag that old commit forever without it.
+  '''nongkati:nongkati@db:(3306|5432)''',
   # scripts/rehearse-migration.sh: throwaway Postgres the rehearsal spins up.
   '''postgres:postgres@127\.0\.0\.1''',
 ]
