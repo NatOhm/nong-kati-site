@@ -22,7 +22,10 @@
  * leave the shop unbootable. The process still exits when a required key
  * (DATABASE_URL, NK_JWT_SECRET) is absent — a production server must never
  * serve with a partial secret set. Local/dev runs without those variables skip
- * the step entirely.
+ * the step entirely. A panel-owned key (DATABASE_URL, DATABASE_DIRECT_URL) that
+ * Infisical had to fill is logged as a loud warning naming the key: the panel
+ * row is missing and the Infisical copy predates the password rotation, so the
+ * boot is "healthy" only until the first query.
  *
  * SECURITY: secret values are never logged. Only counts and error statuses.
  */
@@ -36,6 +39,7 @@ const next = require('next');
 const {
   resolveInfisicalConfig,
   planInjection,
+  panelKeysFromInfisical,
   planCachedSecrets,
   missingRequiredKeys,
   formatSecretCache,
@@ -146,6 +150,24 @@ async function loadSecretsFromInfisical() {
     `[infisical] loaded ${plan.entries.length} secret(s) from ${config.envSlug}` +
       `${plan.kept ? ` (${plan.kept} kept from panel override)` : ''}${fromCache ? ' (cached)' : ''}`,
   );
+
+  // 3b. A panel-owned key Infisical had to fill: the Plesk Secret row is gone
+  //     and the Infisical copy is the pre-rotation password, so the shop will
+  //     boot looking healthy and fail every query. The panel row is not
+  //     something this process can restore, and refusing to boot would take
+  //     down an instance that legitimately runs from Infisical alone — so the
+  //     boot proceeds and says it out loud, by key name. Never the value.
+  for (const key of panelKeysFromInfisical(plan.entries)) {
+    console.error(
+      `[infisical] !!! ${key} came from Infisical, not a Plesk Secret` +
+        `${fromCache ? ' (and from the cached set)' : ''} — the panel row is MISSING.`,
+    );
+    console.error(
+      '[infisical] !!! Infisical still holds the PRE-ROTATION database password, so every query ' +
+        'will fail after boot ("database":"error", 503 from /api/v1/health). A restart does not ' +
+        `fix it — re-add ${key} under Plesk → Node.js → Secrets, then restart.`,
+    );
+  }
 
   // 4. Never serve a partial set. This is the fail-closed half that stays: a
   //    missing DATABASE_URL or JWT secret is not a transient outage.

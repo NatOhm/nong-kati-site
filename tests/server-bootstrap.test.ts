@@ -10,6 +10,7 @@
  * server.js unbuilt, and tsconfig has allowJs off — a static import would
  * not typecheck.
  */
+import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
 import { describe, expect, it } from 'vitest';
@@ -41,6 +42,8 @@ type CachePlan =
 const boot = requireCjs('../server-bootstrap.js') as {
   resolveInfisicalConfig: (env: Env) => Config;
   planInjection: (secrets: unknown[], env: Env) => Plan;
+  panelKeysFromInfisical: (entries: unknown[] | undefined, panelOwned?: string[]) => string[];
+  PANEL_OWNED_KEYS: string[];
   planCronTokenFile: (env: Env) => TokenPlan;
   formatCronCurlConfig: (token: string) => string;
   registerProcessGuards: (proc: Proc, log: (line: string) => void) => void;
@@ -139,6 +142,51 @@ describe('planInjection', () => {
 
   it('reports nothing to inject and nothing kept for an empty secret set', () => {
     expect(boot.planInjection([], {})).toEqual({ entries: [], kept: 0 });
+  });
+});
+
+describe('panelKeysFromInfisical', () => {
+  // 2026-11-20: the DB pair moved into Plesk Secrets (2026-11-18) and the
+  // same-named Infisical rows kept the pre-rotation password. An
+  // Infisical-filled DATABASE_URL therefore means the panel row is gone, and
+  // the boot used to look healthy right up to the first query.
+  it('names the panel-owned key Infisical had to fill', () => {
+    expect(
+      boot.panelKeysFromInfisical([
+        ['DATABASE_URL', 'mysql://stale'],
+        ['NK_JWT_SECRET', 'j'],
+      ]),
+    ).toEqual(['DATABASE_URL']);
+  });
+
+  it('reports both database keys, in the documented order', () => {
+    expect(
+      boot.panelKeysFromInfisical([
+        ['DATABASE_DIRECT_URL', 'mysql://stale'],
+        ['DATABASE_URL', 'mysql://stale'],
+      ]),
+    ).toEqual(['DATABASE_URL', 'DATABASE_DIRECT_URL']);
+    expect(boot.PANEL_OWNED_KEYS).toEqual(['DATABASE_URL', 'DATABASE_DIRECT_URL']);
+  });
+
+  it('stays silent when the panel supplied them (nothing injected)', () => {
+    expect(boot.panelKeysFromInfisical([])).toEqual([]);
+    expect(boot.panelKeysFromInfisical([['NK_JWT_SECRET', 'j']])).toEqual([]);
+    // A near-miss key name is not the panel key — no false alarm.
+    expect(boot.panelKeysFromInfisical([['DATABASE_UR', 'typo']])).toEqual([]);
+  });
+
+  it('tolerates junk instead of throwing mid-boot', () => {
+    expect(boot.panelKeysFromInfisical(undefined)).toEqual([]);
+    expect(boot.panelKeysFromInfisical([null, 'x', {}, [42]])).toEqual([]);
+  });
+
+  // The decision is worthless if the boot path never asks it: guard the wiring.
+  it('is asked in the boot path, with a warning that names the key', () => {
+    const src = readFileSync(new URL('../server.js', import.meta.url), 'utf8');
+    expect(src).toContain('panelKeysFromInfisical(plan.entries)');
+    expect(src).toContain('came from Infisical, not a Plesk Secret');
+    expect(src).toContain('re-add ${key} under Plesk');
   });
 });
 

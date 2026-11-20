@@ -61,6 +61,36 @@ function planInjection(secrets, env) {
   return { entries, kept };
 }
 
+// ── Panel-owned keys (2026-11-20) ────────────────────────────────────────
+//
+// Since 2026-11-18 the MariaDB pair lives in Plesk Secrets, and the same-named
+// Infisical rows are leftovers that still carry the PRE-ROTATION password
+// (docs/PLESK-CUTOVER.md §6.1). planInjection only fills keys that are absent,
+// so one of these names arriving from Infisical means the panel row is gone —
+// and the process used to boot looking healthy, then fail every query.
+//
+// Boot still proceeds: an Infisical-only instance is a documented
+// configuration, and the panel row is not something this process can restore.
+// It just has to say so, by name, at boot (server.js step 3b).
+const PANEL_OWNED_KEYS = ['DATABASE_URL', 'DATABASE_DIRECT_URL'];
+
+/**
+ * Which panel-owned keys Infisical had to fill — i.e. which Plesk Secret rows
+ * are missing. `entries` is planInjection's output, so this can only ever name
+ * keys Infisical supplied; a panel value is never reported.
+ *
+ * @param {Array<[string, string | undefined]> | undefined} entries
+ * @param {string[]} [panelOwned]
+ * @returns {string[]}
+ */
+function panelKeysFromInfisical(entries, panelOwned = PANEL_OWNED_KEYS) {
+  const filled = new Set();
+  for (const entry of Array.isArray(entries) ? entries : []) {
+    if (Array.isArray(entry) && typeof entry[0] === 'string') filled.add(entry[0]);
+  }
+  return panelOwned.filter((key) => filled.has(key));
+}
+
 /**
  * Decide whether to mirror NK_CRON_SECRET to a file the Plesk scheduler can
  * read. Plesk's 10-minute task runs outside this process, so it cannot see
@@ -200,6 +230,8 @@ function parseSecretCache(text) {
 module.exports = {
   resolveInfisicalConfig,
   planInjection,
+  panelKeysFromInfisical,
+  PANEL_OWNED_KEYS,
   planCronTokenFile,
   formatCronCurlConfig,
   registerProcessGuards,
