@@ -75,7 +75,7 @@ probe was spent confirming this, further calls buy nothing.
 - Side note: this was the slip's 3rd provider submit and still no `200501`,
   so provider-side duplicate is not a reliable second line — the DB unique
   slip-ref index remains the real one-slip-one-order guard.
-- Re-probe after the fix ships: 1 more credit, expect `INVALID_SLIP`
+- Re-probe after the fix ships: 1 more credit, expect `SLIP_DUPLICATE`
   (duplicate) or `confirmed`. Open side effects of this probe: 1 Discord
   payment-pending ping for the test order; no secrets touched (the Slip2Go
   secret never left the server — the app called the provider itself).

@@ -20,7 +20,12 @@
  *   — amount 'eq' with no commas and no trailing zeros ("100" not "100.00").
  * - Success (code 200000): data.transRef / data.amount / data.receiver
  * - Condition codes (HTTP 200): 200401 receiver, 200402 amount, 200403 date,
- *   200404 slip not found, 200500 fraud, 200501 duplicate, 200502 bank error
+ *   200404 slip not found YET, 200500 fraud, 200501 duplicate, 200502 bank
+ *   error. 200404 is not a bad slip: Bangkok Bank (and GSB) publish a slip a
+ *   minute or two after the transfer, so a check inside that window answers
+ *   "not found" — it maps to SLIP_DELAYED (wait and retry), never to
+ *   INVALID_SLIP. 200501 maps to SLIP_DUPLICATE, whose message tells the
+ *   customer the payment already went through.
  * - Auth/infra: 401001 token, 401002 shop, 401003 suspended, 401004 package
  *   expired, 401005/401006 credit exhausted, 401007 IP not whitelisted,
  *   429000 rate limit, 500500/500503 server, 4xx body validation.
@@ -70,6 +75,8 @@ export type Slip2GoResult =
         | 'QUOTA_EXCEEDED'
         | 'RATE_LIMITED'
         | 'INVALID_SLIP'
+        | 'SLIP_DUPLICATE'
+        | 'SLIP_DELAYED'
         | 'AMOUNT_MISMATCH'
         | 'RECEIVER_MISMATCH';
       detail?: string;
@@ -104,11 +111,18 @@ function mapSlip2GoError(code: string, message: string): Slip2GoResult {
     case '200401':
       return { ok: false, code: 'RECEIVER_MISMATCH', detail: message };
     case '200501':
-      return { ok: false, code: 'INVALID_SLIP', detail: 'duplicate: ' + message };
+      // The provider has already seen this transfer. That is usually a retry
+      // AFTER a successful check, so "สลิปไม่ถูกต้อง/ถูกใช้ไปแล้ว" told a paying
+      // customer their payment failed. Its own code carries "already
+      // confirmed — open the order to see the code" instead.
+      return { ok: false, code: 'SLIP_DUPLICATE', detail: 'duplicate: ' + message };
     case '200500':
       return { ok: false, code: 'INVALID_SLIP', detail: 'fraud: ' + message };
     case '200404':
-      return { ok: false, code: 'INVALID_SLIP', detail: message };
+      // The bank has not published this slip yet (Bangkok Bank needs ~2–3
+      // minutes; support confirmed the delay and recommends their queue API).
+      // Treating "not found yet" as a forged slip was the customer-facing bug.
+      return { ok: false, code: 'SLIP_DELAYED', detail: message };
     case '200502':
       // Bank-side error — transient upstream trouble, not a bad slip.
       return { ok: false, code: 'UPSTREAM_ERROR', detail };

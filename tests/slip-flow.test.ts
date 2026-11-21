@@ -598,11 +598,11 @@ describe('entry-point boundaries (adversarial pass, 30 ต.ค.)', () => {
     expect(h.slipStore.writeSlip).not.toHaveBeenCalled();
   });
 
-  it('maps a duplicate slip (provider 200501 → INVALID_SLIP) to 422 without fulfilling', async () => {
+  it('maps a duplicate slip (provider 200501 → SLIP_DUPLICATE) to 422 with an "already confirmed" message', async () => {
     h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
     h.slip2go.verifySlip2Go.mockResolvedValueOnce({
       ok: false,
-      code: 'INVALID_SLIP',
+      code: 'SLIP_DUPLICATE',
       detail: 'duplicate: รายการนี้ถูกบันทึกไปแล้ว',
     });
 
@@ -613,9 +613,35 @@ describe('entry-point boundaries (adversarial pass, 30 ต.ค.)', () => {
       message?: string;
       slipStored?: boolean;
     };
-    expect(body.error).toBe('INVALID_SLIP');
-    expect(body.message).toContain('ตรวจสลิปไม่ผ่าน');
+    expect(body.error).toBe('SLIP_DUPLICATE');
+    // A payment that already succeeded must not read as a bad slip: the
+    // customer is told to open the order and see the code.
+    expect(body.message).toContain('ถูกใช้ยืนยันไปแล้ว');
+    expect(body.message).toContain('เปิดหน้าคำสั่งซื้อ');
+    expect(body.message).not.toContain('ไม่ถูกต้อง');
     // The slip stays in the admin queue, order still payable.
+    expect(body.slipStored).toBe(true);
+    expect(h.fulfil.fulfilOrder).not.toHaveBeenCalled();
+  });
+
+  it('maps SLIP_DELAYED (the bank has not published the slip yet) to 502 — a wait, not an accusation', async () => {
+    h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
+    h.slip2go.verifySlip2Go.mockResolvedValueOnce({
+      ok: false,
+      code: 'SLIP_DELAYED',
+      detail: '200404: ไม่พบรายการ',
+    });
+
+    const res = await callVerify();
+    expect(res.status).toBe(502);
+    const body = (await res.json()) as {
+      error?: string;
+      message?: string;
+      slipStored?: boolean;
+    };
+    expect(body.error).toBe('SLIP_DELAYED');
+    expect(body.message).toContain('ธนาคารยังไม่พบข้อมูลสลิปนี้');
+    expect(body.message).not.toContain('ไม่ถูกต้อง');
     expect(body.slipStored).toBe(true);
     expect(h.fulfil.fulfilOrder).not.toHaveBeenCalled();
   });

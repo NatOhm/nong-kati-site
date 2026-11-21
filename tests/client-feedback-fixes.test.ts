@@ -472,7 +472,7 @@ describe('Slip2Go adapter — error mapping', () => {
     expect(r).toMatchObject({ ok: false, code: 'AMOUNT_MISMATCH' });
   });
 
-  it('maps 200501 to INVALID_SLIP (duplicate)', async () => {
+  it('maps 200501 (duplicate) to SLIP_DUPLICATE — a payment that already went through', async () => {
     process.env['NK_SLIP2GO_SECRET'] = 'test-secret';
     fetchMock.mockResolvedValueOnce(
       new Response(
@@ -488,7 +488,33 @@ describe('Slip2Go adapter — error mapping', () => {
       imageBase64: 'aGk=',
       expectedAmountThb: 25,
     });
-    expect(r).toMatchObject({ ok: false, code: 'INVALID_SLIP' });
+    // NOT INVALID_SLIP: a retry after a successful check used to read as
+    // "สลิปไม่ถูกต้อง/ถูกใช้ไปแล้ว" on a payment that had already confirmed.
+    expect(r).toMatchObject({ ok: false, code: 'SLIP_DUPLICATE' });
+    expect(String(failed(r).detail)).toContain('duplicate');
+  });
+
+  it('maps 200404 (slip not found yet) to SLIP_DELAYED, never to INVALID_SLIP', async () => {
+    process.env['NK_SLIP2GO_SECRET'] = 'test-secret';
+    // Bangkok Bank publishes a transfer ~2–3 minutes after it happens
+    // (support, 2026-11-21), so a check inside that window answers 200404
+    // for a genuine slip. Calling that a forged slip was the customer bug.
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          code: '200404',
+          message: 'ไม่พบรายการ',
+        }),
+        { status: 200 },
+      ),
+    );
+    const { verifySlip2Go } = await import('@/lib/payment/slip2go');
+    const r = await verifySlip2Go({
+      imageBase64: 'aGk=',
+      expectedAmountThb: 25,
+    });
+    expect(r).toMatchObject({ ok: false, code: 'SLIP_DELAYED' });
+    expect(failed(r).code).not.toBe('INVALID_SLIP');
   });
 
   it('maps 200500 (fraud) to INVALID_SLIP with a fraud detail', async () => {
@@ -584,6 +610,8 @@ describe('Slip2Go adapter — error mapping', () => {
     expect(await check({ code: '500503', message: 'ระบบขัดข้อง' })).toBe('UPSTREAM_ERROR');
     // Bank-side error is transient, not a bad slip.
     expect(await check({ code: '200502', message: 'ธนาคารขัดข้อง' })).toBe('UPSTREAM_ERROR');
+    // Bank has not published the slip yet (BBL/GSB lag) → wait and retry.
+    expect(await check({ code: '200404', message: 'ไม่พบรายการ' })).toBe('SLIP_DELAYED');
     // Undocumented 2xxxxx condition code stays slip-side.
     expect(await check({ code: '200403', message: 'วันที่ไม่ตรง' })).toBe('INVALID_SLIP');
     // HTTP 429 without a code field → RATE_LIMITED, not INVALID_SLIP.

@@ -330,6 +330,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       QUOTA_EXCEEDED: 502,
       RATE_LIMITED: 502,
       SLIP_DELAYED: 502,
+      SLIP_DUPLICATE: 422,
       INVALID_SLIP: 422,
       AMOUNT_MISMATCH: 422,
       RECEIVER_MISMATCH: 422,
@@ -339,10 +340,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       UPSTREAM_ERROR: 'ระบบตรวจสลิปขัดข้องชั่วคราว — ลองอีกครั้ง หรือรอแอดมินยืนยัน',
       QUOTA_EXCEEDED: 'ระบบตรวจสลิปเกินโควตาวันนี้ — แอดมินจะยืนยันให้เอง',
       RATE_LIMITED: 'ระบบตรวจสลิปยุ่งชั่วคราว — รอสักครู่แล้วลองใหม่ หรือรอแอดมินยืนยันให้เอง',
-      INVALID_SLIP: 'ตรวจสลิปไม่ผ่าน — สลิปไม่ถูกต้อง/อ่านไม่ได้/ถูกใช้ไปแล้ว',
+      // "ถูกใช้ไปแล้ว" moved to SLIP_DUPLICATE: an invalid/unreadable slip is not
+      // the same sentence as a payment that already succeeded.
+      INVALID_SLIP: 'ตรวจสลิปไม่ผ่าน — สลิปไม่ถูกต้องหรืออ่านไม่ได้',
       AMOUNT_MISMATCH: 'ยอดโอนในสลิปไม่ตรงกับยอดสั่งซื้อ',
       RECEIVER_MISMATCH: 'บัญชีผู้รับในสลิปไม่ตรงกับร้าน',
-      SLIP_DELAYED: 'ธนาคารตอบกลับช้าชั่วคราว — รอสักครู่แล้วลองใหม่ หรือรอแอดมินตรวจให้',
+      SLIP_DELAYED:
+        'ธนาคารยังไม่พบข้อมูลสลิปนี้ (บางธนาคารใช้เวลาส่งข้อมูล 2–3 นาที) — รอสักครู่แล้วลองใหม่ หรือรอแอดมินตรวจให้',
+      SLIP_DUPLICATE:
+        'สลิปนี้ถูกใช้ยืนยันไปแล้ว — ถ้าเพิ่งชำระคำสั่งซื้อนี้ เปิดหน้าคำสั่งซื้อเพื่อดูโค้ดที่ได้รับ',
     };
     // The slip is stored and queued for manual review — ping the admin now
     // instead of hoping they refresh จัดการคำสั่งซื้อ (fire-and-forget).
