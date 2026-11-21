@@ -38,7 +38,7 @@ export function AppTile({
       aria-label={`${name} — ${productCount} รายการ`}
       className={cn(
         'group flex flex-col overflow-hidden rounded-2xl bg-clay-950 text-left',
-        'shadow-clay-md transition-transform duration-fast ease-out-quart',
+        'shadow-clay transition-transform duration-fast ease-out-quart',
         'hover:-translate-y-1 hover:shadow-clay-lg active:scale-[0.97] active:shadow-clay-press',
         className,
       )}

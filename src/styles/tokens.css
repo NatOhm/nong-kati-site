@@ -269,6 +269,17 @@
   --border-success: #9fd4b0;
   --border-error: var(--coral-300);
   --border-warning: #f0d48a;
+
+  /* ── Alpha-capable channels ──
+     Tailwind only applies an opacity modifier (`bg-surface/80`) to a colour
+     declared as `rgb(<channels> / <alpha-value>)`. These five are consumed
+     that way in tailwind.config.ts, so the channel triple is published next
+     to its hex and must be kept in the same theme block. */
+  --bg-base-rgb: 255 247 237;
+  --bg-surface-rgb: 250 250 249;
+  --border-subtle-rgb: 245 235 216;
+  --border-brand-rgb: 253 186 116;
+  --fg-error-rgb: 184 64 75;
 }
 
 /* ── Semantic Tokens: Dark Cocoa (available via [data-theme='dark']) ── */
@@ -333,4 +344,11 @@
   --shadow-inset-sm: inset 0 1px 3px rgba(0, 0, 0, 0.35);
   --shadow-inset-md: inset 0 2px 6px rgba(0, 0, 0, 0.4);
   --shadow-focus-ring: 0 0 0 2px var(--bg-base), 0 0 0 4px rgba(245, 176, 126, 0.7);
+
+  /* Alpha-capable channels — dark counterparts (see the light block). */
+  --bg-base-rgb: 58 42 24;
+  --bg-surface-rgb: 70 50 28;
+  --border-subtle-rgb: 107 79 46;
+  --border-brand-rgb: 249 115 22;
+  --fg-error-rgb: 243 163 168;
 }

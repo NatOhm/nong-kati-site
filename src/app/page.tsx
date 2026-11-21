@@ -304,7 +304,7 @@ export default async function HomePage(): Promise<React.JSX.Element> {
             </div>
             {/* Panel follows the theme like the client's reference: warm cream
                 in light mode, the original dark clay panel in dark mode. */}
-            <div className="shadow-clay-md rounded-2xl bg-clay-100 p-4 dark:bg-clay-950">
+            <div className="shadow-clay rounded-2xl bg-clay-100 p-4 dark:bg-clay-950">
               {appGroups.map((group) => (
                 <section key={group.id} className="mb-6 last:mb-0">
                   {/* Main group heading as a glossy full-width pill (client

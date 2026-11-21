@@ -164,7 +164,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlideContent[] }): React.
               type="button"
               onClick={prev}
               aria-label="สไลด์ก่อนหน้า"
-              className="shadow-clay-md absolute left-3 top-1/2 z-10 flex size-11 -translate-y-1/2 items-center justify-center rounded-full bg-surface text-fg transition-transform duration-fast ease-out-quart hover:scale-105 active:scale-90 active:shadow-clay-press"
+              className="shadow-clay absolute left-3 top-1/2 z-10 flex size-11 -translate-y-1/2 items-center justify-center rounded-full bg-surface text-fg transition-transform duration-fast ease-out-quart hover:scale-105 active:scale-90 active:shadow-clay-press"
             >
               <ChevronLeft size={22} />
             </button>
@@ -172,7 +172,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlideContent[] }): React.
               type="button"
               onClick={next}
               aria-label="สไลด์ถัดไป"
-              className="shadow-clay-md absolute right-3 top-1/2 z-10 flex size-11 -translate-y-1/2 items-center justify-center rounded-full bg-surface text-fg transition-transform duration-fast ease-out-quart hover:scale-105 active:scale-90 active:shadow-clay-press"
+              className="shadow-clay absolute right-3 top-1/2 z-10 flex size-11 -translate-y-1/2 items-center justify-center rounded-full bg-surface text-fg transition-transform duration-fast ease-out-quart hover:scale-105 active:scale-90 active:shadow-clay-press"
             >
               <ChevronRight size={22} />
             </button>

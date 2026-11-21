@@ -106,8 +106,13 @@ const config: Config = {
         /* Semantic aliases — bind to CSS vars from tokens.css so a theme change
            is a one-file edit in tokens.css. Prefer these over raw step classes. */
         surface: {
-          base: 'var(--bg-base)',
-          DEFAULT: 'var(--bg-surface)',
+          // `rgb(<channels> / <alpha-value>)` so opacity modifiers work
+          // (`bg-surface/80`, `bg-surface-base/95`). A bare `var(--x)` makes
+          // Tailwind drop them silently — the class compiles to nothing. The
+          // channel triples live in tokens.css per theme; the light value is
+          // the inline fallback.
+          base: 'rgb(var(--bg-base-rgb, 255 247 237) / <alpha-value>)',
+          DEFAULT: 'rgb(var(--bg-surface-rgb, 250 250 249) / <alpha-value>)',
           nav: 'var(--bg-nav)',
           elevated: 'var(--bg-elevated)',
           sunken: 'var(--bg-sunken)',
@@ -125,15 +130,15 @@ const config: Config = {
           brand: 'var(--fg-brand)',
           'brand-strong': 'var(--fg-brand-strong)',
           success: 'var(--fg-success)',
-          error: 'var(--fg-error)',
+          error: 'rgb(var(--fg-error-rgb, 184 64 75) / <alpha-value>)',
           warning: 'var(--fg-warning)',
           info: 'var(--fg-info)',
         },
         line: {
-          subtle: 'var(--border-subtle)',
+          subtle: 'rgb(var(--border-subtle-rgb, 245 235 216) / <alpha-value>)',
           DEFAULT: 'var(--border-default)',
           strong: 'var(--border-strong)',
-          brand: 'var(--border-brand)',
+          brand: 'rgb(var(--border-brand-rgb, 253 186 116) / <alpha-value>)',
           error: 'var(--border-error)',
         },
         ink: {
@@ -241,6 +246,10 @@ const config: Config = {
           '4px 10px 28px rgba(124,45,18,0.16), 2px 4px 10px rgba(124,45,18,0.10), inset 4px 4px 8px rgba(255,255,255,1), inset -3px -3px 6px rgba(217,119,6,0.12)',
         'clay-press':
           'inset 3px 3px 8px rgba(124,45,18,0.18), inset -2px -2px 4px rgba(255,255,255,0.5)',
+        // The pressed-field depth the search bars, thumbnails and count pills
+        // already asked for. The CSS var carries the light/dark variant, so
+        // the utility follows the theme (tokens.css owns both values).
+        'inset-sm': 'var(--shadow-inset-sm)',
         'clay-brand':
           '2px 6px 20px rgba(249,115,22,0.35), 1px 2px 6px rgba(124,45,18,0.20), inset 2px 2px 4px rgba(255,255,255,0.4), inset -2px -2px 4px rgba(124,45,18,0.2)',
         xs: '1px 2px 3px rgba(58,42,24,0.35)',

@@ -201,7 +201,7 @@ export default async function CategoryPage({
           {/* Sub-apps as dark app tiles (client mockup: artwork + จำนวน pill) */}
           {category.children.length > 0 && (
             <section className="pb-8">
-              <div className="shadow-clay-md mb-3 rounded-2xl bg-clay-950 p-4">
+              <div className="shadow-clay mb-3 rounded-2xl bg-clay-950 p-4">
                 <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
                   {category.children.map((child) => (
                     <AppTile

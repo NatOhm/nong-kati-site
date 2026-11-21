@@ -477,7 +477,7 @@ export default function AdminPromotionsPage(): React.JSX.Element {
                             effectiveStatus === 'inactive' &&
                               'bg-surface-sunken text-fg-muted',
                             effectiveStatus === 'expired' &&
-                              'bg-error/10 text-fg-error',
+                              'bg-coral-500/10 text-fg-error',
                             effectiveStatus === 'pending' &&
                               'bg-surface-sunken text-fg-muted',
                           )}
