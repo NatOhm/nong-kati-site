@@ -164,7 +164,7 @@ describe('G4 — fixed customer surfaces can escape any transformed ancestor', (
     // two announcement bars and two navbars stacked (client report 2026-11-06:
     // "หน้าคำสั่งซื้อซ้อนกัน"). Walk every segment that owns the chrome and assert
     // no page beneath it mounts a second one.
-    const segmentsWithChrome = ['src/app/orders', 'src/app/checkout'];
+    const segmentsWithChrome = ['src/app/orders', 'src/app/checkout', 'src/app/legal'];
     for (const segment of segmentsWithChrome) {
       expect(read(`${segment}/layout.tsx`), `${segment} layout owns the chrome`).toMatch(
         /<FacebookLayout/,
