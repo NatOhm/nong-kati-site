@@ -10,6 +10,7 @@ import { formatThb } from '@/lib/pricing';
 import { formatOrderLineDetail, orderLineOptionLabel } from '@/lib/orderLineLabel';
 import { paymentMethodLabel } from '@/lib/paymentMethods';
 import { withStatusColors } from '@/lib/orderStatus';
+import { slipCheckLabel } from '@/lib/slipCheckReason';
 
 /**
  * Admin Orders — real data from /api/v1/admin/orders.
@@ -533,7 +534,12 @@ export default function AdminOrdersPage(): React.JSX.Element {
                           title={`ตรวจอัตโนมัติไม่ผ่าน: ${order.slipCheck.error}${order.slipCheck.provider ? ` · ${order.slipCheck.provider === 'slip2go' ? 'Slip2Go' : order.slipCheck.provider === 'slipok' ? 'SlipOK' : order.slipCheck.provider}` : ''}${order.slipCheck.checkedAt ? ` · ${new Date(order.slipCheck.checkedAt).toLocaleString('th-TH')}` : ''}`}
                         >
                           <XCircle size={13} className="shrink-0" />
-                          <span className="truncate font-mono">{order.slipCheck.error}</span>
+                          {/* Thai label in the row; the raw code stays in the tooltip
+                              above — an admin should not read RECEIVER_UNCONFIGURED
+                              as noise. */}
+                          <span className="truncate">
+                            {slipCheckLabel(order.slipCheck.error) ?? order.slipCheck.error}
+                          </span>
                         </span>
                       ) : (
                         <span className="text-fg-placeholder">—</span>
@@ -749,8 +755,12 @@ export default function AdminOrdersPage(): React.JSX.Element {
                     <p className="font-medium">
                       ตรวจอัตโนมัติไม่ผ่าน — รอแอดมินยืนยัน
                     </p>
-                    <p className="mt-0.5 font-mono text-xs">
-                      {selectedOrder.slipCheck.error}
+                    <p
+                      className="mt-0.5 text-xs"
+                      title={`รหัสจากระบบ: ${selectedOrder.slipCheck.error}`}
+                    >
+                      {slipCheckLabel(selectedOrder.slipCheck.error) ??
+                        selectedOrder.slipCheck.error}
                       {selectedOrder.slipCheck.provider
                         ? ` · ${selectedOrder.slipCheck.provider === 'slip2go' ? 'Slip2Go' : selectedOrder.slipCheck.provider === 'slipok' ? 'SlipOK' : selectedOrder.slipCheck.provider}`
                         : ''}

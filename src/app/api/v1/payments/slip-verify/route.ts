@@ -80,7 +80,26 @@ type ProviderResult =
   | Awaited<ReturnType<typeof verifySlip>>
   | Awaited<ReturnType<typeof verifySlip2Go>>;
 
+/** The route's own refusals — verdicts no provider will ever return. */
+type RouteResult = {
+  ok: false;
+  code: 'RECEIVER_UNCONFIGURED';
+  detail: string;
+};
+
+type VerifyResult = ProviderResult | RouteResult;
+
 /** Transient/config failures worth retrying on the other provider. */
+/**
+ * One sentence for "this slip has already confirmed a payment", whichever
+ * layer noticed it: the provider's duplicate answer (Slip2Go 200501 / SlipOK
+ * 1012 → SLIP_DUPLICATE) and the database's unique `slipVerifiedRef`
+ * (SLIP_ALREADY_USED) are the same customer situation, so they must not read
+ * as two different verdicts. Codes stay distinct for logs and support.
+ */
+const SLIP_ALREADY_USED_MESSAGE =
+  'สลิปนี้ถูกใช้ยืนยันคำสั่งซื้อไปแล้ว — เปิดหน้าคำสั่งซื้อเพื่อดูโค้ดที่ได้รับ ถ้าไม่ใช่คำสั่งซื้อนี้ ติดต่อแอดมิน';
+
 const RETRYABLE_ON_FALLBACK = new Set([
   'UPSTREAM_ERROR',
   'QUOTA_EXCEEDED',
@@ -191,19 +210,25 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   // Strict receiver: the store's own receiving account (digits only) is sent
   // bank-side via checkReceiver AND compared here by receiverPolicy — the
-  // single owner of the rule. Unconfigured store account → check skipped,
-  // exactly as before (fail-closed only where we have something to check
-  // against; a misconfigured account fails verifications into the manual
-  // queue instead of releasing codes).
+  // single owner of the rule.
+  //
+  // Fail CLOSED without it (2026-11-21). The bank-side condition is belt-only
+  // (the 2026-10-30 live probe sent a wrong accountNumber and still got
+  // 200200), so with no store account there is no receiver check at all: a
+  // slip paid to ANY account would confirm an order and release codes. A store
+  // with no configured account is a configuration fault, not a customer one —
+  // the money is real — so the slip is parked for manual review (stored, admin
+  // pinged, order still payable) and the provider is not even called: a credit
+  // spent on a verdict we must not act on buys nothing.
   const manualInfo = await getManualTransferInfo();
   const storeDigits = storeReceiverDigits(manualInfo.accountNumber);
-  if (storeDigits === '') {
-    // Fail-open is a deliberate decision, but it must never be silent: a
-    // store with no account configured is auto-confirming without the
-    // receiver guard and nobody would ever see it.
-    console.warn('[slip-verify] store receiving account not configured — receiver check skipped');
+  const receiverConfigured = storeDigits !== '';
+  const receiverOpt = receiverConfigured ? { expectedReceiverDigits: storeDigits } : {};
+  if (!receiverConfigured) {
+    console.error(
+      '[slip-verify] store receiving account not configured — auto-verify refused, slip parked for manual review',
+    );
   }
-  const receiverOpt = storeDigits === '' ? {} : { expectedReceiverDigits: storeDigits };
 
   // ── Keep the evidence FIRST ──────────────────────────────────────────────
   // Whatever the provider answers (pass, amount mismatch, outage), the
@@ -259,9 +284,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   // ── Ask the configured providers (Slip2Go preferred, SlipOK fallback) ──
-  let result: ProviderResult = isSlip2GoEnabled()
-    ? await verifySlip2Go({ imageBase64, expectedAmountThb: expected, ...receiverOpt })
-    : await verifySlip({ imageBase64, expectedAmountThb: expected });
+  let result: VerifyResult;
+  if (!receiverConfigured) {
+    // No receiver guard → no auto-confirmation and no provider call (see the
+    // fail-closed note above). Flows through the failure branch below, which
+    // keeps the evidence, pings the admin and stamps the reason on the attempt.
+    result = {
+      ok: false,
+      code: 'RECEIVER_UNCONFIGURED',
+      detail: 'store receiving account not configured',
+    };
+  } else if (isSlip2GoEnabled()) {
+    result = await verifySlip2Go({ imageBase64, expectedAmountThb: expected, ...receiverOpt });
+  } else {
+    result = await verifySlip({ imageBase64, expectedAmountThb: expected });
+  }
   if (!result.ok && RETRYABLE_ON_FALLBACK.has(result.code)) {
     // Slip2Go down / quota spent / config broken — retry on the OTHER
     // provider when one is configured, so a real slip can still confirm
@@ -278,8 +315,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // Applied after ANY provider succeeds, because the bank-side condition is
   // not trustworthy on its own (the 2026-10-30 live proof sent a wrong
   // accountNumber and got 200200 instead of 200401) and the SlipOK fallback
-  // carries no receiver condition at all. Unconfigured store account → the
-  // verdict is ok → check skipped, as documented.
+  // carries no receiver condition at all. An unconfigured store account never
+  // reaches this point: the route refuses to auto-confirm before any provider
+  // call (see the fail-closed note above).
   if (result.ok) {
     const verdict = checkReceiverMatch(manualInfo.accountNumber, result.receiverAccount);
     if (!verdict.ok) {
@@ -290,12 +328,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const verifiedBy = usedProvider === 'slip2go' ? 'slip2go:auto' : 'slipok:auto';
 
   if (!result.ok) {
+    // A local refusal never touched a provider. Naming one in the attempt row
+    // would make จัดการคำสั่งซื้อ's tooltip read "Slip2Go" for a call that never
+    // happened, so this column stays null for RECEIVER_UNCONFIGURED.
+    const providerLabel = result.code === 'RECEIVER_UNCONFIGURED' ? null : usedProvider;
     // Provider diagnostics (client feedback 19 Oct: auto-verify failures
     // were undiagnosable). Ids and codes only — never the slip bytes.
     console.warn('[slip-verify] auto-verify failed', {
       orderId: order.id,
       orderNumber: order.orderNumber,
-      provider: usedProvider,
+      provider: providerLabel,
       error: result.code,
       detail: result.detail ?? null,
     });
@@ -309,9 +351,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           where: { id: attempt.id },
           data: {
             failureReason: result.code,
-            gatewayStatusCode: usedProvider,
+            gatewayStatusCode: providerLabel,
             gatewayResponse: {
-              provider: usedProvider,
+              provider: providerLabel,
               error: result.code,
               detail: result.detail ?? null,
               checkedAt: new Date().toISOString(),
@@ -334,6 +376,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       INVALID_SLIP: 422,
       AMOUNT_MISMATCH: 422,
       RECEIVER_MISMATCH: 422,
+      // Our misconfiguration, not the customer's slip, and no retry of the
+      // same request can fix it — same 5xx class as NOT_CONFIGURED.
+      RECEIVER_UNCONFIGURED: 503,
     };
     const msgByCode: Record<string, string> = {
       NOT_CONFIGURED: 'ระบบตรวจสลิปยังไม่พร้อมใช้งาน — ส่งสลิปให้แอดมินยืนยันได้ปกติ',
@@ -345,10 +390,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       INVALID_SLIP: 'ตรวจสลิปไม่ผ่าน — สลิปไม่ถูกต้องหรืออ่านไม่ได้',
       AMOUNT_MISMATCH: 'ยอดโอนในสลิปไม่ตรงกับยอดสั่งซื้อ',
       RECEIVER_MISMATCH: 'บัญชีผู้รับในสลิปไม่ตรงกับร้าน',
+      // Our fault, not the customer's: with no store account there is nothing
+      // to compare the slip against, so verification is refused and the slip
+      // goes to the admin instead of auto-confirming blind.
+      // Only claim the admin HAS the image when the evidence write succeeded;
+      // otherwise the client's /slip-upload fallback still has to run and this
+      // sentence would be untrue.
+      RECEIVER_UNCONFIGURED: slipStored
+        ? 'ร้านยังไม่ได้ตั้งบัญชีรับเงินสำหรับตรวจสลิปอัตโนมัติ — ส่งสลิปให้แอดมินตรวจสอบให้แล้ว'
+        : 'ร้านยังไม่ได้ตั้งบัญชีรับเงินสำหรับตรวจสลิปอัตโนมัติ — รอแอดมินตรวจสอบให้',
       SLIP_DELAYED:
         'ธนาคารยังไม่พบข้อมูลสลิปนี้ (บางธนาคารใช้เวลาส่งข้อมูล 2–3 นาที) — รอสักครู่แล้วลองใหม่ หรือรอแอดมินตรวจให้',
-      SLIP_DUPLICATE:
-        'สลิปนี้ถูกใช้ยืนยันไปแล้ว — ถ้าเพิ่งชำระคำสั่งซื้อนี้ เปิดหน้าคำสั่งซื้อเพื่อดูโค้ดที่ได้รับ',
+      SLIP_DUPLICATE: SLIP_ALREADY_USED_MESSAGE,
     };
     // The slip is stored and queued for manual review — ping the admin now
     // instead of hoping they refresh จัดการคำสั่งซื้อ (fire-and-forget).
@@ -437,7 +490,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes('Unique constraint')) {
       return NextResponse.json(
-        { error: 'SLIP_ALREADY_USED', message: 'สลิปนี้ถูกใช้ยืนยันออเดอร์อื่นไปแล้ว' },
+        { error: 'SLIP_ALREADY_USED', message: SLIP_ALREADY_USED_MESSAGE },
         { status: 422 },
       );
     }

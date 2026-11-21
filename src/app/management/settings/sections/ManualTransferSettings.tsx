@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Banknote, Save, CheckCircle2, AlertTriangle, Trash2, Image as ImageIcon, Loader2, QrCode } from 'lucide-react';
 
 import { adminFetch } from '@/lib/adminSession';
+import { storeReceiverDigits } from '@/lib/payment/receiverPolicy';
 import { cn } from '@/utils/cn';
 import { safeJson } from '@/lib/json';
 
@@ -145,11 +146,29 @@ export function ManualTransferSettings({
     }
   }
 
+  // Same resolver the server uses, so the warning appears exactly when
+  // slip-verify would refuse: no digits (blank, spaces, dashes only) means the
+  // local receiver check has nothing to compare against.
+  const accountDigits = storeReceiverDigits(form.accountNumber);
+
   return (
     <Section
       title="โอนเงินแมนนวล"
       subtitle="บัญชีที่ลูกค้าใช้โอนเงินในหน้าชำระเงิน — เปิดใช้งานเพื่อแสดงบัญชีและช่องอัปโหลดสลิป"
     >
+      {accountDigits === '' && (
+        <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/5 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+          <div>
+            <p className="font-semibold">ยังไม่ได้ตั้งบัญชีรับเงินของร้าน</p>
+            <p className="mt-0.5 text-xs">
+              ระบบตรวจสลิปอัตโนมัติจะ <span className="font-semibold">ปฏิเสธทุกสลิป</span>{' '}
+              และส่งให้แอดมินตรวจเอง จนกว่าจะกรอกเลขบัญชี/พร้อมเพย์ด้านล่าง — ลูกค้าจะเห็นข้อความ
+              “ร้านยังไม่ได้ตั้งบัญชีรับเงิน”
+            </p>
+          </div>
+        </div>
+      )}
       <div className="rounded-lg border border-line-subtle bg-surface p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">

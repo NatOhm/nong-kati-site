@@ -726,3 +726,30 @@ describe('storefront main-category groups', () => {
     expect(result.looseApps.map((c) => c.id)).toEqual(['orphan']);
   });
 });
+
+describe('SlipOK adapter — duplicate mapping', () => {
+  afterEach(() => {
+    delete process.env['NK_SLIP_OK_KEY'];
+    delete process.env['NK_SLIP_OK_BRANCH'];
+  });
+
+  it('maps 1012 (duplicate slip) to SLIP_DUPLICATE — the same verdict as Slip2Go 200501', async () => {
+    // SlipOK is the fallback provider. It answered a duplicate with
+    // INVALID_SLIP, so a payment that had already gone through read as
+    // "สลิปไม่ถูกต้อง" on the fallback path — the same bug Slip2Go's 200501 had.
+    process.env['NK_SLIP_OK_KEY'] = 'test-key';
+    process.env['NK_SLIP_OK_BRANCH'] = 'test-branch';
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ success: false, code: 1012, message: 'สลิปนี้ถูกใช้ไปแล้ว' }),
+        { status: 200 },
+      ),
+    );
+
+    const { verifySlip } = await import('@/lib/payment/slipok');
+    const r = await verifySlip({ imageBase64: 'aGk=', expectedAmountThb: 25 });
+
+    expect(r).toMatchObject({ ok: false, code: 'SLIP_DUPLICATE' });
+    expect(String((r as { detail?: string }).detail)).toContain('duplicate');
+  });
+});

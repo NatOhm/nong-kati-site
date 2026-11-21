@@ -109,7 +109,7 @@ const h = vi.hoisted(() => {
       async (): Promise<Row> => ({
         enabled: true,
         accountName: 'ร้านนกกะทา',
-        accountNumber: null,
+        accountNumber: '199-1-73578-6',
         accountType: 'bank',
         bankName: null,
         qrImageUrl: null,
@@ -155,7 +155,7 @@ const slipOkSuccess = {
   ok: true as const,
   ref: 'SLIP-REF-1',
   amountThb: 300,
-  receiverAccount: 'x-3109',
+  receiverAccount: 'xxx-x-x3578-x',
   receiverName: 'ร้านนกกะทา',
   transferAt: null,
   raw: {},
@@ -199,7 +199,7 @@ beforeEach(() => {
   h.manualTransfer.getManualTransferInfo.mockResolvedValue({
     enabled: true,
     accountName: 'ร้านนกกะทา',
-    accountNumber: null,
+    accountNumber: '199-1-73578-6',
     accountType: 'bank',
     bankName: null,
     qrImageUrl: null,
@@ -616,7 +616,7 @@ describe('entry-point boundaries (adversarial pass, 30 ต.ค.)', () => {
     expect(body.error).toBe('SLIP_DUPLICATE');
     // A payment that already succeeded must not read as a bad slip: the
     // customer is told to open the order and see the code.
-    expect(body.message).toContain('ถูกใช้ยืนยันไปแล้ว');
+    expect(body.message).toContain('ถูกใช้ยืนยันคำสั่งซื้อไปแล้ว');
     expect(body.message).toContain('เปิดหน้าคำสั่งซื้อ');
     expect(body.message).not.toContain('ไม่ถูกต้อง');
     // The slip stays in the admin queue, order still payable.
@@ -682,24 +682,118 @@ describe('entry-point boundaries (adversarial pass, 30 ต.ค.)', () => {
     expect(h.slip2go.verifySlip2Go).toHaveBeenCalledTimes(1);
   });
 
-  it('warns (not silently) when no store account is configured — the deliberate fail-open', async () => {
+  it('fails CLOSED when no store account is configured — slip parked, never auto-confirmed', async () => {
+    // The bank-side checkReceiver is belt-only (the 2026-10-30 live probe sent
+    // a wrong accountNumber and still got 200200), so without a store account
+    // there is no receiver check at all: any slip confirmed the order. A
+    // configuration fault must not spend the customer's money.
     h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
     h.slip2go.verifySlip2Go.mockResolvedValueOnce(slipOkSuccess);
     h.manualTransfer.getManualTransferInfo.mockResolvedValueOnce({
       enabled: true,
       accountName: 'ร้านนกกะทา',
-      accountNumber: null, // unconfigured → receiver check skipped by design
+      accountNumber: null, // unconfigured → auto-verify must refuse
       accountType: 'bank',
       bankName: null,
       qrImageUrl: null,
     });
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const err = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     try {
       const res = await callVerify();
-      expect(res.status).toBe(200);
-      expect(warn).toHaveBeenCalledWith(expect.stringContaining('receiver check skipped'));
+      // 503, not 422: the shop's configuration is broken, the slip is fine.
+      expect(res.status).toBe(503);
+      const body = (await res.json()) as {
+        error?: string;
+        message?: string;
+        slipStored?: boolean;
+      };
+      expect(body.error).toBe('RECEIVER_UNCONFIGURED');
+      // Honest: the admin has the slip, the customer is not told their slip failed.
+      expect(body.message).toContain('ยังไม่ได้ตั้งบัญชีรับเงิน');
+      expect(body.slipStored).toBe(true);
+      expect(h.slipStore.writeSlip).toHaveBeenCalledTimes(1);
+      // Never auto-confirmed, and no credit spent on a verdict we must not act on.
+      expect(h.fulfil.fulfilOrder).not.toHaveBeenCalled();
+      // Neither provider: Slip2Go is the primary, SlipOK the fallback. A credit
+      // must not be spent on a verdict we cannot act on.
+      expect(h.slip2go.verifySlip2Go).not.toHaveBeenCalled();
+      expect(h.slipok.verifySlip).not.toHaveBeenCalled();
+      // Parked: the reason is stamped for จัดการคำสั่งซื้อ and the admin is pinged.
+      expect(h.prisma.paymentAttempt.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            failureReason: 'RECEIVER_UNCONFIGURED',
+            // No provider ran, so the admin tooltip must not name one.
+            gatewayStatusCode: null,
+            gatewayResponse: expect.objectContaining({ provider: null }),
+          }),
+        }),
+      );
+      expect(h.notify.notifyPaymentPending).toHaveBeenCalledWith(
+        expect.objectContaining({ orderNumber: ORDER.orderNumber }),
+      );
+      // And it is never silent — the misconfiguration is loud in the logs.
+      expect(err).toHaveBeenCalledWith(expect.stringContaining('auto-verify refused'));
     } finally {
-      warn.mockRestore();
+      err.mockRestore();
+    }
+  });
+
+  it('treats a symbol-only store account as unconfigured (same fail-closed path)', async () => {
+    h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
+    h.slip2go.verifySlip2Go.mockResolvedValueOnce(slipOkSuccess);
+    h.manualTransfer.getManualTransferInfo.mockResolvedValueOnce({
+      enabled: true,
+      accountName: 'ร้านนกกะทา',
+      accountNumber: '--- --- ----',
+      accountType: 'bank',
+      bankName: null,
+      qrImageUrl: null,
+    });
+    const err = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const res = await callVerify();
+      // 503, not 422: the shop is misconfigured, the slip is not.
+      expect(res.status).toBe(503);
+      expect(((await res.json()) as { error?: string }).error).toBe('RECEIVER_UNCONFIGURED');
+      expect(h.slip2go.verifySlip2Go).not.toHaveBeenCalled();
+      expect(h.slipok.verifySlip).not.toHaveBeenCalled();
+    } finally {
+      err.mockRestore();
+    }
+  });
+
+  it('never claims the slip reached the admin when the evidence write failed', async () => {
+    // The sentence used to say "ส่งสลิปให้แอดมินตรวจสอบให้แล้ว" unconditionally,
+    // but a failed writeSlip leaves the client responsible for uploading it via
+    // /slip-upload. The message must describe the shop, not a storage claim.
+    h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
+    h.slipStore.writeSlip.mockRejectedValueOnce(new Error('disk full'));
+    h.manualTransfer.getManualTransferInfo.mockResolvedValueOnce({
+      enabled: true,
+      accountName: 'ร้านนกกะทา',
+      accountNumber: null,
+      accountType: 'bank',
+      bankName: null,
+      qrImageUrl: null,
+    });
+    const err = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const res = await callVerify();
+      expect(res.status).toBe(503);
+      const body = (await res.json()) as {
+        error?: string;
+        message?: string;
+        slipStored?: boolean;
+      };
+      expect(body.error).toBe('RECEIVER_UNCONFIGURED');
+      expect(body.slipStored).toBe(false);
+      expect(body.message).toContain('ยังไม่ได้ตั้งบัญชีรับเงิน');
+      expect(body.message).not.toContain('ส่งสลิปให้แอดมิน');
+      expect(h.slip2go.verifySlip2Go).not.toHaveBeenCalled();
+      expect(h.slipok.verifySlip).not.toHaveBeenCalled();
+    } finally {
+      err.mockRestore();
     }
   });
 });
@@ -783,6 +877,26 @@ describe('confirmation transaction budget + retry (live P2028, 2026-11-01)', () 
         data: expect.objectContaining({ status: 'pending_manual_fulfilment' }),
       }),
     );
+  });
+
+  it('tells the SAME story when the database rejects the slip as already used (422 SLIP_ALREADY_USED)', async () => {
+    // The provider duplicate (SLIP_DUPLICATE) and the unique `slipVerifiedRef`
+    // (SLIP_ALREADY_USED) are one customer situation, so they answer with one
+    // sentence — the codes differ only for logs and support.
+    h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
+    h.slip2go.verifySlip2Go.mockResolvedValueOnce(slipOkSuccess);
+    txSpy().mockImplementationOnce(async () => {
+      throw new Error('Unique constraint failed on the fields: (`slipVerifiedRef`)');
+    });
+
+    const res = await callVerify();
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { error?: string; message?: string };
+    expect(body.error).toBe('SLIP_ALREADY_USED');
+    expect(body.message).toContain('ถูกใช้ยืนยันคำสั่งซื้อไปแล้ว');
+    expect(body.message).toContain('เปิดหน้าคำสั่งซื้อ');
+    expect(body.message).not.toContain('ไม่ถูกต้อง');
+    expect(h.fulfil.fulfilOrder).not.toHaveBeenCalled();
   });
 
   it('a delivery failure after approval answers verified-but-pending, never "failed"', async () => {

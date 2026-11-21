@@ -49,7 +49,8 @@ export type SlipVerifyResult =
         | 'INVALID_SLIP'
         | 'AMOUNT_MISMATCH'
         | 'RECEIVER_MISMATCH'
-        | 'SLIP_DELAYED';
+        | 'SLIP_DELAYED'
+        | 'SLIP_DUPLICATE';
       detail?: string;
     };
 
@@ -73,7 +74,11 @@ function mapSlipOkError(code: number | undefined, message: string): SlipVerifyRe
     case 1014:
       return { ok: false, code: 'RECEIVER_MISMATCH', detail: message };
     case 1012:
-      return { ok: false, code: 'INVALID_SLIP', detail: 'duplicate: ' + message };
+      // Duplicate slip: the provider has already seen this transfer — usually a
+      // retry after a successful check, sometimes a slip already claimed by
+      // another order. Same code as Slip2Go's 200501, so one story reaches the
+      // customer instead of "สลิปไม่ถูกต้อง" for a payment that went through.
+      return { ok: false, code: 'SLIP_DUPLICATE', detail: 'duplicate: ' + message };
     case 1010:
       return { ok: false, code: 'SLIP_DELAYED', detail: message };
     case 1002:

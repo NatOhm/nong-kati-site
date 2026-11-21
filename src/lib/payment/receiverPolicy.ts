@@ -9,19 +9,21 @@
  * receiver check whatsoever. It lives here now:
  *
  * - `storeReceiverDigits` resolves the admin `manual-transfer` setting into
- *   the digits we enforce (`''` when unconfigured → the check is skipped;
- *   that fail-open is a documented decision: with nothing to check against we
- *   queue to manual review instead of inventing a target).
+ *   the digits we enforce. `''` means UNCONFIGURED, and callers must fail
+ *   closed on it: since 2026-11-21 `slip-verify` refuses to auto-confirm and
+ *   parks the slip for manual review (evidence kept, admin pinged, order
+ *   still payable) instead of skipping the only receiver check that exists.
  * - Those digits go to Slip2Go for its bank-side `checkCondition` — a belt.
  * - `checkReceiverMatch` is the authoritative compare, applied by the route
  *   after ANY provider succeeds. Bank-side conditions cannot be trusted
  *   alone: the 2026-10-30 live proof sent a wrong `accountNumber` and got
  *   `200200` back instead of `200401` (order NK-2026-000171).
  *
- * Fail-closed only where there is something to compare: a definite mismatch
- * (both sides at least 4 digits) rejects; a short/unreadable mask trusts the
- * provider. Details carry last-4 digits only — full account numbers never
- * reach a log.
+ * `checkReceiverMatch` itself fails closed only where there is something to
+ * compare: a definite mismatch (both sides at least 4 digits) rejects, while a
+ * short/unreadable mask trusts the provider. An unconfigured store never
+ * reaches this function — the route refuses to auto-confirm first. Details
+ * carry last-4 digits only — full account numbers never reach a log.
  *
  * 2026-10-30 correction: the provider mask does NOT expose the trailing
  * window. The genuine slip to `199-1-73578-6` reports `xxx-x-x3578-x`
