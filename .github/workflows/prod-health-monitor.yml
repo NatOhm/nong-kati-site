@@ -176,15 +176,48 @@ jobs:
           fi
           fail=0
           failed=""
+          # Read the STATUS, not just curl's exit code. With `-f` a 401 and a 503
+          # collapse into the same "failed", and they mean opposite things:
+          #   401 UNAUTHENTICATED  → the server HAS a NK_CRON_SECRET and it differs
+          #                          from this repo secret (copy server → repo secret).
+          #   503 SWEEP_DISABLED   → the server has NO secret, so the sweep is
+          #                          switched off (add it in Plesk → Node.js →
+          #                          Environment; do NOT touch the repo secret).
+          # One message for both sent operators to the wrong panel: measured
+          # 2026-11-21, 11 of 12 red runs were the 401.
           for ep in $endpoints; do
-            if curl -fsS --max-time 30 -X POST -H "x-cron-token: $NK_CRON_SECRET" \
-              "https://nongkatistore.com/api/v1/$ep" >/dev/null; then
+            # `|| true`, not `|| code=000`: --max-time can fire AFTER the status
+            # line, so curl exits 28 having already printed 200. Overwriting that
+            # with 000 would blame DNS/TLS for a server that answered. A real
+            # code is kept; anything empty or non-numeric (no response at all) is
+            # normalised to 000 below. curl's own stderr still reaches the log.
+            code="$(curl -sS --max-time 30 -o /dev/null -w '%{http_code}' -X POST \
+              -H "x-cron-token: $NK_CRON_SECRET" "https://nongkatistore.com/api/v1/$ep")" || true
+            case "$code" in '' | *[!0-9]*) code=000 ;; esac
+            # Status only, deliberately: the five routes answer with different
+            # JSON shapes, so asserting on the body would go red on a harmless
+            # shape change and teach the operator to ignore this channel. A 200
+            # means the route ran; the annotation below is for everything else.
+            if [ "$code" = "200" ]; then
               echo "ok: $ep"
-            else
-              echo "::error title=housekeeping cron failed::$ep returned non-2xx (site down, or NK_CRON_SECRET mismatch between repo secret and server .env)"
-              failed="$failed $ep"
-              fail=1
+              continue
             fi
+            case "$code" in
+              401)
+                echo "::error title=housekeeping 401 token mismatch::$ep: 401 UNAUTHENTICATED — the server's NK_CRON_SECRET differs from this repo secret, so copy the server value in (Plesk → Node.js → Environment): gh secret set NK_CRON_SECRET. No restart, no redeploy."
+                ;;
+              503)
+                echo "::error title=housekeeping 503 secret unset::$ep: 503 SWEEP_DISABLED — NK_CRON_SECRET is missing on the server, so the sweep fails closed. Add it in Plesk → Node.js → Environment and restart the app; the repo secret is not the problem."
+                ;;
+              000)
+                echo "::error title=housekeeping no response::$ep: no HTTP response (connect/DNS/TLS/timeout) — the site is unreachable, not a secret problem."
+                ;;
+              *)
+                echo "::error title=housekeeping HTTP $code::$ep: HTTP $code, neither 401 nor 503 — read that endpoint's own log."
+                ;;
+            esac
+            failed="$failed $ep($code)"
+            fail=1
           done
           # One webhook message per RUN, never one per endpoint: a dead site
           # fails every sweep at once, and four near-identical pings teach an
