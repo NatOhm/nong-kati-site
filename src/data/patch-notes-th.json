@@ -1,4 +1,27 @@
 {
+  "Zcy3-lY3msugy8heVcZNZ": {
+    "title": "บิลด์ #545 ขึ้น production: สลิปที่ธนาคารตอบช้าไม่ถูกหาว่าใช้แล้ว และร้านที่ยังไม่กรอกบัญชีรับเงินจะไม่ตรวจสลิปแบบเดา",
+    "summary": "อัปเดต Zcy3-lY3msugy8heVcZNZ (commit 5273d60, 1.2.2 บิลด์ #545) ขึ้น production เมื่อ 22 พ.ย. 2569 โดยมี 22 commit ตั้งแต่ 5a70a0e ทั้งการแก้กรณีธนาคารตอบช้า การปิดช่องโหว่ที่ร้านยังไม่ได้ตั้งบัญชีรับเงิน การจับคู่รหัสสลิปซ้ำของ SlipOK และการซ่อม token สีที่ทำให้ปุ่มหลังบ้านมองไม่เห็น",
+    "problem": "สองเรื่องบนเส้นทางเงินยังไม่ตรงความจริง: (1) คำตอบ 200404 จากธนาคารแปลว่า “ธนาคารยังตอบไม่ได้” แต่ระบบอ่านเป็นสลิปเสีย ลูกค้าจึงอ่านว่า “สลิปไม่ถูกต้อง/อ่านไม่ได้/ถูกใช้ไปแล้ว” ทั้งที่สลิปนั้นยังใช้ได้ (2) เมื่อร้านยังไม่ได้กรอกเลขบัญชีรับเงิน ตัวเทียบบัญชีฝั่งธนาคารไม่ทำงานเลย แล้วระบบยังตรวจผ่านให้อัตโนมัติ ทั้งที่ไม่มีอะไรให้เทียบผู้รับเงิน และยังไม่มีการจับคู่รหัส 1012 ของ SlipOK ว่าเป็นสลิปซ้ำ ทำให้สลิปเดิมตอบคนละข้อความกับ 200501 ของ Slip2Go",
+    "change": [
+      "แมป 200404 เป็น SLIP_DELAYED (202) พร้อมข้อความ “ธนาคารยังตอบผลไม่ได้ รอตรวจอีกครั้ง” แทน INVALID_SLIP",
+      "slip-verify ปฏิเสธการตรวจอัตโนมัติเมื่อบัญชีรับเงินของร้านว่าง: เก็บหลักฐานสลิปไว้ แจ้งแอดมิน และตอบ 503 RECEIVER_UNCONFIGURED โดยไม่เรียกทั้ง Slip2Go และ SlipOK",
+      "แถว PaymentAttempt เก็บ gatewayStatusCode เป็น null ในกรณีนี้ (และ gatewayResponse.provider เป็น null) เพื่อให้ tooltip หลังบ้านไม่กล่าวอ้างว่ามีการเรียกผู้ให้บริการ",
+      "ข้อความตอบกลับไม่กล่าวอ้างว่าส่งสลิปให้แอดมินแล้วเมื่อเขียนหลักฐานไม่สำเร็จ (slipStored false) แต่บอกให้รอแอดมินตรวจแทน",
+      "แมป 1012 ของ SlipOK เป็น SLIP_DUPLICATE ใช้ข้อความเดียวกับ 200501 ของ Slip2Go",
+      "หน้าคำสั่งซื้อแสดงป้ายภาษาไทยของทุก verdict จาก src/lib/slipCheckReason.ts โดยรหัสดิบอยู่ใน tooltip เท่านั้น และหน้าโอนเงินแมนนวลขึ้นแถบเตือนสีเหลืองเมื่อเลขบัญชียังว่าง (ใช้ storeReceiverDigits ตัวเดียวกับ route ช่องว่างและขีดจึงนับว่าว่าง)",
+      "ซ่อม utility สี alpha/shadow ที่ถูกตัดทิ้งจนปุ่มหลักหลังบ้านมองไม่เห็น, ให้ /recommended และ /legal/* ใช้ chrome ร่วม, และให้ตัวตรวจสุขภาพแยก 401 token ผิด กับ 503 secret ยังไม่ตั้ง",
+      "เพิ่ม gate tests/slip-provider-code-coverage.test.ts (SC1–SC5) และ tests/manual-transfer-account-warning.test.tsx (MW) พร้อมแถวและหัวข้อใน docs/quality-gates.md"
+    ],
+    "proof": [
+      "/api/v1/version ตอบ buildId Zcy3-lY3msugy8heVcZNZ · version 1.2.2 · buildNumber 545 · gitSha 5273d60258978c1b2b9b1b79b9073afd63ba364c (ตรงทั้ง buildId และ gitSha ไม่ใช่ response จาก cache)",
+      "/api/v1/health ตอบ healthy พร้อม checks.database ok และ uptime 9.3 วินาที แปลว่า Passenger รีสตาร์ทจริง",
+      "/api/v1/products ตอบ 200 และหน้าแรกมีคำว่า turbopack 0 ครั้ง (build ที่เสิร์ฟไม่ใช่ตัวเก่า)",
+      "postswitch-gate.yml run 44963031084 เห็นบิลด์ใหม่ขึ้นจริงหลัง push artifact 119 วินาที แล้วหยุดที่ exit 2 เพราะยังไม่มี POSTSWITCH_TARGET_DATABASE_URL",
+      "ในเครื่อง: npm test 132 ไฟล์ 1224 ผ่าน, npx tsc --noEmit และ npm run lint สะอาด"
+    ],
+    "note": "แถวนี้ปิดเฉพาะครึ่ง identity + liveness: การ certify 22 ข้อที่ต้องอ่านฐานข้อมูลจริงยังไม่ได้รัน เพราะ CI ไม่มี POSTSWITCH_TARGET_DATABASE_URL และเครื่องนี้ต่อ SSH ไป thsv93 ไม่ได้ (publickey ถูกปฏิเสธ) จึงเปิด tunnel ไป 3307 ไม่ได้ ส่วน rollback ยังอยู่ที่ httpdocs/.next.old และ CI ของ commit นี้ยังแดงที่ Lint & Typecheck จาก type error เดิมใน tests/deploy-runbook.test.ts ซึ่งแก้แยกในคอมมิตถัดไป"
+  },
   "hG0RHiUSkpldDxCrlAXQl": {
     "title": "บิลด์ที่พอร์ตระบบไป MariaDB ขึ้น production จริงแล้ว และร้านให้บริการบิลด์นี้อยู่",
     "summary": "สลับบิลด์ hG0RHiUSkpldDxCrlAXQl (commit 5a70a0e, 1.2.2 บิลด์ #523) ขึ้น production ผ่าน Plesk Run Now เมื่อ 21 พ.ย. 2569 ร้านจึงรันโค้ดที่พอร์ตฐานข้อมูลไป MariaDB แทนบิลด์ sXlN595fgEXujyWRQth6p เดิม",

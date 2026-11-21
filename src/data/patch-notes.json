@@ -1,6 +1,15 @@
 [
   {
     "version": "1.2.2",
+    "date": "2026-11-22",
+    "dateLabel": "Nov 22, 2026",
+    "gitSha": "5273d60",
+    "buildId": "Zcy3-lY3msugy8heVcZNZ",
+    "title": "1.2.2 (#545) — the bank-delay fix, the fail-closed slip guard and the dead UI tokens are live.",
+    "detail": "1.2.2 (#545) — the bank-delay fix, the fail-closed slip guard and the dead UI tokens are live. 22 commits from 5a70a0e: published as the deploy-artifact orphan 9a65cf1 by scripts/deploy-artifact.sh (14 MB bundle, both stamps self-verified before publish) and switched by Plesk → Scheduled Tasks → Run Now with the pinned Step-2 line, which compared both stamps from the tar before touching the docroot. Customer-facing: a bank answer of 200404 means “the bank is slow”, not “this slip is bad”, and it used to land as INVALID_SLIP — the customer read “สลิปไม่ถูกต้อง/อ่านไม่ได้/ถูกใช้ไปแล้ว” for a slip that was merely unreadable yet; 0d8bb9d maps it to SLIP_DELAYED (202, “ธนาคารยังตอบผลไม่ได้ รอตรวจอีกครั้ง”). Payment safety: slip-verify now fails closed when the store receiving account is blank — evidence kept, admin pinged, answer 503 RECEIVER_UNCONFIGURED, and neither Slip2Go nor its SlipOK fallback is called (a credit is not spent on a verdict nobody can act on); the attempt row stores gatewayStatusCode: null so the admin tooltip cannot name a provider that never ran. SlipOK 1012 now maps to SLIP_DUPLICATE with the same sentence as Slip2Go 200501. Admin UI: the orders chip and modal show Thai verdict labels from one shared map (src/lib/slipCheckReason.ts, raw code only in the tooltip), and โอนเงินแมนนวล shows an amber warning while the account number is blank — the same storeReceiverDigits() the route resolves with, so spaces and dashes count as unset. Repairs in the range: the alpha/shadow/colour utilities compile instead of being dropped (primary admin buttons were invisible), /recommended and /legal/* get the shared chrome, and the health monitor tells a 401 token mismatch from a 503 unset secret. Gates: tests/slip-provider-code-coverage.test.ts (SC1–SC5: route maps ↔ mapper codes ↔ Thai labels, no orphans, ≤30 chars), tests/manual-transfer-account-warning.test.tsx (MW), and 33 slip-flow cases including “both providers stay uncalled” and “never claims the slip reached the admin when the evidence write failed”. Local: 132 files / 1224 tests, tsc and eslint clean. Live proof: /api/v1/version → Zcy3-lY3msugy8heVcZNZ · 1.2.2 · #545 · 5273d60258978c1b2b9b1b79b9073afd63ba364c (buildId and gitSha, so not a cached response), /api/v1/health healthy with checks.database: ok and uptime 9.3 s (a real restart), /api/v1/products 200, homepage 0 turbopack. Certification: postswitch-gate.yml run 44963031084 watched the switch land (Zcy3-lY3msugy8heVcZNZ served 119 s after the artifact push) and then stopped with exit 2 — POSTSWITCH_TARGET_DATABASE_URL is still unset and this workstation cannot open the SSH forward (nongka@thsv93 refuses this key), so the 22-check database half is not certified. Rollback stays httpdocs/.next.old."
+  },
+  {
+    "version": "1.2.2",
     "date": "2026-11-21",
     "dateLabel": "Nov 21, 2026",
     "gitSha": "5a70a0e",
