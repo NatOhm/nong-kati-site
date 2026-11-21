@@ -248,7 +248,7 @@ export default function AdminCouponsPage(): React.JSX.Element {
               <button
                 onClick={() => void create()}
                 disabled={saving}
-                className="bg-jade-600 rounded-md px-4 py-2 text-sm font-semibold text-white hover:bg-jade-500 disabled:opacity-60"
+                className="bg-jade-700 rounded-md px-4 py-2 text-sm font-semibold text-white hover:bg-jade-500 disabled:opacity-60"
               >
                 {saving ? 'กำลังบันทึก...' : 'บันทึกคูปอง'}
               </button>

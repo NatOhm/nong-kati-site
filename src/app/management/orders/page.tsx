@@ -552,7 +552,7 @@ export default function AdminOrdersPage(): React.JSX.Element {
                           <button
                             onClick={() => void verifyPayment(order.id)}
                             disabled={verifyingId === order.id}
-                            className="bg-jade-600 inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-semibold text-white hover:bg-jade-500 disabled:opacity-60"
+                            className="bg-jade-700 inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-semibold text-white hover:bg-jade-500 disabled:opacity-60"
                           >
                             <CheckCircle size={12} />
                             {verifyingId === order.id
@@ -812,7 +812,7 @@ export default function AdminOrdersPage(): React.JSX.Element {
                   <button
                     onClick={() => void verifyPayment(selectedOrder.id)}
                     disabled={verifyingId === selectedOrder.id}
-                    className="bg-jade-600 inline-flex w-full items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-semibold text-white hover:bg-jade-500 disabled:opacity-60"
+                    className="bg-jade-700 inline-flex w-full items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-semibold text-white hover:bg-jade-500 disabled:opacity-60"
                   >
                     <CheckCircle size={16} />
                     {verifyingId === selectedOrder.id
