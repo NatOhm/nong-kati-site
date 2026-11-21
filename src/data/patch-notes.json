@@ -1,8 +1,8 @@
 [
   {
     "version": "1.2.2",
-    "date": "2026-11-22",
-    "dateLabel": "Nov 22, 2026",
+    "date": "2026-11-21",
+    "dateLabel": "Nov 21, 2026",
     "gitSha": "5273d60",
     "buildId": "Zcy3-lY3msugy8heVcZNZ",
     "title": "1.2.2 (#545) — the bank-delay fix, the fail-closed slip guard and the dead UI tokens are live.",
