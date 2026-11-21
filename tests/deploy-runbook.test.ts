@@ -47,7 +47,7 @@ const NO_CMD =
 /** The literal a `grep -Fxq <literal> .next-stage/.next/<file>` check compares against. */
 function literalFor(file: string): string {
   const match = new RegExp(`grep -Fxq (\\S+) \\.next-stage/\\.next/${file}`).exec(command);
-  return match ? match[1] : '';
+  return match?.[1] ?? '';
 }
 
 const buildId = literalFor('BUILD_ID');
