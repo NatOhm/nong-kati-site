@@ -1,12 +1,12 @@
 [
   {
-    "version": null,
-    "date": "2026-11-19",
-    "dateLabel": "Nov 19, 2026",
+    "version": "1.2.2",
+    "date": "2026-11-21",
+    "dateLabel": "Nov 21, 2026",
     "gitSha": "5a70a0e",
     "buildId": "hG0RHiUSkpldDxCrlAXQl",
-    "title": "Prepared for the panel switch — not yet deployed; nothing in this row happened on production.",
-    "detail": "Prepared for the panel switch — not yet deployed; nothing in this row happened on production. The MariaDB-port build is built and published: scripts/deploy-artifact.sh (SKIP_BUILD=1, reusing a clean 5a70a0e build — the workstation's Node 26.1.0, not the host's 20.20.2) force-pushed the bundle to deploy-artifact (9f97801 → 7bc1c75), the tar's own stamps were verified (BUILD_ID = the cell above, GIT_SHA = 5a70a0e777676df05228244789d6e7dfe5df9175, no -dirty), and the raw URL Plesk pulls answers HTTP 200, 14,279,346 bytes. Pending, and left empty rather than guessed: the switch itself (Plesk → Scheduled Tasks → Run Now), the live /api/v1/version read — still sXlN595fgEXujyWRQth6p / 206a6a2 / 1.2.2 across 24 samples 21:07:02–21:11:07Z — the four 30-second health reads, the postswitch-check.mjs certification, and the version number this build ships as. Certification no longer depends on the push run's 45-minute window: postswitch-gate.yml accepts workflow_dispatch with a build-id input, and run 44544659086 was dispatched against this BUILD_ID. Rollback if the switch lands badly: httpdocs/.next.old."
+    "title": "The MariaDB-port build is live on production; the panel switch ran 2026-11-21.",
+    "detail": "1.2.2 — the MariaDB-port build is live on production; the panel switch ran 2026-11-21. Plesk → Scheduled Tasks → task 250 Run Now executed the pinned Step-2 line from docs/deploy-phase3-switch.md: it pulls the bundle by commit 7bc1c75 and checks the tar's own stamps before swapping (grep -Fxq hG0RHiUSkpldDxCrlAXQl .next/BUILD_ID and grep -Fxq 5a70a0e777676df05228244789d6e7dfe5df9175 .next/GIT_SHA), so a stale tarball could not land. The task was deactivated after the run; extract-check.txt was read once and deleted. Live proof, read after the switch and re-verified in one pass the same day (node scripts/postswitch-verify.mjs → exit 0): /api/v1/version → hG0RHiUSkpldDxCrlAXQl · 1.2.2 · #523 · 5a70a0e777676df05228244789d6e7dfe5df9175 (buildId and gitSha, so not a cached response), health healthy with checks.database: ok, four health reads 30 s apart with uptime 8.5 → 38.5 → 68.5 → 98.5 s (no failure-coupled reset), /api/v1/products 200 (30 products) and / 200 (153,845 bytes). Certification: postswitch-gate.yml run 44912735931 (workflow_dispatch, -f build-id=hG0RHiUSkpldDxCrlAXQl -f check-only=true, headSha 5a70a0e) → success 14:12:37–14:13:41Z; its own notice reads *the release is live. The database half of the gate was not run.* — the 22-check database half still needs POSTSWITCH_TARGET_DATABASE_URL, which the repo does not hold, so this row claims the identity + liveness half only. Rollback stays httpdocs/.next.old."
   },
   {
     "version": "1.2.2",

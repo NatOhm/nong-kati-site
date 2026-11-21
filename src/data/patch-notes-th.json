@@ -1,20 +1,21 @@
 {
   "hG0RHiUSkpldDxCrlAXQl": {
-    "title": "เตรียมปล่อยบิลด์ที่พอร์ตฐานข้อมูลไป MariaDB — ยังไม่ได้สลับขึ้น production",
-    "summary": "bundle ของบิลด์นี้ build และ publish ขึ้น branch deploy-artifact เรียบร้อยแล้ว แต่การสลับจริง (Run Now ใน Plesk) ยังไม่ได้ทำ ร้านยังเสิร์ฟบิลด์ sXlN595fgEXujyWRQth6p อยู่",
-    "problem": "commit 5a70a0e บน db/mariadb-port คือโค้ดที่พอร์ตทั้งระบบไป MariaDB และเป็นบิลด์ที่ทุกขั้นตอนที่เหลือของแผนปิดงาน (certify, ลบแถวฐานข้อมูลใน Infisical, drill การกู้คืน) รออยู่ แต่ตัวบิลด์ยังไม่เคยขึ้น production เลย ร้านจึงยังรันโค้ดชุดเดิม",
+    "title": "บิลด์ที่พอร์ตระบบไป MariaDB ขึ้น production จริงแล้ว และร้านให้บริการบิลด์นี้อยู่",
+    "summary": "สลับบิลด์ hG0RHiUSkpldDxCrlAXQl (commit 5a70a0e, 1.2.2 บิลด์ #523) ขึ้น production ผ่าน Plesk Run Now เมื่อ 21 พ.ย. 2569 ร้านจึงรันโค้ดที่พอร์ตฐานข้อมูลไป MariaDB แทนบิลด์ sXlN595fgEXujyWRQth6p เดิม",
+    "problem": "ก่อนหน้านี้ทำเพียง build และ publish bundle ขึ้น branch deploy-artifact แต่ยังไม่ได้กดสลับ ร้านจึงยังเสิร์ฟบิลด์ 206a6a2 ที่คอมไพล์ไว้ในหน้าต่าง cutover 15 พ.ย. ทำให้ขั้นตอนที่เหลือของแผนปิดงาน (certify ฝั่งฐานข้อมูล, ลบแถว URL เก่าใน Infisical, ซ้อมกู้คืน) ยังเริ่มไม่ได้",
     "change": [
-      "publish bundle เป็น orphan commit 7bc1c75 บน branch deploy-artifact แทนที่ 9f97801 เดิม (force-push ตามวิธีปกติของ repo)",
-      "ตรวจ stamp จากตัว tar เอง: BUILD_ID hG0RHiUSkpldDxCrlAXQl ตรงกับ .next/BUILD_ID และ GIT_SHA 5a70a0e777676df05228244789d6e7dfe5df9175 สะอาด ไม่มี suffix -dirty",
-      "ยืนยันว่า URL ที่ Plesk ใช้ดึง bundle ตอบ HTTP 200 ขนาด 14,279,346 ไบต์ และ git ls-remote ชี้ 7bc1c75",
-      "เปิดทาง certify ที่ไม่ผูกกับเวลาของ run ที่ยิงจาก push: workflow postswitch-gate รับ workflow_dispatch พร้อม input build-id จึงสั่ง certify บิลด์นี้ซ้ำได้ทุกเมื่อ"
+      "กด Run Now ที่ Plesk → Scheduled Tasks → task 250 ด้วยบรรทัด Step-2 ที่ปักหมุด release ไว้: ดึง bundle ตาม commit 7bc1c75 และตรวจ stamp จาก tar เองก่อนสลับ (BUILD_ID hG0RHiUSkpldDxCrlAXQl และ GIT_SHA 5a70a0e777676df05228244789d6e7dfe5df9175) จึงเอาทาร์ที่เก่ากว่าแต่หน้าตาถูกต้องมาทับไม่ได้",
+      "ปิด task หลังรันเสร็จ และลบ extract-check.txt ที่เก็บค่าจริงจาก .next บนเซิร์ฟเวอร์หลังตรวจแล้ว",
+      "ยืนยันด้วยสคริปต์เดียว scripts/postswitch-verify.mjs (read-only) แทนการยิง curl ทีละคำสั่ง: ได้ exit 0 ครบทั้ง buildId, gitSha, health, หน้าสินค้า, หน้าแรก และ uptime สี่ครั้ง",
+      "สั่ง certify ซ้ำผ่าน workflow postswitch-gate แบบ check-only เพราะ repo ไม่มี POSTSWITCH_TARGET_DATABASE_URL สำหรับครึ่งฐานข้อมูล"
     ],
     "proof": [
-      "อ่าน /api/v1/version ซ้ำ 24 ครั้งระหว่าง 21:07:02 ถึง 21:11:07 ยังได้ sXlN595fgEXujyWRQth6p / 206a6a2 / 1.2.2 ทุกครั้ง แปลว่ายังไม่มีอะไรถูกสลับ",
-      "/api/v1/health ตอบ healthy พร้อม database: ok ตลอดช่วงที่ publish และ /api/v1/products ตอบ 200",
-      "gh run list แสดง run 44544659086 (workflow_dispatch, build-id hG0RHiUSkpldDxCrlAXQl) เข้าคิวในกลุ่ม postswitch-gate แล้ว"
+      "/api/v1/version ตอบ buildId hG0RHiUSkpldDxCrlAXQl · version 1.2.2 · buildNumber 523 · gitSha 5a70a0e777676df05228244789d6e7dfe5df9175 (ตรงทั้ง buildId และ gitSha ไม่ใช่ response จาก cache)",
+      "/api/v1/health ตอบ healthy พร้อม checks.database ok และอ่านซ้ำสี่ครั้งห่างกัน 30 วินาที uptime 8.5 → 38.5 → 68.5 → 98.5 วินาที โดยไม่มี reset ที่มาพร้อม database error",
+      "/api/v1/products ตอบ 200 (30 สินค้า) และ / ตอบ 200 ขนาด 153,845 ไบต์",
+      "gh run 44912735931 (Post-switch gate, workflow_dispatch, headSha 5a70a0e) จบแบบ success ใน 64 วินาที 14:12:37–14:13:41Z และ notice ของมันระบุชัดว่า database half of the gate was not run"
     ],
-    "note": "แถวนี้ยังไม่ใช่ดีพลอย: ค่าที่เป็นของร้านจริง เช่น uptime หลังรีสตาร์ท ผล certify 22 ข้อ และเวลาที่สลับจริง จะถูกเติมหลังกด Run Now เท่านั้น ห้ามอ่านช่องพวกนี้ว่าบิลด์ขึ้นแล้ว — ถ้าบิลด์นี้ไม่ได้ขึ้นจริง ให้ลบแถวนี้ออก ไม่ปล่อยให้ค้างในบันทึก"
+    "note": "แถวนี้ถือว่าปิดเฉพาะครึ่ง identity + liveness เท่านั้น: การ certify 22 ข้อที่ต้องอ่านฐานข้อมูลจริงยังไม่ได้รัน เพราะ CI ไม่มี POSTSWITCH_TARGET_DATABASE_URL และฝั่งเครื่องนี้ต้องมี SSH forward ที่ยังไม่ได้ให้สิทธิ์ ส่วน rollback ยังอยู่ที่ httpdocs/.next.old"
   },
   "sXlN595fgEXujyWRQth6p": {
     "title": "บิลด์ที่ย้ายฐานข้อมูลไป MariaDB ขึ้น production และยังให้บริการอยู่ถึงวันนี้",
