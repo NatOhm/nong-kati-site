@@ -105,8 +105,8 @@ const STATUS_LABELS = withStatusColors({
   pending_payment: 'text-amber-600',
   payment_confirmed: 'text-sapphire-700',
   pending_manual_fulfilment: 'text-fg-brand',
-  code_delivered: 'text-jade-600',
-  completed: 'text-jade-600',
+  code_delivered: 'text-fg-success',
+  completed: 'text-fg-success',
   refunded: 'text-fg-error',
   failed: 'text-fg-error',
   expired: 'text-fg-muted',
@@ -518,7 +518,7 @@ export default function AdminOrdersPage(): React.JSX.Element {
                     <td className="px-4 py-3 text-left text-xs">
                       {order.slip ? (
                         <span
-                          className="text-jade-600 inline-flex max-w-[200px] items-center gap-1 dark:text-jade-400"
+                          className="text-fg-success inline-flex max-w-[200px] items-center gap-1 dark:text-jade-400"
                           title={`ตรวจสลิปอัตโนมัติ (${order.slip.by === 'slip2go:auto' ? 'Slip2Go' : order.slip.by === 'slipok:auto' ? 'SlipOK' : 'อัตโนมัติ'})${order.slip.verifiedAt ? ` เมื่อ ${new Date(order.slip.verifiedAt).toLocaleString('th-TH')}` : ''}`}
                         >
                           <ShieldCheck size={13} className="shrink-0" />
@@ -684,7 +684,7 @@ export default function AdminOrdersPage(): React.JSX.Element {
                 {selectedOrder.discountThb > 0 && (
                   <div>
                     <p className="text-fg-muted">ส่วนลด</p>
-                    <p className="text-jade-600">−{formatThb(selectedOrder.discountThb)}</p>
+                    <p className="text-fg-success">−{formatThb(selectedOrder.discountThb)}</p>
                   </div>
                 )}
               </div>
@@ -702,7 +702,7 @@ export default function AdminOrdersPage(): React.JSX.Element {
                         <p className="text-xs text-fg-muted">
                           {formatOrderLineDetail(item.skuCode, item.quantity)} ·{' '}
                           {item.deliveryStatus === 'delivered' ? (
-                            <span className="text-jade-600">
+                            <span className="text-fg-success">
                               ส่งแล้ว ({item.codesDelivered} โค้ด)
                             </span>
                           ) : (

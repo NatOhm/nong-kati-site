@@ -52,7 +52,7 @@ function statusChip(status: string): React.JSX.Element {
       className={cn(
         'rounded-full px-2 py-0.5 text-xs font-medium',
         status === 'open' && 'bg-peach-500/15 text-peach-600',
-        status === 'answered' && 'text-jade-600 bg-jade-500/15',
+        status === 'answered' && 'text-fg-success bg-jade-500/15',
         status === 'closed' && 'bg-neutral-500/15 text-fg-muted',
       )}
     >
@@ -184,7 +184,7 @@ export default function AdminTicketsPage(): React.JSX.Element {
                   'rounded-md px-3 py-1.5 text-sm',
                   status === f.v
                     ? 'bg-surface-brand font-semibold text-fg-inverse'
-                    : 'hover:bg-surface-subtle text-fg-muted',
+                    : 'hover:bg-surface-sunken text-fg-muted',
                 )}
               >
                 {f.label}
@@ -203,7 +203,7 @@ export default function AdminTicketsPage(): React.JSX.Element {
           <button
             type="button"
             onClick={() => void load()}
-            className="hover:bg-surface-subtle rounded-md border border-line-subtle p-2 text-fg-muted"
+            className="hover:bg-surface-sunken rounded-md border border-line-subtle p-2 text-fg-muted"
             aria-label="รีเฟรช"
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : undefined} />
@@ -245,7 +245,7 @@ export default function AdminTicketsPage(): React.JSX.Element {
                   <tr
                     key={t.id}
                     onClick={() => void openDetail(t.id)}
-                    className="hover:bg-surface-subtle cursor-pointer border-b border-line-subtle last:border-0"
+                    className="hover:bg-surface-sunken cursor-pointer border-b border-line-subtle last:border-0"
                   >
                     <td className="px-4 py-3 font-mono text-xs">{t.ticketNumber}</td>
                     <td className="max-w-[240px] truncate px-4 py-3 font-medium text-fg">
@@ -296,7 +296,7 @@ export default function AdminTicketsPage(): React.JSX.Element {
                         <button
                           type="button"
                           onClick={() => setSelected(null)}
-                          className="hover:bg-surface-subtle rounded-md p-1 text-fg-muted"
+                          className="hover:bg-surface-sunken rounded-md p-1 text-fg-muted"
                           aria-label="กลับ"
                         >
                           <ChevronLeft size={18} />
@@ -315,13 +315,13 @@ export default function AdminTicketsPage(): React.JSX.Element {
                     </div>
                   </div>
 
-                  <div className="bg-surface-subtle rounded-md border border-line-subtle p-4 text-sm text-fg">
+                  <div className="bg-surface-sunken rounded-md border border-line-subtle p-4 text-sm text-fg">
                     {selected.message}
                   </div>
 
                   {selected.adminReply && (
                     <div className="mt-3 rounded-md border border-jade-500/40 bg-jade-500/10 p-4 text-sm text-fg">
-                      <div className="text-jade-600 mb-1 flex items-center gap-1 text-xs">
+                      <div className="text-fg-success mb-1 flex items-center gap-1 text-xs">
                         <CheckCircle2 size={12} />
                         ตอบกลับโดย {selected.answeredByName ?? 'แอดมิน'} ·{' '}
                         {selected.answeredAt
@@ -363,7 +363,7 @@ export default function AdminTicketsPage(): React.JSX.Element {
                           type="button"
                           disabled={actionBusy}
                           onClick={() => void act('close')}
-                          className="hover:bg-surface-subtle inline-flex items-center gap-1.5 rounded-md border border-line-subtle px-4 py-2 text-sm text-fg disabled:opacity-50"
+                          className="hover:bg-surface-sunken inline-flex items-center gap-1.5 rounded-md border border-line-subtle px-4 py-2 text-sm text-fg disabled:opacity-50"
                         >
                           <XCircle size={14} />
                           ปิดตั๋ว
@@ -376,14 +376,14 @@ export default function AdminTicketsPage(): React.JSX.Element {
                       type="button"
                       disabled={actionBusy}
                       onClick={() => void act('reopen')}
-                      className="hover:bg-surface-subtle mt-5 inline-flex items-center gap-1.5 rounded-md border border-line-subtle px-4 py-2 text-sm text-fg disabled:opacity-50"
+                      className="hover:bg-surface-sunken mt-5 inline-flex items-center gap-1.5 rounded-md border border-line-subtle px-4 py-2 text-sm text-fg disabled:opacity-50"
                     >
                       <RotateCcw size={14} />
                       เปิดตั๋วใหม่
                     </button>
                   )}
 
-                  {actionMsg && <p className="text-jade-600 mt-3 text-sm">{actionMsg}</p>}
+                  {actionMsg && <p className="text-fg-success mt-3 text-sm">{actionMsg}</p>}
                   {actionErr && <p className="mt-3 text-sm text-fg-error">{actionErr}</p>}
                 </>
               )}

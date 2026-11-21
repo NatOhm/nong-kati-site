@@ -195,7 +195,7 @@ export function BulkStockDialog({
 
   return (
     <div
-      className="bg-overlay fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="bg-surface-overlay fixed inset-0 z-50 flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
       aria-label={`จัดการข้อมูลบัญชี ${productName}`}

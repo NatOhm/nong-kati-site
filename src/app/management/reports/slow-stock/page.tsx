@@ -221,7 +221,7 @@ export default function SlowStockReportPage(): React.JSX.Element {
             className={cn(
               'rounded-lg px-3 py-2 text-sm',
               daysMsg === 'บันทึกแล้ว'
-                ? 'dark:text-jade-300 bg-jade-500/10 text-jade-700'
+                ? 'bg-jade-500/10 text-jade-700'
                 : 'bg-coral-50 text-fg-error dark:bg-coral-900/20 dark:text-coral-300',
             )}
           >

@@ -126,7 +126,7 @@ export function EmailSettings({
             className={cn(
               'flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold',
               emailConfigured
-                ? 'bg-success-500/10 text-fg-success'
+                ? 'bg-jade-500/10 text-fg-success'
                 : 'bg-coral-500/10 text-fg-error',
             )}
           >

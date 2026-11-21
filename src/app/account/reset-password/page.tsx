@@ -97,7 +97,7 @@ export default function ResetPasswordPage(): React.JSX.Element {
         <div className="rounded-lg border border-line-subtle bg-surface p-6">
           {state === 'success' ? (
             <div className="text-center">
-              <CheckCircle2 size={48} className="text-jade-600 mx-auto mb-4" />
+              <CheckCircle2 size={48} className="text-fg-success mx-auto mb-4" />
               <h1 className="mb-2 text-2xl font-bold text-fg">ตั้งรหัสผ่านใหม่สำเร็จ!</h1>
               <p className="mb-6 text-sm text-fg-secondary">
                 ทุกอุปกรณ์ที่ล็อกอินค้างไว้ถูกปิดการใช้งานแล้ว — เข้าสู่ระบบใหม่ด้วยรหัสผ่านใหม่

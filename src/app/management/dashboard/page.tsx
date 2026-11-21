@@ -391,7 +391,7 @@ export default function AdminDashboardPage(): React.JSX.Element {
               label="รายได้รวม"
               value={formatThb(revenue.revenueThisMonth.grossRevenue)}
               icon={DollarSign}
-              color="text-jade-600"
+              color="text-fg-success"
             />
             <MiniStat
               label="รายได้สุทธิ"
@@ -578,7 +578,7 @@ export default function AdminDashboardPage(): React.JSX.Element {
                     key={order.id}
                     className="hover:bg-surface/30 flex gap-3 px-5 py-3 transition-colors"
                   >
-                    <div className="text-jade-600 mt-0.5 flex-shrink-0">
+                    <div className="text-fg-success mt-0.5 flex-shrink-0">
                       <ShoppingCart size={14} />
                     </div>
                     <div className="min-w-0 flex-1">
@@ -952,7 +952,7 @@ function MetricRow({
         <span
           className={cn(
             'font-mono text-sm font-semibold',
-            highlight ? 'text-jade-600' : 'text-fg-secondary',
+            highlight ? 'text-fg-success' : 'text-fg-secondary',
           )}
         >
           {value}

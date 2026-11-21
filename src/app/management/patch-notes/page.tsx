@@ -220,7 +220,7 @@ export default function PatchNotesPage(): React.JSX.Element {
                 </>
               ) : (
                 <>
-                  <p className="mt-3 rounded-md border border-line-subtle bg-bg p-3 text-sm text-fg-secondary">
+                  <p className="mt-3 rounded-md border border-line-subtle bg-surface-base p-3 text-sm text-fg-secondary">
                     build ที่รันอยู่ (v{live.version}) ยังไม่มีแถวในบันทึก deploy —
                     บันทึกจะอัปเดตหลังรอบ deploy ถัดไป
                   </p>

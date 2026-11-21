@@ -213,7 +213,7 @@ export function ImportDialog({
         {result && (
           <div className="mt-4 rounded-xl border border-line-subtle bg-surface p-4">
             <div className="flex flex-wrap items-center gap-4 text-sm font-semibold">
-              <span className="text-jade-600 flex items-center gap-1.5">
+              <span className="text-fg-success flex items-center gap-1.5">
                 <CheckCircle2 size={15} /> สร้าง {result.created}
               </span>
               <span className="flex items-center gap-1.5 text-fg-brand">
@@ -236,7 +236,7 @@ export function ImportDialog({
                         <td
                           className={cn(
                             'px-3 py-1.5 font-medium',
-                            r.status === 'created' && 'text-jade-600',
+                            r.status === 'created' && 'text-fg-success',
                             r.status === 'updated' && 'text-fg-brand',
                             r.status === 'error' && 'text-fg-error',
                           )}

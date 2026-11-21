@@ -983,7 +983,7 @@ function ProductEditor({
       aria-modal="true"
       aria-label={product ? `แก้ไข ${product.name}` : 'เพิ่มสินค้า'}
     >
-      <button aria-label="ปิด" onClick={onClose} className="bg-overlay absolute inset-0" />
+      <button aria-label="ปิด" onClick={onClose} className="bg-surface-overlay absolute inset-0" />
       <div className="absolute inset-y-0 right-0 flex w-full max-w-lg animate-[drawer-in_300ms_cubic-bezier(0,0,0.2,1)_both] flex-col bg-surface shadow-clay-lg">
         <div className="flex items-center justify-between border-b border-line-subtle px-6 py-4">
           <h2 className="text-lg font-bold text-fg">

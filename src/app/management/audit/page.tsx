@@ -258,7 +258,7 @@ export default function AdminAuditPage(): React.JSX.Element {
                       {entry.diff ? (
                         <span>
                           {entry.diff.before && <span className="text-fg-error/70">-</span>}
-                          {entry.diff.after && <span className="text-jade-600/70">+</span>}
+                          {entry.diff.after && <span className="text-fg-success">+</span>}
                         </span>
                       ) : entry.metadata ? (
                         <span className="text-clay-400">

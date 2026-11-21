@@ -344,7 +344,7 @@ export default function AdminStaffPage(): React.JSX.Element {
                         className={cn(
                           'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
                           member.status === 'active'
-                            ? 'text-jade-600 bg-jade-500/15'
+                            ? 'text-fg-success bg-jade-500/15'
                             : 'bg-coral-500/15 text-fg-error',
                         )}
                       >
@@ -364,7 +364,7 @@ export default function AdminStaffPage(): React.JSX.Element {
                         {member.status === 'locked' && (
                           <button
                             onClick={() => handleUnlock(member.id)}
-                            className="text-topaz-600 hover:bg-topaz-50 inline-flex items-center gap-1 rounded px-2 py-1 text-xs"
+                            className="text-fg-warning hover:bg-surface-sunken inline-flex items-center gap-1 rounded px-2 py-1 text-xs"
                           >
                             <LockOpen size={12} /> ปลดล็อก
                           </button>
@@ -389,7 +389,7 @@ export default function AdminStaffPage(): React.JSX.Element {
                         ) : (
                           <button
                             onClick={() => handleActivate(member.id)}
-                            className="text-jade-600 inline-flex items-center gap-1 rounded px-2 py-1 text-xs hover:bg-jade-900/20"
+                            className="text-fg-success inline-flex items-center gap-1 rounded px-2 py-1 text-xs hover:bg-jade-900/20"
                           >
                             <UserCheck size={12} /> เปิดใช้งาน
                           </button>

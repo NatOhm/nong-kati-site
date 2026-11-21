@@ -580,7 +580,7 @@ export default function AdminInventoryPage(): React.JSX.Element {
                             'inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium',
                             item.isActive
                               ? 'border-jade-500/40 bg-jade-500/15 text-fg-success'
-                              : 'bg-sunken border-line-subtle text-fg-placeholder',
+                              : 'bg-surface-sunken border-line-subtle text-fg-placeholder',
                           )}
                         >
                           {item.isActive ? 'แสดงบนเว็บ' : 'ซ่อน'}
@@ -786,7 +786,7 @@ export default function AdminInventoryPage(): React.JSX.Element {
       {/* ── Edit modal ── */}
       {draft && (
         <div
-          className="bg-overlay fixed inset-0 z-50 flex items-center justify-center p-4"
+          className="bg-surface-overlay fixed inset-0 z-50 flex items-center justify-center p-4"
           onClick={() => !saving && setDraft(null)}
         >
           <div
@@ -801,7 +801,7 @@ export default function AdminInventoryPage(): React.JSX.Element {
                   value={draft.sku}
                   onChange={(e) => setDraft({ ...draft, sku: e.target.value.toUpperCase() })}
                   placeholder="เช่น NETFLIX_30_JO"
-                  className="bg-surface-raised w-full rounded-lg border border-line-subtle px-3 py-2 font-mono text-sm text-fg placeholder:text-fg-placeholder focus:border-line-brand"
+                  className="bg-surface-elevated w-full rounded-lg border border-line-subtle px-3 py-2 font-mono text-sm text-fg placeholder:text-fg-placeholder focus:border-line-brand"
                 />
                 <p className="mt-1 text-xs text-fg-placeholder">
                   รหัสสินค้า (ต้องไม่ซ้ำกับสินค้าอื่น)
@@ -814,7 +814,7 @@ export default function AdminInventoryPage(): React.JSX.Element {
                 <input
                   value={draft.name}
                   onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-                  className="bg-surface-raised w-full rounded-lg border border-line-subtle px-3 py-2 text-sm text-fg focus:border-line-brand"
+                  className="bg-surface-elevated w-full rounded-lg border border-line-subtle px-3 py-2 text-sm text-fg focus:border-line-brand"
                 />
               </div>
               <div className="grid grid-cols-3 gap-3">
@@ -832,7 +832,7 @@ export default function AdminInventoryPage(): React.JSX.Element {
                     title={
                       draft.variantCount > 1 ? 'แก้ราคาตัวเลือกย่อยในหน้า "สินค้า" แทน' : undefined
                     }
-                    className="bg-surface-raised w-full rounded-lg border border-line-subtle px-3 py-2 text-sm text-fg focus:border-line-brand disabled:opacity-50"
+                    className="bg-surface-elevated w-full rounded-lg border border-line-subtle px-3 py-2 text-sm text-fg focus:border-line-brand disabled:opacity-50"
                   />
                 </div>
                 <div>
@@ -845,7 +845,7 @@ export default function AdminInventoryPage(): React.JSX.Element {
                     step="0.01"
                     value={draft.cost}
                     onChange={(e) => setDraft({ ...draft, cost: e.target.value })}
-                    className="bg-surface-raised w-full rounded-lg border border-line-subtle px-3 py-2 text-sm text-fg focus:border-line-brand"
+                    className="bg-surface-elevated w-full rounded-lg border border-line-subtle px-3 py-2 text-sm text-fg focus:border-line-brand"
                   />
                 </div>
                 <div>
@@ -859,7 +859,7 @@ export default function AdminInventoryPage(): React.JSX.Element {
                     value={draft.stock}
                     onChange={(e) => setDraft({ ...draft, stock: e.target.value })}
                     disabled={draft.variantCount > 1}
-                    className="bg-surface-raised w-full rounded-lg border border-line-subtle px-3 py-2 text-sm text-fg focus:border-line-brand disabled:opacity-50"
+                    className="bg-surface-elevated w-full rounded-lg border border-line-subtle px-3 py-2 text-sm text-fg focus:border-line-brand disabled:opacity-50"
                   />
                 </div>
               </div>
@@ -876,7 +876,7 @@ export default function AdminInventoryPage(): React.JSX.Element {
                   value={draft.description}
                   onChange={(e) => setDraft({ ...draft, description: e.target.value })}
                   rows={3}
-                  className="bg-surface-raised w-full resize-none rounded-lg border border-line-subtle px-3 py-2 text-sm text-fg focus:border-line-brand"
+                  className="bg-surface-elevated w-full resize-none rounded-lg border border-line-subtle px-3 py-2 text-sm text-fg focus:border-line-brand"
                 />
               </div>
               <div>
@@ -887,7 +887,7 @@ export default function AdminInventoryPage(): React.JSX.Element {
                   value={draft.imageUrl}
                   onChange={(e) => setDraft({ ...draft, imageUrl: e.target.value })}
                   placeholder="/products/example.png"
-                  className="bg-surface-raised w-full rounded-lg border border-line-subtle px-3 py-2 text-sm text-fg placeholder:text-fg-placeholder focus:border-line-brand"
+                  className="bg-surface-elevated w-full rounded-lg border border-line-subtle px-3 py-2 text-sm text-fg placeholder:text-fg-placeholder focus:border-line-brand"
                 />
               </div>
             </div>

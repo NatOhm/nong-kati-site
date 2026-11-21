@@ -592,7 +592,7 @@ export default function CheckoutPage(): React.JSX.Element {
                   <p
                     className={cn(
                       'mt-1.5 text-xs',
-                      couponApplied ? 'text-jade-600' : 'text-fg-error',
+                      couponApplied ? 'text-fg-success' : 'text-fg-error',
                     )}
                   >
                     {couponMsg}

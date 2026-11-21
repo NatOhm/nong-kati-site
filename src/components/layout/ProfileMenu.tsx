@@ -206,7 +206,7 @@ export function ProfileMenu(): React.JSX.Element {
                   await fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'include' });
                   window.location.href = '/';
                 }}
-                className="hover:bg-error0/10 flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm text-fg-error transition-colors"
+                className="hover:bg-error flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm text-fg-error transition-colors"
               >
                 <LogOut size={15} /> ออกจากระบบ
               </button>

@@ -152,7 +152,7 @@ export default function MagicLinkPage(): React.JSX.Element {
 
             {consume === 'success' && (
               <>
-                <CheckCircle2 size={48} className="text-jade-600 mx-auto mb-4" />
+                <CheckCircle2 size={48} className="text-fg-success mx-auto mb-4" />
                 <h1 className="text-xl font-bold text-fg">เข้าสู่ระบบสำเร็จ!</h1>
                 <p className="mt-2 text-sm text-fg-secondary">กำลังพาไปหน้าบัญชีของคุณ...</p>
               </>
@@ -267,7 +267,7 @@ export default function MagicLinkPage(): React.JSX.Element {
             ) : (
               <>
                 <div className="mb-6 text-center">
-                  <CheckCircle2 size={48} className="text-jade-600 mx-auto mb-3" />
+                  <CheckCircle2 size={48} className="text-fg-success mx-auto mb-3" />
                   <h1 className="mb-2 text-2xl font-bold text-fg">ส่งลิงก์แล้ว!</h1>
                   <p className="text-sm text-fg-secondary">
                     เราได้ส่งลิงก์เข้าสู่ระบบไปที่{' '}

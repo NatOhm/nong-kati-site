@@ -51,7 +51,7 @@ export function CheckoutStepper({
                   isClickable && 'cursor-pointer',
                   !isClickable && 'cursor-not-allowed',
                   isCurrent && 'text-fg-brand',
-                  isCompleted && 'text-jade-600',
+                  isCompleted && 'text-fg-success',
                   isFuture && 'text-fg-placeholder',
                 )}
               >

@@ -99,7 +99,7 @@ const HISTORY_STATUS = withStatusColors({
   pending_payment: 'text-amber-600',
   payment_confirmed: 'text-sapphire-700',
   pending_manual_fulfilment: 'text-fg-brand',
-  completed: 'text-jade-600',
+  completed: 'text-fg-success',
   refunded: 'text-fg-error',
   failed: 'text-fg-error',
   expired: 'text-fg-muted',
@@ -375,7 +375,7 @@ export default function AdminCustomersPage(): React.JSX.Element {
                     <p
                       className={cn(
                         'font-medium',
-                        selectedCustomer.status === 'blocked' ? 'text-fg-error' : 'text-jade-600',
+                        selectedCustomer.status === 'blocked' ? 'text-fg-error' : 'text-fg-success',
                       )}
                     >
                       {selectedCustomer.status === 'blocked' ? 'บล็อค' : 'ใช้งาน'}
@@ -496,7 +496,7 @@ export default function AdminCustomersPage(): React.JSX.Element {
                               </span>
                             </div>
                             {order.slip && (
-                              <p className="mt-0.5 text-[11px] text-jade-600">
+                              <p className="mt-0.5 text-[11px] text-fg-success">
                                 สลิป ref {order.slip.ref}
                                 {order.slip.verifiedAt
                                   ? ` · ตรวจแล้ว ${new Date(order.slip.verifiedAt).toLocaleString('th-TH')}`
@@ -554,7 +554,7 @@ export default function AdminCustomersPage(): React.JSX.Element {
                     className={cn(
                       'inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm',
                       selectedCustomer.status === 'blocked'
-                        ? 'text-jade-600 border-jade-500/40 hover:bg-jade-900/20'
+                        ? 'text-fg-success border-jade-500/40 hover:bg-jade-900/20'
                         : 'hover:bg-error border-coral-300 text-fg-error',
                     )}
                   >
@@ -606,7 +606,7 @@ export default function AdminCustomersPage(): React.JSX.Element {
                           'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
                           customer.status === 'blocked'
                             ? 'bg-coral-500/15 text-fg-error'
-                            : 'text-jade-600 bg-jade-500/15',
+                            : 'text-fg-success bg-jade-500/15',
                         )}
                       >
                         {customer.status === 'blocked' ? 'บล็อค' : 'ใช้งาน'}
@@ -626,7 +626,7 @@ export default function AdminCustomersPage(): React.JSX.Element {
                     <td
                       className={cn(
                         'px-4 py-3 text-right font-medium',
-                        customer.walletBalanceThb > 0 ? 'text-jade-600' : 'text-fg-muted',
+                        customer.walletBalanceThb > 0 ? 'text-fg-success' : 'text-fg-muted',
                       )}
                     >
                       {formatThb(customer.walletBalanceThb)}

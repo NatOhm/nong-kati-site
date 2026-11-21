@@ -280,7 +280,7 @@ export default function CustomerSalesReportPage(): React.JSX.Element {
                         className={cn(
                           'rounded-full px-2.5 py-0.5 text-xs font-semibold',
                           r.tier === 'dealer'
-                            ? 'dark:text-jade-300 bg-jade-500/15 text-jade-700'
+                            ? 'bg-jade-500/15 text-jade-700'
                             : r.tier === 'member'
                               ? 'bg-peach-500/15 text-fg-brand'
                               : 'bg-surface-base text-fg-muted',

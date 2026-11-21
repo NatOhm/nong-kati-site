@@ -80,7 +80,7 @@ export default function DevSeedPage(): React.JSX.Element {
               พร้อมขายทั้งหมด {result.availableCodes} ชิ้น
               {result.codesAdded ? ` (เพิ่มใหม่ ${result.codesAdded})` : ' (มีอยู่แล้ว)'}
             </p>
-            <p className="text-jade-600 text-xs">{result.note}</p>
+            <p className="text-fg-success text-xs">{result.note}</p>
             <p className="text-xs text-fg-muted">
               ขั้นตอนต่อ: สมัคร/ล็อกอินเป็นลูกค้า → ซื้อสินค้านี้ด้วยเครดิต → เช็ค /account/codes
             </p>

@@ -114,7 +114,7 @@ export function CopyButton({ text }: { text: string }) {
       className="flex h-10 w-10 items-center justify-center rounded-lg border border-line text-fg-placeholder hover:bg-surface hover:text-fg"
       title="คัดลอก"
     >
-      {copied ? <CheckCircle2 size={14} className="text-jade-600" /> : <Copy size={14} />}
+      {copied ? <CheckCircle2 size={14} className="text-fg-success" /> : <Copy size={14} />}
     </button>
   );
 }

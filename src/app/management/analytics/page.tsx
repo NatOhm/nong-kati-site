@@ -122,7 +122,7 @@ export default function AdminAnalyticsPage(): React.JSX.Element {
               </div>
               <div className="rounded-md border border-line-subtle bg-surface p-4">
                 <div className="flex items-center gap-3">
-                  <div className="text-jade-600 flex h-10 w-10 items-center justify-center rounded-md bg-jade-500/15">
+                  <div className="text-fg-success flex h-10 w-10 items-center justify-center rounded-md bg-jade-500/15">
                     <DollarSign size={20} />
                   </div>
                   <div>
@@ -183,7 +183,7 @@ export default function AdminAnalyticsPage(): React.JSX.Element {
                   <div className="border-t border-line-subtle pt-3">
                     <div className="flex justify-between text-sm font-medium">
                       <span className="text-fg-secondary">รายได้สุทธิ</span>
-                      <span className="text-jade-600">{formatThb(data.revenue.netRevenue)}</span>
+                      <span className="text-fg-success">{formatThb(data.revenue.netRevenue)}</span>
                     </div>
                   </div>
                 </div>

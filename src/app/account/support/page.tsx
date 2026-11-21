@@ -95,7 +95,7 @@ export default function AccountSupportPage(): React.JSX.Element {
 
       {created && (
         <div className="rounded-md border border-jade-500/40 bg-jade-500/10 p-6 text-center">
-          <CheckCircle size={32} className="text-jade-600 mx-auto mb-3" />
+          <CheckCircle size={32} className="text-fg-success mx-auto mb-3" />
           <h3 className="mb-2 text-lg font-semibold text-fg">ส่งข้อความสำเร็จ</h3>
           <p className="text-sm text-fg-muted">
             หมายเลขตั๋วของคุณคือ{' '}
@@ -175,7 +175,7 @@ export default function AccountSupportPage(): React.JSX.Element {
                   <span
                     className={cn(
                       'rounded-full px-2 py-0.5 text-xs font-medium',
-                      t.status === 'answered' && 'text-jade-600 bg-jade-500/15',
+                      t.status === 'answered' && 'text-fg-success bg-jade-500/15',
                       t.status === 'open' && 'bg-peach-500/15 text-peach-600',
                       t.status === 'closed' && 'bg-neutral-500/15 text-fg-muted',
                     )}
@@ -185,7 +185,7 @@ export default function AccountSupportPage(): React.JSX.Element {
                 </div>
                 <p className="mt-1 text-sm font-medium text-fg">{t.subject}</p>
                 {t.adminReply && (
-                  <div className="bg-surface-subtle mt-2 rounded-md p-3 text-sm text-fg-muted">
+                  <div className="bg-surface-sunken mt-2 rounded-md p-3 text-sm text-fg-muted">
                     <span className="font-semibold text-fg">ทีมงานตอบกลับ:</span> {t.adminReply}
                   </div>
                 )}

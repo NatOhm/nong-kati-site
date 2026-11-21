@@ -150,7 +150,7 @@ export default function ForgotPasswordPage(): React.JSX.Element {
             <>
               <div className="mb-6 text-center">
                 <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-jade-500/15">
-                  <Send size={22} className="text-jade-600" />
+                  <Send size={22} className="text-fg-success" />
                 </div>
                 <h1 className="mb-2 text-2xl font-bold text-fg">ส่งลิงก์แล้ว!</h1>
                 <p className="text-sm text-fg-secondary">

@@ -120,7 +120,7 @@ export function ChangePassword(): React.JSX.Element {
           </div>
         )}
         {done && (
-          <div className="border-jade-300 bg-jade-50 flex items-center gap-2 rounded-lg border px-4 py-3 text-sm text-jade-700">
+          <div className="border-jade-500/40 bg-jade-500/10 flex items-center gap-2 rounded-lg border px-4 py-3 text-sm text-jade-700">
             <CheckCircle2 size={16} /> เปลี่ยนรหัสผ่านสำเร็จ — กำลังพาไปหน้าเข้าสู่ระบบ…
           </div>
         )}

@@ -47,7 +47,7 @@ export function AlsoWished({ items }: { items: WishRankedProduct[] }): React.JSX
               }))}
             />
             <span
-              className="text-crimson-600 absolute right-2 top-2 z-10 inline-flex items-center gap-1 rounded-full bg-surface px-2 py-0.5 text-xs font-semibold shadow-sm"
+              className="text-fg-error absolute right-2 top-2 z-10 inline-flex items-center gap-1 rounded-full bg-surface px-2 py-0.5 text-xs font-semibold shadow-sm"
               title={`${wishCount} คนบันทึกสินค้านี้ไว้ในรายการโปรด`}
             >
               <Heart size={11} className="fill-crimson-500 text-crimson-500" />

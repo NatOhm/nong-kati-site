@@ -31,12 +31,12 @@ const STATUS_LABELS: Record<
   completed: {
     label: 'เสร็จสิ้น',
     icon: <CheckCircle size={14} />,
-    color: 'text-jade-600 bg-jade-500/15',
+    color: 'text-fg-success bg-jade-500/15',
   },
   rejected: {
     label: 'ปฏิเสธ',
     icon: <XCircle size={14} />,
-    color: 'text-fg-error bg-error0/15',
+    color: 'text-fg-error bg-coral-500/15',
   },
 };
 
@@ -207,7 +207,7 @@ export default function AdminPdpaPage(): React.JSX.Element {
                         <div className="flex justify-end gap-2">
                           <button
                             onClick={() => handleUpdateStatus(req.id, 'completed')}
-                            className="text-jade-600 rounded bg-jade-500/15 px-2 py-1 text-xs hover:bg-jade-900/50"
+                            className="text-fg-success rounded bg-jade-500/15 px-2 py-1 text-xs hover:bg-jade-900/50"
                           >
                             เสร็จสิ้น
                           </button>

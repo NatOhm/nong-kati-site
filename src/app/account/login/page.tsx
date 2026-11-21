@@ -473,7 +473,7 @@ export default function LoginPage(): React.JSX.Element {
                   </>
                 )}
 
-                {otpMessage && <p className="text-jade-600 text-xs">{otpMessage}</p>}
+                {otpMessage && <p className="text-fg-success text-xs">{otpMessage}</p>}
                 {otpError && (
                   <div
                     role="alert"

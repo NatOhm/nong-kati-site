@@ -176,7 +176,7 @@ export default function WalletPage(): React.JSX.Element {
       value: formatThb(data?.balanceThb ?? 0),
     },
     {
-      icon: <TrendingUp size={18} className="text-jade-600" />,
+      icon: <TrendingUp size={18} className="text-fg-success" />,
       label: 'เติมเงินในเดือนนี้',
       value: formatThb(data?.topupThisMonthThb ?? 0),
     },

@@ -95,7 +95,7 @@ export default function AccountSettingsPage(): React.JSX.Element {
       </div>
 
       {saved && (
-        <div className="dark:text-jade-300 flex items-center gap-2 rounded-lg bg-jade-500/10 px-4 py-3 text-sm text-jade-700">
+        <div className="flex items-center gap-2 rounded-lg bg-jade-500/10 px-4 py-3 text-sm text-jade-700">
           <CheckCircle size={16} /> บันทึกสำเร็จ
         </div>
       )}

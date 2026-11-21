@@ -615,9 +615,6 @@ body {
 [data-theme='dark'] .text-coral-600 {
   color: var(--coral-200);
 }
-[data-theme='dark'] .text-jade-600 {
-  color: var(--jade-400);
-}
 [data-theme='dark'] .bg-jade-500\/15.text-jade-700,
 [data-theme='dark'] .bg-jade-500\/10.text-jade-700 {
   color: var(--jade-200);
