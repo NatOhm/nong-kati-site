@@ -258,23 +258,44 @@ jobs:
             --url https://nongkatistore.com \
             --webhook "$PRODUCTION_ALERT_WEBHOOK"
 
-      # Dead-man's switch. The job can be perfectly GREEN while the SCHEDULE
-      # is dead — cron disabled, repo inactive, Actions quota spent. Only an
-      # external watchdog notices "nothing has pinged in 20 minutes".
-      # healthchecks.io is the free tier that fits a cron job; it alerts when a
-      # ping is MISSED, which is the one failure mode GitHub cannot self-report.
-      - name: Ping healthchecks.io
+      # ─── The one step that reaches a person ───────────────
+      # A red run notifies nobody who is not already staring at the run page:
+      # GitHub's failure mail goes to whoever last edited the cron syntax, and
+      # it cannot report a schedule that stopped firing at all. healthchecks.io
+      # is the free external watchdog, but it has to be told the VERDICT, not
+      # merely "a run happened":
+      #   job green → ping the check, which keeps it up
+      #   job red   → ping <url>/fail, which makes healthchecks alert NOW
+      # This step used to ping unconditionally on `always()`, so a failed run
+      # reported a healthy check — the switch could only ever notice silence,
+      # and on 2026-11-21 eleven red runs out of twelve paged nobody.
+      # It covers all three monitored things (site health, housekeeping sweeps,
+      # sellable stock) in one channel, which matters precisely because none of
+      # them alert on its own when PRODUCTION_ALERT_WEBHOOK is unset.
+      - name: Report the verdict to healthchecks.io
         if: always()
         env:
           HEALTHCHECKS_PING_URL: ${{ secrets.HEALTHCHECKS_PING_URL }}
         run: |
           if [ -z "$HEALTHCHECKS_PING_URL" ]; then
-            echo "HEALTHCHECKS_PING_URL not set — skipping (optional)."
+            # Loud, not "optional": with no ping URL there is no path from a
+            # red monitor to a human at all, which is how the Nov 21 failures
+            # passed unseen. The annotation is the run page's own proof.
+            echo "::error title=no alert channel::HEALTHCHECKS_PING_URL is unset, so a red monitor pages nobody. Create a check at https://healthchecks.io (period 10 min, grace 20 min, email integration) and set this repo secret to its ping URL — see docs/production-health-monitoring.md §3."
             exit 0
           fi
-          # `|| true`: a dead watchdog endpoint must not fail the job that is
-          # already reporting the real outage.
-          curl -fsS --max-time 10 "$HEALTHCHECKS_PING_URL" || echo "ping failed (non-fatal)"
+          # Tolerate a trailing slash: /fail is appended literally, and //fail
+          # is not a route healthchecks answers.
+          url="${HEALTHCHECKS_PING_URL%/}"
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "job green — pinging the check as up"
+            curl -fsS --max-time 10 "$url" || echo "ping failed (non-fatal)"
+          else
+            echo "job ${{ job.status }} — reporting FAILURE so healthchecks alerts"
+            # `|| echo`: a dead watchdog endpoint must not fail the job that is
+            # already reporting the real outage.
+            curl -fsS --max-time 10 "$url/fail" || echo "fail-ping failed (non-fatal)"
+          fi
 
       - name: Upload uptime history
         if: always()

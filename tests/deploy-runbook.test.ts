@@ -17,11 +17,17 @@
  * D7 the pack step refuses a dirty or mismatched bundle before publishing
  * D8 the phase-3 runbook pastes that same line, and its value table repeats the
  *    three values the line is pinned to
+ * D9 the post-switch verifier's uptime rule follows the window the reads actually
+ *    had — a healthy Passenger respawn cannot demand a climb the window no longer
+ *    has room for (it did, live, on the first run against hG0R…)
  */
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
+
+// @ts-expect-error -- untyped .mjs helper (deploy tooling runs it under bare `node`)
+import { judgeClimb } from '../scripts/lib/stability.mjs';
 
 const read = (p: string): string => readFileSync(path.join(process.cwd(), p), 'utf8');
 const doc = read('docs/deploy-hostatom-manual.md');
@@ -138,5 +144,56 @@ describe('Hostatom deploy one-liner', () => {
     expect(script.indexOf('TAR_GIT_SHA='), 'D7: stamps checked after the push').toBeLessThan(
       script.indexOf('git push'),
     );
+  });
+});
+
+/**
+ * The verifier's uptime rule lives in scripts/lib/stability.mjs rather than in the
+ * CLI itself: it is arithmetic, and a test that spawned the real script would have
+ * to spend the actual 90 s window to prove anything.
+ */
+describe('Post-switch verifier — uptime rule (Phase 3)', () => {
+  const sample = (at: number, uptime: number): { at: number; uptime: number } => ({ at, uptime });
+  const window4 = { reads: 4, interval: 30 };
+
+  it('D9: a healthy respawn cannot be failed by a climb the window no longer has', () => {
+    // A respawn before read 1 leaves the whole window ahead of the new process, so the
+    // ordinary 90 s bar is reachable — this is the "respawn at the start" case.
+    const reapedBeforeRead1 = [sample(0, 0.4), sample(30, 30.4), sample(60, 60.4), sample(90, 90.4)];
+    expect(judgeClimb(reapedBeforeRead1, window4)).toMatchObject({
+      ok: true,
+      respawned: false,
+      maxUptime: 90.4,
+    });
+
+    // Live 2026-11-21 against hG0RHiUSkpldDxCrlAXQl: the run reaped at read 3/4, so
+    // only 30 s of window remained while the rule still asked for 2 x 30 = 60 s.
+    const reapedAtRead3 = [sample(0, 8.5), sample(30, 38.5), sample(60, 0.4), sample(90, 30.4)];
+    const late = judgeClimb(reapedAtRead3, window4);
+    expect(late).toMatchObject({ ok: true, respawned: true, availableSpan: 30 });
+    expect(late.bestSpan).toBeCloseTo(30, 5);
+
+    // One read earlier it was a knife-edge: 60 s of window against a 60 s bar, so a
+    // few hundred ms of request jitter decided pass or fail on a healthy app.
+    const reapedAtRead2 = [sample(0, 8.5), sample(30, 0.4), sample(60, 30.2), sample(90, 59.8)];
+    expect(judgeClimb(reapedAtRead2, window4)).toMatchObject({ ok: true, respawned: true });
+  });
+
+  it('D9b: the looser bar still refuses a process that stopped ticking', () => {
+    const stuckAfterReap = [sample(0, 50), sample(30, 1), sample(60, 1.1), sample(90, 1.2)];
+    expect(judgeClimb(stuckAfterReap, window4).ok).toBe(false);
+
+    // No respawn to blame: uptime never moved, so nothing explains the missing climb.
+    const neverMoved = [sample(0, 40), sample(30, 40.2), sample(60, 40.1), sample(90, 40.3)];
+    expect(judgeClimb(neverMoved, window4)).toMatchObject({ ok: false, respawned: false });
+  });
+
+  it('D9c: a clean window still has to show 90 s of uptime', () => {
+    const clean = [sample(0, 8.5), sample(30, 38.5), sample(60, 68.5), sample(90, 98.5)];
+    expect(judgeClimb(clean, window4)).toMatchObject({
+      ok: true,
+      respawned: false,
+      maxUptime: 98.5,
+    });
   });
 });

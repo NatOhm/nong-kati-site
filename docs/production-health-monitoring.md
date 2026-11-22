@@ -131,7 +131,7 @@ Optional extras, both opt-in via repo secrets:
 | Secret | Effect |
 |---|---|
 | `PRODUCTION_ALERT_WEBHOOK` | also POSTs `{"text": …}` to Slack / Discord / Line |
-| `HEALTHCHECKS_PING_URL` | pings [healthchecks.io](https://healthchecks.io) after every run |
+| `HEALTHCHECKS_PING_URL` | tells [healthchecks.io](https://healthchecks.io) the run's verdict: pings the check as **up** when the job is green, and `<url>/fail` when any step failed — the alerting path that works with no webhook |
 
 The healthchecks ping is the **dead-man's switch**: a green job says nothing about
 whether the *schedule* is alive. GitHub disables scheduled workflows after 60 days
@@ -171,9 +171,18 @@ Requires your accounts — an agent cannot create either one. About two minutes.
    Actions → *New repository secret*, name **`HEALTHCHECKS_PING_URL`**, paste the
    URL. The exact name matters; the workflow reads that key.
 6. **Confirm it works**: Actions → *Production Health Monitor* → *Run workflow*. The
-   ping step logs `ping failed (non-fatal)` if the URL is wrong, and the check's
-   status flips to green within a minute. If the job log says
-   `HEALTHCHECKS_PING_URL not set — skipping`, the secret name is wrong.
+   step logs `job green — pinging the check as up`, and the check flips green within a
+   minute; a wrong URL logs `ping failed (non-fatal)`. If the log says
+   `::error no alert channel`, the secret name is wrong (it is `HEALTHCHECKS_PING_URL`).
+
+**A red run alerts through this ping, not through a webhook.** The step reads the job's
+own verdict: green pings the check as up, and **any** failing step pings `<url>/fail`,
+which is what makes healthchecks send the notification immediately rather than waiting
+for the watchdog window. One configured check therefore covers site health, the
+housekeeping sweeps and the sellable-stock check, with `PRODUCTION_ALERT_WEBHOOK` unset.
+The ping used to be unconditional, so a failed run reported a healthy check and nothing
+could page anyone (2026-11-21: 11 red runs in 12). Prove delivery once with *Send test
+notification* on the check's email integration instead of waiting for a real outage.
 
 Verify by absence, not presence: once wired, the failure this protects against is a
 check going **quiet**, which looks identical to a healthy system from inside GitHub.

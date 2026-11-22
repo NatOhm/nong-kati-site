@@ -14,6 +14,9 @@
  * failure was a reset that came back WITH `database: "error"`, and a 503 whose uptime cycled every
  * 25–90 s. So this script does not fail on a low uptime. It fails on a sample that is not healthy,
  * and on a reset whose new process reports a bad database; a healthy respawn is reported, not failed.
+ * The climb bar follows the window the reads actually had: a reap at read 3/4 leaves 30 s, so the old
+ * fixed "2 x interval = 60 s" bar was arithmetically impossible on a healthy app (first live run
+ * against hG0RHiUSkpldDxCrlAXQl). `lib/stability.mjs` owns that arithmetic so a test can pin it.
  *
  * Read-only: three GETs plus four health reads. It changes nothing, deploys nothing, writes nothing.
  *
@@ -28,6 +31,8 @@
  * Exit: 0 the checklist passed · 1 a check failed (the verdict box names it) · 2 bad usage.
  */
 import process from 'node:process';
+
+import { judgeClimb } from './lib/stability.mjs';
 
 const arg = (name, fallback = '') => {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`));
@@ -224,38 +229,34 @@ async function checkStability() {
     }
   }
 
-  // The climb: a clean window must show the process passing 90 s. A respawn resets that clock,
-  // so after one the bar is that the new process kept ticking rather than looping.
+  // The climb: a clean window must show one process alive past 90 s. A respawn resets that
+  // clock, so the bar becomes the time the window actually had left. lib/stability.mjs owns the
+  // arithmetic (see its header for the first live run this rule went red on).
+  const climb = judgeClimb(samples, {
+    reads: READS,
+    interval: INTERVAL,
+    tolerance: TOLERANCE,
+  });
   const fresh = samples.filter((s) => Number.isFinite(s.uptime));
-  const maxUptime = fresh.length ? Math.max(...fresh.map((s) => s.uptime)) : NaN;
-  let bestSpan = 0;
-  let streakStart = 0;
-  for (let i = 1; i < samples.length; i += 1) {
-    const prev = samples[i - 1];
-    const cur = samples[i];
-    if (Number.isFinite(prev.uptime) && Number.isFinite(cur.uptime) && cur.uptime < prev.uptime - TOLERANCE) {
-      streakStart = i;
-    }
-    if (Number.isFinite(samples[i].uptime) && Number.isFinite(samples[streakStart].uptime)) {
-      bestSpan = Math.max(bestSpan, samples[i].uptime - samples[streakStart].uptime);
-    }
-  }
-  const respawned = warnings.some((w) => w.startsWith('healthy respawn'));
-  const requiredSpan = respawned
-    ? Math.min(2 * INTERVAL, (READS - 1) * INTERVAL)
-    : (READS - 1) * INTERVAL - TOLERANCE;
-
-  if (!Number.isFinite(maxUptime)) {
+  if (!Number.isFinite(climb.maxUptime)) {
     bad('no usable uptime in any read — a live process cannot be told from a looping one');
-  } else if (maxUptime >= 90 || bestSpan >= requiredSpan) {
-    ok(`uptime reached ${fmt(maxUptime)}, climbing span ${fmt(bestSpan)}${respawned ? ' after the respawn' : ''}`);
+  } else if (climb.ok) {
+    ok(
+      `uptime reached ${fmt(climb.maxUptime)}, climbing span ${fmt(climb.bestSpan)}` +
+        (climb.respawned ? ` of ${fmt(climb.availableSpan)} available after the respawn` : ''),
+    );
+  } else if (climb.respawned) {
+    bad(
+      `uptime climbed only ${fmt(climb.bestSpan)} of the ${fmt(climb.availableSpan)} left after ` +
+        'a respawn — a stuck or looping process',
+    );
   } else {
     bad(
       `uptime never climbed past 90s and no respawn explains it — ${fmt(fresh[0]?.uptime)} → ` +
         `${fmt(fresh[fresh.length - 1]?.uptime)} across ${READS} reads (a stuck or looping process)`,
     );
   }
-  return { maxUptime, bestSpan };
+  return { maxUptime: climb.maxUptime, bestSpan: climb.bestSpan };
 }
 
 // ── Verdict ──────────────────────────────────────────────────────────────
