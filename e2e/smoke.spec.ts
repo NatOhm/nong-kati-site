@@ -123,10 +123,18 @@ test.describe('prerendered routes under enforced CSP', () => {
       const html = await (await page.request.get(path)).text();
       const inlineOpenTags = html.match(/<script(?![^>]*\bsrc=)[^>]*>/g) ?? [];
       expect(inlineOpenTags.length, 'page must ship inline bootstrap scripts').toBeGreaterThan(0);
-      const nonceless = inlineOpenTags.filter((t) => !/\bnonce=/.test(t));
+      // `<script type="application/ld+json">` is a DATA BLOCK, not code: the
+      // browser never executes it, so script-src never checks its nonce (the
+      // console assertion below is the proof — it stays empty). It is also the
+      // one inline script a prerendered page cannot get a nonce for: Next
+      // rewrites its own bootstrap tags at request time, not an author's JSX.
+      // Exempt exactly that type and nothing else, so a nonce-less executable
+      // script still fails this gate (2026-11-22, the legal-page breadcrumb).
+      const dataBlocks = (t: string): boolean => /type="application\/ld\+json"/.test(t);
+      const nonceless = inlineOpenTags.filter((t) => !dataBlocks(t) && !/\bnonce=/.test(t));
       expect(
         nonceless,
-        'every inline script must carry the per-request nonce (prerender bake-in)',
+        'every executable inline script must carry the per-request nonce (prerender bake-in)',
       ).toEqual([]);
 
       expect(
