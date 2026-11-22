@@ -519,7 +519,7 @@ export default function AdminOrdersPage(): React.JSX.Element {
                     <td className="px-4 py-3 text-left text-xs">
                       {order.slip ? (
                         <span
-                          className="text-fg-success inline-flex max-w-[200px] items-center gap-1 dark:text-jade-400"
+                          className="text-fg-success inline-flex max-w-[200px] items-center gap-1"
                           title={`ตรวจสลิปอัตโนมัติ (${order.slip.by === 'slip2go:auto' ? 'Slip2Go' : order.slip.by === 'slipok:auto' ? 'SlipOK' : 'อัตโนมัติ'})${order.slip.verifiedAt ? ` เมื่อ ${new Date(order.slip.verifiedAt).toLocaleString('th-TH')}` : ''}`}
                         >
                           <ShieldCheck size={13} className="shrink-0" />
