@@ -197,6 +197,31 @@
 
 /* ── Claymorphism utilities ── */
 @layer components {
+  /* ── Polka texture (docs/design-system.md §2, spec nk-00 §7.1) ──
+     Sets ONLY background-image/size/position. Never background-color: the
+     contrast scanner follows the background-color chain, and a colour here
+     would silently override the coral/peach underlay it is painted on. The
+     underlay is always a `bg-*` utility on the same element.
+     Geometry is theme-invariant; only --texture-dot changes per theme. */
+  .polka {
+    background-image: radial-gradient(
+      var(--texture-dot) var(--texture-dot-size),
+      transparent calc(var(--texture-dot-size) + 0.5px)
+    );
+    background-size: var(--texture-dot-gap) var(--texture-dot-gap);
+    background-position: 0 0;
+  }
+
+  .polka-sm {
+    --texture-dot-size: 2px;
+    --texture-dot-gap: 12px;
+  }
+
+  .polka-lg {
+    --texture-dot-size: 4.5px;
+    --texture-dot-gap: 28px;
+  }
+
   .clay-card {
     background: var(--warm-white, #fafaf9);
     border-radius: 28px;

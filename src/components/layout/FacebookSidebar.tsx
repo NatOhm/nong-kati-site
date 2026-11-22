@@ -159,7 +159,7 @@ function SidebarContent({ onClose }: { onClose?: (() => void) | undefined }) {
     <div className="flex h-full flex-col">
       {/* Mobile close button */}
       {onClose && (
-        <div className="flex items-center justify-between border-b border-line-subtle px-4 py-3 lg:hidden">
+        <div className="flex items-center justify-between border-b border-line-subtle px-4 py-3">
           <div className="flex items-center gap-3">
             <span className="block rounded-full shadow-[2px_3px_8px_rgba(124,45,18,0.25)]">
               <HamsterFace size={40} />
@@ -374,7 +374,7 @@ export function FacebookSidebar({
               z-[60] keeps it above the sticky navbar (z-50). */}
           <div
             className={cn(
-              'fixed inset-0 z-[60] bg-clay-900/55 lg:hidden',
+              'fixed inset-0 z-[60] bg-clay-900/55',
               closing ? 'drawer-backdrop-out' : 'drawer-backdrop',
             )}
             onClick={close}
@@ -391,7 +391,7 @@ export function FacebookSidebar({
             onKeyDown={handleTab}
             onAnimationEnd={handleAnimationEnd}
             className={cn(
-              'drawer-scroll fixed left-0 top-0 z-[70] h-full w-[300px] overflow-y-auto rounded-r-[28px] bg-surface-base shadow-[6px_0_24px_rgba(78,56,32,0.35)] lg:hidden',
+              'drawer-scroll fixed left-0 top-0 z-[70] h-full w-[300px] overflow-y-auto rounded-r-[28px] bg-surface-base shadow-[6px_0_24px_rgba(78,56,32,0.35)]',
               closing ? 'drawer-panel-out' : 'drawer-panel',
             )}
           >
