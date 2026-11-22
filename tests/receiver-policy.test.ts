@@ -40,6 +40,21 @@ describe('checkReceiverMatch', () => {
     expect(checkReceiverMatch('199-1-73578-6', 'xxx-x-x3578-x')).toEqual({ ok: true });
   });
 
+  it('accepts a Bangkok Bank slip whose mask keeps the front and the tail (2026-11-22)', () => {
+    // The client's real slip: 735 THB paid to 199-1-73578-6, printed as
+    // 199-1-xxx786. Digits 1991786 are not contiguous inside 1991735786, so
+    // containment false-rejected it — the "เทสกรุงเทพไม่ได้" report.
+    expect(checkReceiverMatch('199-1-73578-6', '199-1-xxx786')).toEqual({ ok: true });
+  });
+
+  it('still rejects the sender account and other shops behind that same mask', () => {
+    // Sender's own account on the same slip.
+    expect(checkReceiverMatch('199-1-73578-6', '540-7-xxx640').ok).toBe(false);
+    // Same prefix, different tail — and a different prefix with the right tail.
+    expect(checkReceiverMatch('199-1-73578-6', '199-1-xxx999').ok).toBe(false);
+    expect(checkReceiverMatch('199-1-73578-6', '541-7-xxx786').ok).toBe(false);
+  });
+
   it('fails closed on a definite mismatch, reporting last-4 only', () => {
     const v = checkReceiverMatch('123-456-5786', 'xxx-x-x9999-x');
     expect(v).toEqual({ ok: false, detail: 'receiver …9999 vs store …5786' });
