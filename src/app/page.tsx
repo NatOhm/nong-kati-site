@@ -1,16 +1,14 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
+import { ArrowRight, Crown, ShoppingCart, Sparkles } from 'lucide-react';
 
 import { FacebookLayout } from '@/components/layout/FacebookLayout';
 import { Footer } from '@/components/layout/Footer';
-
-export const dynamic = 'force-dynamic';
 import { ProductCard } from '@/components/product/ProductCard';
-import { AppTile } from '@/components/product/AppTile';
+import { CategoryIcon } from '@/components/product/CategoryIcon';
 import { ProductGrid } from '@/components/product/ProductGrid';
 import { StructuredData } from '@/components/data-display/StructuredData';
 
-// New components
 import { HeroCarousel } from '@/components/home/HeroCarousel';
 import { StatsCounter } from '@/components/home/StatsCounter';
 import { TrustBadges } from '@/components/home/TrustBadges';
@@ -18,9 +16,10 @@ import { FAQAccordion } from '@/components/home/FAQAccordion';
 import { LINEChatButton } from '@/components/home/LINEChatButton';
 import { ScrollToTop } from '@/components/home/ScrollToTop';
 import { ScrollReveal } from '@/components/home/ScrollReveal';
-import { PawDivider } from '@/components/ui/PawDivider';
+import { MascotHalo } from '@/components/ui/MascotHalo';
+import { PolkaBackdrop } from '@/components/ui/PolkaBackdrop';
 import { SiteMascot } from '@/components/ui/SiteMascot';
-import { HamsterCelebrating, HamsterFace, HamsterWorried } from '@/components/ui/ClayIcons';
+import { HamsterCelebrating, HamsterFace, HamsterWorried, PawIcon } from '@/components/ui/ClayIcons';
 
 import {
   getCategoriesWithProductCounts,
@@ -32,8 +31,62 @@ import {
   getOgShareSettings,
 } from '@/lib/data';
 import { DEFAULT_TRUST_BADGES } from '@/lib/trustBadges';
-import { splitAppGroups } from '@/lib/appGroups';
+import { featureAppGroupId, filterEmptyAppGroups, splitAppGroups } from '@/lib/appGroups';
 import { publicOrigin } from '@/lib/siteConfig';
+import { cn } from '@/utils/cn';
+
+export const dynamic = 'force-dynamic';
+
+/**
+ * Floating brand chips around the hero mascot — the client mockup's four
+ * app marks, reduced to typographic badges (no third-party logo files are
+ * shipped). Decorative only: the wordmark beside the head already names the
+ * shop, so these are `aria-hidden` and never the only label of anything.
+ */
+const HERO_CHIPS = [
+  { label: 'N', bg: 'bg-clay-950', pos: '-left-1 top-3 -rotate-6' },
+  { label: '♫', bg: 'bg-jade-700', pos: '-right-2 top-8 rotate-6' },
+  { label: 'D+', bg: 'bg-sapphire-700', pos: '-left-2 bottom-12 rotate-3' },
+  { label: '▶', bg: 'bg-crimson-500', pos: '-right-1 bottom-8 -rotate-3' },
+];
+
+/** Warm tints the category bento cycles through, matching the mockup. */
+const BENTO_TINTS = [
+  'bg-peach-100 dark:bg-peach-900/30',
+  'bg-blush-50 dark:bg-coral-900/25',
+  'bg-oat dark:bg-clay-800',
+];
+
+/**
+ * Section heading with the mockup's crown + pill link. Local to the homepage
+ * (no other page shares this shape yet), so it stays a function here rather
+ * than a new component.
+ */
+function SectionHeading({
+  title,
+  href,
+  hrefLabel = 'ดูทั้งหมด',
+}: {
+  title: string;
+  href: string;
+  hrefLabel?: string;
+}): React.JSX.Element {
+  return (
+    <div className="mb-3 flex items-center justify-between gap-3">
+      <h2 className="flex min-w-0 items-center gap-1.5 text-lg font-bold text-fg">
+        <Crown size={18} className="shrink-0 text-amber-600" aria-hidden="true" />
+        <span className="min-w-0 break-words leading-snug">{title}</span>
+      </h2>
+      <Link
+        href={href}
+        className="-my-3 inline-flex min-h-[44px] shrink-0 items-center gap-1 rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-fg-brand-strong shadow-clay-xs transition-colors hover:border-peach-300 hover:shadow-clay-sm"
+      >
+        {hrefLabel}
+        <ArrowRight size={14} aria-hidden="true" />
+      </Link>
+    </div>
+  );
+}
 
 /**
  * og:title / og:description are admin-editable at /management/og-share
@@ -93,24 +146,20 @@ export default async function HomePage(): Promise<React.JSX.Element> {
   const faqSettings = settle(faqR, { enabled: true, items: [] }, 'faq settings');
   const trustBadges = settle(trustR, DEFAULT_TRUST_BADGES, 'trust badges');
 
-  // Main groups keep their sub-apps instead of being flattened away. The old
-  // flatMap dissolved every group into the grid, so staff could configure a
-  // main group (แอปดูหนัง/ซีรีส์) with children (weTV, Bilibili…) and customers
-  // would never see one — the grouping existed only in the database.
-  const { groups: appGroups, looseApps } = splitAppGroups(categories);
+  // Main groups keep their sub-apps instead of being flattened away (staff can
+  // configure แอปดูหนัง/ซีรีส์ with children), then the empties are dropped so
+  // the bento only ever shows categories a customer can actually buy in.
+  const { groups: appGroups, looseApps } = filterEmptyAppGroups(splitAppGroups(categories));
+
+  // The bento's wide tile: the group with the most products. Loose apps join
+  // the grid after the groups so a flat catalogue still renders.
+  const bentoTiles = [...appGroups, ...looseApps];
+  const featureId = featureAppGroupId(appGroups);
 
   // Hero v2: a price anchor is the one thing the old hero never said, and it
   // needs no extra query — the featured variants are already awaited above.
   const heroPrices = featuredProducts.flatMap((p) => p.variants.map((v) => v.effectivePrice));
   const heroPrice = heroPrices.length > 0 ? Math.min(...heroPrices) : null;
-
-  // Hero tiles: illustrated apps only — an emoji-only tile next to the
-  // headline reads as a bullet, not as merchandise. First group's children
-  // win (they are the shop's headline apps), loose apps fill in when the
-  // catalogue has no groups yet.
-  const heroApps = (appGroups.length > 0 ? appGroups.flatMap((g) => g.children) : looseApps)
-    .filter((c) => Boolean(c.imageUrl))
-    .slice(0, 3);
 
   return (
     <>
@@ -127,128 +176,150 @@ export default async function HomePage(): Promise<React.JSX.Element> {
         {/* Hero carousel — admin-managed promo banners (hidden until configured) */}
         {heroSlides.length > 0 && <HeroCarousel slides={heroSlides} />}
 
-        {/* Hero v2 — the notice board plus what is actually on sale.
-            The award-winning e-commerce heroes we benchmarked (Bucks Sauce,
-            Serotoninn — both SOTD 2026) put merchandise in the first screen;
-            ours sold the checkout flow and showed no product at all. So from
-            md up the section runs two columns: the announcement card on the
-            left, the three illustrated app tiles on the right.
-            The tiles stay out of the phone's first screen on purpose — mobile
-            keeps the audit #9 promise that the category grid enters the first
-            viewport, and gets the price anchor instead.
-            This band is the page's only tonal break: the whole page used to be
-            one `rgb(255,247,237)` from top to bottom. `bg-peach-100` is a real
-            background-color underlay (the contrast scanner follows
-            background-color only), the gradient paints over it. */}
-        <section className="bg-peach-100 bg-gradient-to-b from-peach-100 via-peach-50 to-surface px-3 pt-4 pb-6 md:px-8 md:pt-8 dark:bg-clay-900 dark:from-clay-900 dark:via-clay-900 dark:to-surface">
-          <div className="mx-auto grid max-w-5xl gap-4 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] md:items-center md:gap-6">
-            <div className="rounded-2xl border-2 border-dashed border-peach-300 bg-peach-50 px-4 py-3 text-center shadow-clay-sm sm:px-6 sm:py-5 md:text-left dark:border-peach-700/60 dark:bg-peach-900/20">
-              {/* Mascot — 56px on phones so the headline, the price and the CTA
-                  all sit inside the first screen. The `!` classes beat
-                  SiteMascot's inline width/height (it pins the size inline on
-                  purpose, see its comment); 84px returns from sm up.
-                  An admin-uploaded mascot replaces it here as well as the logo. */}
-              <SiteMascot
-                size={56}
-                className="mascot-wave mx-auto mb-1 block w-fit !h-14 !w-14 drop-shadow-[0_3px_5px_rgba(147,107,73,0.28)] sm:!h-[84px] sm:!w-[84px] md:mx-0"
-              />
-              {/* Site-wide h1 (landmark spec): the notice-board headline is the
-                  page's main heading — p→h1 keeps the identical clay styling. */}
-              <h1 className="font-display text-xl font-bold leading-snug text-fg-brand-strong sm:text-2xl">
-                แอคดูหนัง ซีรีส์ ส่งถึงอีเมลหลังยืนยันการชำระเงิน
+        {/* Hero — the mockup's cream-to-pink band with the polka texture, the
+            mascot in a dotted halo and the four app marks floating around it.
+            `bg-peach-100` is a real background-color underlay (the contrast
+            scanner follows background-color only); the gradient paints over it
+            and `.polka` adds the dots without owning a colour.
+            The mascot is a SIBLING of the copy, never its wrapper: a transformed
+            ancestor would become the containing block for fixed descendants. */}
+        <section className="relative overflow-hidden bg-peach-100 bg-gradient-to-b from-peach-200 via-peach-100 to-peach-50 px-4 pb-6 pt-5 md:px-8 md:pb-9 md:pt-8 dark:from-clay-900 dark:via-clay-900 dark:to-surface">
+          <PolkaBackdrop className="opacity-90" />
+          {/* Ambient light behind the mascot — static gradient, no animation */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -right-10 top-0 h-56 w-56 rounded-full bg-blush-200/50 blur-2xl md:h-80 md:w-80 dark:bg-peach-900/30"
+          />
+
+          <div className="relative mx-auto grid max-w-5xl grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] items-center gap-2 md:gap-8">
+            <div className="relative z-10 min-w-0 text-left">
+              <span className="inline-flex items-center gap-1 rounded-full bg-surface/85 px-2.5 py-1 text-[11px] font-semibold text-fg-brand-strong shadow-clay-xs">
+                <Sparkles size={12} aria-hidden="true" />
+                ร้านแอพพรีเมียม ของแท้ ราคาถูก
+              </span>
+
+              {/* Site-wide h1 (landmark spec). Two lines, capped at `sm` sizes:
+                  the first-viewport contract fails if the headline grows past
+                  two lines at 390px (spec C6). */}
+              <h1 className="mt-2 break-words font-display text-[1.75rem] font-bold leading-[1.12] text-fg sm:text-4xl md:text-5xl">
+                <span className="block">น้องกะทิ</span>
+                <span className="block text-fg-brand-strong">แอพพรีเมียม</span>
               </h1>
-              {/* clay-700 lands exactly 4.50 on the peach-50 card — use clay-800
-                  for headroom (7.11). Dark keeps the muted token. */}
-              <p className="mt-1.5 text-sm text-clay-800 dark:text-fg-muted">
-                โอนเงินแล้วอัปโหลดสลิป ทีมงานยืนยันและส่งโค้ดให้ทันที
+
+              <p className="mt-2 text-sm font-medium leading-snug text-fg-secondary sm:text-base">
+                จ่ายง่าย ได้โค้ด ดูหนัง ฟังเพลง
+                <br className="sm:hidden" /> และอีกมากมายในที่เดียว!
               </p>
-              {/* Price + delivery promise. Brand-strong (the h1's token, which
-                  already passes the dark scan) — a peach ramp colour here read
-                  1.5:1 against the dark band because the scanner resolves the
-                  base class, not `dark:text-*`. */}
+
               {heroPrice !== null && (
-                <p className="mt-2 text-sm font-semibold text-fg-brand-strong">
+                <p className="mt-1.5 text-xs font-semibold text-fg-brand-strong sm:text-sm">
                   เริ่ม ฿{heroPrice.toLocaleString('th-TH')} · ส่งโค้ดถึงอีเมลในไม่กี่นาที
                 </p>
               )}
+
               <Link
                 href="/search"
-                className="transition-smart mt-4 inline-flex min-h-[48px] w-full items-center justify-center rounded-full bg-peach-500 px-8 py-2.5 text-sm font-semibold text-white shadow-clay-brand hover:bg-peach-400 hover:shadow-clay-lg active:scale-95 active:shadow-clay-press sm:w-auto"
+                className="transition-smart mt-4 inline-flex min-h-[48px] items-center justify-center gap-2 rounded-full bg-peach-500 px-7 py-2.5 text-base font-bold text-white shadow-clay-brand hover:bg-peach-400 hover:shadow-clay-lg active:scale-95 active:shadow-clay-press"
               >
-                เลือกซื้อสินค้า
+                <ShoppingCart size={18} aria-hidden="true" />
+                ช้อปเลย
+                <ArrowRight size={18} aria-hidden="true" />
               </Link>
             </div>
 
-            {heroApps.length > 0 && (
-              <div className="hidden md:block">
-                <p className="mb-2 text-xs font-semibold text-clay-800 dark:text-fg-muted">
-                  แอปยอดนิยม
-                </p>
-                <div className="grid grid-cols-3 gap-3">
-                  {heroApps.map((cat) => (
-                    <AppTile
-                      key={cat.id}
-                      name={cat.name}
-                      slug={cat.slug}
-                      icon={cat.icon}
-                      imageUrl={cat.imageUrl}
-                      productSlug={cat.productSlug}
-                      productCount={cat.productCount}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* Mascot cluster — halo, crown and the floating app marks are all
+                decoration; the mascot itself is aria-hidden inside SiteMascot. */}
+            <div className="relative mx-auto flex w-full max-w-[150px] items-center justify-center sm:max-w-[210px] md:max-w-[260px]">
+              <MascotHalo className="inset-x-0 top-1/2 h-[92%] -translate-y-1/2 rounded-full bg-peach-200/70 dark:bg-peach-900/40" />
+              <Crown
+                size={22}
+                className="absolute -top-2 left-1/2 z-10 -translate-x-1/2 -rotate-6 text-amber-600"
+                aria-hidden="true"
+              />
+              <SiteMascot
+                size={150}
+                className="mascot-wave relative z-10 block w-fit !h-28 !w-28 drop-shadow-[0_6px_10px_rgba(147,107,73,0.26)] sm:!h-40 sm:!w-40 md:!h-52 md:!w-52"
+              />
+              {HERO_CHIPS.map((chip) => (
+                <span
+                  key={chip.label}
+                  aria-hidden="true"
+                  className={cn(
+                    'absolute z-20 flex h-9 w-9 items-center justify-center rounded-2xl text-sm font-black text-white shadow-clay sm:h-10 sm:w-10',
+                    chip.bg,
+                    chip.pos,
+                  )}
+                >
+                  {chip.label}
+                </span>
+              ))}
+            </div>
           </div>
         </section>
 
-        {/* How It Works — วิธีการซื้อ moved to the very top (client ask).
-            Audit #9: compact single-row cards on mobile (~100px total),
-            full three-column grid from sm up. */}
+        {/* Trust strip — directly under the hero, exactly as in the mockup */}
+        <TrustBadges settings={trustBadges} />
+
+        {/* How It Works — วิธีการซื้อ. Pill heading + three clay cards; the
+            mockup's arrow flow is decorative (aria-hidden) and only appears
+            once the cards sit side by side. */}
         <ScrollReveal>
-          <section className="px-4 py-4 md:px-8 md:py-8">
-            <h2 className="mb-3 text-center text-base font-bold text-fg sm:mb-6 sm:text-lg">
-              วิธีการซื้อ
-            </h2>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-4">
-              {[
-                {
-                  step: '01',
-                  title: 'เลือกสินค้า',
-                  desc: 'เลือกประเภทบัตรและราคาที่ต้องการ',
-                  // Sniffing around the shelves = browsing.
-                  art: <HamsterFace size={44} className="mascot-sniff" />,
-                },
-                {
-                  step: '02',
-                  title: 'ชำระเงิน',
-                  desc: 'โอนเงินแล้วส่งสลิปยืนยัน',
-                  // Anxious waiting while the slip is checked — on-brand, and it
-                  // sets up the payoff on step 03.
-                  art: <HamsterWorried size={44} className="mascot-beg" />,
-                },
-                {
-                  step: '03',
-                  title: 'รับโค้ด',
-                  desc: 'รับโค้ดหลังยืนยันการชำระเงิน',
-                  // Code delivered.
-                  art: <HamsterCelebrating size={44} className="mascot-celebrate" />,
-                },
-              ].map((item) => (
-                <div
-                  key={item.step}
-                  className="clay-card flex items-center gap-4 rounded-xl p-4 transition-transform duration-fast ease-out-quart hover:-translate-y-0.5"
-                >
-                  <span className="text-2xl font-bold text-peach-700 dark:text-peach-200">
-                    {item.step}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="text-sm font-semibold text-fg">{item.title}</h3>
-                    <p className="text-xs text-fg-muted">{item.desc}</p>
+          <section className="px-4 py-5 md:px-8 md:py-8">
+            <div className="mx-auto max-w-4xl">
+              <h2 className="mx-auto mb-4 flex w-fit items-center gap-1.5 rounded-full bg-peach-100 px-4 py-1.5 text-sm font-bold text-fg-brand-strong shadow-clay-xs dark:bg-peach-900/40 dark:text-peach-200">
+                <PawIcon size={16} aria-hidden="true" />
+                วิธีการซื้อ ง่ายๆ ใน 3 ขั้นตอน
+              </h2>
+              {/* `sm` is 480px in this project, and three cards there leave the
+                  text column ~20px wide (one character per line). Side-by-side
+                  starts at md (768px) instead. */}
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3 md:gap-4">
+                {[
+                  {
+                    step: '1',
+                    title: 'เลือกสินค้า',
+                    desc: 'เลือกประเภทบัตรและราคาที่ต้องการจากหน้าร้านของเรา',
+                    // Sniffing around the shelves = browsing.
+                    art: <HamsterFace size={52} className="mascot-sniff" />,
+                  },
+                  {
+                    step: '2',
+                    title: 'ชำระเงิน',
+                    desc: 'โอนเงินแล้วส่งสลิปยืนยัน',
+                    // Anxious waiting while the slip is checked — on-brand, and it
+                    // sets up the payoff on step 03.
+                    art: <HamsterWorried size={64} className="mascot-beg" />,
+                  },
+                  {
+                    step: '3',
+                    title: 'รับโค้ด',
+                    desc: 'รับโค้ดหลังยืนยันการชำระเงิน',
+                    // Code delivered.
+                    art: <HamsterCelebrating size={60} className="mascot-celebrate" />,
+                  },
+                ].map((item, i) => (
+                  <div
+                    key={item.step}
+                    className="relative flex items-center gap-3 rounded-2xl border border-line-subtle bg-surface p-4 text-left shadow-clay transition-transform duration-fast ease-out-quart hover:-translate-y-0.5"
+                  >
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-peach-500 text-sm font-bold text-white shadow-clay-sm">
+                      {item.step}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-sm font-bold text-fg">{item.title}</h3>
+                      <p className="text-xs leading-snug text-fg-muted">{item.desc}</p>
+                    </div>
+                    <span className="shrink-0">{item.art}</span>
+                    {i < 2 && (
+                      <ArrowRight
+                        size={18}
+                        aria-hidden="true"
+                        className="absolute -right-[15px] top-1/2 hidden -translate-y-1/2 text-fg-placeholder md:block"
+                      />
+                    )}
                   </div>
-                  <span className="shrink-0">{item.art}</span>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </section>
         </ScrollReveal>
@@ -259,7 +330,6 @@ export default async function HomePage(): Promise<React.JSX.Element> {
             only (no client handlers in this tree). */}
         {dbDown && (
           <section role="alert" className="px-4 pb-4 md:px-8">
-            {' '}
             <div className="border-error bg-error mx-auto flex max-w-2xl flex-col items-center gap-3 rounded-2xl border px-6 py-6 text-center">
               <p className="text-lg font-bold text-fg">โหลดสินค้าไม่สำเร็จ</p>
               <p className="text-base text-fg-muted">
@@ -284,158 +354,100 @@ export default async function HomePage(): Promise<React.JSX.Element> {
           </section>
         )}
 
-        {/* Categories Section */}
-
-        <PawDivider className="py-4" />
-
-        {/* App-tile grid — dark panel like the client mockup: artwork tiles
-            per app, จำนวน pill, single-product apps go straight to the
-            package page; multi-product apps open the category */}
-        <ScrollReveal>
-          <section className="px-4 py-6 md:px-8">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-fg">หมวดหมู่แอปทั้งหมด</h2>
-              <Link
-                href="/search"
-                className="-my-3 inline-flex min-h-[44px] items-center text-sm font-medium text-fg-brand-strong hover:text-fg-brand-strong"
-              >
-                ดูทั้งหมด
-              </Link>
-            </div>
-            {/* Panel follows the theme like the client's reference: warm cream
-                in light mode, the original dark clay panel in dark mode. */}
-            <div className="shadow-clay rounded-2xl bg-clay-100 p-4 dark:bg-clay-950">
-              {appGroups.map((group) => (
-                <section key={group.id} className="mb-6 last:mb-0">
-                  {/* Main group heading as a glossy full-width pill (client
-                      reference): warm gradient bar, folder + name + count chip
-                      inside, ดูทั้งหมด kept at the right. Theme-aware — cream /
-                      peach in light mode, caramel clay in dark mode, dark text
-                      on both so the contrast gate stays green.
-                      Underlay = bg-clay-300, a luminance stand-in for the
-      gradient's darkest stop (clay-300 ≈ peach-200); the gradient paints
-      over it, so users never see the flat color, but the contrast scanner
-      (background-color chain only) reads a conservative stand-in instead of
-      falling through to the dark panel. Deliberately NOT bg-peach-200: the
-      globals legibility patch `[data-theme='dark'] .bg-peach-200
-      .text-peach-800` would force the dark-mode link back to peach-800 and
-      drop it to 3.13 on the caramel pill. */}
-                  <div className="relative mb-3 flex items-center justify-between gap-3 overflow-hidden rounded-full bg-clay-300 bg-gradient-to-r from-peach-100 via-fawn-50 to-peach-200 px-4 py-2.5 shadow-clay-sm ring-1 ring-white/70 dark:bg-clay-500 dark:from-clay-500 dark:via-clay-400 dark:to-clay-500 dark:ring-clay-600/60">
-                    {/* Gloss band — the client reference pills are candy-glossy:
-                        a bright wash over the top half. Overlay only (no
-                        background-color), so the contrast scanner still reads
-                        the underlay beneath it. */}
-                    <span
-                      aria-hidden
-                      className="pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/55 to-transparent"
-                    />
-                    <h3 className="flex min-w-0 flex-1 items-center gap-2 text-sm font-bold text-clay-900">
-                      <span aria-hidden className="shrink-0 text-base">
-                        {group.icon || '📁'}
-                      </span>
-                      {/* Wraps instead of clipping: at 390px the count pill and
-                          "ดูทั้งหมด" leave ~97px, so "Chinese Miniseries" used to
-                          render as "Chinese Mi…". */}
-                      <span className="min-w-0 break-words leading-snug">{group.name}</span>
-                      <span className="shrink-0 rounded-full bg-clay-100/80 px-2 py-0.5 text-xs font-semibold text-clay-800 dark:bg-clay-100">
-                        {group.productCount ?? 0} รายการ
-                      </span>
-                    </h3>
-                    <Link
-                      href={`/category/${group.slug}`}
-                      className="-my-3.5 shrink-0 rounded-full px-2.5 py-3.5 text-xs font-semibold text-peach-800 transition-colors hover:bg-clay-100/70 hover:text-peach-900 dark:text-clay-950 dark:hover:bg-clay-950/10 dark:hover:text-clay-950"
-                    >
-                      ดูทั้งหมด →
-                    </Link>
-                  </div>
-                  {/* Two columns on phones: at 390px the old 3-up grid left
-                      ~111px tiles, where Thai app names and the จำนวน pill
-                      collided. */}
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
-                    {group.children.map((cat) => (
-                      <AppTile
-                        key={cat.id}
-                        name={cat.name}
-                        slug={cat.slug}
-                        icon={cat.icon}
-                        imageUrl={cat.imageUrl}
-                        productSlug={cat.productSlug}
-                        productCount={cat.productCount}
-                      />
-                    ))}
-                  </div>
-                </section>
-              ))}
-
-              {looseApps.length > 0 && (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
-                  {looseApps.map((cat) => (
-                    <AppTile
-                      key={cat.id}
-                      name={cat.name}
-                      slug={cat.slug}
-                      icon={cat.icon}
-                      imageUrl={cat.imageUrl}
-                      productSlug={cat.productSlug}
-                      productCount={cat.productCount}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          </section>
-        </ScrollReveal>
-
-        {/* Featured Products Section */}
-        {featuredProducts.length > 0 && (
+        {/* Categories bento — group tiles only, no zero-product rows. The
+            widest tile is the group with the most products (featureAppGroupId);
+            loose categories join the same grid so a flat catalogue still
+            renders. Each tile links to its category page. */}
+        {bentoTiles.length > 0 && (
           <ScrollReveal>
-            <section className="px-4 py-6 md:px-8">
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-bold text-fg">สินค้าแนะนำ</h2>
-                <Link
-                  href="/recommended"
-                  className="-my-3 inline-flex min-h-[44px] items-center text-sm font-medium text-fg-brand-strong hover:text-fg-brand-strong"
-                >
-                  ดูทั้งหมด →
-                </Link>
+            <section className="px-4 py-5 md:px-8 md:py-7">
+              <div className="mx-auto max-w-5xl">
+                <SectionHeading title="หมวดหมู่สินค้า" href="/search" />
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
+                  {bentoTiles.map((group, i) => {
+                    const featured = group.id === featureId;
+                    return (
+                      <Link
+                        key={group.id}
+                        href={`/category/${group.slug}`}
+                        className={cn(
+                          'group relative flex min-h-[104px] flex-col justify-center overflow-hidden rounded-3xl border border-line-subtle p-4 shadow-clay transition-transform duration-fast ease-out-quart',
+                          'hover:-translate-y-0.5 hover:shadow-clay-lg active:scale-[0.98] active:shadow-clay-press',
+                          BENTO_TINTS[i % BENTO_TINTS.length],
+                          featured && 'col-span-2 md:col-span-1',
+                        )}
+                      >
+                        <span className="relative z-10 flex items-center gap-2">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface/85 shadow-clay-xs">
+                            <CategoryIcon
+                              name={group.icon}
+                              size={20}
+                              className="text-fg-brand-strong"
+                            />
+                          </span>
+                          <span className="min-w-0 break-words text-sm font-bold leading-snug text-fg">
+                            {group.name}
+                          </span>
+                        </span>
+                        <span className="relative z-10 mt-1.5 pl-11 text-xs font-medium text-fg">
+                          มากกว่า {group.productCount ?? 0} รายการ
+                        </span>
+                        {group.imageUrl && (
+                          // eslint-disable-next-line @next/next/no-img-element -- admin-upload/data-URL source: served immutable via /api/v1/images
+                          <img
+                            src={group.imageUrl}
+                            alt=""
+                            aria-hidden="true"
+                            className="pointer-events-none absolute -bottom-4 -right-4 h-24 w-24 rounded-full object-cover opacity-85 shadow-clay-sm transition-transform duration-moderate ease-out-quart group-hover:scale-105"
+                            loading="lazy"
+                          />
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
               </div>
-              <ProductGrid>
-                {featuredProducts.map((product) => (
-                  <ProductCard
-                    key={product.id}
-                    id={product.id}
-                    name={product.name}
-                    slug={product.slug}
-                    shortDescription={product.shortDescription}
-                    imageUrl={product.imageUrl}
-                    categoryName={product.category.name}
-                    categorySlug={product.category.slug}
-                    price={product.variants[0]?.effectivePrice ?? 0}
-                    promotion={product.variants[0]?.promotion}
-                    stock={product.variants.reduce((sum, v) => sum + v.stock, 0)}
-                    variantId={product.variants[0]?.id}
-                    variantCount={product.variants.length}
-                    variants={product.variants.map((v) => ({
-                      id: v.id,
-                      label: v.label,
-                      price: v.effectivePrice,
-                      effectivePrice: v.effectivePrice,
-                      stock: v.stock,
-                      promotion: v.promotion,
-                    }))}
-                  />
-                ))}
-              </ProductGrid>
             </section>
           </ScrollReveal>
         )}
 
-        <PawDivider className="py-6" />
-
-        {/* Trust Badges */}
-        <ScrollReveal>
-          <TrustBadges settings={trustBadges} />
-        </ScrollReveal>
+        {/* Featured Products Section */}
+        {featuredProducts.length > 0 && (
+          <ScrollReveal>
+            <section className="px-4 py-5 md:px-8 md:py-7">
+              <div className="mx-auto max-w-5xl">
+                <SectionHeading title="สินค้าแนะนำ" href="/recommended" />
+                <ProductGrid>
+                  {featuredProducts.map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      id={product.id}
+                      name={product.name}
+                      slug={product.slug}
+                      shortDescription={product.shortDescription}
+                      imageUrl={product.imageUrl}
+                      categoryName={product.category.name}
+                      categorySlug={product.category.slug}
+                      price={product.variants[0]?.effectivePrice ?? 0}
+                      promotion={product.variants[0]?.promotion}
+                      stock={product.variants.reduce((sum, v) => sum + v.stock, 0)}
+                      variantId={product.variants[0]?.id}
+                      variantCount={product.variants.length}
+                      variants={product.variants.map((v) => ({
+                        id: v.id,
+                        label: v.label,
+                        price: v.effectivePrice,
+                        effectivePrice: v.effectivePrice,
+                        stock: v.stock,
+                        promotion: v.promotion,
+                      }))}
+                    />
+                  ))}
+                </ProductGrid>
+              </div>
+            </section>
+          </ScrollReveal>
+        )}
 
         {/* FAQ — admin-switchable: hidden entirely when the section is off */}
         {faqSettings.enabled && (

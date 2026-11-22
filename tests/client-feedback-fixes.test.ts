@@ -699,6 +699,44 @@ describe('storefront main-category groups', () => {
     expect(result.looseApps.map((c) => c.id)).toEqual(['a1', 'a2']);
   });
 
+  it('drops empty groups and empty loose apps instead of rendering dead tiles', async () => {
+    const { filterEmptyAppGroups, splitAppGroups } = await import('@/lib/appGroups');
+    const priced = (node: AppGroupNode, productCount: number): AppGroupNode => ({ ...node, productCount });
+    const roots = [
+      priced(group('sold-out', 'หมด', [priced(child('empty-app', 'ว่าง'), 0)]), 0),
+      priced(child('no-stock', 'ไม่มีสต๊อก'), 0),
+      priced(child('netflix', 'Netflix'), 3),
+    ];
+    const result = filterEmptyAppGroups(splitAppGroups(roots));
+    expect(result.groups).toHaveLength(0);
+    expect(result.looseApps.map((c) => c.id)).toEqual(['netflix']);
+  });
+
+  it('keeps a product-bearing group and prunes only its empty children', async () => {
+    const { filterEmptyAppGroups, splitAppGroups } = await import('@/lib/appGroups');
+    const priced = (node: AppGroupNode, productCount: number): AppGroupNode => ({ ...node, productCount });
+    const roots = [
+      priced(
+        group('movie', 'แอปดูหนัง/ซีรีส์', [priced(child('wetv', 'WeTV'), 4), priced(child('idle', 'ว่าง'), 0)]),
+        4,
+      ),
+    ];
+    const result = filterEmptyAppGroups(splitAppGroups(roots));
+    expect(result.groups.map((c) => c.id)).toEqual(['movie']);
+    expect(result.groups[0]?.children.map((c) => c.id)).toEqual(['wetv']);
+  });
+
+  it('features the group with the most products and stays stable on a tie', async () => {
+    const { featureAppGroupId } = await import('@/lib/appGroups');
+    const priced = (node: AppGroupNode, productCount: number): AppGroupNode => ({ ...node, productCount });
+    const tied = [priced(group('a', 'a', [child('a1', 'a1')]), 2), priced(group('b', 'b', [child('b1', 'b1')]), 2)];
+    expect(featureAppGroupId(tied)).toBe('a');
+    expect(featureAppGroupId([...tied, priced(group('big', 'big', [child('big1', 'big1')]), 9)])).toBe(
+      'big',
+    );
+    expect(featureAppGroupId([])).toBeNull();
+  });
+
   it('the homepage consumes the helper rather than re-flattening the tree', async () => {
     const { splitAppGroups } = await import('@/lib/appGroups');
     const roots = [group('g1', 'กลุ่ม 1', [child('c1', 'c1')]), child('a1', 'a1')];

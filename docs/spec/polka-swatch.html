@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nong Kati — polka texture swatch (derived)</title>
+<style>
+  :root {
+    --clay-100: #fdf8ee; --clay-300: #eadcc3; --clay-400: #d9c4a5;
+    --clay-700: #8c6d46; --clay-800: #6b4f2e; --clay-900: #4e3820; --clay-950: #3a2a18;
+    --peach-50: #fff7ed; --peach-100: #ffedd5; --peach-300: #fdba74; --peach-500: #f97316;
+    --coral-100: #fadcde; --blush: #fecdd3; --sunken: #2c1e12;
+    --surface: #fafaf9;
+
+    /* ── the proposed tokens ── */
+    --dot-light: rgba(253, 186, 116, 0.32); /* peach-300 @ 32% */
+    --dot-dark:  rgba(251, 146, 60, 0.08);  /* peach-400 @ 8%  */
+    --dot-gap: 12px;
+    --dot-size: 2px;                        /* RADIUS, not diameter → 4px dots, 12px pitch */
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 32px 24px 64px;
+    background: #f6f1e7; color: var(--clay-900);
+    font: 14px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 6px; letter-spacing: -0.01em; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em;
+       color: var(--clay-700); margin: 34px 0 10px; font-weight: 700; }
+  .lede { margin: 0 0 4px; color: var(--clay-800); max-width: 70ch; }
+  code { font-family: ui-monospace, "JetBrains Mono", monospace; font-size: 12.5px;
+         background: #ece4d6; padding: 1px 5px; border-radius: 4px; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+
+  /* the texture: image only, never a background-color — the underlay is the
+     bg-* class on the same element, exactly as the spec requires */
+  .polka {
+    background-image:
+      radial-gradient(circle, var(--dot) var(--dot-size),
+                      transparent calc(var(--dot-size) + 0.5px));
+    background-size: var(--dot-gap) var(--dot-gap);
+  }
+
+  .swatch {
+    position: relative; border-radius: 16px; min-height: 128px;
+    padding: 14px 16px; display: flex; flex-direction: column; justify-content: flex-end;
+    box-shadow: 0 3px 6px rgba(124, 45, 18, .10), inset 0 0 0 1px rgba(124, 45, 18, .10);
+    --dot: var(--dot-light);
+  }
+  .swatch span { font-size: 11.5px; letter-spacing: .01em; }
+  .swatch b { display: block; font-size: 12px; margin-bottom: 2px; }
+
+  .light  { background-color: var(--peach-50);  color: var(--clay-700); }
+  .light-card { background-color: var(--peach-100); color: var(--clay-700); }
+  .light-surface { background-color: var(--surface); color: var(--clay-700); }
+  .light-promo { background-color: var(--coral-100); color: var(--clay-900); }
+  .light-promo::after {
+    content: ""; position: absolute; inset: 0; border-radius: 16px;
+    background: linear-gradient(100deg, rgba(254, 205, 211, .55), transparent 70%);
+    pointer-events: none;
+  }
+  .dark  { background-color: var(--clay-950); color: var(--clay-300); --dot: var(--dot-dark); }
+  .dark-card { background-color: var(--clay-900); color: var(--clay-300); --dot: var(--dot-dark); }
+  .dark-sunken { background-color: var(--sunken); color: var(--clay-400); --dot: var(--dot-dark); }
+  .dark-promo { background-color: var(--clay-950); color: var(--clay-100); --dot: var(--dot-dark); }
+  .dark-promo::after {
+    content: ""; position: absolute; inset: 0; border-radius: 16px;
+    background: linear-gradient(100deg, rgba(78, 56, 32, .65), transparent 70%);
+    pointer-events: none;
+  }
+  .swatch > * { position: relative; z-index: 1; }
+
+  /* geometry at 8× so the dot edge and pitch are actually inspectable */
+  .specimen { --dot-gap: 96px; --dot-size: 16px; }
+  .specimen .polka-inner {
+    background-image:
+      radial-gradient(circle, var(--dot) var(--dot-size), transparent calc(var(--dot-size) + 4px));
+    background-size: var(--dot-gap) var(--dot-gap);
+  }
+  .zoom { min-height: 190px; }
+
+  /* the real risk: does it still read at halo size? */
+  .halos { display: flex; align-items: flex-end; gap: 22px; flex-wrap: wrap; }
+  .halo {
+    border-radius: 9999px; display: grid; place-items: center;
+    box-shadow: inset 0 0 0 1px rgba(124, 45, 18, .12);
+    flex: none;
+  }
+  .halo small { font-size: 10.5px; letter-spacing: .04em; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 12.5px; background: #fffdf8;
+          border-radius: 10px; overflow: hidden; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid #eadcc3; }
+  th { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--clay-700); }
+  tr:last-child td { border-bottom: 0; }
+  td.num { font-variant-numeric: tabular-nums; }
+
+  .note { margin-top: 26px; padding: 14px 16px; background: #fffdf8; border-radius: 12px;
+          border: 1px solid #eadcc3; max-width: 78ch; }
+  .note h3 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase;
+             letter-spacing: .07em; color: var(--clay-700); }
+  .note ul { margin: 6px 0 0; padding-left: 18px; }
+  .note li { margin: 3px 0; }
+  .bad { color: #b8404b; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Polka texture — derived swatch, no logo source needed</h1>
+  <p class="lede">
+    Same geometry in both themes, only the colour changes. Dots are <code>4px</code> across on a
+    <code>12px</code> pitch (≈8.7% coverage). Each panel is the texture laid over the real underlay
+    colour, with the composite hex and its contrast against that underlay printed underneath.
+  </p>
+
+  <h2>Light — <code>.polka-sm</code> · peach-300 @ 32%</h2>
+  <div class="grid">
+    <div class="swatch polka light">
+      <span><b>Page base</b>peach-50 · dot #fee3c6 · 1.16:1</span>
+    </div>
+    <div class="swatch polka light-card">
+      <span><b>Hero card</b>peach-100 · dot #fedcb6 · 1.13:1</span>
+    </div>
+    <div class="swatch polka light-surface">
+      <span><b>Surface / FAQ</b>#fafaf9 · dot #fbd1ce · 1.15:1</span>
+    </div>
+    <div class="swatch polka light-promo">
+      <span><b>Promo band</b>coral-100 · dot #fbd1bc · 1.09:1</span>
+    </div>
+  </div>
+
+  <h2>Dark — <code>.polka-sm</code> · peach-400 @ 8%</h2>
+  <div class="grid">
+    <div class="swatch polka dark">
+      <span><b>Page base</b>clay-950 · dot #49321b · 1.16:1</span>
+    </div>
+    <div class="swatch polka dark-card">
+      <span><b>Hero card</b>clay-900 · dot #5c3f22 · 1.14:1</span>
+    </div>
+    <div class="swatch polka dark-sunken">
+      <span><b>Sunken / footer</b>#2c1e12 · dot #3d2715 · 1.16:1</span>
+    </div>
+    <div class="swatch polka dark-promo">
+      <span><b>Promo band</b>clay-950 + clay-900 wash · 1.16:1</span>
+    </div>
+  </div>
+
+  <h2>Geometry at 8× — 12px pitch vs 28px pitch</h2>
+  <div class="grid">
+    <div class="swatch zoom light specimen">
+      <div class="polka-inner" style="position:absolute;inset:0;border-radius:16px"></div>
+      <span style="position:relative;z-index:1">
+        <b><code>.polka-sm</code> at 8×</b>2px radius / 12px gap → 4px dots, 8.7% coverage
+      </span>
+    </div>
+    <div class="swatch zoom light specimen" style="--dot-gap:112px;--dot-size:18px">
+      <div class="polka-inner" style="position:absolute;inset:0;border-radius:16px;background-size:112px 112px;background-image:radial-gradient(circle,rgba(253,186,116,.32) 18px,transparent 22px)"></div>
+      <span style="position:relative;z-index:1">
+        <b><code>.polka-lg</code> at 4×</b>4.5px radius / 28px gap → 9px dots, 8.1% coverage
+      </span>
+    </div>
+  </div>
+
+  <h2>The real risk — does it survive at halo size?</h2>
+  <div class="halos">
+    <div class="halo polka light" style="width:96px;height:96px"><small>96</small></div>
+    <div class="halo polka light" style="width:160px;height:160px"><small>160</small></div>
+    <div class="halo polka dark" style="width:200px;height:200px"><small>200</small></div>
+    <div class="halo polka dark" style="width:240px;height:240px"><small>240</small></div>
+    <div style="max-width:34ch;font-size:12.5px;color:var(--clay-800)">
+      At 96px (the mobile halo) only ~64 dots fit. If this reads as noise rather than
+      texture, the fix is the <em>gap</em> for that one call site — <code>.polka-xs</code> at
+      8px — not a heavier colour, which would overpower the hero.
+    </div>
+  </div>
+
+  <h2>The values, in tokens</h2>
+  <table>
+    <thead>
+      <tr><th>Token</th><th>Light</th><th>Dark</th><th>Note</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>--texture-dot</code></td>
+        <td><code>rgba(253,186,116,.32)</code></td>
+        <td><code>rgba(251,146,60,.08)</code></td>
+        <td>peach-300 / peach-400 — no new hue</td>
+      </tr>
+      <tr>
+        <td><code>--texture-dot-size</code></td>
+        <td class="num">2px</td><td class="num">2px</td>
+        <td><strong>radius</strong>, not diameter → 4px dots</td>
+      </tr>
+      <tr>
+        <td><code>--texture-dot-gap</code></td>
+        <td class="num">12px</td><td class="num">12px</td>
+        <td>28px for <code>.polka-lg</code>, 4.5px radius</td>
+      </tr>
+      <tr>
+        <td>composite / underlay</td>
+        <td class="num">1.09–1.16:1</td><td class="num">1.14–1.16:1</td>
+        <td>target band 1.14–1.20, measured not eyeballed</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    <h3>What was rejected</h3>
+    <ul>
+      <li><span class="bad">peach-300 @ 22%</span> — the earlier placeholder: 1.10:1 on cream, which
+        reads as printer grain, not polka. The gap between “too faint to see” and “dirty” is about
+        10 points of alpha, so the value has to be measured.</li>
+      <li>A dot <em>image</em> or SVG asset — nothing to cache-bust, nothing to load, zero height.</li>
+      <li>Any hue outside the clay/peach ramps, and any <code>background-color</code> on
+        <code>.polka</code> itself: it would override the promo band's coral underlay and the
+        contrast scanner follows the <code>background-color</code> chain.</li>
+    </ul>
+  </div>
+
+  <div class="note">
+    <h3>If the logo file arrives later</h3>
+    <ul>
+      <li>Only <code>--texture-dot</code> changes (both themes), plus <code>--texture-dot-size</code>
+        / <code>--texture-dot-gap</code> if the logo's pitch differs. Re-derive the alpha so the
+        composite stays in the 1.14–1.20 band on that theme's base.</li>
+      <li><code>.polka</code>, <code>.polka-sm</code>, <code>.polka-lg</code>,
+        <code>PolkaBackdrop</code>, <code>MascotHalo</code> and every call site stay untouched —
+        one commit, <code>tokens.css</code> + <code>design-system.md</code> together.</li>
+      <li>Irregular or non-circular dots: either accept the radial-gradient approximation or add the
+        single <code>polka-mask.svg</code> the spec already allows.</li>
+      <li>No screenshot, gate or first-viewport number changes: the texture adds zero height.</li>
+    </ul>
+  </div>
+
+</div>
+</body>
+</html>

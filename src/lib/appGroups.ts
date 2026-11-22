@@ -47,3 +47,35 @@ export function splitAppGroups(categories: readonly AppGroupNode[]): AppGroupSpl
   }
   return { groups, looseApps };
 }
+
+/** A category is shoppable only when at least one active product sits in it. */
+export function hasProducts(node: AppGroupNode): boolean {
+  return (node.productCount ?? 0) > 0;
+}
+
+/**
+ * Hide the empties instead of rendering a tile that leads to "no products".
+ * A group keeps only its product-bearing children and disappears entirely
+ * when none are left, so an unconfigured catalogue no longer shows eight
+ * identical empty rows. Ordering follows the caller's sortOrder.
+ */
+export function filterEmptyAppGroups(split: AppGroupSplit): AppGroupSplit {
+  const groups = split.groups
+    .map((group) => ({ ...group, children: group.children.filter(hasProducts) }))
+    .filter((group) => group.children.length > 0 && hasProducts(group));
+  return { groups, looseApps: split.looseApps.filter(hasProducts) };
+}
+
+/**
+ * The bento's wide tile: the group with the most products. First one wins a
+ * tie, so the layout is stable between requests (the list is already sorted
+ * by sortOrder). Returns null for an empty catalogue.
+ */
+export function featureAppGroupId(groups: readonly AppGroupNode[]): string | null {
+  let best: AppGroupNode | null = null;
+  for (const group of groups) {
+    if (!hasProducts(group)) continue;
+    if (best === null || (group.productCount ?? 0) > (best.productCount ?? 0)) best = group;
+  }
+  return best?.id ?? null;
+}
