@@ -5,6 +5,8 @@
 
 import type { Metadata } from 'next';
 
+import { Breadcrumb } from '@/components/data-display/Breadcrumb';
+
 export const metadata: Metadata = {
   title: 'นโยบายความเป็นส่วนตัว',
   alternates: { canonical: '/legal/privacy-policy' },
@@ -13,7 +15,11 @@ export const metadata: Metadata = {
 
 export default function PrivacyPolicyPage(): React.JSX.Element {
   return (
-    <div className="mx-auto max-w-3xl px-4 py-12">
+    <div className="mx-auto max-w-3xl px-4 pb-12">
+      <Breadcrumb
+        className="py-4"
+        items={[{ label: 'หน้าแรก', href: '/' }, { label: 'นโยบายความเป็นส่วนตัว' }]}
+      />
       <h1 className="mb-6 text-2xl font-bold text-fg">นโยบายความเป็นส่วนตัว</h1>
       <p className="mb-4 text-xs text-fg-muted">อัปเดตล่าสุด: 24 สิงหาคม 2569</p>
 

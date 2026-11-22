@@ -4,6 +4,7 @@
  */
 
 import type { Metadata } from 'next';
+import { Breadcrumb } from '@/components/data-display/Breadcrumb';
 import { getStoreInfo } from '@/lib/data';
 
 export const metadata: Metadata = {
@@ -15,7 +16,11 @@ export const metadata: Metadata = {
 export default async function RefundPolicyPage(): Promise<React.JSX.Element> {
   const store = await getStoreInfo();
   return (
-    <div className="mx-auto max-w-3xl px-4 py-12">
+    <div className="mx-auto max-w-3xl px-4 pb-12">
+      <Breadcrumb
+        className="py-4"
+        items={[{ label: 'หน้าแรก', href: '/' }, { label: 'นโยบายการคืนเงิน' }]}
+      />
       <h1 className="mb-6 text-2xl font-bold text-fg">นโยบายการคืนเงิน</h1>
       <p className="mb-4 text-xs text-fg-muted">อัปเดตล่าสุด: 24 สิงหาคม 2569</p>
 

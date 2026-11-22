@@ -185,7 +185,7 @@ export default function AccountSupportPage(): React.JSX.Element {
                 </div>
                 <p className="mt-1 text-sm font-medium text-fg">{t.subject}</p>
                 {t.adminReply && (
-                  <div className="bg-surface-sunken mt-2 rounded-md p-3 text-sm text-fg-muted">
+                  <div className="bg-surface-sunken mt-2 rounded-md p-3 text-sm text-fg">
                     <span className="font-semibold text-fg">ทีมงานตอบกลับ:</span> {t.adminReply}
                   </div>
                 )}

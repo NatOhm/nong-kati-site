@@ -184,7 +184,7 @@ export default function AdminPdpaPage(): React.JSX.Element {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center text-xs text-fg-placeholder">
-                      {req.createdAt.toLocaleDateString('th-TH')}
+                      {new Date(req.createdAt).toLocaleDateString('th-TH')}
                     </td>
                     <td className="px-4 py-3 text-right">
                       {req.status === 'pending' && (

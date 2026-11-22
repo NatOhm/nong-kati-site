@@ -4,6 +4,7 @@
  */
 
 import type { Metadata } from 'next';
+import { Breadcrumb } from '@/components/data-display/Breadcrumb';
 import { DataRequestForm } from '@/components/pdpa/DataRequestForm';
 
 export const metadata: Metadata = {
@@ -14,7 +15,11 @@ export const metadata: Metadata = {
 
 export default function DataRequestPage(): React.JSX.Element {
   return (
-    <div className="mx-auto max-w-2xl px-4 py-12">
+    <div className="mx-auto max-w-2xl px-4 pb-12">
+      <Breadcrumb
+        className="py-4"
+        items={[{ label: 'หน้าแรก', href: '/' }, { label: 'ขอจัดการข้อมูลส่วนบุคคล' }]}
+      />
       <h1 className="mb-2 text-2xl font-bold text-fg">ขอจัดการข้อมูลส่วนบุคคล</h1>
       <p className="mb-6 text-sm text-fg-placeholder">
         ภายใต้ พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562 คุณมีสิทธิ์ขอจัดการข้อมูลส่วนบุคคลของคุณ
