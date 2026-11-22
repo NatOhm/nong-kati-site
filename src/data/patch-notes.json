@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.2.3",
+    "date": "2026-11-22",
+    "dateLabel": "Nov 22, 2026",
+    "gitSha": "c24db74",
+    "buildId": "ohsTY9SJ1GyvV3ZuZktga",
+    "title": "1.2.3 (#551) — the policy pages get a breadcrumb, and a red monitor finally reaches a person.",
+    "detail": "1.2.3 (#551) — the policy pages get a breadcrumb, and a red monitor finally reaches a person. 3 commits from a353e5c: published as the deploy-artifact orphan ebf45eae1875a6dcbf02f3efad69d32ea5ea814c by scripts/deploy-artifact.sh (14 MB bundle, both stamps self-verified before publish) and switched by Plesk → Scheduled Tasks → Run Now. Task 250 was re-pinned first — its stored command now curls that artifact commit (not the branch) and compares both stamps with grep -Fxq against ohsTY9SJ1GyvV3ZuZktga + c24db746dd797c50c079074a0c104e558ea98784 before anything is moved (650 bytes, sha256 7ef6adc…1f06 verified after saving). Customer-facing: /legal/privacy-policy, /legal/terms-of-service, /legal/refund-policy, /legal/cookie-policy and /legal/data-request open with the shared Breadcrumb (Thai labels, py-4) over a pb-12 wrapper, so a reader arriving from search has a way back; an admin reply in account support prints in text-fg instead of text-fg-muted on its sunken surface, and the PDPA request table re-casts createdAt (serialized to a string by the API) before toLocaleDateString. Ops: prod-health-monitor.yml now reports the job verdict to healthchecks.io — green pings the check up, any failing step pings <url>/fail — so a red run pages instead of recording a healthy check (2026-11-21: 11 red runs in 12 notified nobody), and an unset HEALTHCHECKS_PING_URL is a loud ::error. scripts/postswitch-verify.mjs moves its climb arithmetic into scripts/lib/stability.mjs, where the bar follows the span the window actually had instead of a fixed 60 s that a late Passenger reap made impossible. Gates: tests/deploy-runbook.test.ts D9/D9b/D9c pin that arithmetic; locally 132 files / 1224 tests, tsc and eslint clean. CI: run 44972743000 green, 44972742954 red — Browser Smoke caught /legal/privacy-policy shipping the Breadcrumb JSON-LD without a nonce; JSON-LD is a data block CSP never executes (the run's console-error assertion stayed empty), so fa01f3b exempts exactly that type and keeps every nonce-less executable script failing. Live proof: /api/v1/version → ohsTY9SJ1GyvV3ZuZktga · 1.2.3 · #551 · c24db746dd797c50c079074a0c104e558ea98784, /api/v1/health healthy with checks.database: ok and uptime 9.6 s, /api/v1/products 200, homepage 0 turbopack, /legal/privacy-policy 200. Certification: the 22-check database half is again not run — POSTSWITCH_TARGET_DATABASE_URL unset and no SSH route from this workstation. Rollback stays httpdocs/.next.old; extract-check.txt deleted (task 237 Run Now with a temporary field, proven gone by ls, stored command unchanged)."
+  },
+  {
     "version": "1.2.2",
     "date": "2026-11-21",
     "dateLabel": "Nov 21, 2026",

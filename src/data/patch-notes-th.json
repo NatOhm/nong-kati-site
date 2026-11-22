@@ -1,4 +1,25 @@
 {
+  "ohsTY9SJ1GyvV3ZuZktga": {
+    "title": "บิลด์ #551 ขึ้น production: หน้าเงื่อนไข/นโยบายมี breadcrumb ให้กดกลับ และตัวเฝ้าระวังที่แดงแล้วมีคนรู้จริง",
+    "summary": "อัปเดต ohsTY9SJ1GyvV3ZuZktga (commit c24db74, 1.2.3 บิลด์ #551) ขึ้น production เมื่อ 22 พ.ย. 2569 จาก 3 commit ตั้งแต่ a353e5c: breadcrumb ให้หน้า legal ทั้งห้ากับหน้าขอจัดการข้อมูลส่วนบุคคล การอ่านง่ายขึ้นสองจุด และงาน ops ที่ทำให้ healthchecks ได้คำตัดสินของรอบรันจริงกับตัวตรวจหลังสลับบิลด์ไม่ตัดสินแดงใส่ healthy ที่ Passenger respawn",
+    "problem": "หน้าเงื่อนไข/นโยบายทั้ง 5 หน้าและหน้าขอจัดการข้อมูลส่วนบุคคลเปิดมาด้วยหัวข้อเดี่ยว ผู้อ่านที่เข้ามาจากผลค้นหาไม่มีทางกลับและไม่รู้ว่าอยู่ส่วนไหนของเว็บ ขณะที่ฝั่ง ops มีสองจุดที่โกหก: healthchecks ถูก ping ทุกครั้งโดยไม่สนผลของรอบรัน รอบที่แดงจึงรายงานว่า healthy (21 พ.ย. มี 11 รอบแดงจาก 12 รอบที่ไม่มีใครรู้) และตัวตรวจหลังสลับบิลด์บังคับให้ uptime ไต่ 60 วินาทีหลัง respawn ทั้งที่หน้าต่างเหลือ 30 วินาที ทำให้ release ที่ปกติดีถูกตัดสินแดง",
+    "change": [
+      "เพิ่ม Breadcrumb (py-4, ป้ายภาษาไทย) ให้หน้า privacy-policy, terms-of-service, refund-policy, cookie-policy และ data-request พร้อมเปลี่ยน py-12 เป็น pb-12 ให้ breadcrumb เป็นเจ้าของระยะหัวหน้า",
+      "ข้อความตอบกลับของแอดมินในหน้า support เปลี่ยนจาก text-fg-muted เป็น text-fg เพื่อให้อ่านได้บนพื้น sunken ที่ใช้อยู่",
+      "ตารางคำขอ PDPA แปลง createdAt ด้วย new Date ก่อนเรียก toLocaleDateString เพราะ API ส่งค่านี้ออกมาเป็นสตริง",
+      "prod-health-monitor.yml รายงานคำตัดสินของ job ให้ healthchecks: รอบเขียว ping ปกติ รอบแดง ping <url>/fail เพื่อให้แจ้งเตือนทันที และถ้ายังไม่ตั้ง HEALTHCHECKS_PING_URL จะขึ้น ::error ให้เห็นชัด",
+      "ย้ายสูตรตัดสิน uptime ของ postswitch-verify.mjs ไปอยู่ที่ scripts/lib/stability.mjs โดยเกณฑ์ไต่ตามเวลาที่หน้าต่างเหลือจริงหลัง respawn แทน 60 วินาทีคงที่",
+      "เพิ่มเคส D9/D9b/D9c ใน tests/deploy-runbook.test.ts และผ่อนเฉพาะ script type application/ld+json ใน e2e/smoke.spec.ts เพราะเป็น data block ที่ CSP ไม่รัน (ตัวเช็ค console error ยังว่าง)"
+    ],
+    "proof": [
+      "/api/v1/version ตอบ buildId ohsTY9SJ1GyvV3ZuZktga · version 1.2.3 · buildNumber 551 · gitSha c24db746dd797c50c079074a0c104e558ea98784 (ตรงทั้ง buildId และ gitSha)",
+      "/api/v1/health ตอบ healthy พร้อม checks.database ok และ uptime 9.6 วินาที แปลว่า Passenger รีสตาร์ทจริง",
+      "/api/v1/products ตอบ 200, หน้าแรกมีคำว่า turbopack 0 ครั้ง และ /legal/privacy-policy ตอบ 200",
+      "ในเครื่อง: npm test 132 ไฟล์ 1224 ผ่าน, npx tsc --noEmit และ npm run lint สะอาด; CI run 44972743000 (Secret scan) เขียว",
+      "extract-check.txt ถูกลบหลังสลับบิลด์ และยืนยันด้วย ls ผ่าน Run Now ของ task 237 ว่าไม่มีไฟล์นี้แล้ว (คำสั่งที่เก็บไว้ของ task 237 ไม่ถูกแก้)"
+    ],
+    "note": "แถวนี้ยังไม่ได้ certify ครึ่งฐานข้อมูล 22 ข้อ เพราะ POSTSWITCH_TARGET_DATABASE_URL ว่างและเครื่องนี้ต่อ SSH ไป thsv93 ไม่ได้; CI ของ c24db74 แดงที่ Browser Smoke จาก nonce ของ JSON-LD ที่ breadcrumb เพิ่มเข้ามา แล้วแก้ด้วย fa01f3b (แก้เฉพาะเทสต์ ไม่ต้อง deploy ซ้ำ) ส่วน patch-notes.json ถูกคอมไพล์เข้า bundle ก่อนแถวนี้ถูกเขียน หน้า /management/patch-notes จึงเห็น #551 หลัง deploy ครั้งถัดไป และ rollback ยังอยู่ที่ httpdocs/.next.old"
+  },
   "Zcy3-lY3msugy8heVcZNZ": {
     "title": "บิลด์ #545 ขึ้น production: สลิปที่ธนาคารตอบช้าไม่ถูกหาว่าใช้แล้ว และร้านที่ยังไม่กรอกบัญชีรับเงินจะไม่ตรวจสลิปแบบเดา",
     "summary": "อัปเดต Zcy3-lY3msugy8heVcZNZ (commit 5273d60, 1.2.2 บิลด์ #545) ขึ้น production เมื่อ 21 พ.ย. 2569 โดยมี 22 commit ตั้งแต่ 5a70a0e ทั้งการแก้กรณีธนาคารตอบช้า การปิดช่องโหว่ที่ร้านยังไม่ได้ตั้งบัญชีรับเงิน การจับคู่รหัสสลิปซ้ำของ SlipOK และการซ่อม token สีที่ทำให้ปุ่มหลังบ้านมองไม่เห็น",
