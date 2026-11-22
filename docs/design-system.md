@@ -56,6 +56,18 @@ sapphire (info), topaz/fawn (warning) — **ค่าที่ต่ำกว่
 | fg-muted / placeholder | clay-700   | clay-400/500 |
 | fg-brand               | peach-700  | peach-200    |
 | border-default         | clay-300   | clay-700     |
+| bg-footer              | clay-950 `#3a2a18` | bg-sunken `#2c1e12` |
+| fg-footer              | clay-100 (13.0:1)  | clay-100 (15.2:1)   |
+| fg-footer-muted        | clay-300 (10.2:1)  | clay-400 (9.5:1)    |
+| border-footer          | clay-800   | clay-700     |
+| --texture-dot (ลายจุด) | peach-300 @ 32% | peach-400 @ 8% |
+
+**ลายจุด (polka texture) ไม่ใช่สีพื้น:** `.polka` วางทับบน `bg-*` ของ element
+เดียวกันเสมอ (`bg-coral-100`, `bg-peach-50`, `bg-surface`) — ห้ามตั้ง `background-color`
+ในตัว utility เพราะ contrast scanner ไล่ตาม chain ของ `background-color` และจะทับพื้น
+ของ promo band เงียบ ๆ ขนาดจุดคือ **2px radius** (ไม่ใช่ diameter → จุด 4px) บน **12px gap**
+เท่ากันทั้งสองธีม เปลี่ยนเฉพาะค่า alpha ซึ่งคำนวณให้ composite อยู่ที่ **1.14–1.20:1**
+บนพื้นหลักของธีมนั้น (peach-300 @ 22% เดิมได้ 1.10:1 จึงอ่านเป็นเม็ดกระดาษ ไม่ใช่ลายจุด)
 
 กติกา: ห้าม hardcode hex ใน component — อ้าง semantic token
 (`bg-surface`, `text-fg-muted`, `border-line`) ผ่าน Tailwind ที่ map ไว้แล้ว
@@ -83,8 +95,11 @@ sapphire (info), topaz/fawn (warning) — **ค่าที่ต่ำกว่
 | modal  | `shadow-clay-lg` | drawer, dialog, popover เท่านั้น       |
 
 ห้ามใช้ Tailwind `shadow-lg`/`shadow-xl` (เทาเย็น หลุดพาเลตต์) — เงาอื่นที่อนุญาต
-มีเพียง `shadow-clay-brand` (CTA hero/ปุ่มลอย) และ `shadow-clay-press`
-(สถานะกด) — หน้า checkout/payment ใช้ระดับ raised ลงไป พื้นเรียบ เส้นบาง เพื่อ
+มีเพียง `shadow-clay-brand` (CTA hero/ปุ่มลอย) `shadow-clay-press` (สถานะกด)
+และ **`shadow-clay` (น้ำหนักกลาง) เฉพาะแผงหมวดหมู่ (categories panel) และ `AppTile`**
+— สองพื้นนี้เป็น clay หนาแน่นที่ต้องการมิติมากกว่า `clay-sm` แต่ไม่ถึง `clay-lg`
+(modal-only) ตาม `docs/spec/nk-00-foundation.md` §6; ที่อื่นยังใช้สามระดับเดิม
+หน้า checkout/payment ใช้ระดับ raised ลงไป พื้นเรียบ เส้นบาง เพื่อ
 สื่อความปลอดภัย
 
 - Spacing base 4px (space-1 … space-32) — ห้ามค่าอื่นที่ไม่ได้มาจาก scale
@@ -128,6 +143,12 @@ sapphire (info), topaz/fawn (warning) — **ค่าที่ต่ำกว่
 
 ## 8. ประวัติการแก้
 
+- **v2.2 (2569-11-22)** — เพิ่มชุด token พื้น footer อบอุ่นน้ำตาลเข้ม
+  (`bg-footer`/`fg-footer`/`fg-footer-muted`/`border-footer`, ผูกเป็น `bg-footer`,
+  `text-footer`, `text-footer-muted`, `border-footer`) และชุดลายจุด
+  (`--texture-dot` + geometry 2px radius / 12px gap, ค่า alpha คำนวณจาก
+  composite 1.14–1.20:1); อนุมัติข้อยกเว้น `shadow-clay` สำหรับแผงหมวดหมู่
+  และ `AppTile` — ตาม `docs/spec/nk-00-foundation.md` §4 / §7.1
 - **v2.1 (2569-09-26)** — เพิ่มบทบาทมาสคอตตามสถานการณ์, elevation 3 ระดับ
   (subtle/raised/modal), checkout แบนลง, สัดส่วน 70/20/10
 - **v2 (2569-09-26)** — ยกเลิกทิศทาง ink-navy/amber dark-first จากเอกสาร v1;

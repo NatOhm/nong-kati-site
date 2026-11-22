@@ -18,9 +18,19 @@ const config: Config = {
          iPhone profile). Bind both to their semantic tokens. */
       backgroundColor: {
         error: 'var(--bg-error)',
+        // Footer surface (docs/design-system.md §2). Declared per-utility
+        // rather than under `colors.footer`, because a colors entry's DEFAULT
+        // is shared by bg-/text-/border-: a DEFAULT of `--bg-footer` would
+        // make `text-footer` paint the background colour as text.
+        footer: 'var(--bg-footer)',
       },
       borderColor: {
         error: 'var(--border-error)',
+        footer: 'var(--border-footer)',
+      },
+      textColor: {
+        footer: 'var(--fg-footer)',
+        'footer-muted': 'var(--fg-footer-muted)',
       },
       colors: {
         clay: {

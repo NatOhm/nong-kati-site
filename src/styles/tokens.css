@@ -270,6 +270,28 @@
   --border-error: var(--coral-300);
   --border-warning: #f0d48a;
 
+  /* ── Footer surface (docs/design-system.md §2) ──
+     A warm dark-brown finish, not a black slab: the shop's chocolate tone.
+     Contrast on clay-950: clay-100 13.0:1, clay-300 (muted) 10.2:1. */
+  --bg-footer: var(--clay-950);
+  --fg-footer: var(--clay-100);
+  --fg-footer-muted: var(--clay-300);
+  --border-footer: var(--clay-800);
+
+  /* ── Polka texture (docs/design-system.md §2, spec nk-00 §7.1) ──
+     The gradient stop is a RADIUS, not a diameter: 2px → 4px dots on a
+     12px pitch, ≈8.7% coverage. Geometry is theme-invariant; only the
+     colour below is re-solved per theme.
+
+     The alpha is computed, never eyeballed: a dot must composite to
+     1.14–1.20:1 against the theme's base so it reads as texture at arm's
+     length. peach-300 @ 22% measured 1.10:1 on peach-50 — printer grain,
+     not polka; 32% lands at 1.16:1. Re-solve, don't nudge, if the logo art
+     later changes the density. */
+  --texture-dot: rgba(253, 186, 116, 0.32);
+  --texture-dot-size: 2px;
+  --texture-dot-gap: 12px;
+
   /* ── Alpha-capable channels ──
      Tailwind only applies an opacity modifier (`bg-surface/80`) to a colour
      declared as `rgb(<channels> / <alpha-value>)`. These five are consumed
@@ -328,6 +350,19 @@
   --border-success: #2e7d4f;
   --border-error: var(--coral-700);
   --border-warning: #8a5b12;
+
+  /* Dark footer: the sunken step, so the footer sits BELOW the page rather
+     than floating on it. clay-100 is 15.2:1 here and clay-400 9.5:1 — every
+     pairing in the footer is stronger in dark than in light. */
+  --bg-footer: var(--bg-sunken);
+  --fg-footer: var(--clay-100);
+  --fg-footer-muted: var(--clay-400);
+  --border-footer: var(--clay-700);
+
+  /* Dark polka dot: peach-400 at 8% composites to 1.16:1 on clay-950, matching
+     the light theme. The old 12% measured 1.26:1 and made dark mode's dots
+     louder than light mode's. Size and gap inherit from :root. */
+  --texture-dot: rgba(251, 146, 60, 0.08);
 
   /* Dark clay shadows — cocoa-tinted drops, dimmed inner highlight */
   --shadow-clay-xs: 0 1px 2px rgba(0, 0, 0, 0.35), inset 0 1px 2px rgba(255, 255, 255, 0.06);
