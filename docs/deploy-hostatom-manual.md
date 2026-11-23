@@ -10,15 +10,16 @@ below is what actually shipped the live build.
 > script does. This file predates the script.
 
 > **Current live build (Nov 22, 2026): `c24db74`, v1.2.3 #551, BUILD_ID `ohsTY9SJ1GyvV3ZuZktga`.** Repo HEAD is
-> 13 commits ahead of live (`e33b0fb`): 1.2.3 shipped the legal-page breadcrumbs and a health monitor
+> 14 commits ahead of live (`b906f27`): 1.2.3 shipped the legal-page breadcrumbs and a health monitor
 > that reports its own run verdict, and the commits since carry the homepage v2 palette, the slip-flow
 > work and the 1.2.4 re-check handover. **Pending release: 1.2.4 (#564), built from a clean tree at
 > `e33b0fb`, BUILD_ID `N6N9XVrZgZw8J8IifAnmS`, GIT_SHA
-> `e33b0fb316bb11e7e1040a2cfcc527840c39ff33` — build #564; built and logged, but not published yet**, so no
-> `deploy-artifact` orphan exists for it: Step 2's URL and both `grep -Fxq` literals still name the
-> 1.2.3 bundle (`ohsTY9SJ1GyvV3ZuZktga` + `c24db74…`). Re-pin task 250 with the pair above — and paste
-> the artifact commit `scripts/deploy-artifact.sh` prints into the URL — as the first thing after
-> publishing. See the deploy log in [hostatom-live.md](hostatom-live.md) §5. The `c24db74..HEAD` range
+> `e33b0fb316bb11e7e1040a2cfcc527840c39ff33` — build #564; published as the `deploy-artifact` orphan
+> `0330e6164e8601600090a700742ac571c7cb6cff` (14,642,907-byte bundle, both stamps re-read from the served tar, no `.env` entries),
+> **but not switched yet**: Step 2's URL and both `grep -Fxq` literals now name this bundle, so re-pin
+> task 250 from the sample in Step 2 and Run Now. The artifact's stamped SHA is the *built* commit
+> `e33b0fb`; `b906f27` on top of it is the docs-only re-pin, so the guard literals are `e33b0fb` even
+> though the branch HEAD is one commit later. See the deploy log in [hostatom-live.md](hostatom-live.md) §5. The `c24db74..HEAD` range
 > has **no `prisma/` changes**, so no migration is needed; `package.json` moves only its `version` field
 > (1.2.3 → 1.2.4), so no dependency changed and the slow `npm ci` deps task can still be skipped.
 
@@ -119,7 +120,7 @@ took the deploy with it) — `grep`, `cat`, `tar`, `cp`, `mv`, `rm` all work.
    `scripts/deploy-artifact.sh`'s output when the target bundle changes:
 
 ```
-cd httpdocs && rm -rf .next-stage && curl -fsSLk --max-time 180 -o deploy-bundle.tar.gz https://raw.githubusercontent.com/NatOhm/nong-kati-site/7bc1c753b89cf7ad1fba1833337c004884463778/deploy-bundle.tar.gz?cb=$$ && mkdir -p .next-stage && tar -xzf deploy-bundle.tar.gz -C .next-stage && grep -Fxq hG0RHiUSkpldDxCrlAXQl .next-stage/.next/BUILD_ID && grep -Fxq 5a70a0e777676df05228244789d6e7dfe5df9175 .next-stage/.next/GIT_SHA && rm -rf .next.old && if test -d .next; then mv .next .next.old; fi && mv .next-stage/.next .next && cp -a .next-stage/. . && rm -rf .next-stage deploy-bundle.tar.gz && { cat .next/BUILD_ID; echo; cat .next/GIT_SHA; echo; } > extract-check.txt && touch tmp/restart.txt
+cd httpdocs && rm -rf .next-stage && curl -fsSLk --max-time 180 -o deploy-bundle.tar.gz https://raw.githubusercontent.com/NatOhm/nong-kati-site/0330e6164e8601600090a700742ac571c7cb6cff/deploy-bundle.tar.gz?cb=$$ && mkdir -p .next-stage && tar -xzf deploy-bundle.tar.gz -C .next-stage && grep -Fxq N6N9XVrZgZw8J8IifAnmS .next-stage/.next/BUILD_ID && grep -Fxq e33b0fb316bb11e7e1040a2cfcc527840c39ff33 .next-stage/.next/GIT_SHA && rm -rf .next.old && if test -d .next; then mv .next .next.old; fi && mv .next-stage/.next .next && cp -a .next-stage/. . && rm -rf .next-stage deploy-bundle.tar.gz && { cat .next/BUILD_ID; echo; cat .next/GIT_SHA; echo; } > extract-check.txt && touch tmp/restart.txt
 ```
 
 > **⚠️ The command must contain ZERO double-quote characters.** The runner wraps it in a
