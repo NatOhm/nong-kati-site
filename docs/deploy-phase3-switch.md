@@ -71,7 +71,7 @@ Everything else is “no swap happened”:
   truncated (the paste check after step 3); the pinned commit no longer resolves, so `curl -f`
   exits non-zero (each publish force-pushes the orphan branch); the download was cut off inside
   180 s; or one stamp did not match. The live `.next` was never moved, the shop still serves
-  `sXlN595…`, and `.next-stage` is kept for inspection — nothing to undo, so read the run's
+  `ohsTY9SJ…`, and `.next-stage` is kept for inspection — nothing to undo, so read the run's
   notification line and fix that cause before clicking again.
 - **Any other content** cannot come from this command — the greps run first and the swap copies
   those same files — so it means something outside the task wrote `.next`, or the file is a leftover
@@ -137,4 +137,4 @@ as repo secrets) has exactly one pass value: **`RESULT: 22/22 checks passed`**.
 - File Manager → delete `httpdocs/extract-check.txt`. Keep `tmp/restart.txt`.
 - **Rollback** if step 3 fails and a Secrets Replace does not fix it:
   `cd httpdocs && rm -rf .next && mv .next.old .next && touch tmp/restart.txt` — then
-  `/api/v1/version` must read `sXlN595fgEXujyWRQth6p` again.
+  `/api/v1/version` must read `ohsTY9SJ1GyvV3ZuZktga` again.
