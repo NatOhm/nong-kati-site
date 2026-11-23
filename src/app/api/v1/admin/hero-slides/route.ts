@@ -39,10 +39,15 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
  * is not a pair of percentages in 0–100 is rejected outright rather than
  * passed through. Returns null for "not supplied", and null in the DB means
  * centred, so every existing slide keeps rendering exactly as before.
+ *
+ * A missing key is "not supplied" — the panel's create request has no
+ * `imageFocus` at all (`BannerSettings.createFromImage`), so treating
+ * `undefined` as malformed made เพิ่มสไลด์ answer 400 INVALID_IMAGE_FOCUS
+ * from 2026-10-06 until this fix (`tests/hero-slides-focus.test.ts`).
  */
 const FOCUS_RE = /^(\d{1,3})% (\d{1,3})%$/;
 function parseFocus(v: unknown): string | null | undefined {
-  if (v === null) return null;
+  if (v === undefined || v === null) return null;
   if (typeof v !== 'string') return undefined;
   const t = v.trim();
   if (!t) return null;
