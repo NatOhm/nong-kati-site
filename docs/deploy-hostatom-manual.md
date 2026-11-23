@@ -113,7 +113,7 @@ took the deploy with it) — `grep`, `cat`, `tar`, `cp`, `mv`, `rm` all work.
    `scripts/deploy-artifact.sh`'s output when the target bundle changes:
 
 ```
-cd httpdocs && rm -rf .next-stage && curl -fsSLk --max-time 180 -o deploy-bundle.tar.gz https://raw.githubusercontent.com/NatOhm/nong-kati-site/7bc1c753b89cf7ad1fba1833337c004884463778/deploy-bundle.tar.gz?cb=$$ && mkdir -p .next-stage && tar -xzf deploy-bundle.tar.gz -C .next-stage && grep -Fxq hG0RHiUSkpldDxCrlAXQl .next-stage/.next/BUILD_ID && grep -Fxq 5a70a0e777676df05228244789d6e7dfe5df9175 .next-stage/.next/GIT_SHA && rm -rf .next.old && if test -d .next; then mv .next .next.old; fi && mv .next-stage/.next .next && cp -a .next-stage/. . && rm -rf .next-stage deploy-bundle.tar.gz && { cat .next/BUILD_ID; echo; cat .next/GIT_SHA; echo; } > extract-check.txt && touch tmp/restart.txt
+cd httpdocs && rm -rf .next-stage && curl -fsSLk --max-time 180 -o deploy-bundle.tar.gz https://raw.githubusercontent.com/NatOhm/nong-kati-site/14e957caa1a6b75f94217a5ac81140882f5e4074/deploy-bundle.tar.gz?cb=$ && mkdir -p .next-stage && tar -xzf deploy-bundle.tar.gz -C .next-stage && grep -Fxq _7_wbXgAa0uZw_jLrpCcP .next-stage/.next/BUILD_ID && grep -Fxq 3bcdb6b14a23101357392bb69a514cfcc8083ac3 .next-stage/.next/GIT_SHA && rm -rf .next.old && if test -d .next; then mv .next .next.old; fi && mv .next-stage/.next .next && cp -a .next-stage/. . && rm -rf .next-stage deploy-bundle.tar.gz && { cat .next/BUILD_ID; echo; cat .next/GIT_SHA; echo; } > extract-check.txt && touch tmp/restart.txt
 ```
 
 > **⚠️ The command must contain ZERO double-quote characters.** The runner wraps it in a

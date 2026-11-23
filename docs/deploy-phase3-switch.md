@@ -6,11 +6,11 @@ built, published and staged.
 
 | Value                  | This release                                                         |
 | ---------------------- | -------------------------------------------------------------------- |
-| Target `BUILD_ID`      | `hG0RHiUSkpldDxCrlAXQl`                                              |
-| Target git sha         | `5a70a0e777676df05228244789d6e7dfe5df9175`                           |
-| Artifact commit (URL)  | `7bc1c753b89cf7ad1fba1833337c004884463778`                           |
-| Artifact branch tip    | `7bc1c75` — `deploy bundle hG0RHiUSkpldDxCrlAXQl (git 5a70a0e7776…)` |
-| Live before the switch | `sXlN595fgEXujyWRQth6p` / `206a6a2` / v1.2.2                         |
+| Target `BUILD_ID`      | `_7_wbXgAa0uZw_jLrpCcP`                                              |
+| Target git sha         | `3bcdb6b14a23101357392bb69a514cfcc8083ac3`                           |
+| Artifact commit (URL)  | `14e957caa1a6b75f94217a5ac81140882f5e4074`                           |
+| Artifact branch tip    | `14e957c` — `deploy bundle _7_wbXgAa0uZw_jLrpCcP (git 3bcdb6b14a2…)` |
+| Live before the switch | `sXlN595fgEXujyWRQth6p` / `206a6a2` / v1.2.5                         |
 | Rollback lives in      | `httpdocs/.next.old` (the `sXlN595…` build)                          |
 
 ## 1 — The click
@@ -25,7 +25,7 @@ built, published and staged.
    0 s with `unexpected EOF`):
 
 ```
-cd httpdocs && rm -rf .next-stage && curl -fsSLk --max-time 180 -o deploy-bundle.tar.gz https://raw.githubusercontent.com/NatOhm/nong-kati-site/7bc1c753b89cf7ad1fba1833337c004884463778/deploy-bundle.tar.gz?cb=$$ && mkdir -p .next-stage && tar -xzf deploy-bundle.tar.gz -C .next-stage && grep -Fxq hG0RHiUSkpldDxCrlAXQl .next-stage/.next/BUILD_ID && grep -Fxq 5a70a0e777676df05228244789d6e7dfe5df9175 .next-stage/.next/GIT_SHA && rm -rf .next.old && if test -d .next; then mv .next .next.old; fi && mv .next-stage/.next .next && cp -a .next-stage/. . && rm -rf .next-stage deploy-bundle.tar.gz && { cat .next/BUILD_ID; echo; cat .next/GIT_SHA; echo; } > extract-check.txt && touch tmp/restart.txt
+cd httpdocs && rm -rf .next-stage && curl -fsSLk --max-time 180 -o deploy-bundle.tar.gz https://raw.githubusercontent.com/NatOhm/nong-kati-site/14e957caa1a6b75f94217a5ac81140882f5e4074/deploy-bundle.tar.gz?cb=$ && mkdir -p .next-stage && tar -xzf deploy-bundle.tar.gz -C .next-stage && grep -Fxq _7_wbXgAa0uZw_jLrpCcP .next-stage/.next/BUILD_ID && grep -Fxq 3bcdb6b14a23101357392bb69a514cfcc8083ac3 .next-stage/.next/GIT_SHA && rm -rf .next.old && if test -d .next; then mv .next .next.old; fi && mv .next-stage/.next .next && cp -a .next-stage/. . && rm -rf .next-stage deploy-bundle.tar.gz && { cat .next/BUILD_ID; echo; cat .next/GIT_SHA; echo; } > extract-check.txt && touch tmp/restart.txt
 ```
 
 After pasting, scroll the field to the end and confirm it still ends `touch tmp/restart.txt`. The
@@ -57,8 +57,8 @@ ceiling, not the expectation.
 
 File Manager → `httpdocs/extract-check.txt` → exactly two lines:
 
-- line 1 = `hG0RHiUSkpldDxCrlAXQl`
-- line 2 = `5a70a0e777676df05228244789d6e7dfe5df9175`
+- line 1 = `_7_wbXgAa0uZw_jLrpCcP`
+- line 2 = `3bcdb6b14a23101357392bb69a514cfcc8083ac3`
 
 **PASS** = exactly those two lines. The command downloads from the commit pinned in its URL and
 compares both stamps to these literals (`grep -Fxq`) _before_ the swap, so a tarball from any other
@@ -92,7 +92,7 @@ deploy-hostatom-manual.md §Step 3 (Run Node.js commands: `npm ci --omit=dev` /
 B=https://nongkatistore.com
 
 curl -s "$B/api/v1/version?cb=$RANDOM"
-# PASS: "buildId":"hG0RHiUSkpldDxCrlAXQl" AND "gitSha":"5a70a0e7776…
+# PASS: "buildId":"_7_wbXgAa0uZw_jLrpCcP" AND "gitSha":"3bcdb6b14a2…
 # Both, not either — a cached response can satisfy the buildId alone.
 
 curl -s "$B/api/v1/health?cb=$RANDOM"
@@ -119,7 +119,7 @@ textarea) and re-read. Do not touch the database.
 
 ```bash
 gh workflow run postswitch-gate.yml --ref master \
-  -f build-id=hG0RHiUSkpldDxCrlAXQl -f check-only=true
+  -f build-id=_7_wbXgAa0uZw_jLrpCcP -f check-only=true
 gh run list --workflow=postswitch-gate.yml --limit 3
 ```
 

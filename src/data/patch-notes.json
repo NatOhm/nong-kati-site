@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.2.5",
+    "date": "2026-11-23",
+    "dateLabel": "Nov 23, 2026",
+    "gitSha": "3bcdb6b",
+    "buildId": "_7_wbXgAa0uZw_jLrpCcP",
+    "title": "1.2.5 (#552) — เพิ่มสไลด์ในแบนเนอร์หน้าแรกได้อีกครั้ง; hotfix บนโค้ดที่ production เสิร์ฟอยู่ (1.2.3 #551) เพื่อไม่เปิดหน้าแรกฉบับร่าง v2 กลับมา.",
+    "detail": "1.2.5 (#552) — เพิ่มสไลด์ในแบนเนอร์หน้าแรกได้อีกครั้ง; hotfix บนโค้ดที่ production เสิร์ฟอยู่ (1.2.3 #551) เพื่อไม่เปิดหน้าแรกฉบับร่าง v2 กลับมา. The panel's create call never sent imageFocus, and parseFocus() read a missing key as malformed, so every เพิ่มสไลด์ answered 400 INVALID_IMAGE_FOCUS from 01d8da1 (2026-10-06) onward: the image uploaded, no HeroSlide row was created, and page.tsx renders the carousel only when heroSlides.length > 0, so the banner carousel has been silently absent for seven weeks. The fix makes parseFocus(undefined) return null (centred — what null already means for every older slide) while \"abc\", \"left top\" and \"120% 30%\" still fail closed, because the value lands in a style attribute. Built from a clean tree at 3bcdb6b14a23101357392bb69a514cfcc8083ac3 (BUILD_NUMBER 552, VERSION 1.2.5) on a branch cut from the live commit c24db74, deliberately not on top of the pending 1.2.4 line, which still carries the unapproved v2 homepage. Gates on the shipped tree: tests/hero-slides-focus.test.ts (HSF-1 create without the key → 201 with imageFocus: null; HSF-2 \"abc\" → 400 and no DB write) plus the full suite — 137 files / 1276 tests, tsc and eslint clean. Published and live: the bundle is the deploy-artifact orphan 14e957caa1a6b75f94217a5ac81140882f5e4074 (14,329,197 bytes, 1,853 entries, 0 .env entries, both stamps re-read from the served tar); task 250 was re-pinned to those two literals and its Run Now swapped the docroot. Live proof: /api/v1/version → _7_wbXgAa0uZw_jLrpCcP · 1.2.5 · #552 · 3bcdb6b14a23101357392bb69a514cfcc8083ac3, /api/v1/health healthy with checks.database: ok and uptime 6.2 s, /api/v1/products 200, homepage 161,571 bytes with 0 turbopack and the old h1 (text-xl … sm:text-2xl) — the v2 hero stays off the site. .next.old now holds the 1.2.3 #551 tree. Note: the pending 1.2.4 row is superseded by this hotfix; that branch must be re-versioned (1.2.6) before it ships, or its 1.2.4 badge would read as older than live."
+  },
+  {
     "version": "1.2.2",
     "date": "2026-11-21",
     "dateLabel": "Nov 21, 2026",
