@@ -162,6 +162,8 @@ describe('recheckDelayedAttempt — a Bangkok Bank slip the bank has since publi
       expect.objectContaining({ orderNumber: 'NK-2026-000735', totalThb: 735 }),
     );
     expect(fulfilmentMock.scheduleOutboxDrain).toHaveBeenCalled();
+    // Confirmed is not a handover — the admin already got the success ping.
+    expect(notifyMock.notifyPaymentPending).not.toHaveBeenCalled();
   });
 });
 
@@ -182,6 +184,8 @@ describe('recheckDelayedAttempt — still delayed', () => {
     expect(update.data['failureReason']).toBe('SLIP_DELAYED');
     expect(update.data['status']).toBeUndefined();
     expect(update.data['gatewayResponse']).toMatchObject({ error: 'SLIP_DELAYED', rechecks: 1 });
+    // Still queued, so there is nothing to escalate yet.
+    expect(notifyMock.notifyPaymentPending).not.toHaveBeenCalled();
   });
 
   it('marks the attempt failed once the retry budget is spent', async () => {
@@ -201,6 +205,12 @@ describe('recheckDelayedAttempt — still delayed', () => {
     // `failed` is what takes it out of the sweep — the verdict stays readable.
     expect(update.data['status']).toBe('failed');
     expect(update.data['failureReason']).toBe('SLIP_DELAYED');
+    // …and the admin is told, or a paid slip leaves the queue in silence.
+    expect(notifyMock.notifyPaymentPending).toHaveBeenCalledWith({
+      orderNumber: 'NK-2026-000735',
+      totalThb: 735,
+      customerEmail: 'buyer@example.com',
+    });
   });
 
   it('a real verdict on the retry replaces the delay, so the admin sees it', async () => {
@@ -221,6 +231,10 @@ describe('recheckDelayedAttempt — still delayed', () => {
       failureReason: 'AMOUNT_MISMATCH',
       gatewayStatusCode: 'slip2go',
     });
+    // A terminal verdict is the same handover: the auto-check is over.
+    expect(notifyMock.notifyPaymentPending).toHaveBeenCalledWith(
+      expect.objectContaining({ orderNumber: 'NK-2026-000735' }),
+    );
   });
 });
 
@@ -267,6 +281,28 @@ describe('recheckDelayedAttempt — never spends a credit it cannot use', () => 
     expect(prismaMock.paymentAttempt.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ status: 'failed' }) }),
     );
+    // No file to check and no other owner — a human has to take this one.
+    expect(notifyMock.notifyPaymentPending).toHaveBeenCalledWith(
+      expect.objectContaining({ orderNumber: 'NK-2026-000735', totalThb: 735 }),
+    );
+  });
+
+  it('escalates when the bank said paid but nothing could record it', async () => {
+    seededVerify();
+    // Both the confirmation and the parking transaction fail, so the payment
+    // exists nowhere but the reconciliation trail.
+    prismaMock.paymentAttempt.update.mockRejectedValue(new Error('db down'));
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const outcome = await recheckDelayedAttempt('att-1');
+
+      expect(outcome).toEqual({ kind: 'closed', detail: 'reconciliation_failed' });
+      expect(notifyMock.notifyPaymentPending).toHaveBeenCalledWith(
+        expect.objectContaining({ orderNumber: 'NK-2026-000735' }),
+      );
+    } finally {
+      error.mockRestore();
+    }
   });
 });
 

@@ -18,7 +18,7 @@ import {
   verifySlipImage,
 } from '@/lib/payment/slipVerifyFlow';
 import { isValidSlipUploadToken, mintSlipStorageKey, slipImageRoute } from '@/lib/slipSecurity';
-import { scheduleSlipRecheck } from '@/lib/slipRecheck';
+import { recheckCount, scheduleSlipRecheck } from '@/lib/slipRecheck';
 import { writeSlip } from '@/lib/slipStore';
 
 export const dynamic = 'force-dynamic';
@@ -184,13 +184,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // every real slip ended in the manual queue and the order expired. Create
   // the pending attempt here instead of requiring the QR flow.
   let attempt: { id: string } | null = null;
+  // A retry is a fresh check, not a fresh budget: the provider calls the
+  // background re-check already spent are carried forward, or every tap of
+  // ตรวจสลิปอีกครั้ง would reset the cap and buy three more.
+  let priorRechecks = 0;
   try {
-    attempt = await prisma.paymentAttempt.findFirst({
+    const existing = await prisma.paymentAttempt.findFirst({
       where: { orderId: order.id, status: 'pending', paymentMethod: 'promptpay' },
       orderBy: { createdAt: 'desc' },
-      select: { id: true },
+      select: { id: true, gatewayResponse: true },
     });
-    if (!attempt) {
+    if (existing) {
+      attempt = { id: existing.id };
+      priorRechecks = recheckCount(existing.gatewayResponse);
+    } else {
       attempt = await prisma.paymentAttempt.create({
         data: {
           orderId: order.id,
@@ -247,6 +254,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
               error: result.code,
               detail: result.detail ?? null,
               checkedAt: new Date().toISOString(),
+              ...(priorRechecks > 0 ? { rechecks: priorRechecks } : {}),
             },
           },
         });

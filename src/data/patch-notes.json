@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.2.4",
+    "date": "2026-11-23",
+    "dateLabel": "Nov 23, 2026",
+    "gitSha": "43b9288",
+    "buildId": "nABiG-fUIWV601SYHOy0P",
+    "title": "1.2.4 (#561) — the admin can read the bank's receiver off a slip before confirming, and a delayed slip re-checks itself.",
+    "detail": "1.2.4 (#561) — the admin can read the bank's receiver off a slip before confirming, and a delayed slip re-checks itself. Built from a clean tree at 43b9288644520535122eed6b8bcaffb2b02f323e (BUILD_NUMBER 561, VERSION 1.2.4, GIT_SHA stamped without -dirty; full suite 136 files / 1271 passed / 5 skipped, tsc and eslint clean). Customer-facing: a กรุงเทพ/GSB slip Slip2Go has not published yet still answers SLIP_DELAYED, but the panel now offers ตรวจสลิปอีกครั้ง instead of dead-ending, and the server re-asks the provider on its own timer (recheckDelayedAttempt: CAS lease on attempt.updatedAt, 3 tries inside 20 min) and settles through the same confirmVerifiedSlip the first call uses; NK_CRON_SECRET-protected /api/v1/internal/orders/slip-recheck drains the queue and prod-health-monitor.yml watches that route, so a verdict no longer depends on the customer leaving the page open. Ops: GET /api/v1/admin/orders/[id]/slip-receiver (orders:write, read-only) answers with the receiver account the bank printed on the slip — from the stored slipReceiverAccount when an earlier read already paid for it, otherwise exactly one provider credit against the slip already on the order — and it never writes an attempt, so a read cannot overwrite a verdict with a failure; the row button and the confirm modal gate on one shared slipNeedsReceiverRead(order, hasVerdict) predicate, so they cannot disagree. slipVerifyFlow.ts now owns the provider call that both the HTTP route and the recheck use. Gates: tests/admin-slip-receiver.test.ts, tests/admin-orders-slip-check.test.ts, tests/slip-recheck.test.ts, tests/slip-rule-signals.test.ts, rows SR / SC / RK in docs/quality-gates.md. Not on production yet: this row records the built artifact, not a release — task 250 is re-pinned to nABiG-fUIWV601SYHOy0P + 43b9288644520535122eed6b8bcaffb2b02f323e and the Run-Now switch plus its live proof are still pending."
+  },
+  {
     "version": "1.2.3",
     "date": "2026-11-22",
     "dateLabel": "Nov 22, 2026",

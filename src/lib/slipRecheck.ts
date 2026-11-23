@@ -27,7 +27,11 @@
 import type { Prisma } from '@prisma/client';
 
 import { prisma } from '@/lib/db';
-import { notifyPaymentConfirmed, notifyStockAlertsForVariants } from '@/lib/notify';
+import {
+  notifyPaymentConfirmed,
+  notifyPaymentPending,
+  notifyStockAlertsForVariants,
+} from '@/lib/notify';
 import { scheduleOutboxDrain } from '@/lib/fulfilment';
 import { confirmVerifiedSlip } from '@/lib/payment/slipConfirmation';
 import { verifySlipImage } from '@/lib/payment/slipVerifyFlow';
@@ -51,8 +55,15 @@ export type RecheckOutcome =
   | { kind: 'closed'; detail: string }
   | { kind: 'skipped'; reason: string };
 
-/** How many background re-checks this attempt has already had. */
-function recheckCount(gatewayResponse: unknown): number {
+/**
+ * How many provider calls this attempt has already spent on re-checks.
+ *
+ * Exported because `POST /api/v1/payments/slip-verify` stamps a fresh
+ * `gatewayResponse` on every customer retry: it must carry this count forward,
+ * or tapping ตรวจสลิปอีกครั้ง resets the budget and the cap stops meaning
+ * anything (each tap is itself a paid call, up to 10 per 10 minutes per IP).
+ */
+export function recheckCount(gatewayResponse: unknown): number {
   if (!gatewayResponse || typeof gatewayResponse !== 'object') return 0;
   const value = (gatewayResponse as { rechecks?: unknown }).rechecks;
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
@@ -71,6 +82,26 @@ function stamp(args: {
     checkedAt: new Date().toISOString(),
     rechecks: args.rechecks,
   };
+}
+
+/**
+ * Tell the admin a paid slip's auto-check stopped without confirming.
+ *
+ * A close marks the attempt `failed`, which is what takes it out of the sweep:
+ * from that moment nobody is looking. The order is still payable and the money
+ * may well be real, so the same Discord ping the failing live route sends is
+ * the only thing standing between this and a silent unpaid order.
+ */
+function notifyRecheckClosed(order: {
+  orderNumber: string;
+  customerEmail: string | null;
+  totalAmountThb: unknown;
+}): void {
+  void notifyPaymentPending({
+    orderNumber: order.orderNumber,
+    totalThb: Number(order.totalAmountThb),
+    customerEmail: order.customerEmail ?? '',
+  });
 }
 
 /**
@@ -131,6 +162,8 @@ export async function recheckDelayedAttempt(attemptId: string): Promise<RecheckO
   const key = slipKeyFromImageUrl(order.slipImageUrl);
   const bytes = key ? await readSlip(key).catch(() => null) : null;
   if (!bytes) {
+    // Nothing left to check automatically — a human owns this order now.
+    notifyRecheckClosed(order);
     await prisma.paymentAttempt
       .update({
         where: { id: attempt.id },
@@ -175,9 +208,11 @@ export async function recheckDelayedAttempt(attemptId: string): Promise<RecheckO
       })
       .catch(() => undefined);
     console.error('[slip-recheck] provider call failed:', err);
-    return stillDue
-      ? { kind: 'delayed', rechecks: nextCount }
-      : { kind: 'closed', detail: 'provider-unreachable' };
+    if (!stillDue) {
+      notifyRecheckClosed(order);
+      return { kind: 'closed', detail: 'provider-unreachable' };
+    }
+    return { kind: 'delayed', rechecks: nextCount };
   }
 
   if (!verification.ok) {
@@ -202,6 +237,10 @@ export async function recheckDelayedAttempt(attemptId: string): Promise<RecheckO
       })
       .catch(() => undefined);
     if (stillDue) return { kind: 'delayed', rechecks: nextCount };
+    // Budget spent, or the bank gave a terminal verdict (amount, receiver,
+    // duplicate): the attempt leaves the sweep here, so an admin has to be
+    // told — otherwise a paid slip sits in the queue with nobody aware.
+    notifyRecheckClosed(order);
     return { kind: 'closed', detail: stillDelayed ? 'budget-spent' : verification.code };
   }
 
@@ -232,8 +271,11 @@ export async function recheckDelayedAttempt(attemptId: string): Promise<RecheckO
 
   if (outcome.kind === 'confirmed') return { kind: 'confirmed' };
   if (outcome.kind === 'parked') return { kind: 'parked', reason: outcome.reason };
-  // duplicate / already_claimed / reconciliation_failed: another writer owns
-  // this payment, or the evidence row does. Nothing left to retry.
+  // The bank verified the money but nothing recorded it — the reconciliation
+  // trail is all that exists, so the admin must be told, not just a log line.
+  if (outcome.kind === 'reconciliation_failed') notifyRecheckClosed(order);
+  // duplicate / already_claimed: another writer owns this payment. Nothing
+  // left to retry and nothing to escalate.
   return { kind: 'closed', detail: outcome.kind };
 }
 

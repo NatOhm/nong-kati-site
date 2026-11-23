@@ -646,6 +646,34 @@ describe('entry-point boundaries (adversarial pass, 30 ต.ค.)', () => {
     expect(h.fulfil.fulfilOrder).not.toHaveBeenCalled();
   });
 
+  it('a customer retry carries the re-check count forward instead of resetting the budget', async () => {
+    // Each background re-check is a paid provider call, capped at 3 per slip.
+    // This route stamped a brand-new gatewayResponse on every retry, dropping
+    // `rechecks`, so a customer tapping ตรวจสลิปอีกครั้ง handed the sweep a
+    // fresh budget every time and the cap meant nothing.
+    h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
+    h.slip2go.verifySlip2Go.mockResolvedValueOnce({
+      ok: false,
+      code: 'SLIP_DELAYED',
+      detail: '200404: ไม่พบรายการ',
+    });
+    h.prisma.paymentAttempt.findFirst.mockResolvedValueOnce({
+      id: 'att-flow',
+      gatewayResponse: { error: 'SLIP_DELAYED', rechecks: 2 },
+    });
+
+    const res = await callVerify();
+    expect(res.status).toBe(502);
+    expect(h.prisma.paymentAttempt.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          failureReason: 'SLIP_DELAYED',
+          gatewayResponse: expect.objectContaining({ rechecks: 2 }),
+        }),
+      }),
+    );
+  });
+
   it('caps the JSON path at MAX_IMAGE_BYTES (the multipart path already did)', async () => {
     h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
     // ~7 MB of base64 → decodes above the 5 MB ceiling.
