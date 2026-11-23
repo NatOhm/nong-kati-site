@@ -72,18 +72,24 @@ describe('serializeJsonLd — JSON-LD XSS escape (production review, High)', () 
   });
 });
 
-describe('slip-verify recovery claims through the shared helper (production review, Medium)', () => {
+describe('slip confirmation recovery claims through the shared helper (production review, Medium)', () => {
   it('the recovery transaction uses claimOrderForConfirmation, not a bare order updateMany', async () => {
-    // Static assertion on the route source: the recovery block must call the
-    // shared claim helper. (The full behavioural fault-injection lives in
+    // Static assertion on the settlement source. Since 2026-11-22 the money
+    // path lives in src/lib/payment/slipConfirmation.ts (the route and the
+    // background re-check both call it), so that is where the recovery block
+    // is read now. (The full behavioural fault-injection lives in
     // tests/payment-recovery.test.ts, which mocks the helper — this guards
     // against someone re-inlining a bare updateMany that skips coupons.)
     const fs = await import('node:fs');
-    const src = fs.readFileSync('src/app/api/v1/payments/slip-verify/route.ts', 'utf8');
+    const src = fs.readFileSync('src/lib/payment/slipConfirmation.ts', 'utf8');
     const recovery = src.slice(src.indexOf('INSUFFICIENT_STOCK') /* first marker */);
-    expect(recovery).toContain('claimOrderForConfirmation(order.id, tx, { paidExternally: true })');
+    expect(recovery).toContain('claimOrderForConfirmation(orderId, tx, { paidExternally: true })');
     // No bare order-status write inside the recovery transaction.
     expect(recovery).not.toMatch(/tx\.order\.updateMany\(/);
     expect(recovery).toContain("manualFulfilmentReason: 'INSUFFICIENT_STOCK'");
+
+    // And the route must not grow a settlement path of its own again.
+    const route = fs.readFileSync('src/app/api/v1/payments/slip-verify/route.ts', 'utf8');
+    expect(route).not.toMatch(/tx\.order\.(updateMany|update)\(/);
   });
 });

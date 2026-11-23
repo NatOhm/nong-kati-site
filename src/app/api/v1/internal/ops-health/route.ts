@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { prisma } from '@/lib/db';
+import { receiverRuleSignalOrNull } from '@/lib/slipRuleSignals';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,6 +20,10 @@ export const dynamic = 'force-dynamic';
  *                              directory shipped with THIS build
  *  - limiterMode             → shared|memory|strict (Redis outage visibility
  *                              — "Redis/rate-limiter outages")
+ *  - slipRule                → RECEIVER_MISMATCH refusals + admin overrides in
+ *                              the last 24 h (and the 24 h before), so a rule
+ *                              that started rejecting real slips is visible
+ *                              before a customer writes in
  *
  * Webhook rejection counts land in the admin reconciliation queue via the
  * same AuditLog this reads; amount mismatches are verified inside the
@@ -67,6 +72,10 @@ export async function GET(req: Request): Promise<NextResponse> {
       .catch(() => [] as { count: bigint }[]),
   ]);
 
+  // `null` when the counts cannot be read — the endpoint still answers, it
+  // just says nothing about the rule rather than failing the whole payload.
+  const slipRule = await receiverRuleSignalOrNull();
+
   const strictLimiter = process.env['NK_RATE_LIMIT_STRICT'] === 'true';
   const sharedLimiter = Boolean(
     process.env['UPSTASH_REDIS_REST_URL'] && process.env['UPSTASH_REDIS_REST_TOKEN'],
@@ -93,6 +102,7 @@ export async function GET(req: Request): Promise<NextResponse> {
         mode: sharedLimiter ? 'shared' : 'memory',
         strict: strictLimiter,
       },
+      slipRule,
       checkedAt: new Date().toISOString(),
     },
     { headers: { 'Cache-Control': 'no-store' } },

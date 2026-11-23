@@ -72,6 +72,13 @@ probe was spent confirming this, further calls buy nothing.
   must appear inside the store digits (or vice versa). Regression test uses
   the real mask. Failing safe is preserved: mismatch still queues to manual
   review, never fulfils.
+- **2026-11-22 follow-up (Bangkok Bank).** A BBL slip to the same account
+  prints `199-1-xxx786` (front and tail shown, middle hidden), whose digits
+  are not one contiguous run, so containment alone rejected a genuine slip.
+  A masked account is now also compared position by position against the
+  store digits (same length, one mask char per hidden digit), so visible
+  digits must sit in the slots they came from; there is no prefix/suffix
+  guessing any more.
 - Side note: this was the slip's 3rd provider submit and still no `200501`,
   so provider-side duplicate is not a reliable second line — the DB unique
   slip-ref index remains the real one-slip-one-order guard.

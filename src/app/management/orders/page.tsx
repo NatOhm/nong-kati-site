@@ -10,7 +10,12 @@ import { formatThb } from '@/lib/pricing';
 import { formatOrderLineDetail, orderLineOptionLabel } from '@/lib/orderLineLabel';
 import { paymentMethodLabel } from '@/lib/paymentMethods';
 import { withStatusColors } from '@/lib/orderStatus';
-import { slipCheckLabel } from '@/lib/slipCheckReason';
+import {
+  slipCheckLabel,
+  slipNeedsReceiverRead,
+  type SlipCheckView,
+  type SlipReceiverView,
+} from '@/lib/slipCheckReason';
 
 /**
  * Admin Orders — real data from /api/v1/admin/orders.
@@ -35,9 +40,40 @@ interface OrderRow {
   /** Auto-verification success (ref + verified amount + provider) when the slip passed. */
   slip: { ref: string; amountThb: number; verifiedAt: string | null; by: string | null } | null;
   /** Last auto-check (success or fail) — null when never checked. */
-  slipCheck: { provider: string | null; error: string | null; checkedAt: string | null } | null;
+  slipCheck: SlipCheckView | null;
+  /** The account the bank reported (auto-check or admin read); null = unknown. */
+  slipReceiver: SlipReceiverView | null;
   createdAt: string;
   completedAt: string | null;
+}
+
+/** Provider display name for a slip-check row (`slip2go` → `Slip2Go`). */
+function providerLabel(provider: string | null): string | null {
+  return provider === 'slip2go' ? 'Slip2Go' : provider === 'slipok' ? 'SlipOK' : provider;
+}
+
+/** `verdict · detail · provider · time` for a failed auto-check. */
+function slipCheckLine(check: SlipCheckView): string {
+  return [
+    slipCheckLabel(check.error) ?? check.error,
+    check.detail,
+    providerLabel(check.provider),
+    check.checkedAt ? new Date(check.checkedAt).toLocaleString('th-TH') : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+/** Row tooltip: the same line, but with the raw machine code the row hides. */
+function slipCheckTitle(check: SlipCheckView): string {
+  return [
+    `ตรวจอัตโนมัติไม่ผ่าน: ${check.error}`,
+    check.detail,
+    providerLabel(check.provider),
+    check.checkedAt ? new Date(check.checkedAt).toLocaleString('th-TH') : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 interface OrderDetail {
@@ -57,7 +93,9 @@ interface OrderDetail {
     by: string | null;
   } | null;
   /** Last auto-check (success or fail) — null when never checked. */
-  slipCheck: { provider: string | null; error: string | null; checkedAt: string | null } | null;
+  slipCheck: SlipCheckView | null;
+  /** The account the bank reported (auto-check or admin read); null = unknown. */
+  slipReceiver: SlipReceiverView | null;
   /** Customer-uploaded slip image (manual check). */
   slipImageUrl: string | null;
   slipUploadedAt: string | null;
@@ -143,6 +181,14 @@ export default function AdminOrdersPage(): React.JSX.Element {
   const [revealBusy, setRevealBusy] = useState(false);
   const [revealData, setRevealData] = useState<DeliveryReveal | null>(null);
   const [revealError, setRevealError] = useState<string | null>(null);
+  /**
+   * Admin-triggered bank read of a manually uploaded slip. `error` doubles as
+   * the escape hatch for the confirm gate: once a read has failed, the admin
+   * may confirm by eye instead of being stuck behind a dead provider.
+   */
+  const [receiverRead, setReceiverRead] = useState<{ busy: boolean; error: string | null }>(
+    { busy: false, error: null },
+  );
 
   const load = useCallback(async () => {
     // Latest-wins: abort the in-flight load before starting another, and
@@ -198,11 +244,63 @@ export default function AdminOrdersPage(): React.JSX.Element {
   };
 
   const openDetail = async (id: string) => {
+    setReceiverRead({ busy: false, error: null });
     try {
       const detail = await adminJson<OrderDetail>(`/api/v1/admin/orders/${id}`);
       setSelectedOrder(detail);
     } catch {
       setActionError('โหลดรายละเอียดไม่สำเร็จ');
+    }
+  };
+
+  /**
+   * Ask the bank which account the stored slip was paid into. Read-only server
+   * side (never confirms, never delivers); one provider credit per call, so the
+   * UI only offers it while the receiver is unknown.
+   */
+  const readSlipReceiver = async (id: string) => {
+    setReceiverRead({ busy: true, error: null });
+    try {
+      const res = await adminJson<{
+        slipReceiver: SlipReceiverView | null;
+        matchesStore: boolean | null;
+        message?: string;
+      }>(`/api/v1/admin/orders/${id}/slip-receiver`, { method: 'POST' });
+      const receiver = res.slipReceiver;
+      if (receiver) {
+        setSelectedOrder((prev) =>
+          prev && prev.id === id ? { ...prev, slipReceiver: receiver } : prev,
+        );
+        setActionMessage(
+          [
+            res.message,
+            res.matchesStore === false
+              ? 'บัญชีไม่ตรงกับบัญชีร้าน'
+              : res.matchesStore === true
+                ? 'ตรงกับบัญชีร้าน'
+                : null,
+          ]
+            .filter(Boolean)
+            .join(' · '),
+        );
+        setReceiverRead({ busy: false, error: null });
+        await load();
+      } else {
+        // Bank could not name an account — show why and unblock the confirm,
+        // otherwise a down provider would strand a genuinely paid order.
+        setReceiverRead({
+          busy: false,
+          error: res.message ?? 'อ่านบัญชีผู้รับจากสลิปไม่ได้',
+        });
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '';
+      setReceiverRead({
+        busy: false,
+        error: msg.includes('NO_STORED_SLIP')
+          ? 'ไม่พบไฟล์สลิปของออเดอร์นี้'
+          : 'อ่านบัญชีผู้รับจากสลิปไม่สำเร็จ',
+      });
     }
   };
 
@@ -358,6 +456,16 @@ export default function AdminOrdersPage(): React.JSX.Element {
       setRevealBusy(false);
     }
   };
+
+  /**
+   * One condition for the receiver block and the confirm button. A slip whose
+   * bank verdict is already on file has nothing left to read, and the read
+   * route refuses to overwrite that verdict — offering the button there would
+   * spend a provider credit and record nothing.
+   */
+  const selectedNeedsReceiverRead = selectedOrder
+    ? slipNeedsReceiverRead(selectedOrder, Boolean(selectedOrder.slipVerification))
+    : false;
 
   return (
     <AdminShell staffRole="super_admin" breadcrumbs={[{ label: 'คำสั่งซื้อ' }]}>
@@ -517,6 +625,17 @@ export default function AdminOrdersPage(): React.JSX.Element {
                       {order.paymentMethod ? paymentMethodLabel(order.paymentMethod) : '—'}
                     </td>
                     <td className="px-4 py-3 text-left text-xs">
+                      {/* Which account the bank reported. Shown next to the
+                          confirm action so a manual slip is never released
+                          blind; hidden when the verified line already names it. */}
+                      {order.slipReceiver && !order.slip && (
+                        <span
+                          className="mb-0.5 block whitespace-nowrap font-mono text-xs text-fg-muted"
+                          title="บัญชีผู้รับที่ธนาคารรายงาน"
+                        >
+                          บัญชีผู้รับ …{order.slipReceiver.last4}
+                        </span>
+                      )}
                       {order.slip ? (
                         <span
                           className="text-fg-success inline-flex max-w-[200px] items-center gap-1"
@@ -531,7 +650,7 @@ export default function AdminOrdersPage(): React.JSX.Element {
                       ) : order.slipCheck?.error ? (
                         <span
                           className="inline-flex max-w-[200px] items-center gap-1 text-amber-600 dark:text-amber-400"
-                          title={`ตรวจอัตโนมัติไม่ผ่าน: ${order.slipCheck.error}${order.slipCheck.provider ? ` · ${order.slipCheck.provider === 'slip2go' ? 'Slip2Go' : order.slipCheck.provider === 'slipok' ? 'SlipOK' : order.slipCheck.provider}` : ''}${order.slipCheck.checkedAt ? ` · ${new Date(order.slipCheck.checkedAt).toLocaleString('th-TH')}` : ''}`}
+                          title={slipCheckTitle(order.slipCheck)}
                         >
                           <XCircle size={13} className="shrink-0" />
                           {/* Thai label in the row; the raw code stays in the tooltip
@@ -557,8 +676,16 @@ export default function AdminOrdersPage(): React.JSX.Element {
                           order.status === 'pending_manual_fulfilment') && (
                           <button
                             onClick={() => void verifyPayment(order.id)}
-                            disabled={verifyingId === order.id}
-                            className="bg-jade-700 inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-semibold text-white hover:bg-jade-500 disabled:opacity-60"
+                            disabled={
+                              verifyingId === order.id ||
+                              slipNeedsReceiverRead(order, Boolean(order.slip))
+                            }
+                            title={
+                              slipNeedsReceiverRead(order, Boolean(order.slip))
+                                ? 'ต้องอ่านบัญชีผู้รับจากสลิปก่อน — กด ดู เพื่อเปิดรายละเอียด'
+                                : undefined
+                            }
+                            className="bg-jade-700 inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-semibold text-white hover:bg-jade-500 disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             <CheckCircle size={12} />
                             {verifyingId === order.id
@@ -755,18 +882,8 @@ export default function AdminOrdersPage(): React.JSX.Element {
                     <p className="font-medium">
                       ตรวจอัตโนมัติไม่ผ่าน — รอแอดมินยืนยัน
                     </p>
-                    <p
-                      className="mt-0.5 text-xs"
-                      title={`รหัสจากระบบ: ${selectedOrder.slipCheck.error}`}
-                    >
-                      {slipCheckLabel(selectedOrder.slipCheck.error) ??
-                        selectedOrder.slipCheck.error}
-                      {selectedOrder.slipCheck.provider
-                        ? ` · ${selectedOrder.slipCheck.provider === 'slip2go' ? 'Slip2Go' : selectedOrder.slipCheck.provider === 'slipok' ? 'SlipOK' : selectedOrder.slipCheck.provider}`
-                        : ''}
-                      {selectedOrder.slipCheck.checkedAt
-                        ? ` · ${new Date(selectedOrder.slipCheck.checkedAt).toLocaleString('th-TH')}`
-                        : ''}
+                    <p className="mt-0.5 text-xs">
+                      {slipCheckLine(selectedOrder.slipCheck)}
                     </p>
                   </div>
                 </div>
@@ -819,10 +936,59 @@ export default function AdminOrdersPage(): React.JSX.Element {
               {(selectedOrder.status === 'pending_payment' ||
                 selectedOrder.status === 'pending_manual_fulfilment') && (
                 <div className="mt-5 border-t border-line-subtle pt-4">
+                  {/* Receiver account right next to the confirm action: a slip
+                      that no provider checked has no verdict, so without this
+                      the admin releases money without knowing where it went.
+                      Only while unconfirmed and without a verdict — a parked
+                      re-delivery is paid, and a slip the bank already passed
+                      has nothing left to read. */}
+                  {selectedOrder.status === 'pending_payment' &&
+                    selectedOrder.slipImageUrl &&
+                    !selectedOrder.slipVerification && (
+                    <div className="mb-3 rounded-md border border-line-subtle bg-surface px-3 py-2.5">
+                      {selectedOrder.slipReceiver ? (
+                        <>
+                          <p className="text-xs font-medium text-fg-muted">
+                            บัญชีผู้รับที่ธนาคารรายงาน
+                          </p>
+                          <p className="mt-0.5 font-mono text-sm font-semibold text-fg">
+                            …{selectedOrder.slipReceiver.last4}
+                            <span className="ml-2 text-xs font-normal text-fg-muted">
+                              ({selectedOrder.slipReceiver.masked})
+                            </span>
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">
+                            ยังไม่ได้อ่านบัญชีผู้รับของสลิปนี้
+                          </p>
+                          <p className="mt-0.5 text-xs text-fg-muted">
+                            ต้องอ่านให้รู้ว่าเงินเข้าบัญชีไหนก่อนจึงจะกดยืนยันได้ (ใช้ 1 เครดิตตรวจสลิป)
+                          </p>
+                          <button
+                            onClick={() => void readSlipReceiver(selectedOrder.id)}
+                            disabled={receiverRead.busy}
+                            className="mt-2 inline-flex items-center justify-center gap-2 rounded-md border border-line-subtle px-3 py-1.5 text-xs font-semibold text-fg-secondary hover:bg-surface disabled:opacity-60"
+                          >
+                            {receiverRead.busy ? 'กำลังอ่าน...' : 'อ่านบัญชีผู้รับจากสลิป'}
+                          </button>
+                          {receiverRead.error && (
+                            <p className="mt-1.5 text-xs text-fg-error">
+                              {receiverRead.error} — ตรวจสลิปด้วยตาก่อนยืนยัน
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
                   <button
                     onClick={() => void verifyPayment(selectedOrder.id)}
-                    disabled={verifyingId === selectedOrder.id}
-                    className="bg-jade-700 inline-flex w-full items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-semibold text-white hover:bg-jade-500 disabled:opacity-60"
+                    disabled={
+                      verifyingId === selectedOrder.id ||
+                      (selectedNeedsReceiverRead && !receiverRead.error)
+                    }
+                    className="bg-jade-700 inline-flex w-full items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-semibold text-white hover:bg-jade-500 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <CheckCircle size={16} />
                     {verifyingId === selectedOrder.id
@@ -831,9 +997,15 @@ export default function AdminOrdersPage(): React.JSX.Element {
                         ? 'ส่งโค้ดอีกครั้ง (หลังเติมสต๊อก)'
                         : 'ยืนยันการชำระเงิน — ส่งโค้ดทันที'}
                   </button>
-                  <p className="mt-2 text-center text-xs text-fg-muted">
-                    ระบบจะตัดสต๊อกและส่งโค้ดให้ลูกค้าอัตโนมัติทันทีที่ยืนยัน
-                  </p>
+                  {selectedNeedsReceiverRead && !receiverRead.error ? (
+                    <p className="mt-2 text-center text-xs font-medium text-amber-700 dark:text-amber-300">
+                      อ่านบัญชีผู้รับจากสลิปก่อนยืนยัน
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-center text-xs text-fg-muted">
+                      ระบบจะตัดสต๊อกและส่งโค้ดให้ลูกค้าอัตโนมัติทันทีที่ยืนยัน
+                    </p>
+                  )}
                 </div>
               )}
               {(selectedOrder.status === 'completed' || selectedOrder.status === 'refunded') && (

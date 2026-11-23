@@ -5,6 +5,7 @@ import { checkPermission, maskEmail } from '@/lib/rbac';
 import { getAdminToken } from '@/lib/adminRequest';
 import { LOW_STOCK_THRESHOLD } from '@/lib/lowStock';
 import { bangkokDayStart, bangkokMonthStart } from '@/lib/bangkokTime';
+import { receiverRuleSignalOrNull } from '@/lib/slipRuleSignals';
 
 export const dynamic = 'force-dynamic';
 
@@ -232,6 +233,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const averageCustomerLifetimeValue = Math.round((grossRevenue / activeBase) * 100) / 100;
   const returningCustomerRate = Math.round((repeatCustomers / activeBase) * 1000) / 10;
 
+  // Receiver-rule watch (2026-11-22): `RECEIVER_MISMATCH` is a FAIL-CLOSED
+  // verdict, so a bank mask the rule cannot read looks exactly like a customer
+  // paying the wrong account. The dashboard shows the day's count and any
+  // confirmation the admin had to make after the rule refused — null when the
+  // counts cannot be read, never a failed dashboard.
+  const slipRule = await receiverRuleSignalOrNull();
+
   return NextResponse.json({
     sales: {
       todayOrders: todayAgg._count._all,
@@ -281,6 +289,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       averageCustomerLifetimeValue,
       returningCustomerRate,
     },
+    /** `null` = counts unavailable (the card renders nothing). */
+    slipRule,
     stock: {
       totalUnits: stockAgg._sum.stock ?? 0,
       variantCount: stockAgg._count._all,

@@ -9,12 +9,12 @@ below is what actually shipped the live build.
 > same flow spelled out manually; keep them as the fallback and as the explanation of what the
 > script does. This file predates the script.
 
-> **Current live build (Nov 13, 2026): `d731fa1`, v1.2.0 #425, BUILD_ID `cd-f9HRtjjej-SFkkmc3X`.** Repo HEAD is
-> level with live: 1.2.0 ships the client's eight-item list (bank top-ups with admin approval,
-> refund-to-credit, cart re-pricing and package labels, dashboard auto-refresh, the 1.1.21
-> stacked-chrome fix, and the VAT/query speed work). See the deploy log in
-> [hostatom-live.md](hostatom-live.md) §5. The `3cfd380..HEAD` range has **no `prisma/` changes**, so no
-> migration is needed, and `package.json` only bumps its version — the slow `npm ci` deps task can be skipped.
+> **Current live build (Nov 22, 2026): `c24db74`, v1.2.3 #551, BUILD_ID `ohsTY9SJ1GyvV3ZuZktga`.** Repo HEAD is
+> 9 commits ahead of live (`62a9395`): 1.2.3 shipped the legal-page breadcrumbs and a health monitor
+> that reports its own run verdict, and the commits since carry the homepage v2 palette and the
+> slip-flow work. See the deploy log in [hostatom-live.md](hostatom-live.md) §5. The
+> `c24db74..HEAD` range has **no `prisma/` changes**, so no migration is needed, and `package.json`
+> is unchanged — the slow `npm ci` deps task can be skipped.
 
 > **⛔ Never read the `INFISICAL_CLIENT_SECRET` value in the Plesk panel.** It renders in clear text
 > and reading it has now burned that credential twice (Sep 30 and Oct 3). Presence checks only.

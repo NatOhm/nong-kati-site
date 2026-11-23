@@ -8,6 +8,7 @@ import { checkPermission, maskEmail, maskPhone } from '@/lib/rbac';
 import { getAdminToken } from '@/lib/adminRequest';
 import { writeAuditLog } from '@/lib/auditLog';
 import { decryptCode } from '@/lib/crypto/giftCode';
+import { slipCheckView, slipReceiverView } from '@/lib/slipCheckReason';
 
 export const dynamic = 'force-dynamic';
 
@@ -81,6 +82,11 @@ export async function GET_search(req: NextRequest): Promise<NextResponse> {
           slipVerifiedBy: true,
           failureReason: true,
           gatewayStatusCode: true,
+          // Read by slipCheckView for the receiver diagnostic shown in the
+          // row tooltip (`receiver …1786 vs store …5786`).
+          gatewayResponse: true,
+          // The bank's masked receiver (auto-check or the admin read action).
+          slipReceiverAccount: true,
           updatedAt: true,
         },
         orderBy: { updatedAt: 'desc' },
@@ -103,37 +109,20 @@ export async function GET_search(req: NextRequest): Promise<NextResponse> {
     slipImageUrl: o.slipImageUrl,
     slipUploadedAt: o.slipUploadedAt?.toISOString() ?? null,
     createdAt: o.createdAt.toISOString(),
-    completedAt: o.completedAt?.toISOString() ?? null,      slip:
-        o.paymentAttempts[0]?.slipVerifiedRef
-          ? {
-              ref: o.paymentAttempts[0].slipVerifiedRef ?? '',
-              amountThb: Number(o.paymentAttempts[0].amountThb ?? 0),
-              verifiedAt:
-                o.paymentAttempts[0].slipVerifiedAt instanceof Date
-                  ? o.paymentAttempts[0].slipVerifiedAt.toISOString()
-                  : null,
-              by: o.paymentAttempts[0].slipVerifiedBy ?? null,
-            }
-          : null,
-      slipCheck: o.paymentAttempts[0]?.slipVerifiedRef
-        ? {
-            provider: o.paymentAttempts[0].slipVerifiedBy ?? null,
-            error: null,
-            checkedAt:
-              o.paymentAttempts[0].slipVerifiedAt instanceof Date
-                ? o.paymentAttempts[0].slipVerifiedAt.toISOString()
-                : null,
-          }
-        : o.paymentAttempts[0]?.failureReason
-          ? {
-              provider: o.paymentAttempts[0].gatewayStatusCode ?? null,
-              error: o.paymentAttempts[0].failureReason ?? '',
-              checkedAt:
-                o.paymentAttempts[0].updatedAt instanceof Date
-                  ? o.paymentAttempts[0].updatedAt.toISOString()
-                  : null,
-            }
-          : null,
+    completedAt: o.completedAt?.toISOString() ?? null,
+    slipReceiver: slipReceiverView(o.paymentAttempts[0]?.slipReceiverAccount),
+    slip: o.paymentAttempts[0]?.slipVerifiedRef
+      ? {
+          ref: o.paymentAttempts[0].slipVerifiedRef ?? '',
+          amountThb: Number(o.paymentAttempts[0].amountThb ?? 0),
+          verifiedAt:
+            o.paymentAttempts[0].slipVerifiedAt instanceof Date
+              ? o.paymentAttempts[0].slipVerifiedAt.toISOString()
+              : null,
+          by: o.paymentAttempts[0].slipVerifiedBy ?? null,
+        }
+      : null,
+      slipCheck: slipCheckView(o.paymentAttempts[0]),
   }));
 
   const groupResult = await prisma.order.groupBy({ by: ['status'], _count: { _all: true } });
@@ -202,10 +191,14 @@ export async function GET_customerHistory(
         select: {
           slipVerifiedRef: true,
           slipVerifiedAt: true,
+          // The bank's masked receiver (auto-check or the admin read action).
           slipReceiverAccount: true,
           slipVerifiedBy: true,
           failureReason: true,
           gatewayStatusCode: true,
+          // Read by slipCheckView for the receiver diagnostic shown in the
+          // row tooltip (`receiver …1786 vs store …5786`).
+          gatewayResponse: true,
           updatedAt: true,
         },
         orderBy: { updatedAt: 'desc' },
@@ -265,23 +258,8 @@ export async function GET_customerHistory(
               by: o.paymentAttempts[0].slipVerifiedBy ?? null,
             }
           : null,
-      slipCheck: o.paymentAttempts[0]?.slipVerifiedRef
-        ? {
-            provider: o.paymentAttempts[0].slipVerifiedBy ?? null,
-            error: null,
-            checkedAt: o.paymentAttempts[0].slipVerifiedAt instanceof Date
-              ? o.paymentAttempts[0].slipVerifiedAt.toISOString()
-              : null,
-          }
-        : o.paymentAttempts[0]?.failureReason
-          ? {
-              provider: o.paymentAttempts[0].gatewayStatusCode ?? null,
-              error: o.paymentAttempts[0].failureReason ?? '',
-              checkedAt: o.paymentAttempts[0].updatedAt instanceof Date
-                ? o.paymentAttempts[0].updatedAt.toISOString()
-                : null,
-            }
-          : null,
+      slipCheck: slipCheckView(o.paymentAttempts[0]),
+      slipReceiver: slipReceiverView(o.paymentAttempts[0]?.slipReceiverAccount),
       slipImageUrl: o.slipImageUrl,
       slipUploadedAt: o.slipUploadedAt?.toISOString() ?? null,
       items: o.items.map((i) => ({

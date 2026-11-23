@@ -41,6 +41,21 @@ export function normalizeSlipKey(key: string): string | null {
   return SLIP_KEY_RE.test(bare) ? bare : null;
 }
 
+/**
+ * The storage key behind a `slipImageRoute()` URL (the inverse of the builder).
+ * Used by anything that has the order row and needs the bytes back — the
+ * delayed-slip re-check and the admin "read the receiver" action.
+ */
+export function slipKeyFromImageUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const tail = url.split('/').pop() ?? '';
+  try {
+    return normalizeSlipKey(decodeURIComponent(tail));
+  } catch {
+    return null;
+  }
+}
+
 /** Absolute path for a validated key. Throws on anything that could escape the dir. */
 export function slipPath(key: string, dir: string = slipDir()): string {
   const bare = normalizeSlipKey(key);

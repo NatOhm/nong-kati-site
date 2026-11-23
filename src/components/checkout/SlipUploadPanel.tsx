@@ -31,6 +31,14 @@ interface SlipTicket {
  *    clicks ยืนยันการชำระเงิน as before.
  */
 
+/**
+ * The sentence every non-auto-confirmed slip ends with: the evidence already
+ * sits on the order, so the customer never has to upload it again.
+ */
+function manualReviewMessage(reason: string | null): string {
+  return `${reason ?? 'ระบบตรวจสลิปยังไม่ยืนยันอัตโนมัติ'} — สลิปถูกส่งให้แอดมินตรวจแล้ว แอดมินจะยืนยันให้เร็วที่สุด`;
+}
+
 export function SlipUploadPanel({
   orderId,
   orderNumber,
@@ -154,18 +162,15 @@ export function SlipUploadPanel({
             onConfirmed?.(body.status as 'confirmed' | 'pending_manual_fulfilment');
             return;
           }
-          if (res.ok) {
-            // Unexpected success shape — still hand it to the admin below.
-            verifyMessage = body.message ?? null;
-          } else {
-            // Keep the provider's reason: "why did it not auto-confirm?"
-            // (message only — a raw error code is not a sentence)
-            verifyMessage = body.message ?? null;
-          }
+          // Keep the provider's reason: "why did it not auto-confirm?" — a
+          // message only, since a raw error code is not a sentence. Both a
+          // failure and an unexpected success shape fall through to the
+          // manual upload below with that reason attached.
+          verifyMessage = body.message ?? null;
           if (body.slipStored) {
             setResult({
               ok: false,
-              message: `${verifyMessage ?? 'ระบบตรวจสลิปยังไม่ยืนยันอัตโนมัติ'} — สลิปถูกส่งให้แอดมินตรวจแล้ว แอดมินจะยืนยันให้เร็วที่สุด`,
+              message: manualReviewMessage(verifyMessage),
               // Bangkok Bank (and GSB) only publish a transfer 2–3 minutes
               // after it happens, so "not found yet" is the NORMAL first
               // answer for a กรุงเทพ slip and a retry is what turns it into a
@@ -185,7 +190,7 @@ export function SlipUploadPanel({
         if (uploaded) {
           setResult({
             ok: false,
-            message: `${verifyMessage ?? 'ระบบตรวจสลิปยังไม่ยืนยันอัตโนมัติ'} — สลิปถูกส่งให้แอดมินตรวจแล้ว แอดมินจะยืนยันให้เร็วที่สุด`,
+            message: manualReviewMessage(verifyMessage),
           });
         }
       } else {
@@ -197,6 +202,11 @@ export function SlipUploadPanel({
       setBusy(false);
     }
   }
+
+  // A rejected slip is not a dead end: the picker stays so a corrected slip
+  // can be uploaded for the same order. A delayed slip already offers its own
+  // retry for the file that is sitting there, so it needs no second picker.
+  const showPicker = !result || (!result.ok && !result.retry);
 
   return (
     <div className="mt-4 rounded-lg border border-dashed border-line-brand bg-surface-brand-subtle p-4">
@@ -245,7 +255,7 @@ export function SlipUploadPanel({
         </Link>
       )}
 
-      {result ? (
+      {result && (
         <>
           <div
             className={cn(
@@ -288,7 +298,9 @@ export function SlipUploadPanel({
             </div>
           )}
         </>
-      ) : ticket ? null : (
+      )}
+
+      {showPicker && (
         <>
           {/* Wraps on a phone: the select button, thumbnail and submit used to
               share one 390px row and squeeze the submit label. */}

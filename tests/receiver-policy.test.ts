@@ -47,6 +47,16 @@ describe('checkReceiverMatch', () => {
     expect(checkReceiverMatch('199-1-73578-6', '199-1-xxx786')).toEqual({ ok: true });
   });
 
+  it('rejects a masked account whose visible digits sit in the wrong slots', () => {
+    // `1xx-9-73578-x` contains 73578 and starts with 1, so the old
+    // prefix/suffix/containment guessing accepted it; the 9 is where the store
+    // has a 1, i.e. a different account wearing the same visible digits.
+    expect(checkReceiverMatch('199-1-73578-6', '1xx-9-73578-x').ok).toBe(false);
+    // A mask one digit longer than the store account is another account, not a
+    // formatting quirk to guess around.
+    expect(checkReceiverMatch('199-1-73578-6', '199-1-xxx786-0').ok).toBe(false);
+  });
+
   it('still rejects the sender account and other shops behind that same mask', () => {
     // Sender's own account on the same slip.
     expect(checkReceiverMatch('199-1-73578-6', '540-7-xxx640').ok).toBe(false);

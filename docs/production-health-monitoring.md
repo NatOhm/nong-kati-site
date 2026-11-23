@@ -261,6 +261,13 @@ Paying late is safe (v1.1.12 accepts a slip after expiry), so the honest
 summary is: **tidiness and a few late-day coupons, not money.** That is why
 there is no scheduler in the codebase for this.
 
+One exception since 2026-11-22: `internal/orders/slip-recheck` re-checks a slip
+the bank had not published yet, and that IS money (a BBL/GSB transfer shows up
+2–3 minutes late, so the first answer is normally "not found"). Its fast path is
+an in-process timer fired right after the `SLIP_DELAYED` verdict; the sweep only
+catches what a restart or deploy dropped, which is why the 10-minute GitHub
+tick calls it (task 254's stored command does not include it yet).
+
 **The sweeps now tick on their own — Plesk task 254** (`*/10 * * * *`, Active,
 `housekeeping sweeps (10 min)`), which calls `internal/orders/expire`,
 `internal/promotions/expire` and `internal/email-outbox/drain`. It is a
@@ -325,6 +332,7 @@ endpoint is closed, admin or not:
 | Route | Answer with no `NK_CRON_SECRET` |
 | --- | --- |
 | `POST /api/v1/internal/orders/expire` | `503 {"error":"SWEEP_DISABLED"}` |
+| `POST /api/v1/internal/orders/slip-recheck` | `503 {"error":"SWEEP_DISABLED"}` |
 | `POST /api/v1/internal/promotions/expire` | `503 {"error":"SWEEP_DISABLED"}` |
 | `POST /api/v1/internal/media/sweep` | `503 {"error":"SWEEP_DISABLED"}` |
 | `POST /api/v1/internal/email-outbox/drain` | `503 {"error":"OUTBOX_DISABLED"}` |

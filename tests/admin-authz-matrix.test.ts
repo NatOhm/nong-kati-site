@@ -215,6 +215,9 @@ const ROUTE_COVERAGE: MatrixRow[] = [
     perm: 'orders:write',
     body: {},
   },
+  // Reads which account the bank reported for a manual slip. Same permission
+  // as the confirm button it protects: whoever releases the money may look.
+  { method: 'POST', path: '/orders/ord-1/slip-receiver', perm: 'orders:write', body: {} },
   { method: 'GET', path: '/orders/search', perm: 'orders:read' },
   { method: 'GET', path: '/orders/ord-1/delivery', perm: 'orders:delivery:reveal' },
   // record-only refund: 07-api.md §22. The gateway move happens in the

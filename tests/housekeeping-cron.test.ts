@@ -46,6 +46,7 @@ describe('housekeeping cron wiring (prod-health-monitor.yml)', () => {
       'internal/orders/expire',
       'internal/promotions/expire',
       'internal/email-outbox/drain',
+      'internal/orders/slip-recheck',
       'internal/settings/slip-retention',
       'internal/media/sweep?apply=1',
     ]) {
@@ -77,6 +78,7 @@ describe('housekeeping cron wiring (prod-health-monitor.yml)', () => {
       'internal/orders/expire/route.ts',
       'internal/promotions/expire/route.ts',
       'internal/email-outbox/drain/route.ts',
+      'internal/orders/slip-recheck/route.ts',
       'internal/settings/slip-retention/route.ts',
       'internal/media/sweep/route.ts',
     ];

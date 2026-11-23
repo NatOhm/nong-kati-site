@@ -82,6 +82,8 @@ describe('SlipUploadPanel — auto verify with admin fallback', () => {
 
     const box = await screen.findByRole('status');
     expect(box.textContent).toContain('2–3 นาที');
+    // The retry re-checks the file already on the order — no second picker.
+    expect(screen.queryByRole('button', { name: /เลือกสลิปใหม่|เลือกไฟล์สลิป/ })).toBeNull();
     const retry = screen.getByRole('button', { name: /ตรวจสลิปอีกครั้ง/ });
 
     // The bank has published it by the time the customer taps again.
@@ -91,6 +93,46 @@ describe('SlipUploadPanel — auto verify with admin fallback', () => {
       json: async () => ({ status: 'confirmed', codes: [], message: 'ตรวจสลิปผ่าน — ส่งโค้ดเรียบร้อยแล้ว' }),
     });
     fireEvent.click(retry);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const calls = fetchMock.mock.calls as unknown as FetchCall[];
+    expect(calls[1]![0]).toContain('/api/v1/payments/slip-verify');
+    expect((await screen.findByRole('status')).textContent).toContain('ตรวจสลิปผ่าน');
+  });
+
+  it('keeps the picker after a rejection so a corrected slip can be uploaded', async () => {
+    // Wrong amount / receiver mismatch used to replace the upload controls
+    // with the error box: the customer could only reload the page and start
+    // over, so a rejected slip was a dead end.
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 422,
+      json: async () => ({
+        error: 'RECEIVER_MISMATCH',
+        message: 'บัญชีผู้รับในสลิปไม่ตรงกับร้าน',
+        slipStored: true,
+      }),
+    });
+    render(<SlipUploadPanel orderId="o1" slipUploadToken="tok" slipVerifyEnabled />);
+    pickAndSubmit();
+
+    expect((await screen.findByRole('status')).textContent).toContain('บัญชีผู้รับในสลิปไม่ตรงกับร้าน');
+    const picker = screen.getByRole('button', { name: /เลือกสลิปใหม่/ });
+
+    // The corrected slip is checked against the same order.
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: 'confirmed', codes: [], message: 'ตรวจสลิปผ่าน — ส่งโค้ดเรียบร้อยแล้ว' }),
+    });
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, {
+      target: { files: [new File(['fixed-bytes'], 'fixed.png', { type: 'image/png' })] },
+    });
+    expect(picker.isConnected).toBe(true);
+    // Picking clears the old verdict, then the normal submit runs again.
+    expect(screen.queryByRole('status')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'ตรวจสลิป' }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     const calls = fetchMock.mock.calls as unknown as FetchCall[];

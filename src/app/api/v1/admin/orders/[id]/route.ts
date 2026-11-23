@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { checkPermission, maskEmail, maskPhone } from '@/lib/rbac';
 import { getAdminToken } from '@/lib/adminRequest';
+import { slipCheckView, slipReceiverView } from '@/lib/slipCheckReason';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,6 +50,9 @@ export async function GET(
           slipVerifiedBy: true,
           failureReason: true,
           gatewayStatusCode: true,
+          // Read by slipCheckView: the receiver diagnostic the detail modal
+          // shows while the admin decides whether to confirm the payment.
+          gatewayResponse: true,
           updatedAt: true,
         },
         orderBy: { updatedAt: 'desc' },
@@ -80,19 +84,10 @@ export async function GET(
           by: slipVerification.slipVerifiedBy ?? null,
         }
       : null,
-    slipCheck: slipVerification?.slipVerifiedRef
-      ? {
-          provider: slipVerification.slipVerifiedBy ?? null,
-          error: null,
-          checkedAt: slipVerification.slipVerifiedAt?.toISOString() ?? null,
-        }
-      : slipVerification?.failureReason
-        ? {
-            provider: slipVerification.gatewayStatusCode ?? null,
-            error: slipVerification.failureReason ?? '',
-            checkedAt: slipVerification.updatedAt?.toISOString() ?? null,
-          }
-        : null,
+    slipCheck: slipCheckView(slipVerification),
+    /** Where the bank says the money went — the manual slip has no verdict, so
+     * this is the only way the confirm modal can name the account. */
+    slipReceiver: slipReceiverView(slipVerification?.slipReceiverAccount),
     // Customer-uploaded slip for manual check (ส่งสลิปให้แอดมินตรวจ).
     slipImageUrl: order.slipImageUrl,
     slipUploadedAt: order.slipUploadedAt?.toISOString() ?? null,

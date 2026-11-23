@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { checkPermission, maskEmail } from '@/lib/rbac';
 import { getAdminToken } from '@/lib/adminRequest';
+import { slipCheckView, slipReceiverView } from '@/lib/slipCheckReason';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,6 +66,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
             slipVerifiedBy: true,
             failureReason: true,
             gatewayStatusCode: true,
+            // Read by slipCheckView for the receiver diagnostic the row
+            // tooltip shows (`receiver …1786 vs store …5786`).
+            gatewayResponse: true,
+            // The bank's masked receiver, stored by an auto-check or by the
+            // admin "read the receiver" action on a manual slip.
+            slipReceiverAccount: true,
             updatedAt: true,
           },
           orderBy: { updatedAt: 'desc' },
@@ -99,19 +106,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
           }
         : null,
       /** Last auto-check (success or fail) — null when never checked. */
-      slipCheck: o.paymentAttempts[0]?.slipVerifiedRef
-        ? {
-            provider: o.paymentAttempts[0].slipVerifiedBy ?? null,
-            error: null,
-            checkedAt: o.paymentAttempts[0].slipVerifiedAt?.toISOString() ?? null,
-          }
-        : o.paymentAttempts[0]?.failureReason
-          ? {
-              provider: o.paymentAttempts[0].gatewayStatusCode ?? null,
-              error: o.paymentAttempts[0].failureReason ?? '',
-              checkedAt: o.paymentAttempts[0].updatedAt?.toISOString() ?? null,
-            }
-          : null,
+      slipCheck: slipCheckView(o.paymentAttempts[0]),
+      /** Admin-facing last-4 of the account the bank reported (may be null). */
+      slipReceiver: slipReceiverView(o.paymentAttempts[0]?.slipReceiverAccount),
       createdAt: o.createdAt.toISOString(),
       completedAt: o.completedAt?.toISOString() ?? null,
     })),

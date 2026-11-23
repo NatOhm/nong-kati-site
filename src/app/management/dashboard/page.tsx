@@ -176,6 +176,17 @@ interface DashboardData {
     variantCount: number;
     lowStock: { id: string; sku: string; name: string; stock: number; threshold: number }[];
   };
+  /**
+   * Receiver-rule watch — `RECEIVER_MISMATCH` is fail-closed, so these counts
+   * are the only way to notice a mask format the rule cannot read before a
+   * customer writes in. `null` = counts unavailable, render nothing.
+   */
+  slipRule: {
+    windowHours: number;
+    current: { autoFails: number; confirmedAfterFail: number };
+    previous: { autoFails: number; confirmedAfterFail: number };
+    spike: boolean;
+  } | null;
   recentOrders: {
     id: string;
     customer: string;
@@ -228,6 +239,7 @@ const EMPTY: DashboardData = {
     returningCustomerRate: 0,
   },
   stock: { totalUnits: 0, variantCount: 0, lowStock: [] },
+  slipRule: null,
   recentOrders: [],
 };
 
@@ -277,6 +289,7 @@ export default function AdminDashboardPage(): React.JSX.Element {
   };
 
   const sales = data.sales;
+  const slipRule = data.slipRule;
   const revenue = data.revenue;
   const products = data.products;
   const customers = data.customers;
@@ -377,6 +390,49 @@ export default function AdminDashboardPage(): React.JSX.Element {
             iconBg="bg-surface text-fg-muted"
           />
         </div>
+
+        {/* ── Receiver-rule watch ──
+            RECEIVER_MISMATCH is a fail-closed verdict: a bank mask the rule
+            cannot read is indistinguishable from a customer paying the wrong
+            account, and both corrections on record were found by a complaint.
+            Shown only when the day has something to say, so the normal zero
+            does not become wallpaper; one admin override is worth seeing on
+            its own, a jump over yesterday is the rule drifting. */}
+        {slipRule &&
+          (slipRule.current.autoFails > 0 || slipRule.current.confirmedAfterFail > 0) && (
+            <div
+              className={cn(
+                'flex flex-wrap items-start gap-3 rounded-xl border px-4 py-3 text-sm',
+                slipRule.spike
+                  ? 'border-coral-300 bg-coral-50 text-fg-error dark:bg-coral-500/10'
+                  : 'border-amber-500/40 bg-amber-500/5 text-amber-800 dark:text-amber-200',
+              )}
+              role="status"
+            >
+              <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold">
+                  สลิปถูกปฏิเสธด้วยกฎบัญชีผู้รับ · {slipRule.windowHours} ชม.
+                </p>
+                <p className="mt-0.5 text-xs">
+                  {slipRule.current.autoFails} ครั้ง
+                  {slipRule.current.confirmedAfterFail > 0
+                    ? ` · แอดมินยืนยันเองหลังปฏิเสธ ${slipRule.current.confirmedAfterFail}`
+                    : ''}
+                  {` · ก่อนหน้า ${slipRule.previous.autoFails}`}
+                  {slipRule.spike
+                    ? ' — สูงผิดปกติ: เช็กว่าธนาคารเปลี่ยนรูปแบบหน้ากาก หรือบัญชีรับเงินในตั้งค่าถูกแก้'
+                    : ''}
+                </p>
+              </div>
+              <Link
+                href="/management/orders"
+                className="inline-flex items-center gap-1 text-xs font-semibold underline decoration-dotted underline-offset-2"
+              >
+                ดูคำสั่งซื้อ <ArrowUpRight size={13} />
+              </Link>
+            </div>
+          )}
 
         {/* ── Revenue Breakdown Bar ── */}
         <div className="rounded-xl border border-line-subtle bg-surface p-5">

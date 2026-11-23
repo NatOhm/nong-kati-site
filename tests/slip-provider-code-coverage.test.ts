@@ -21,8 +21,9 @@
  *
  * Directions:
  *
- *   SC1  every code the route maps is producible by at least one provider
- *        (a mapped code nobody can send is a dead branch).
+ *   SC1  every code the route maps is producible by at least one provider —
+ *        or by the route rules lib that took over its own verdicts on
+ *        2026-11-22 (a mapped code nobody can send is a dead branch).
  *   SC2  every code a provider can return has BOTH a status and a message
  *        (otherwise it answers 502 with the fallback sentence).
  *   SC3  the two maps are keyed identically, all statuses are 4xx/5xx and no
@@ -56,6 +57,13 @@ import { SLIP_CHECK_LABELS } from '@/lib/slipCheckReason';
 
 const SRC = path.join(__dirname, '..', 'src');
 const ROUTE_FILE = path.join(SRC, 'app/api/v1/payments/slip-verify/route.ts');
+/**
+ * Since 2026-11-22 the route's own verdicts (RECEIVER_UNCONFIGURED, the
+ * receiver policy) are produced in this lib, shared with the background
+ * re-check — so the "can the route produce it?" side of the audit has to read
+ * it too, or a real branch looks dead.
+ */
+const RULES_FILE = path.join(SRC, 'lib/payment/slipVerifyFlow.ts');
 
 interface ProviderSource {
   name: string;
@@ -152,9 +160,13 @@ function audit(routeSrc: string, providers: { name: string; src: string; mapper:
   return { status, messages, produced, deadInRoute, unmapped };
 }
 
-const realAudit = audit(readFileSync(ROUTE_FILE, 'utf8'), [
-  ...PROVIDERS.map((p) => ({ name: p.name, src: readFileSync(p.file, 'utf8'), mapper: p.mapper })),
-]);
+const realAudit = audit(
+  // The rules lib is concatenated, not registered as a provider: its codes are
+  // the ROUTE's own verdicts (`routeOwnCodes` scans the whole text), and a
+  // block scan would stop at the parameter type's braces.
+  `${readFileSync(ROUTE_FILE, 'utf8')}\n${readFileSync(RULES_FILE, 'utf8')}`,
+  PROVIDERS.map((p) => ({ name: p.name, src: readFileSync(p.file, 'utf8'), mapper: p.mapper })),
+);
 
 describe('slip-verify → provider code coverage', () => {
   it('SC1: every code the route maps is producible by a provider', () => {
