@@ -10,11 +10,11 @@ below is what actually shipped the live build.
 > script does. This file predates the script.
 
 > **Current live build (Nov 22, 2026): `c24db74`, v1.2.3 #551, BUILD_ID `ohsTY9SJ1GyvV3ZuZktga`.** Repo HEAD is
-> 12 commits ahead of live (`28fdc4c`): 1.2.3 shipped the legal-page breadcrumbs and a health monitor
+> 13 commits ahead of live (`e33b0fb`): 1.2.3 shipped the legal-page breadcrumbs and a health monitor
 > that reports its own run verdict, and the commits since carry the homepage v2 palette, the slip-flow
-> work and the 1.2.4 re-check handover. **Pending release: 1.2.4 (#562), built from a clean tree at
-> `1d38b00`, BUILD_ID `i_m-0_-floMKGzxE98qP-`, GIT_SHA
-> `1d38b006d3db854364ef94520161b2417fc92385` — built and logged, but not published yet**, so no
+> work and the 1.2.4 re-check handover. **Pending release: 1.2.4 (#564), built from a clean tree at
+> `e33b0fb`, BUILD_ID `N6N9XVrZgZw8J8IifAnmS`, GIT_SHA
+> `e33b0fb316bb11e7e1040a2cfcc527840c39ff33` — build #564; built and logged, but not published yet**, so no
 > `deploy-artifact` orphan exists for it: Step 2's URL and both `grep -Fxq` literals still name the
 > 1.2.3 bundle (`ohsTY9SJ1GyvV3ZuZktga` + `c24db74…`). Re-pin task 250 with the pair above — and paste
 > the artifact commit `scripts/deploy-artifact.sh` prints into the URL — as the first thing after
