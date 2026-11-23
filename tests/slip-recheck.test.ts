@@ -14,6 +14,9 @@
  *   · nothing spends a provider credit for an order that is no longer
  *     payable, for a slip whose file is gone, or when another runner already
  *     claimed the check (the timer and the sweep can fire together);
+ *   · a reconciliation failure (the bank verified the money, nothing recorded
+ *     it) counts as a spent retry and closes at the same cap, instead of
+ *     re-paying and re-pinging every backoff until the window ages out;
  *   · the sweep's query only ever selects delayed, payable, stored slips;
  *   · the internal endpoint keeps the sibling sweeps' fail-closed auth.
  *
@@ -287,18 +290,66 @@ describe('recheckDelayedAttempt — never spends a credit it cannot use', () => 
     );
   });
 
-  it('escalates when the bank said paid but nothing could record it', async () => {
+  it('spends a retry when the bank said paid but nothing could record it', async () => {
     seededVerify();
     // Both the confirmation and the parking transaction fail, so the payment
-    // exists nowhere but the reconciliation trail.
-    prismaMock.paymentAttempt.update.mockRejectedValue(new Error('db down'));
+    // exists nowhere but the reconciliation trail. The stamp write that follows
+    // succeeds, which is what the sweep reads next round.
+    prismaMock.paymentAttempt.update
+      .mockRejectedValueOnce(new Error('db down'))
+      .mockRejectedValueOnce(new Error('db down'));
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const outcome = await recheckDelayedAttempt('att-1');
+
+      // Not a verdict: the attempt stays queued for one more try…
+      expect(outcome).toEqual({ kind: 'delayed', rechecks: 1 });
+      const update = prismaMock.paymentAttempt.update.mock.calls[2]![0] as {
+        data: Record<string, unknown>;
+      };
+      // …and the credit is on the record, so the sweep cannot re-pay this slip
+      // every 2.5 minutes until the window runs out.
+      expect(update.data).toMatchObject({
+        gatewayResponse: { error: 'RECONCILIATION_FAILED', rechecks: 1 },
+      });
+      expect(update.data['status']).toBeUndefined();
+      expect(update.data['failureReason']).toBeUndefined();
+      // Still queued ⇒ nothing to escalate yet.
+      expect(notifyMock.notifyPaymentPending).not.toHaveBeenCalled();
+    } finally {
+      error.mockRestore();
+    }
+  });
+
+  it('closes a reconfirmed reconciliation failure at the retry cap', async () => {
+    seededVerify();
+    prismaMock.paymentAttempt.findUnique.mockResolvedValue(
+      attemptRow({
+        gatewayResponse: { error: 'RECONCILIATION_FAILED', rechecks: SLIP_RECHECK_MAX_ATTEMPTS - 1 },
+      }),
+    );
+    prismaMock.paymentAttempt.update
+      .mockRejectedValueOnce(new Error('db down'))
+      .mockRejectedValueOnce(new Error('db down'));
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     try {
       const outcome = await recheckDelayedAttempt('att-1');
 
       expect(outcome).toEqual({ kind: 'closed', detail: 'reconciliation_failed' });
+      const update = prismaMock.paymentAttempt.update.mock.calls[2]![0] as {
+        data: Record<string, unknown>;
+      };
+      // `failed` takes it out of the sweep, and the count is at the cap.
+      expect(update.data).toMatchObject({
+        status: 'failed',
+        gatewayResponse: {
+          error: 'RECONCILIATION_FAILED',
+          rechecks: SLIP_RECHECK_MAX_ATTEMPTS,
+        },
+      });
+      // The auto-check just gave up on a verified-paid order — a human must know.
       expect(notifyMock.notifyPaymentPending).toHaveBeenCalledWith(
-        expect.objectContaining({ orderNumber: 'NK-2026-000735' }),
+        expect.objectContaining({ orderNumber: 'NK-2026-000735', totalThb: 735 }),
       );
     } finally {
       error.mockRestore();

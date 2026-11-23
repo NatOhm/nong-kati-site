@@ -271,9 +271,40 @@ export async function recheckDelayedAttempt(attemptId: string): Promise<RecheckO
 
   if (outcome.kind === 'confirmed') return { kind: 'confirmed' };
   if (outcome.kind === 'parked') return { kind: 'parked', reason: outcome.reason };
-  // The bank verified the money but nothing recorded it — the reconciliation
-  // trail is all that exists, so the admin must be told, not just a log line.
-  if (outcome.kind === 'reconciliation_failed') notifyRecheckClosed(order);
+
+  if (outcome.kind === 'reconciliation_failed') {
+    // The bank verified the money but neither the confirmation nor the parking
+    // write recorded it. That is not a verdict, so the attempt stays in the
+    // sweep for another try — but this check DID spend a credit, and the only
+    // record of it is this stamp. Without it the sweep re-verified the same slip
+    // (and re-pinged) every 2.5 minutes until the 20-minute window aged the row
+    // out, so the 3-call cap never applied to the one branch that keeps failing.
+    const stillDue = nextCount < SLIP_RECHECK_MAX_ATTEMPTS;
+    await prisma.paymentAttempt
+      .update({
+        where: { id: attempt.id },
+        data: {
+          // `failureReason` stays SLIP_DELAYED while retries remain: the sweep
+          // selects on it. At the cap `failed` is what takes the row out.
+          ...(stillDue ? {} : { status: 'failed' }),
+          gatewayResponse: stamp({
+            // No failure code here to name the provider with — the verification
+            // succeeded, so the successful answer's own attribution says who.
+            provider: verification.verifiedBy,
+            error: 'RECONCILIATION_FAILED',
+            detail: outcome.error,
+            rechecks: nextCount,
+          }),
+        },
+      })
+      .catch(() => undefined);
+    if (stillDue) return { kind: 'delayed', rechecks: nextCount };
+    // The budget is spent, so the auto-check is over — the reconciliation trail
+    // is all that exists and the admin must be told, not just a log line.
+    notifyRecheckClosed(order);
+    return { kind: 'closed', detail: 'reconciliation_failed' };
+  }
+
   // duplicate / already_claimed: another writer owns this payment. Nothing
   // left to retry and nothing to escalate.
   return { kind: 'closed', detail: outcome.kind };
