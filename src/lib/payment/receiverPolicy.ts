@@ -32,6 +32,18 @@
  * 9 = 9, same account, yet `RECEIVER_MISMATCH`). The compare is therefore
  * containment — the slip's exposed run must appear inside the store digits
  * (or vice versa) — not tail equality.
+ *
+ * 2026-11-22 correction: not every bank hides the tail. A Bangkok Bank slip
+ * paid to this same account prints the receiver as `199-1-xxx786` — front
+ * AND tail visible, middle hidden — so its digits (`1991786`) are not one
+ * contiguous run and containment rejected a genuine กรุงเทพ slip even though
+ * nothing was wrong with it. A masked account is therefore also compared
+ * position by position: one mask char hides one digit, every visible digit
+ * must equal the store digit in that same slot, and the digit count must
+ * match. The prefix/suffix guessing is gone — with the mask's own layout as
+ * the ruler, a different account can only pass by hiding every digit that
+ * tells the two apart. Anything with fewer than 4 visible digits
+ * still trusts the provider (nothing to compare).
  */
 
 /** Digits only — strips spaces/dashes/mask chars from account numbers. */
@@ -51,11 +63,48 @@ export function storeReceiverDigits(
 
 export type ReceiverVerdict = { ok: true } | { ok: false; detail: string };
 
+/** Mask characters a provider may print for the hidden part of an account. */
+const MASK_CHARS = 'xX*•·#';
+
+/** Provider text → visible digits and masks only, in the bank's own order. */
+function maskPattern(v: string): string {
+  return Array.from(v)
+    .filter((ch) => /[0-9]/.test(ch) || MASK_CHARS.includes(ch))
+    .join('');
+}
+
+/**
+ * Does the provider's masked account line up with the store account?
+ *
+ * Providers print the account in the bank's own digit groups, with one mask
+ * char per hidden digit, so the mask itself is a positional template
+ * (`199-1-73578-6` → `199-1-xxx786`, or `xxx-x-x3578-x`). Squeezing the
+ * separators out leaves visible digits and masks in the store's own order:
+ * every visible digit must equal the store digit in that slot, and the total
+ * length must match — a truncated or different-length account is a different
+ * account and is rejected rather than guessed at.
+ */
+function maskMatches(want: string, slipReceiver: string): boolean {
+  const pattern = maskPattern(slipReceiver);
+  if (pattern.length !== want.length) return false;
+  let hasMask = false;
+  for (let i = 0; i < pattern.length; i++) {
+    const ch = pattern.charAt(i);
+    // maskPattern leaves only digits and masks, so this is the whole test.
+    if (/[0-9]/.test(ch)) {
+      if (ch !== want.charAt(i)) return false;
+    } else {
+      hasMask = true;
+    }
+  }
+  return hasMask;
+}
+
 /**
  * Compare the slip's receiver against the store account. Providers report
- * masked accounts ("xxx-x-x3578-x" for store `199-1-73578-6`), so the
- * exposed digit run must appear inside the store digits (or vice versa),
- * and only when both sides yield at least 4 digits.
+ * masked accounts ("xxx-x-x3578-x" for store `199-1-73578-6`), so a visible
+ * run must appear inside the store digits (or vice versa), or the whole mask
+ * must line up positionally; only when both sides yield at least 4 digits.
  */
 export function checkReceiverMatch(
   storeAccount: string | null | undefined,
@@ -65,5 +114,6 @@ export function checkReceiverMatch(
   const got = normalizeAccountDigits(slipReceiver);
   if (want.length < 4 || got.length < 4) return { ok: true };
   if (want.includes(got) || got.includes(want)) return { ok: true };
+  if (maskMatches(want, slipReceiver ?? '')) return { ok: true };
   return { ok: false, detail: `receiver …${got.slice(-4)} vs store …${want.slice(-4)}` };
 }

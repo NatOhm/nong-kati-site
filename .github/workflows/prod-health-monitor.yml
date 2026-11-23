@@ -166,7 +166,7 @@ jobs:
             echo "::error title=NK_CRON_SECRET missing::add it as a repo secret (same value as the server .env). The internal endpoints fail closed with 503 until then, so no sweep can run."
             exit 1
           fi
-          endpoints="internal/orders/expire internal/promotions/expire internal/email-outbox/drain"
+          endpoints="internal/orders/expire internal/promotions/expire internal/email-outbox/drain internal/orders/slip-recheck"
           # Daily (not every 10 minutes): both of these are storage housekeeping
           # that scans a table or a directory, so a tick per day is the right
           # cadence. `?apply=1` is what turns the media sweep from a report into

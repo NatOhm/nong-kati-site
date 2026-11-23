@@ -967,3 +967,35 @@ describe('the confirmed panel stays on screen', () => {
     expect(page).toContain("order && paymentState.status !== 'succeeded'");
   });
 });
+describe('paid-retry budget across a customer retry (2026-11-23)', () => {
+  it('carries gatewayResponse.rechecks forward instead of resetting the budget', async () => {
+    // Each background re-check is a paid provider call, capped at 3 per slip.
+    // The route stamped a brand-new gatewayResponse on every retry, dropping
+    // rechecks, so a resubmit handed the sweep a fresh budget every time.
+    h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
+    // Persistent, not a single-use value: earlier cases leave queued ones behind
+    // (clearAllMocks resets calls, not implementations), and this case must
+    // see its own delayed verdict.
+    h.slip2go.verifySlip2Go.mockReset();
+    h.slip2go.verifySlip2Go.mockResolvedValue({
+      ok: false,
+      code: 'SLIP_DELAYED',
+      detail: '200404: ไม่พบรายการ',
+    });
+    h.prisma.paymentAttempt.findFirst.mockResolvedValueOnce({
+      id: 'att-flow',
+      gatewayResponse: { error: 'SLIP_DELAYED', rechecks: 2 },
+    });
+
+    const res = await callVerify();
+    expect(res.status).toBe(502);
+    expect(h.prisma.paymentAttempt.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          failureReason: 'SLIP_DELAYED',
+          gatewayResponse: expect.objectContaining({ rechecks: 2 }),
+        }),
+      }),
+    );
+  });
+});

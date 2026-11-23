@@ -79,9 +79,12 @@ describe('slip-verify recovery claims through the shared helper (production revi
     // tests/payment-recovery.test.ts, which mocks the helper — this guards
     // against someone re-inlining a bare updateMany that skips coupons.)
     const fs = await import('node:fs');
-    const src = fs.readFileSync('src/app/api/v1/payments/slip-verify/route.ts', 'utf8');
+    // The recovery transaction moved to src/lib/payment/slipConfirmation.ts on
+    // 2026-11-23 so the background re-check settles through the same code; the
+    // assertion follows the owner instead of the old route copy.
+    const src = fs.readFileSync('src/lib/payment/slipConfirmation.ts', 'utf8');
     const recovery = src.slice(src.indexOf('INSUFFICIENT_STOCK') /* first marker */);
-    expect(recovery).toContain('claimOrderForConfirmation(order.id, tx, { paidExternally: true })');
+    expect(recovery).toContain('claimOrderForConfirmation(orderId, tx, { paidExternally: true })');
     // No bare order-status write inside the recovery transaction.
     expect(recovery).not.toMatch(/tx\.order\.updateMany\(/);
     expect(recovery).toContain("manualFulfilmentReason: 'INSUFFICIENT_STOCK'");

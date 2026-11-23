@@ -152,7 +152,12 @@ function audit(routeSrc: string, providers: { name: string; src: string; mapper:
   return { status, messages, produced, deadInRoute, unmapped };
 }
 
-const realAudit = audit(readFileSync(ROUTE_FILE, 'utf8'), [
+// The route's OWN refusals (no provider involved) live in slipVerifyFlow.ts
+// since 2026-11-23, so the background re-check applies the same rule. Scan that
+// file too, or `RECEIVER_UNCONFIGURED` reads as a dead branch in the route.
+const FLOW_FILE = path.join(SRC, 'lib/payment/slipVerifyFlow.ts');
+
+const realAudit = audit(readFileSync(ROUTE_FILE, 'utf8') + '\n' + readFileSync(FLOW_FILE, 'utf8'), [
   ...PROVIDERS.map((p) => ({ name: p.name, src: readFileSync(p.file, 'utf8'), mapper: p.mapper })),
 ]);
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { claimOrderForConfirmation, getOrderById } from '@/api/orders';
+import { getOrderById } from '@/api/orders';
 import { prisma } from '@/lib/db';
 import { getManualTransferInfo } from '@/lib/data';
 import {
@@ -8,88 +8,23 @@ import {
   notifyPaymentPending,
   notifyStockAlertsForVariants,
 } from '@/lib/notify';
-import { fulfilOrder, scheduleOutboxDrain } from '@/lib/fulfilment';
+import { scheduleOutboxDrain } from '@/lib/fulfilment';
 import { getDeliveredCodes } from '@/lib/delivery/customerCodes';
-import { recordPaymentReconciliation } from '@/lib/paymentReconciliation';
-import {
-  CONFIRM_TX_ATTEMPTS,
-  CONFIRM_TX_MAX_WAIT_MS,
-  CONFIRM_TX_RETRY_DELAY_MS,
-  CONFIRM_TX_TIMEOUT_MS,
-  PARK_TX_TIMEOUT_MS,
-} from '@/lib/slipConfirmBudget';
 import { getClientIp, checkRateLimit } from '@/lib/rateLimit';
-import { isSlip2GoEnabled, verifySlip2Go } from '@/lib/payment/slip2go';
-import { checkReceiverMatch, storeReceiverDigits } from '@/lib/payment/receiverPolicy';
-import { isSlipVerificationEnabled, verifySlip } from '@/lib/payment/slipok';
+import { confirmVerifiedSlip } from '@/lib/payment/slipConfirmation';
+import {
+  isSlipAutoVerifyEnabled,
+  primarySlipProvider,
+  verifySlipImage,
+} from '@/lib/payment/slipVerifyFlow';
 import { isValidSlipUploadToken, mintSlipStorageKey, slipImageRoute } from '@/lib/slipSecurity';
+import { recheckCount, scheduleSlipRecheck } from '@/lib/slipRecheck';
 import { writeSlip } from '@/lib/slipStore';
 
 export const dynamic = 'force-dynamic';
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // SlipOK accepts up to ~10MB; we cap tighter
 
-
-function prismaErrorCode(e: unknown): string | null {
-  const code = (e as { code?: unknown } | null)?.code;
-  return typeof code === 'string' ? code : null;
-}
-
-/** True when the transaction itself was lost, not when the work inside failed. */
-function isRetryableConfirmationError(e: unknown): boolean {
-  const code = prismaErrorCode(e);
-  if (code === 'P2028' || code === 'P2034') return true;
-  const msg = e instanceof Error ? e.message : String(e);
-  return (
-    msg.includes('Transaction not found') ||
-    msg.includes('old closed transaction') ||
-    msg.includes('Transaction already closed') ||
-    msg.includes('Write conflict') ||
-    msg.includes('could not serialize access')
-  );
-}
-
-/**
- * Run the confirmation, retrying once when the transaction expired under us.
- * Bounded: the caller's error handling (unique-slip, ALREADY_CLAIMED, stock,
- * parking) sees the last failure exactly as it saw a single one before.
- */
-async function withConfirmationRetry<T>(run: () => Promise<T>): Promise<T> {
-  for (let attemptNo = 1; ; attemptNo += 1) {
-    try {
-      return await run();
-    } catch (e) {
-      if (attemptNo >= CONFIRM_TX_ATTEMPTS || !isRetryableConfirmationError(e)) throw e;
-      console.warn('[slip-verify] confirmation transaction expired — retrying once', {
-        code: prismaErrorCode(e),
-      });
-      await new Promise((resolve) => setTimeout(resolve, CONFIRM_TX_RETRY_DELAY_MS));
-    }
-  }
-}
-
-/**
- * Automatic verification is on when EITHER provider is configured — the
- * client's merchant account is Slip2Go; SlipOK remains a drop-in fallback.
- */
-function isSlipAutoVerifyEnabled(): boolean {
-  return isSlip2GoEnabled() || isSlipVerificationEnabled();
-}
-
-type ProviderResult =
-  | Awaited<ReturnType<typeof verifySlip>>
-  | Awaited<ReturnType<typeof verifySlip2Go>>;
-
-/** The route's own refusals — verdicts no provider will ever return. */
-type RouteResult = {
-  ok: false;
-  code: 'RECEIVER_UNCONFIGURED';
-  detail: string;
-};
-
-type VerifyResult = ProviderResult | RouteResult;
-
-/** Transient/config failures worth retrying on the other provider. */
 /**
  * One sentence for "this slip has already confirmed a payment", whichever
  * layer noticed it: the provider's duplicate answer (Slip2Go 200501 / SlipOK
@@ -100,34 +35,32 @@ type VerifyResult = ProviderResult | RouteResult;
 const SLIP_ALREADY_USED_MESSAGE =
   'สลิปนี้ถูกใช้ยืนยันคำสั่งซื้อไปแล้ว — เปิดหน้าคำสั่งซื้อเพื่อดูโค้ดที่ได้รับ ถ้าไม่ใช่คำสั่งซื้อนี้ ติดต่อแอดมิน';
 
-const RETRYABLE_ON_FALLBACK = new Set([
-  'UPSTREAM_ERROR',
-  'QUOTA_EXCEEDED',
-  'RATE_LIMITED',
-  'NOT_CONFIGURED',
-]);
-
-
-/** GET — feature probe for the checkout page (panel renders only when on). */
+/**
+ * GET — feature probe for the checkout page (panel renders only when on).
+ */
 export async function GET(): Promise<NextResponse> {
   return NextResponse.json({ enabled: isSlipAutoVerifyEnabled() });
 }
 
 /**
- * POST /api/v1/payments/slip-verify — automatic slip verification (SlipOK).
+ * POST /api/v1/payments/slip-verify — automatic slip verification.
  * Body: multipart { orderId, token, slip: File } — the same capability token
  * the manual upload requires (HMAC over orderId+confirmationUuid, minted
  * into the checkout response). JSON { orderId, token, imageBase64 } also works.
  *
  * Review finding (Medium): an order ID + a matching-amount slip used to be
  * enough — anyone who learned an order ID could confirm and fulfil somebody
- * else's order. The capability check now runs BEFORE contacting SlipOK or
- * spending quota. Flow after authorization: strict checks (amount exact, ref
- * never used anywhere) → atomically claim + settle the attempt + fulfil in
- * the SAME transaction. Manual admin confirm remains as fallback.
+ * else's order. The capability check now runs BEFORE contacting a provider or
+ * spending quota.
  *
- * Rate limit: 10 verifications / 10 minutes per IP (each call costs SlipOK
- * quota, so abuse has a real cost).
+ * The two halves of the decision live in shared libs, because the background
+ * re-check of a delayed slip runs the same rule and the same money
+ * transaction: `verifySlipImage` (provider + receiver policy) and
+ * `confirmVerifiedSlip` (settle + claim + deliver). This file owns the HTTP
+ * shape only.
+ *
+ * Rate limit: 10 verifications / 10 minutes per IP (each call costs quota, so
+ * abuse has a real cost).
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!isSlipAutoVerifyEnabled()) {
@@ -191,7 +124,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   // Capability check (review Medium): possession of an order ID must not
   // authorize confirming it. Same HMAC token as the manual upload — checked
-  // before any SlipOK call so attackers cannot ride our verification quota
+  // before any provider call so attackers cannot ride our verification quota
   // either.
   if (!uploadToken || !isValidSlipUploadToken(orderId, uploadToken)) {
     return NextResponse.json({ error: 'INVALID_UPLOAD_TOKEN' }, { status: 403 });
@@ -208,27 +141,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
   const expected = Number(order.totalAmountThb);
 
-  // Strict receiver: the store's own receiving account (digits only) is sent
-  // bank-side via checkReceiver AND compared here by receiverPolicy — the
-  // single owner of the rule.
+  // Strict receiver: the store's own receiving account is resolved and applied
+  // by verifySlipImage (src/lib/payment/slipVerifyFlow.ts) — one owner for the
+  // "is this our account?" rule, shared with the background re-check.
   //
-  // Fail CLOSED without it (2026-11-21). The bank-side condition is belt-only
+  // Fail CLOSED without it (2026-11-21): the bank-side condition is belt-only
   // (the 2026-10-30 live probe sent a wrong accountNumber and still got
-  // 200200), so with no store account there is no receiver check at all: a
-  // slip paid to ANY account would confirm an order and release codes. A store
-  // with no configured account is a configuration fault, not a customer one —
-  // the money is real — so the slip is parked for manual review (stored, admin
-  // pinged, order still payable) and the provider is not even called: a credit
-  // spent on a verdict we must not act on buys nothing.
+  // 200200), so with no store account a slip paid to ANY account could confirm
+  // an order and release codes. The lib refuses and parks the slip for manual
+  // review without calling a provider — a credit spent on a verdict we must
+  // not act on buys nothing.
   const manualInfo = await getManualTransferInfo();
-  const storeDigits = storeReceiverDigits(manualInfo.accountNumber);
-  const receiverConfigured = storeDigits !== '';
-  const receiverOpt = receiverConfigured ? { expectedReceiverDigits: storeDigits } : {};
-  if (!receiverConfigured) {
-    console.error(
-      '[slip-verify] store receiving account not configured — auto-verify refused, slip parked for manual review',
-    );
-  }
 
   // ── Keep the evidence FIRST ──────────────────────────────────────────────
   // Whatever the provider answers (pass, amount mismatch, outage), the
@@ -251,7 +174,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     console.error('[slip-verify] could not persist slip evidence:', err);
   }
 
-  let usedProvider = isSlip2GoEnabled() ? 'slip2go' : 'slipok';
+  const gatewayName = primarySlipProvider();
 
   // ── An attempt row to record the verdict on ─────────────────────────────
   // Production checkout is manual-transfer: it shows the store's bank account
@@ -261,18 +184,25 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // every real slip ended in the manual queue and the order expired. Create
   // the pending attempt here instead of requiring the QR flow.
   let attempt: { id: string } | null = null;
+  // A retry is a fresh check, not a fresh budget: the provider calls the
+  // background re-check already spent are carried forward, or every tap of
+  // ตรวจสลิปอีกครั้ง would reset the cap and buy three more.
+  let priorRechecks = 0;
   try {
-    attempt = await prisma.paymentAttempt.findFirst({
+    const existing = await prisma.paymentAttempt.findFirst({
       where: { orderId: order.id, status: 'pending', paymentMethod: 'promptpay' },
       orderBy: { createdAt: 'desc' },
-      select: { id: true },
+      select: { id: true, gatewayResponse: true },
     });
-    if (!attempt) {
+    if (existing) {
+      attempt = { id: existing.id };
+      priorRechecks = recheckCount(existing.gatewayResponse);
+    } else {
       attempt = await prisma.paymentAttempt.create({
         data: {
           orderId: order.id,
           paymentMethod: 'promptpay',
-          gatewayName: usedProvider,
+          gatewayName,
           amountThb: order.totalAmountThb,
           status: 'pending',
         },
@@ -283,55 +213,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     console.error('[slip-verify] could not create the payment attempt:', err);
   }
 
-  // ── Ask the configured providers (Slip2Go preferred, SlipOK fallback) ──
-  let result: VerifyResult;
-  if (!receiverConfigured) {
-    // No receiver guard → no auto-confirmation and no provider call (see the
-    // fail-closed note above). Flows through the failure branch below, which
-    // keeps the evidence, pings the admin and stamps the reason on the attempt.
-    result = {
-      ok: false,
-      code: 'RECEIVER_UNCONFIGURED',
-      detail: 'store receiving account not configured',
-    };
-  } else if (isSlip2GoEnabled()) {
-    result = await verifySlip2Go({ imageBase64, expectedAmountThb: expected, ...receiverOpt });
-  } else {
-    result = await verifySlip({ imageBase64, expectedAmountThb: expected });
-  }
-  if (!result.ok && RETRYABLE_ON_FALLBACK.has(result.code)) {
-    // Slip2Go down / quota spent / config broken — retry on the OTHER
-    // provider when one is configured, so a real slip can still confirm
-    // instead of being dumped into the manual queue.
-    const canRetry = isSlip2GoEnabled() ? isSlipVerificationEnabled() : isSlip2GoEnabled();
-    if (canRetry) {
-      result = isSlip2GoEnabled()
-        ? await verifySlip({ imageBase64, expectedAmountThb: expected })
-        : await verifySlip2Go({ imageBase64, expectedAmountThb: expected, ...receiverOpt });
-      usedProvider = isSlip2GoEnabled() ? 'slipok' : 'slip2go';
-    }
-  }
-  // ── Receiver policy (one owner: receiverPolicy.ts) ────────────────────
-  // Applied after ANY provider succeeds, because the bank-side condition is
-  // not trustworthy on its own (the 2026-10-30 live proof sent a wrong
-  // accountNumber and got 200200 instead of 200401) and the SlipOK fallback
-  // carries no receiver condition at all. An unconfigured store account never
-  // reaches this point: the route refuses to auto-confirm before any provider
-  // call (see the fail-closed note above).
-  if (result.ok) {
-    const verdict = checkReceiverMatch(manualInfo.accountNumber, result.receiverAccount);
-    if (!verdict.ok) {
-      result = { ok: false, code: 'RECEIVER_MISMATCH', detail: verdict.detail };
-    }
-  }
-
-  const verifiedBy = usedProvider === 'slip2go' ? 'slip2go:auto' : 'slipok:auto';
+  // ── Ask the configured providers ────────────────────────────────────────
+  const result = await verifySlipImage({
+    imageBase64,
+    expectedAmountThb: expected,
+    storeAccountNumber: manualInfo.accountNumber,
+  });
 
   if (!result.ok) {
     // A local refusal never touched a provider. Naming one in the attempt row
     // would make จัดการคำสั่งซื้อ's tooltip read "Slip2Go" for a call that never
-    // happened, so this column stays null for RECEIVER_UNCONFIGURED.
-    const providerLabel = result.code === 'RECEIVER_UNCONFIGURED' ? null : usedProvider;
+    // happened, so `provider` is null for RECEIVER_UNCONFIGURED.
+    const providerLabel = result.provider;
     // Provider diagnostics (client feedback 19 Oct: auto-verify failures
     // were undiagnosable). Ids and codes only — never the slip bytes.
     console.warn('[slip-verify] auto-verify failed', {
@@ -352,11 +245,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           data: {
             failureReason: result.code,
             gatewayStatusCode: providerLabel,
+            // When a provider DID answer (a receiver mismatch or amount
+            // check), keep the account it named: the admin sees it next to
+            // the confirm button instead of only inside the tooltip prose.
+            ...(result.receiverAccount ? { slipReceiverAccount: result.receiverAccount } : {}),
             gatewayResponse: {
               provider: providerLabel,
               error: result.code,
               detail: result.detail ?? null,
               checkedAt: new Date().toISOString(),
+              ...(priorRechecks > 0 ? { rechecks: priorRechecks } : {}),
             },
           },
         });
@@ -364,6 +262,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     } catch {
       // Diagnostics only — the customer response + admin ping below still run.
     }
+    // A bank that has not published the transfer yet is the ONE verdict worth
+    // asking again: BBL/GSB publish 2–3 minutes late, so a genuine slip
+    // answers "not found" first. Schedule that re-check server-side now — the
+    // customer may close the tab, and then nobody is left to tap the button.
+    // The sweep (10-minute tick) covers anything this in-process timer loses
+    // to a restart.
+    if (result.code === 'SLIP_DELAYED' && attempt) scheduleSlipRecheck(attempt.id);
     // Mapped, honest errors — the customer can fix and retry. Every branch
     // leaves the order untouched (still payable, admin fallback intact).
     const statusByCode: Record<string, number> = {
@@ -399,8 +304,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       RECEIVER_UNCONFIGURED: slipStored
         ? 'ร้านยังไม่ได้ตั้งบัญชีรับเงินสำหรับตรวจสลิปอัตโนมัติ — ส่งสลิปให้แอดมินตรวจสอบให้แล้ว'
         : 'ร้านยังไม่ได้ตั้งบัญชีรับเงินสำหรับตรวจสลิปอัตโนมัติ — รอแอดมินตรวจสอบให้',
+      // The customer keeps this sentence even though we now retry for them:
+      // the re-check is not a promise, and the admin fallback still stands.
       SLIP_DELAYED:
-        'ธนาคารยังไม่พบข้อมูลสลิปนี้ (บางธนาคารใช้เวลาส่งข้อมูล 2–3 นาที) — รอสักครู่แล้วลองใหม่ หรือรอแอดมินตรวจให้',
+        'ธนาคารยังไม่พบข้อมูลสลิปนี้ (บางธนาคารใช้เวลาส่งข้อมูล 2–3 นาที) — ระบบจะตรวจซ้ำให้อัตโนมัติ หรือรอแอดมินตรวจให้',
       SLIP_DUPLICATE: SLIP_ALREADY_USED_MESSAGE,
     };
     // The slip is stored and queued for manual review — ping the admin now
@@ -447,218 +354,52 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       { status: 409 },
     );
   }
-  // Flat id: the transaction callbacks below cannot see the narrowing of a
-  // mutable `let`.
-  const attemptId = attempt.id;
 
-  // Global one-slip-one-order guard: the unique index rejects a ref that any
-  // other attempt already used. Race losers fall into the catch below.
-  try {
-    await withConfirmationRetry(() =>
-      prisma.$transaction(
-        async (tx) => {
-          await tx.paymentAttempt.update({
-            where: { id: attemptId },
-            data: {
-              status: 'succeeded',
-              slipVerifiedRef: result.ref,
-              slipVerifiedAt: new Date(),
-              slipReceiverAccount: result.receiverAccount,
-              slipVerifiedBy: verifiedBy,
-              gatewayResponse: result.raw as object,
-            },
-          });
-          // Production review HIGH-2: the bank verified this transfer (Slip2Go/SlipOK);
-          // coupon state changes after QR issuance cannot strand the money.
-          const claimed = await claimOrderForConfirmation(order.id, tx, { paidExternally: true });
-          if (!claimed) throw new Error('ALREADY_CLAIMED');
-          const fulfilment = await fulfilOrder(order.id, tx);
-          if (fulfilment.error === 'INSUFFICIENT_STOCK') throw new Error('INSUFFICIENT_STOCK');
-          if (fulfilment.error && fulfilment.error !== 'ALREADY_FULFILLED') {
-            throw new Error(fulfilment.error);
-          }
-          return claimed;
-        },
-        {
-          isolationLevel: 'Serializable',
-          timeout: CONFIRM_TX_TIMEOUT_MS,
-          maxWait: CONFIRM_TX_MAX_WAIT_MS,
-        },
-      ),
+  const outcome = await confirmVerifiedSlip({
+    orderId: order.id,
+    orderNumber: order.orderNumber,
+    attemptId: attempt.id,
+    ref: result.ref,
+    receiverAccount: result.receiverAccount,
+    verifiedBy: result.verifiedBy,
+    raw: result.raw,
+  });
+
+  if (outcome.kind === 'duplicate_slip') {
+    return NextResponse.json(
+      { error: 'SLIP_ALREADY_USED', message: SLIP_ALREADY_USED_MESSAGE },
+      { status: 422 },
     );
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    if (msg.includes('Unique constraint')) {
-      return NextResponse.json(
-        { error: 'SLIP_ALREADY_USED', message: SLIP_ALREADY_USED_MESSAGE },
-        { status: 422 },
-      );
-    }
-    if (msg === 'ALREADY_CLAIMED') {
-      // Lost a race with the admin button or another verify — treat as success-ish.
-      return NextResponse.json({ error: 'ORDER_NOT_PAYABLE' }, { status: 409 });
-    }
-    if (msg === 'INSUFFICIENT_STOCK') {
-      // Same recovery as the webhook: commit manual-fulfilment state (the
-      // transaction above rolled back claim+attempt, so redo it committed).
-      // Audit #4: the recovery MUST be awaited and its outcome verified
-      // BEFORE answering — a swallowed failure here used to 200 while the
-      // verified payment was recorded NOWHERE (order pending, attempt
-      // pending, no evidence row). ALREADY_CLAIMED = the admin button or a
-      // racing verify won → the payment is already being handled → 409.
-      try {
-        // Production review (Medium): the recovery MUST use the shared claim
-        // helper — the old direct updateMany skipped claimOrderForConfirmation,
-        // so discounted orders that hit a shortage were parked for manual
-        // fulfilment WITHOUT consuming the coupon's global/per-customer
-        // allowance; the restock-resume path then assumed it was already
-        // counted and the discount could be reused.
-        await prisma.$transaction(async (tx) => {
-          await tx.paymentAttempt.update({
-            where: { id: attemptId },
-            data: {
-              status: 'succeeded',
-              slipVerifiedRef: result.ref,
-              slipVerifiedAt: new Date(),
-              slipReceiverAccount: result.receiverAccount,
-              slipVerifiedBy: verifiedBy,
-            },
-          });
-          const claimed = await claimOrderForConfirmation(order.id, tx, { paidExternally: true });
-          if (!claimed) throw new Error('ALREADY_CLAIMED');
-          await tx.order.update({
-            where: { id: order.id },
-            data: {
-              status: 'pending_manual_fulfilment',
-              manualFulfilmentReason: 'INSUFFICIENT_STOCK',
-            },
-          });
-        });
-      } catch (recoveryErr) {
-        const recMsg = recoveryErr instanceof Error ? recoveryErr.message : String(recoveryErr);
-        if (recMsg === 'ALREADY_CLAIMED') {
-          const cur = await prisma.order.findUnique({
-            where: { id: order.id },
-            select: { status: true },
-          });
-          if (cur && cur.status !== 'pending_payment') {
-            return NextResponse.json({ error: 'ORDER_NOT_PAYABLE' }, { status: 409 });
-          }
-          // Status still pending but the guard did not match — treat as a
-          // genuine recovery failure, not a race win.
-        }
-        await recordPaymentReconciliation({
-          trigger: 'slip_verify_recovery_failed',
-          orderId: order.id,
-          orderNumber: order.orderNumber,
-          paymentRef: result.ref,
-          paymentAttemptId: attemptId,
-          failureReason: 'INSUFFICIENT_STOCK',
-          recoveryError: recMsg,
-        });
-        return NextResponse.json(
-          {
-            error: 'RECONCILIATION_REQUIRED',
-            message: 'ตรวจสลิปผ่านแต่ระบบบันทึกสถานะไม่สำเร็จ — ทีมงานจะตรวจสอบและดำเนินการให้เอง',
-          },
-          { status: 500 },
-        );
-      }
-      // Audit #2: schedule an outbox drain even on this degraded path —
-      // there may be queued mails (previous successes) worth delivering.
-      await scheduleOutboxDrain();
-      return NextResponse.json({
-        status: 'pending_manual_fulfilment',
-        confirmationUuid: order.confirmationUuid,
-        codes: [],
-        message: 'ชำระเงินถูกตรวจแล้ว — สินค้าเซ็นต์ไม่พอ แอดมินจะจัดส่งโค้ดให้เร็วที่สุด',
-      });
-    }
-    // Anything else — a transaction that expired even after the retry, a
-    // delivery write failure, a serialization conflict — rolled the WHOLE
-    // confirmation back. The bank says paid, but the order is still
-    // pending_payment, so it would expire and take the customer's money with
-    // it. Do what the shortage branch above does: commit the approval and
-    // park the order for the team (the rerun action resumes by status, so it
-    // needs no new reason value to work).
-    //
-    // Audit #4's "never a fake success" still holds: the answer is
-    // pending_manual_fulfilment, not confirmed, and it says the payment was
-    // verified and delivery is queued. The old 500 here told the customer the
-    // whole charge had failed when the bank had already said OK — untrue, and
-    // an invitation to transfer a second time.
-    try {
-      await prisma.$transaction(
-        async (tx) => {
-          await tx.paymentAttempt.update({
-            where: { id: attemptId },
-            data: {
-              status: 'succeeded',
-              slipVerifiedRef: result.ref,
-              slipVerifiedAt: new Date(),
-              slipReceiverAccount: result.receiverAccount,
-              slipVerifiedBy: verifiedBy,
-            },
-          });
-          const claimed = await claimOrderForConfirmation(order.id, tx, { paidExternally: true });
-          if (!claimed) throw new Error('ALREADY_CLAIMED');
-          await tx.order.update({
-            where: { id: order.id },
-            data: {
-              status: 'pending_manual_fulfilment',
-              manualFulfilmentReason: 'DELIVERY_PENDING',
-            },
-          });
-        },
-        {
-          isolationLevel: 'Serializable',
-          timeout: PARK_TX_TIMEOUT_MS,
-          maxWait: CONFIRM_TX_MAX_WAIT_MS,
-        },
-      );
-    } catch (parkErr) {
-      const parkMsg = parkErr instanceof Error ? parkErr.message : String(parkErr);
-      if (parkMsg === 'ALREADY_CLAIMED') {
-        // Another writer recorded this payment first — the customer is being
-        // served by that path, so say that instead of "failed".
-        const cur = await prisma.order.findUnique({
-          where: { id: order.id },
-          select: { status: true },
-        });
-        if (cur && cur.status !== 'pending_payment') {
-          return NextResponse.json({
-            status: 'pending_manual_fulfilment',
-            paymentVerified: true,
-            ref: result.ref,
-            message:
-              'ตรวจสลิปผ่านแล้ว — การชำระเงินได้รับการยืนยัน ระบบกำลังดำเนินการจัดส่งโค้ดให้',
-          });
-        }
-      }
-      // Even the parking write failed: the verified payment is recorded
-      // nowhere but the reconciliation trail. Keep the refusal (a 5xx here IS
-      // the honest answer) and say plainly what was verified and what failed.
-      await recordPaymentReconciliation({
-        trigger: 'slip_verify_recovery_failed',
-        orderId: order.id,
-        orderNumber: order.orderNumber,
-        paymentRef: result.ref,
-        paymentAttemptId: attemptId,
-        failureReason: msg,
-        recoveryError: parkMsg,
-      });
-      console.error('[slip-verify] fulfilment failure and recovery failure:', msg, '/', parkMsg);
-      return NextResponse.json(
-        {
-          error: 'RECONCILIATION_REQUIRED',
-          message:
-            'ตรวจสลิปผ่านแล้ว (ธนาคารยืนยันการชำระเงิน) แต่ระบบบันทึกสถานะไม่สำเร็จ — ทีมงานได้รับแจ้งแล้วและจะจัดส่งโค้ดให้',
-        },
-        { status: 500 },
-      );
-    }
-    // Same as the shortage path: drain whatever is already queued even on this
-    // degraded outcome.
+  }
+  if (outcome.kind === 'already_claimed' && outcome.stage !== 'delivery') {
+    // Lost a race with the admin button or another verify — treat as success-ish.
+    return NextResponse.json({ error: 'ORDER_NOT_PAYABLE' }, { status: 409 });
+  }
+  if (outcome.kind === 'already_claimed') {
+    // Another writer recorded this payment first and is delivering it.
+    return NextResponse.json({
+      status: 'pending_manual_fulfilment',
+      paymentVerified: true,
+      ref: result.ref,
+      message: 'ตรวจสลิปผ่านแล้ว — การชำระเงินได้รับการยืนยัน ระบบกำลังดำเนินการจัดส่งโค้ดให้',
+    });
+  }
+  if (outcome.kind === 'parked' && outcome.reason === 'INSUFFICIENT_STOCK') {
+    // Audit #2: schedule an outbox drain even on this degraded path — there
+    // may be queued mails (previous successes) worth delivering.
+    await scheduleOutboxDrain();
+    return NextResponse.json({
+      status: 'pending_manual_fulfilment',
+      confirmationUuid: order.confirmationUuid,
+      codes: [],
+      message: 'ชำระเงินถูกตรวจแล้ว — สินค้าเซ็นต์ไม่พอ แอดมินจะจัดส่งโค้ดให้เร็วที่สุด',
+    });
+  }
+  if (outcome.kind === 'parked') {
+    // The answer is pending_manual_fulfilment, not confirmed, and it says the
+    // payment was verified and delivery is queued. The old 500 here told the
+    // customer the whole charge had failed when the bank had already said OK —
+    // untrue, and an invitation to transfer a second time.
     await scheduleOutboxDrain();
     return NextResponse.json({
       status: 'pending_manual_fulfilment',
@@ -670,12 +411,24 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         'ตรวจสลิปผ่านแล้ว — ยืนยันการชำระเงินเรียบร้อย ระบบกำลังจัดส่งโค้ดให้ แอดมินติดตามจนกว่าจะถึง',
     });
   }
+  if (outcome.kind === 'reconciliation_failed') {
+    return NextResponse.json(
+      {
+        error: 'RECONCILIATION_REQUIRED',
+        message:
+          outcome.stage === 'stock'
+            ? 'ตรวจสลิปผ่านแต่ระบบบันทึกสถานะไม่สำเร็จ — ทีมงานจะตรวจสอบและดำเนินการให้เอง'
+            : 'ตรวจสลิปผ่านแล้ว (ธนาคารยืนยันการชำระเงิน) แต่ระบบบันทึกสถานะไม่สำเร็จ — ทีมงานได้รับแจ้งแล้วและจะจัดส่งโค้ดให้',
+      },
+      { status: 500 },
+    );
+  }
 
   // ── Notifications + outbox drain (after commit, fire-and-forget) ───────
-  // Audit #2: the code-delivery email is now a durable outbox row written
-  // inside the fulfilment transaction above — the drain below delivers it.
-  // The old success copy claimed "ส่งโค้ดให้ทางอีเมลแล้ว" while nobody had
-  // sent anything; that was a lie and is gone.
+  // Audit #2: the code-delivery email is a durable outbox row written inside
+  // the fulfilment transaction above — the drain below delivers it. The old
+  // success copy claimed "ส่งโค้ดให้ทางอีเมลแล้ว" while nobody had sent
+  // anything; that was a lie and is gone.
   await scheduleOutboxDrain();
 
   void notifyPaymentConfirmed({
@@ -707,7 +460,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       // Same authenticated request that carried the slip — no new endpoint and
       // no code in a URL. Empty when fulfilment parked the order.
       codes,
-      message: 'ตรวจสลิปผ่าน — ส่งโค้ดเรียบร้อยแล้ว ดูโค้ดด้านล่างได้เลย',
+      message: 'ตรวจสลิปผ่านแล้ว — ส่งโค้ดเรียบร้อยแล้ว ดูโค้ดด้านล่างได้เลย',
     },
     { headers: { 'Cache-Control': 'no-store' } },
   );
