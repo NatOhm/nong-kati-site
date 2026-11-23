@@ -134,6 +134,7 @@
 | TOPUP-REF | การอนุมัติ/ปฏิเสธเติมเงินต้องไม่เขียนทับสลิป (13 พ.ย. 2569) — `TopUpLog.reference` เก็บ path สลิปที่แอดมินตรวจ แต่ route เขียน `note` ทับทั้งคอลัมน์ ทำให้หลักฐานการโอนหายจากประวัติเติมเงิน · ต้องต่อท้ายเป็น "สลิป + หมายเหตุ" ตามที่ `ReferenceCell` แยกคอลัมน์ด้วยอักขระ pipe | `tests/admin-topup-review.test.ts` | `npm test` (vitest) | Unit Tests |
 | ORDER-LABEL | รายการย่อยในออเดอร์ต้องบอกชื่อแพ็กเกจ (13 พ.ย. 2569) — `OrderItem.skuCode` เก็บ **label ของ variant** (pricing engine เขียน label ลงคอลัมน์นี้) ไม่ใช่รหัสสินค้า แต่ทุกหน้าออเดอร์พิมพ์เป็น `skuCode × จำนวน` ออเดอร์ NK-2026-000203 จึงขึ้นเป็น "2 × 3" ซึ่งแยกรายการที่ชื่อสินค้าเดียวกันไม่ออก · ต้องพิมพ์ "แพ็กเกจ {label} · จำนวน {n}" และตัด label ที่ว่างหรือ `default` ทิ้ง · การ์ดออเดอร์ลูกค้า หน้าสรุปการชำระเงิน รายละเอียดออเดอร์ฝั่งแอดมิน dialog เปิดโค้ด และประวัติลูกค้า ใช้ตัวจัดรูปแบบเดียวกัน | `tests/order-line-label.test.tsx` | `npm test` (vitest, jsdom) | Unit Tests |
 | DEPLOY-ART | Deploy artifact ต้องพา gate ไปเองและปิดสัญญาณปลอม (15 พ.ย. 2569) — ที่เก็บ release คือ force-push ไป branch orphan `deploy-artifact` และ CI รู้ว่า "มี release" จาก subject ของ commit นั้นเท่านั้น · เทสต์ปั้น bare remote + clone จริง (master ไม่มีสคริปต์ gate, release มี) แล้วรัน `scripts/deploy-artifact.sh` ตัวจริง: tree ที่ publish ต้องมี `deploy-bundle.tar.gz` + workflow + สคริปต์ gate ที่ artifact พาไปเอง (ไม่งั้น release เก่าที่ source commit ไม่มี gate จะ certify ไม่ได้เลย) และ subject ต้อง parse ได้ · จากนั้น replay ขั้น git ของ workflow เพื่อพิสูจน์ว่า gate รันจาก commit ที่ subject ระบุ ไม่ใช่ default branch · และทุกทางล้มต้อง exit ไม่ใช่ศูนย์ (site ไม่เสิร์ฟ build นั้น, ไม่มี artifact ref, ไม่มี DB) — gate ที่ skip ตัวเองดูเหมือน release ที่ผ่าน | `tests/deploy-artifact-selftest.test.ts` | `npm test` (vitest) | Unit Tests |
+| HSF   | Hero-slide create accepts a missing focal point — `เพิ่มสไลด์` answered 400 `INVALID_IMAGE_FOCUS` from 2026-10-06 because the panel omits `imageFocus` and `parseFocus(undefined)` read that as malformed; key absent → stored `null` (centred), `"abc"` → still 400 | `tests/hero-slides-focus.test.ts` | `npm test` (vitest) | Unit Tests |
 
 **วิธีรัน:**
 
@@ -1531,3 +1532,10 @@ A Tailwind class that names a token which does not exist is silently dropped: th
 - **อยู่ไฟล์ไหน:** `tests/manual-transfer-account-warning.test.tsx` (jsdom) renders the real `ManualTransferSettings` component with a mocked `adminFetch`; nothing is re-implemented in the test.
 - **รันยังไง:** `npx vitest run tests/manual-transfer-account-warning.test.tsx` — 4 cases: blank warns and states the consequence, symbol-only still warns, stored digits show nothing, typing digits clears it.
 - **แก้เมื่อแดง:** fix the panel, not the test — the assertion is the operator contract that a blank receiving account is never silent.
+
+## Hero-slide focal point — `tests/hero-slides-focus.test.ts` (fix 2026-11-23)
+
+`ตั้งค่า → แบนเนอร์หน้าแรก → เพิ่มสไลด์` ส่ง body `{ imageUrl, alt, sortOrder }` โดยไม่มีคีย์ `imageFocus` เลย แต่ `parseFocus()` ตีความ "ไม่มีคีย์" เป็นค่าผิดรูปแบบแล้วตอบ `400 INVALID_IMAGE_FOCUS` ก่อนถึง `prisma.heroSlide.create` — รูปขึ้น storage แต่ไม่มีแถว slide จึงไม่มีแบนเนอร์ และ carousel (`page.tsx` เรนเดอร์เมื่อ `heroSlides.length > 0`) ไม่แสดงอะไรเลยตั้งแต่ `01d8da1` (2026-10-06)
+
+- **HSF-1:** POST ที่ไม่มีคีย์ `imageFocus` → **201** และแถวถูกสร้างด้วย `imageFocus: null` (null = กึ่งกลางภาพ)
+- **HSF-2:** POST ด้วย `imageFocus: "abc"` → ยัง **400** `INVALID_IMAGE_FOCUS` และไม่มีการเขียน DB

@@ -42,7 +42,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
  */
 const FOCUS_RE = /^(\d{1,3})% (\d{1,3})%$/;
 function parseFocus(v: unknown): string | null | undefined {
-  if (v === null) return null;
+  if (v === undefined || v === null) return null;
   if (typeof v !== 'string') return undefined;
   const t = v.trim();
   if (!t) return null;
