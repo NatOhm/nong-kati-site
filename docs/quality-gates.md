@@ -1575,3 +1575,10 @@ A Bangkok Bank / GSB transfer is published to the provider 2–3 minutes after i
 - **ทำไมไม่ใช่การเดา:** provider ไม่เคยคืนเลขเต็ม และ `checkReceiver` ฝั่งธนาคารไม่ทำงาน (ยืนยันสด 2 ครั้ง) ชื่อผู้ถือบัญชีคือหลักฐานเดียวที่เหลือและ adapter ทั้งสองคืนอยู่แล้วแต่ flow เดิมทิ้งไป · ร้านที่ยังไม่กรอกชื่อบัญชี = ยืนยันอัตโนมัติไม่ได้จนกว่าจะกรอก (fail closed โดยตั้งใจ)
 - **พิสูจน์สองทาง:** `tests/slip-flow.test.ts` — สลิปหน้ากากตรงแต่ชื่อเป็นคนอื่น → 502 `RECEIVER_UNPROVEN`, ไม่เรียก claim/fulfil, แถว attempt เก็บ code + บัญชีที่ธนาคารระบุ + ping แอดมิน; สลิปที่ชื่อตรง → 200 `confirmed` ตามเดิม (happy path ไม่เปลี่ยน) · `tests/receiver-policy.test.ts` ล็อกกฎบริสุทธิ์ (เต็มบัญชี, ชื่อ, ตำแหน่งหน้ากากทั้งสองแบบ, title/ช่องว่าง, ชื่อว่าง, บัญชีว่าง)
 - **ของเก่ายังจริง:** `checkReceiverMatch` ยังเป็นด่านแรก (ตัวเลขไม่เข้ากับบัญชีร้าน = `RECEIVER_MISMATCH`) การพิสูจน์ชื่อจึงเป็นด่านที่สอง ไม่ใช่แทนที่
+
+## Artifact identity — the pack owns it, the log records it after the deploy (2026-11-24)
+
+- **กฎ:** BUILD_ID ไม่มีอยู่ก่อน build ดังนั้นแถว release ที่ยัง *prepared* ต้องไม่ระบุ BUILD_ID/commit — ระบุเมื่อ deploy จริงเท่านั้น (จาก `/api/v1/version`) · `scripts/patch-notes.mjs` ข้ามแถวที่ไม่มีทั้งสองค่าโดยตั้งใจ
+- **ทำไม:** การเขียน BUILD_ID ลง `src/data/patch-notes*.json` หลัง build ทำให้ไฟล์ที่ ship ใหม่กว่า `.next` ⇒ artifact ไม่ใช่ bytes-of-HEAD และคำสั่ง re-pin ชี้ commit ที่ไม่ได้ build จากมัน
+- **invariant ที่ pack บังคับ:** `.next/GIT_SHA = git rev-parse HEAD` แบบไม่มี `-dirty` และไม่มีไฟล์ tracked เปลี่ยนหลัง build; `scripts/deploy-artifact.sh` พิมพ์คู่ BUILD_ID/GIT_SHA, ตรวจกับ tar, และคัดลอกลง `tmp/release-stamp.txt` (gitignored) ให้ขั้น re-pin ใช้
+- **พิสูจน์:** `tests/patch-notes.test.ts` P1 (JSON ตรงกับ log), P6/P7 (ทุก build ที่ log ไว้มีข้อความไทย และไม่มี key กำพร้า) · `DRY_RUN=1 bash scripts/deploy-artifact.sh` ต้อง exit 1 เมื่อ `origin/master` ไม่มี caller ของ `internal/orders/slip-recheck` (D10)

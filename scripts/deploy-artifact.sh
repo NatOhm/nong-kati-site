@@ -155,6 +155,16 @@ esac
 echo "$TAR_GIT_SHA" | grep -Eq '^[0-9a-f]{40}$' \
   || die "Bundle GIT_SHA '$TAR_GIT_SHA' is not a 40-hex commit id — stamp-git-sha.mjs did not run."
 say "Stamps verified: BUILD_ID=$TAR_BUILD_ID · git=$TAR_GIT_SHA (clean)"
+
+# The identity of THIS artifact, where the next step can read it without being
+# written into the tree: the release log records a commit + BUILD_ID only when
+# the deploy happens, because a BUILD_ID that does not exist yet cannot be
+# committed before the build without making the pack stop being bytes-of-HEAD
+# (see scripts/patch-notes.mjs). tmp/ is gitignored, so writing it here cannot
+# dirty the tree the stamps just certified.
+mkdir -p tmp
+printf 'BUILD_ID=%s\nGIT_SHA=%s\nHEAD=%s\n' "$TAR_BUILD_ID" "$TAR_GIT_SHA" "$START_SHA" > tmp/release-stamp.txt
+say "Re-pin task 250 to: BUILD_ID=$TAR_BUILD_ID  GIT_SHA=$TAR_GIT_SHA  (also in tmp/release-stamp.txt)"
 # A frozen build (SKIP_BUILD=1 after commit-and-build) is made from an EARLIER
 # commit than HEAD, so every literal below must be the bundle's stamp: the
 # Step-2 grep compares against the tar, not against HEAD, and a HEAD literal

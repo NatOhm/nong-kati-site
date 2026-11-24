@@ -60,6 +60,16 @@ Sessions expire in minutes — re-SSO right before each Plesk step.
 > decided the in-process timer is enough for this deploy, set `NK_ALLOW_NO_SWEEP_CALLER=1` to ship
 > with a loud warning. The guard itself is pinned by `D10` in `tests/deploy-runbook.test.ts`, which
 > also asserts this branch's workflow really does call the endpoint.
+>
+> **Artifact identity (2026-11-24) — the pack owns it, the log records it after the deploy.** A
+> BUILD_ID does not exist until the build runs, so a *prepared* release row carries none: the
+> deployed identity is whatever the pack prints (`BUILD_ID … git …`), verifies against the tar, and
+> copies to the gitignored `tmp/release-stamp.txt`. Re-pin task 250 to exactly those two values and
+> fill the log row's commit + BUILD_ID from `/api/v1/version` when the deploy happens. Writing the
+> id into `src/data/patch-notes*.json` before the build is what used to leave a tracked `src/` file
+> newer than `.next`, so the artifact was no longer bytes-of-HEAD and the re-pin named a commit the
+> bundle was not built from. The invariant the pack enforces instead: `.next/GIT_SHA` equals
+> `git rev-parse HEAD` with a clean tree, and nothing tracked changes after the build.
 
 ```bash
 cd "<project root>"                       # webapp/nong-kati/nong-kati

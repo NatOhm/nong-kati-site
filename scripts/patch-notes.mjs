@@ -16,6 +16,15 @@
 // Rows without a commit or a BUILD_ID are not builds (DB cleanups, secret
 // rotations, repo hygiene) and are skipped: the page is about what was *built
 // and pushed*, which those rows are not.
+//
+// A PREPARED (undeployed) release is the same case, and that is deliberate
+// (2026-11-24): its BUILD_ID does not exist until the build runs, so naming one
+// in the log forced an edit of src/data/*.json AFTER the build — which made the
+// packed artifact stop being bytes-of-HEAD and made the task-250 re-pin name a
+// commit nothing was built from. A row therefore gains its commit and BUILD_ID
+// when the deploy happens (`/api/v1/version`), and stays out of this list until
+// then. The artifact's own pair is printed by scripts/deploy-artifact.sh and
+// copied to the gitignored tmp/release-stamp.txt.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
