@@ -12,7 +12,11 @@
  */
 import { isSlip2GoEnabled, verifySlip2Go } from '@/lib/payment/slip2go';
 import { isSlipVerificationEnabled, verifySlip } from '@/lib/payment/slipok';
-import { checkReceiverMatch, storeReceiverDigits } from '@/lib/payment/receiverPolicy';
+import {
+  checkReceiverMatch,
+  normalizeAccountDigits,
+  storeReceiverDigits,
+} from '@/lib/payment/receiverPolicy';
 
 /** Codes worth retrying on the other provider (transient/config, not verdicts). */
 const RETRYABLE_ON_FALLBACK = new Set([
@@ -61,6 +65,17 @@ export type SlipVerification =
        * tooltip lie (`RECEIVER_UNCONFIGURED`).
        */
       provider: 'slip2go' | 'slipok' | null;
+      /**
+       * The FIRST provider's refusal, when this failure is the answer of a
+       * fallback. It used to exist only in a log line: the attempt row kept the
+       * last provider alone, so "why did Slip2Go not answer?" was unrecoverable
+       * from the record (audit 2026-11-24). Persisted into `gatewayResponse`.
+       */
+      fallback?: {
+        provider: 'slip2go' | 'slipok';
+        code: string;
+        detail?: string | null | undefined;
+      };
     };
 
 /** Automatic verification is on when EITHER provider is configured. */
@@ -83,6 +98,13 @@ export function primarySlipProvider(): 'slip2go' | 'slipok' {
  */
 export async function verifySlipImage(input: {
   imageBase64: string;
+  /**
+   * The image's REAL type, sniffed from its bytes (`sniffSlipMime`) by every
+   * caller. Optional so an older caller keeps the previous `image/png`, but the
+   * two production call sites always pass it: the customer route discards the
+   * client's declared type, so hardcoding PNG mislabelled every JPEG upload.
+   */
+  imageMime?: string | undefined;
   expectedAmountThb: number;
   storeAccountNumber: string | null | undefined;
   /**
@@ -109,16 +131,21 @@ export async function verifySlipImage(input: {
 
   const receiverOpt = { expectedReceiverDigits: storeDigits };
   let usedProvider: 'slip2go' | 'slipok' = primarySlipProvider();
+  /** The abandoned provider's answer, carried into the failure for the row. */
+  let firstRefusal: { provider: 'slip2go' | 'slipok'; code: string; detail?: string | null } | null =
+    null;
   let result: Awaited<ReturnType<typeof verifySlip>> | Awaited<ReturnType<typeof verifySlip2Go>> =
     usedProvider === 'slip2go'
       ? await verifySlip2Go({
           imageBase64: input.imageBase64,
           expectedAmountThb: input.expectedAmountThb,
+          imageMime: input.imageMime,
           ...receiverOpt,
         })
       : await verifySlip({
           imageBase64: input.imageBase64,
           expectedAmountThb: input.expectedAmountThb,
+          imageMime: input.imageMime,
         });
 
   if (!result.ok && RETRYABLE_ON_FALLBACK.has(result.code)) {
@@ -127,15 +154,26 @@ export async function verifySlipImage(input: {
     // being dumped into the manual queue.
     const canRetry = isSlip2GoEnabled() ? isSlipVerificationEnabled() : isSlip2GoEnabled();
     if (canRetry) {
+      // Why the first provider was abandoned, so an operator can tell a dead
+      // provider from a spent quota without reading the attempt row (which only
+      // keeps the LAST answer — audit 2026-11-24).
+      console.warn('[slip-verify] falling back to the other provider', {
+        from: usedProvider,
+        code: result.code,
+        ...(result.detail ? { detail: result.detail } : {}),
+      });
+      firstRefusal = { provider: usedProvider, code: result.code, detail: result.detail ?? null };
       result =
         usedProvider === 'slip2go'
           ? await verifySlip({
               imageBase64: input.imageBase64,
               expectedAmountThb: input.expectedAmountThb,
+              imageMime: input.imageMime,
             })
           : await verifySlip2Go({
               imageBase64: input.imageBase64,
               expectedAmountThb: input.expectedAmountThb,
+              imageMime: input.imageMime,
               ...receiverOpt,
             });
       usedProvider = usedProvider === 'slip2go' ? 'slipok' : 'slip2go';
@@ -154,6 +192,7 @@ export async function verifySlipImage(input: {
       ...(raw?.httpStatus !== undefined ? { httpStatus: raw.httpStatus } : {}),
       provider: usedProvider,
       receiverAccount: null,
+      ...(firstRefusal ? { fallback: firstRefusal } : {}),
     };
   }
 
@@ -165,6 +204,31 @@ export async function verifySlipImage(input: {
       ok: false,
       code: 'RECEIVER_UNCONFIGURED',
       detail: 'store receiving account not configured',
+      provider: usedProvider,
+      receiverAccount: result.receiverAccount,
+    };
+  }
+
+  // A provider that says "paid" but names no receiving account leaves the only
+  // authoritative check with nothing to compare: `checkReceiverMatch` passes
+  // anything shorter than 4 digits on purpose, and the bank-side condition is
+  // known not to fire (a wrong `checkReceiver` still answered `200200` on
+  // 2026-10-30 and 2026-11-24). This is REACHABLE, not theoretical: both
+  // providers type the field optional (`data.receiver?.account?.bank?.account`,
+  // `d.receiver?.account?.value`) and each parser returns `ok: true` on the
+  // documented success code alone, so a payload without it would auto-confirm
+  // a slip paid to ANY account — the exact hole the store-account guard closes.
+  // Fail closed and park it: a false reject is recoverable by hand, a false
+  // confirm delivers goods.
+  // The test is COMPARABILITY, not non-nullness: a fully masked line
+  // (`xxx-x-xxxx-x`) is a present string with zero digits, which
+  // checkReceiverMatch also passes. Fewer than 4 digits cannot identify an
+  // account either way, so both shapes are the same refusal.
+  if (normalizeAccountDigits(result.receiverAccount).length < 4) {
+    return {
+      ok: false,
+      code: 'RECEIVER_MISSING',
+      detail: 'provider confirmed the transfer without a comparable receiving account',
       provider: usedProvider,
       receiverAccount: result.receiverAccount,
     };

@@ -8,7 +8,11 @@
  *
  * Two triggers, same code path:
  *   · `scheduleSlipRecheck()` — an unref'd timer for the attempt that just got
- *     the delayed verdict, so the normal case settles ~2.5 minutes later.
+ *     the delayed verdict, RE-ARMED after every still-delayed retry while the
+ *     budget lasts, so the tries happen at ~2.5/5/7.5 minutes. This is the
+ *     only trigger that runs on time: the housekeeping cron asks for every 10
+ *     minutes but lands hours apart (measured in prod-health-monitor.yml), and
+ *     the sweep's 20-minute window is closed by then.
  *   · `recheckDelayedSlips()` — a sweep for anything the timer lost (process
  *     restart, deploy). Wired to the 10-minute housekeeping tick.
  *
@@ -35,8 +39,10 @@ import {
 import { scheduleOutboxDrain } from '@/lib/fulfilment';
 import { confirmVerifiedSlip } from '@/lib/payment/slipConfirmation';
 import { verifySlipImage } from '@/lib/payment/slipVerifyFlow';
+import { nextCasStamp } from '@/lib/casStamp';
 import { getManualTransferInfo } from '@/lib/data';
-import { readSlip, slipKeyFromImageUrl } from '@/lib/slipStore';
+import { recheckCount } from '@/lib/payment/recheckBudget';
+import { readSlip, slipKeyFromImageUrl, sniffSlipMime } from '@/lib/slipStore';
 
 /** 2.5 minutes: the window the banks themselves quote, plus a small margin. */
 export const SLIP_RECHECK_DELAY_MS = 150_000;
@@ -55,30 +61,25 @@ export type RecheckOutcome =
   | { kind: 'closed'; detail: string }
   | { kind: 'skipped'; reason: string };
 
-/**
- * How many provider calls this attempt has already spent on re-checks.
- *
- * Exported because `POST /api/v1/payments/slip-verify` stamps a fresh
- * `gatewayResponse` on every customer retry: it must carry this count forward,
- * or tapping ตรวจสลิปอีกครั้ง resets the budget and the cap stops meaning
- * anything (each tap is itself a paid call, up to 10 per 10 minutes per IP).
- */
-export function recheckCount(gatewayResponse: unknown): number {
-  if (!gatewayResponse || typeof gatewayResponse !== 'object') return 0;
-  const value = (gatewayResponse as { rechecks?: unknown }).rechecks;
-  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
-}
+// Lives in `@/lib/payment/recheckBudget` so payment code (the slip-verify
+// find-or-create) can read the budget without importing this sweep's
+// Next-request dependencies. Re-exported because every existing caller and
+// test expects it here.
+export { recheckCount };
 
 function stamp(args: {
   provider: string | null;
   error: string;
   detail: string | null;
   rechecks: number;
+  /** Raw provider code — the same evidence the live route keeps. */
+  providerCode?: string | undefined;
 }): Prisma.InputJsonValue {
   return {
     provider: args.provider,
     error: args.error,
     detail: args.detail,
+    ...(args.providerCode ? { providerCode: args.providerCode } : {}),
     checkedAt: new Date().toISOString(),
     rechecks: args.rechecks,
   };
@@ -151,7 +152,10 @@ export async function recheckDelayedAttempt(attemptId: string): Promise<RecheckO
   // fire together, and the `where` pins the row's previous `updatedAt`.
   const claimed = await prisma.paymentAttempt.updateMany({
     where: { id: attempt.id, failureReason: 'SLIP_DELAYED', updatedAt: attempt.updatedAt },
-    data: { updatedAt: new Date() },
+    // Strictly-changed stamp (see casStamp.ts): with `new Date()` the timer and
+    // the sweep could both match this token inside one millisecond and BOTH buy
+    // a provider call for the same delayed slip.
+    data: { updatedAt: nextCasStamp(attempt.updatedAt) },
   });
   if (claimed.count === 0) return { kind: 'skipped', reason: 'claimed-by-another-run' };
 
@@ -186,6 +190,9 @@ export async function recheckDelayedAttempt(attemptId: string): Promise<RecheckO
     const manualInfo = await getManualTransferInfo();
     verification = await verifySlipImage({
       imageBase64: bytes.toString('base64'),
+      // The stored bytes' real type, not a hardcoded PNG (a re-check must send
+      // the provider the same declaration the live route made).
+      imageMime: sniffSlipMime(bytes),
       expectedAmountThb: Number(order.totalAmountThb),
       storeAccountNumber: manualInfo.accountNumber,
     });
@@ -193,7 +200,7 @@ export async function recheckDelayedAttempt(attemptId: string): Promise<RecheckO
     // A provider/network throw is not a verdict; count it as a failed retry so
     // the loop stays bounded, and let the sweep try again after the backoff.
     const stillDue = nextCount < SLIP_RECHECK_MAX_ATTEMPTS;
-    await prisma.paymentAttempt
+    const stamped = await prisma.paymentAttempt
       .update({
         where: { id: attempt.id },
         data: {
@@ -212,13 +219,14 @@ export async function recheckDelayedAttempt(attemptId: string): Promise<RecheckO
       notifyRecheckClosed(order);
       return { kind: 'closed', detail: 'provider-unreachable' };
     }
+    if (stamped) scheduleSlipRecheck(attempt.id);
     return { kind: 'delayed', rechecks: nextCount };
   }
 
   if (!verification.ok) {
     const stillDelayed = verification.code === 'SLIP_DELAYED';
     const stillDue = stillDelayed && nextCount < SLIP_RECHECK_MAX_ATTEMPTS;
-    await prisma.paymentAttempt
+    const stamped = await prisma.paymentAttempt
       .update({
         where: { id: attempt.id },
         data: {
@@ -227,16 +235,32 @@ export async function recheckDelayedAttempt(attemptId: string): Promise<RecheckO
           ...(stillDue ? {} : { status: 'failed' }),
           failureReason: stillDelayed ? 'SLIP_DELAYED' : verification.code,
           gatewayStatusCode: verification.provider,
+          // Same evidence the live route keeps: the account the bank named is
+          // what an admin needs before confirming by hand, and without it a
+          // delayed slip that later says RECEIVER_MISMATCH reaches the queue
+          // with no receiver at all — the one screen this guard exists for.
+          ...(verification.receiverAccount
+            ? { slipReceiverAccount: verification.receiverAccount }
+            : {}),
           gatewayResponse: stamp({
             provider: verification.provider,
             error: verification.code,
             detail: verification.detail ?? null,
             rechecks: nextCount,
+            ...(verification.providerCode ? { providerCode: verification.providerCode } : {}),
+            // Why the first provider was abandoned, same as the live route.
+            ...(verification.fallback ? { fallback: verification.fallback } : {}),
           }),
         },
       })
-      .catch(() => undefined);
-    if (stillDue) return { kind: 'delayed', rechecks: nextCount };
+      .catch(() => null);
+    if (stillDue) {
+      // Re-arm only once the spent credit is ON THE ROW (`rechecks` advanced):
+      // with a failed stamp the budget never moves, and an armed timer would
+      // pay the provider again every 2.5 minutes until the order expired.
+      if (stamped) scheduleSlipRecheck(attempt.id);
+      return { kind: 'delayed', rechecks: nextCount };
+    }
     // Budget spent, or the bank gave a terminal verdict (amount, receiver,
     // duplicate): the attempt leaves the sweep here, so an admin has to be
     // told — otherwise a paid slip sits in the queue with nobody aware.
@@ -280,7 +304,7 @@ export async function recheckDelayedAttempt(attemptId: string): Promise<RecheckO
     // (and re-pinged) every 2.5 minutes until the 20-minute window aged the row
     // out, so the 3-call cap never applied to the one branch that keeps failing.
     const stillDue = nextCount < SLIP_RECHECK_MAX_ATTEMPTS;
-    await prisma.paymentAttempt
+    const stamped = await prisma.paymentAttempt
       .update({
         where: { id: attempt.id },
         data: {
@@ -298,7 +322,10 @@ export async function recheckDelayedAttempt(attemptId: string): Promise<RecheckO
         },
       })
       .catch(() => undefined);
-    if (stillDue) return { kind: 'delayed', rechecks: nextCount };
+    if (stillDue) {
+      if (stamped) scheduleSlipRecheck(attempt.id);
+      return { kind: 'delayed', rechecks: nextCount };
+    }
     // The budget is spent, so the auto-check is over — the reconciliation trail
     // is all that exists and the admin must be told, not just a log line.
     notifyRecheckClosed(order);
@@ -306,7 +333,27 @@ export async function recheckDelayedAttempt(attemptId: string): Promise<RecheckO
   }
 
   // duplicate / already_claimed: another writer owns this payment. Nothing
-  // left to retry and nothing to escalate.
+  // left to retry and nothing to escalate — but the attempt MUST leave the
+  // re-check loop. `failureReason` stays SLIP_DELAYED (the delay was real)
+  // while `status: failed` is the selector that stops it, and the stamp puts
+  // the spent credit on the record. Without this write the row looked
+  // untouched, so every later timer or sweep tick paid the provider again for
+  // a payment that was already settled — and since `rechecks` never advanced,
+  // the 3-call cap could never end it.
+  await prisma.paymentAttempt
+    .update({
+      where: { id: attempt.id },
+      data: {
+        status: 'failed',
+        gatewayResponse: stamp({
+          provider: verification.verifiedBy,
+          error: outcome.kind.toUpperCase(),
+          detail: 'payment already recorded by another writer',
+          rechecks: nextCount,
+        }),
+      },
+    })
+    .catch(() => undefined);
   return { kind: 'closed', detail: outcome.kind };
 }
 

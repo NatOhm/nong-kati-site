@@ -46,12 +46,18 @@ export function normalizeAccountDigits(v: string | null | undefined): string {
 
 /**
  * Store receiving account as digits, resolved from the `manual-transfer`
- * setting. Empty string means "not configured" → callers skip the check.
+ * setting. Empty string means "not configured" → callers fail closed.
+ *
+ * Fewer than 4 digits is ALSO "not configured", deliberately: that is the same
+ * length `checkReceiverMatch` treats as "nothing to compare", so a typo (`12`)
+ * or a placeholder would otherwise switch the only authoritative receiver check
+ * off while still looking configured — every slip, paid to any account, would
+ * auto-confirm. Fail closed instead (2026-11-24 audit; the blank-account guard
+ * used to be bypassed by any 1–3 digit value).
  */
-export function storeReceiverDigits(
-  accountNumber: string | null | undefined,
-): string {
-  return normalizeAccountDigits(accountNumber);
+export function storeReceiverDigits(accountNumber: string | null | undefined): string {
+  const digits = normalizeAccountDigits(accountNumber);
+  return digits.length >= 4 ? digits : '';
 }
 
 export type ReceiverVerdict = { ok: true } | { ok: false; detail: string };

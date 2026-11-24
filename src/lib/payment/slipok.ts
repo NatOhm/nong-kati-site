@@ -17,11 +17,30 @@
  * checkout keeps the manual-slip fallback (admin clicks ยืนยันการชำระเงิน).
  */
 
-const SLIP_VERIFY_BASE =
-  process.env['SLIP_VERIFY_BASE_OVERRIDE'] ?? 'https://api.slipok.com/api/line/apikey';
+import { describeFetchError } from './fetchFailure';
+import { parseSlipAmount } from './slipAmount';
+
+/**
+ * Where SlipOK lives. `SLIP_VERIFY_BASE_OVERRIDE` exists for the e2e stub ONLY:
+ * a leftover value in an env file once pointed the built server at a dead
+ * loopback port, and every real slip became "ระบบตรวจสลิปขัดข้อง" (audit
+ * 2026-11-24). In production the override is IGNORED, so a stray test hook can
+ * never redirect customer slip images (and the API key) to another host.
+ */
+function slipOkBase(): string {
+  const override =
+    process.env['NODE_ENV'] === 'production' ? undefined : process.env['SLIP_VERIFY_BASE_OVERRIDE'];
+  return override ?? 'https://api.slipok.com/api/line/apikey';
+}
 
 export interface SlipVerifyInput {
   imageBase64: string;
+  /**
+   * Real image type, sniffed from the bytes by the caller. SlipOK accepts
+   * JPG/JPEG/PNG/WEBP; declaring a JPEG as `image/png` (with a `slip.png` file
+   * name) was an assumption the route's discarded MIME made invisible.
+   */
+  imageMime?: string | undefined;
   /** Exact order total in THB — passed to SlipOK for the bank-side check. */
   expectedAmountThb: number;
 }
@@ -96,7 +115,11 @@ export async function verifySlip(input: SlipVerifyInput): Promise<SlipVerifyResu
 
   const form = new FormData();
   const bytes = Buffer.from(input.imageBase64, 'base64');
-  form.append('files', new Blob([new Uint8Array(bytes)], { type: 'image/png' }), 'slip.png');
+  const mime = input.imageMime ?? 'image/png';
+  // The extension follows the real type — a `.png` name over JPEG bytes is a
+  // declaration the provider never asked us to make.
+  const ext = mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg';
+  form.append('files', new Blob([new Uint8Array(bytes)], { type: mime }), `slip.${ext}`);
   // Bank-side amount check (error 1013 when the slip's amount differs) and
   // duplicate-slip detection (1012) — both cheaper than reimplementing.
   form.append('amount', String(Math.round(input.expectedAmountThb * 100) / 100));
@@ -104,13 +127,16 @@ export async function verifySlip(input: SlipVerifyInput): Promise<SlipVerifyResu
 
   let res: Response;
   try {
-    res = await fetch(`${SLIP_VERIFY_BASE}/${encodeURIComponent(branch)}`, {
+    res = await fetch(`${slipOkBase()}/${encodeURIComponent(branch)}`, {
       method: 'POST',
       headers: { 'x-authorization': key },
       body: form,
       signal: AbortSignal.timeout(15_000),
     });
-  } catch {
+  } catch (err) {
+    // Keep the operator-visible cause: a dead socket and a request the runtime
+    // refused to build must not look the same (audit 2026-11-24).
+    console.error('[slipok] verify request failed', describeFetchError(err));
     return { ok: false, code: 'UPSTREAM_ERROR', detail: 'network' };
   }
 
@@ -130,13 +156,17 @@ export async function verifySlip(input: SlipVerifyInput): Promise<SlipVerifyResu
   }
 
   const d = body.data;
-  const amount = Number(d.amount ?? NaN);
+  // Strict decimal (see slipAmount.ts): no hex/exponent/separator coercion of
+  // the only number that decides whether this slip pays the order.
+  const amount = parseSlipAmount(d.amount);
   if (!Number.isFinite(amount) || !d.transRef) {
     return { ok: false, code: 'INVALID_SLIP', detail: 'missing amount/transRef' };
   }
   // SlipOK already enforced the amount via the `amount` field (1013), but the
   // local re-check keeps the invariant in our hands, not the provider's.
-  if (Math.abs(amount - input.expectedAmountThb) > 0.005) {
+  // Positive/total form: `NaN > tol` is FALSE, so the negated form accepted any
+  // amount when the order total was not a finite number (audit 2026-11-24).
+  if (!(Math.abs(amount - input.expectedAmountThb) <= 0.005)) {
     return {
       ok: false,
       code: 'AMOUNT_MISMATCH',

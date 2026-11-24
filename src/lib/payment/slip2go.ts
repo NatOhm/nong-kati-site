@@ -36,12 +36,21 @@
  * arrival). Production sets NK_SLIP2GO_BASE explicitly in the Plesk panel.
  */
 
+import { describeFetchError } from './fetchFailure';
 import { normalizeAccountDigits } from './receiverPolicy';
+import { parseSlipAmount } from './slipAmount';
 
 const SLIP2GO_BASE = process.env['NK_SLIP2GO_BASE'] ?? 'https://connect.slip2go.com';
 
 export interface Slip2GoVerifyInput {
   imageBase64: string;
+  /**
+   * Real image type, sniffed from the bytes by the caller. A slip is a
+   * screenshot, so it is routinely a JPEG; declaring every upload as PNG was
+   * an assumption, not the contract (the API takes a data URI, the guide does
+   * not require PNG). Defaults to PNG only for callers that pass nothing.
+   */
+  imageMime?: string | undefined;
   /** Exact order total in THB — enforced bank-side via checkAmount eq. */
   expectedAmountThb: number;
   /**
@@ -179,9 +188,28 @@ function amountString(amountThb: number): string {
   return String(Number(rounded.toFixed(2)));
 }
 
-/** True when the response is an auth rejection worth retrying with the other scheme. */
+/**
+ * True when the response is a CREDENTIALS rejection worth retrying with the
+ * other auth scheme.
+ *
+ * Narrowed 2026-11-24: the old `/^401\d*$/` also matched `401005`/`401006`
+ * (credit exhausted) and `401007` (IP not whitelisted). Neither is about the
+ * scheme, so the retry re-sent the identical request — a second outbound call
+ * for an answer that could not change. Only the token/shop rejections qualify
+ * (and any HTTP-level 401/403, which can be a proxy refusing the header form).
+ */
+/** Provider 401xxx codes that are NOT about the Authorization scheme. */
+const SCHEME_UNRELATED_401 = new Set(['401003', '401004', '401005', '401006', '401007']);
+
 function isAuthRejection(httpStatus: number, providerCode: string): boolean {
-  return httpStatus === 401 || httpStatus === 403 || /^401\d*$/.test(providerCode);
+  // A NAMED non-credential refusal is the provider speaking, whatever the HTTP
+  // status: a 403 carrying "credit exhausted" must not buy a second request
+  // (red-team 2026-11-24 — the status-only rule retried it once).
+  if (SCHEME_UNRELATED_401.has(providerCode)) return false;
+  // A bare 401/403 (or a proxy's HTML) may be the header form itself, so it is
+  // worth exactly one retry with the raw secret.
+  if (httpStatus === 401 || httpStatus === 403) return true;
+  return providerCode === '401001' || providerCode === '401002';
 }
 
 /** Verify one slip through Slip2Go. Never throws — every path returns a result. */
@@ -192,7 +220,7 @@ export async function verifySlip2Go(input: Slip2GoVerifyInput): Promise<Slip2GoR
   const receiverDigits = normalizeAccountDigits(input.expectedReceiverDigits);
   const body = {
     payload: {
-      imageBase64: `data:image/png;base64,${input.imageBase64}`,
+      imageBase64: `data:${input.imageMime ?? 'image/png'};base64,${input.imageBase64}`,
       checkCondition: {
         checkAmount: { type: 'eq', amount: amountString(input.expectedAmountThb) },
         checkDuplicate: true,
@@ -220,7 +248,10 @@ export async function verifySlip2Go(input: Slip2GoVerifyInput): Promise<Slip2GoR
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(15_000),
       });
-    } catch {
+    } catch (err) {
+      // Never conflate "the provider is down" with "our own request never
+      // left the process" (audit 2026-11-24).
+      console.error('[slip2go] verify request failed', describeFetchError(err));
       return { ok: false, code: 'UPSTREAM_ERROR', detail: 'network' };
     }
 
@@ -258,7 +289,9 @@ function verifySuccess(parsed: Slip2GoBody, input: Slip2GoVerifyInput): Slip2GoR
   if (!parsed.data) return mapSlip2GoError(code || 'HTTP_200', message || 'HTTP 200');
 
   const d = parsed.data;
-  const amount = Number(d.amount ?? NaN);
+  // Strict decimal (see slipAmount.ts): `Number('0x19')` is 25, and a money
+  // field must not be coerced through hex/exponent/separator rules.
+  const amount = parseSlipAmount(d.amount);
   if (!Number.isFinite(amount) || !d.transRef) {
     return {
       ok: false,
@@ -271,7 +304,12 @@ function verifySuccess(parsed: Slip2GoBody, input: Slip2GoVerifyInput): Slip2GoR
   }
   // Slip2Go already enforced the amount via checkAmount (200402), but the
   // local re-check keeps the invariant in our hands, not the provider's.
-  if (Math.abs(amount - input.expectedAmountThb) > 0.005) {
+  //
+  // Written as the POSITIVE, total form (`!(… <= tol)`) on purpose: with the
+  // negated form a non-finite order total made `NaN > 0.005` false, so the
+  // guard ACCEPTED any slip amount (audit 2026-11-24 — the one comparison on
+  // the money path must never fail open).
+  if (!(Math.abs(amount - input.expectedAmountThb) <= 0.005)) {
     return {
       ok: false,
       code: 'AMOUNT_MISMATCH',

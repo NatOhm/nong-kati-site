@@ -12,14 +12,15 @@ import { scheduleOutboxDrain } from '@/lib/fulfilment';
 import { getDeliveredCodes } from '@/lib/delivery/customerCodes';
 import { getClientIp, checkRateLimit } from '@/lib/rateLimit';
 import { confirmVerifiedSlip } from '@/lib/payment/slipConfirmation';
+import { pendingAttemptFor } from '@/lib/payment/pendingAttempt';
 import {
   isSlipAutoVerifyEnabled,
   primarySlipProvider,
   verifySlipImage,
 } from '@/lib/payment/slipVerifyFlow';
 import { isValidSlipUploadToken, mintSlipStorageKey, slipImageRoute } from '@/lib/slipSecurity';
-import { recheckCount, scheduleSlipRecheck } from '@/lib/slipRecheck';
-import { writeSlip } from '@/lib/slipStore';
+import { scheduleSlipRecheck } from '@/lib/slipRecheck';
+import { sniffSlipMime, writeSlip } from '@/lib/slipStore';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,6 +35,7 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // SlipOK accepts up to ~10MB; we cap t
  */
 const SLIP_ALREADY_USED_MESSAGE =
   'สลิปนี้ถูกใช้ยืนยันคำสั่งซื้อไปแล้ว — เปิดหน้าคำสั่งซื้อเพื่อดูโค้ดที่ได้รับ ถ้าไม่ใช่คำสั่งซื้อนี้ ติดต่อแอดมิน';
+
 
 /**
  * GET — feature probe for the checkout page (panel renders only when on).
@@ -159,12 +161,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // always sees what was submitted — including on paths where the client
   // never gets a chance to re-upload. Private `slip:` namespace, one NEW key
   // per attempt (nothing overwritten). Failures here never block a check.
+  // What the bytes ARE, not what the client claimed: this route throws away the
+  // multipart `file.type` and the JSON data-URI prefix, so the provider used to
+  // be handed a JPEG declared as `image/png` (audit 2026-11-24). One sniff feeds
+  // the provider and the evidence file.
+  const imageBytes = Buffer.from(imageBase64, 'base64');
+  const imageMime = sniffSlipMime(imageBytes);
+
   let slipStored = false;
   try {
     const key = mintSlipStorageKey();
     // A private file under NK_SLIP_DIR, not a `slip:` settings row — the
     // evidence is a financial document and up to ~6.7 MB of base64.
-    await writeSlip(key, Buffer.from(imageBase64, 'base64'));
+    await writeSlip(key, imageBytes);
     await prisma.order.update({
       where: { id: order.id },
       data: { slipImageUrl: slipImageRoute(key), slipUploadedAt: new Date() },
@@ -189,26 +198,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // ตรวจสลิปอีกครั้ง would reset the cap and buy three more.
   let priorRechecks = 0;
   try {
-    const existing = await prisma.paymentAttempt.findFirst({
-      where: { orderId: order.id, status: 'pending', paymentMethod: 'promptpay' },
-      orderBy: { createdAt: 'desc' },
-      select: { id: true, gatewayResponse: true },
+    const pending = await pendingAttemptFor({
+      id: order.id,
+      totalAmountThb: Number(order.totalAmountThb),
+      gatewayName,
     });
-    if (existing) {
-      attempt = { id: existing.id };
-      priorRechecks = recheckCount(existing.gatewayResponse);
-    } else {
-      attempt = await prisma.paymentAttempt.create({
-        data: {
-          orderId: order.id,
-          paymentMethod: 'promptpay',
-          gatewayName,
-          amountThb: order.totalAmountThb,
-          status: 'pending',
-        },
-        select: { id: true },
-      });
-    }
+    attempt = { id: pending.id };
+    priorRechecks = pending.priorRechecks;
   } catch (err) {
     console.error('[slip-verify] could not create the payment attempt:', err);
   }
@@ -216,6 +212,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // ── Ask the configured providers ────────────────────────────────────────
   const result = await verifySlipImage({
     imageBase64,
+    imageMime,
     expectedAmountThb: expected,
     storeAccountNumber: manualInfo.accountNumber,
   });
@@ -255,6 +252,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
               detail: result.detail ?? null,
               // Kept so a failed verdict is explainable from the row alone.
               ...(result.providerCode ? { providerCode: result.providerCode } : {}),
+              // …and the provider we gave up on, otherwise the row names only
+              // the last answer and hides why the fallback happened.
+              ...(result.fallback ? { fallback: result.fallback } : {}),
               checkedAt: new Date().toISOString(),
               ...(priorRechecks > 0 ? { rechecks: priorRechecks } : {}),
             },
@@ -283,6 +283,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       INVALID_SLIP: 422,
       AMOUNT_MISMATCH: 422,
       RECEIVER_MISMATCH: 422,
+      // The bank says the money moved but names no receiving account, so the
+      // only authoritative check has nothing to compare. Not the customer's
+      // fault and no retry of this file can fix it → 5xx, admin confirms.
+      RECEIVER_MISSING: 502,
       // Our misconfiguration, not the customer's slip, and no retry of the
       // same request can fix it — same 5xx class as NOT_CONFIGURED.
       RECEIVER_UNCONFIGURED: 503,
@@ -297,6 +301,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       INVALID_SLIP: 'ตรวจสลิปไม่ผ่าน — สลิปไม่ถูกต้องหรืออ่านไม่ได้',
       AMOUNT_MISMATCH: 'ยอดโอนในสลิปไม่ตรงกับยอดสั่งซื้อ',
       RECEIVER_MISMATCH: 'บัญชีผู้รับในสลิปไม่ตรงกับร้าน',
+      RECEIVER_MISSING:
+        'ธนาคารยืนยันยอดเงินแล้วแต่ไม่ได้ระบุบัญชีผู้รับ — รอแอดมินตรวจสอบและยืนยันให้',
       // Our fault, not the customer's: with no store account there is nothing
       // to compare the slip against, so verification is refused and the slip
       // goes to the admin instead of auto-confirming blind.

@@ -22,6 +22,7 @@ export const SLIP_CHECK_LABELS: Record<string, string> = {
   INVALID_SLIP: 'อ่านสลิปไม่ผ่าน',
   AMOUNT_MISMATCH: 'ยอดในสลิปไม่ตรง',
   RECEIVER_MISMATCH: 'บัญชีผู้รับไม่ใช่บัญชีร้าน',
+  RECEIVER_MISSING: 'ธนาคารไม่ได้ระบุบัญชีผู้รับ',
   RECEIVER_UNCONFIGURED: 'ร้านยังไม่ได้ตั้งบัญชีรับเงิน',
 };
 
