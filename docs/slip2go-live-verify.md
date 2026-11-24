@@ -147,27 +147,33 @@ Accepted cost: an undocumented *success* code now answers `INVALID_SLIP` +
 instead of confirming silently. A false reject is recoverable; a false confirm
 is not. Before widening the list, prove the code live first.
 
-## 2026-11-24 scope cut before the 1.2.6 deploy
+## 2026-11-24 scope: the mask compare ships, the diagnostics panel is cut
 
-Two pieces of 1.2.6 work were built and then cut, because they widen a release
-that exists to fix one customer-facing failure:
+Two pieces of 1.2.6 work were built, cut, and then one of them was restored the
+same day on new evidence:
 
 - **Positional middle-mask compare** (`maskMatches` in `receiverPolicy.ts`, which
-  read `199-1-xxx786` as the same account as `199-1-73578-6`). No provider
-  payload this store has ever received has used a middle mask — every observed
-  `receiverAccount` is tail-masked (`xxx-x-x3578-x`, confirmed live on
-  NK-2026-000183), and the existing containment check already accepts those. The
-  branch would therefore have added a *new reject path* to the one flow that
-  just burned a paying customer, exercised by nothing in production.
-  `receiverPolicy.ts` is back at the live (`3bcdb6b`) version.
+  reads `199-1-xxx786` as the same account as `199-1-73578-6`) — **shipped,
+  restored in `4f2e00b`.** It was cut because every `receiverAccount` payload
+  this store had seen was tail-masked (`xxx-x-x3578-x`, live NK-2026-000183).
+  The client then produced a real Bangkok Bank receipt for the same store
+  account printing **`199-1-xxx786`** (฿67.00, 23 พ.ย. 69 21:11, ref
+  `2026112321112124004394508`). Its digits `1991786` are not a contiguous run,
+  so containment alone answers `RECEIVER_MISMATCH` on a genuine payment: the
+  mask belongs to the *sending* bank, so both shapes are real and the cut
+  premise ("middle mask never observed") was simply wrong. The mask is a
+  positional ruler — one mask char per hidden digit, same total length — so a
+  visible digit in the wrong slot or a different length still rejects.
 - **Provider-code diagnostics endpoint + `/management/orders` panel**
   (`GET/POST /api/v1/admin/orders/[id]/slip-provider-code`, the paid re-probe,
-  and its two test files). New admin API surface and a credit-spending POST for
-  a support convenience. Cut; retire it as one piece behind its own gate.
+  and its two test files) — **still cut.** New admin API surface and a
+  credit-spending POST for a support convenience; retire it as one piece behind
+  its own gate.
 
 **Kept:** `providerCode` persisted on the verification attempt row by
 `slip-verify`. It is a column write with no new surface, and it is the only
 thing that makes a future `INVALID_SLIP` explainable without the worker log.
 
-Both cuts are recoverable: the work is in `a57c18f` (and its tests in that tree),
-so `git show a57c18f -- <path>` restores it when it gets its own release.
+The diagnostics cut is recoverable: the work is in `a57c18f` (and its tests in
+that tree), so `git show a57c18f -- <path>` restores it when it gets its own
+release.
