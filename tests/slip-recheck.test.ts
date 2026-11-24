@@ -31,12 +31,13 @@ process.env['NK_JWT_SECRET'] = 'recheck-test-secret-0123456789abcdef0123456789ab
 
 const STORE_ACCOUNT = '199-1-73578-6';
 /**
- * The receiver string every observed payload carries for that account: the
- * tail mask (live: NK-2026-000183). A middle mask (`199-1-xxx786`) has never
- * been seen from the provider, and the positional compare for it was cut from
- * 1.2.6 — so this suite pins the shape the recheck must actually confirm.
+ * Bangkok Bank masks the middle: a real receipt for that account prints
+ * `199-1-xxx786` (attached 2026-11-24, ฿67.00), which only the positional
+ * compare accepts. The tail mask (`xxx-x-x3578-x`, live NK-2026-000183) is
+ * the same account from a different sender's app, so this suite pins the
+ * shape the recheck must confirm: the one containment alone rejects.
  */
-const BBL_MASK = 'xxx-x-x3578-x';
+const BBL_MASK = '199-1-xxx786';
 
 const { prismaMock, provider, ordersMock, fulfilmentMock, notifyMock, storeMock, dataMock } =
   vi.hoisted(() => {
