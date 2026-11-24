@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.2.6",
+    "date": "2026-11-24",
+    "dateLabel": "Nov 24, 2026",
+    "gitSha": "a57c18f",
+    "buildId": "X-kOU-T2pEQr4Q-JrkpsY",
+    "title": "1.2.6 (#555) — a Bangkok Bank slip the bank has not published yet is no longer reported as a forgery, and the customer can re-check it.",
+    "detail": "1.2.6 (#555) — a Bangkok Bank slip the bank has not published yet is no longer reported as a forgery, and the customer can re-check it. A 200404 — \"the bank has not seen this slip yet\", the normal first answer for a กรุงเทพ slip 2–3 minutes after the transfer — was read as a payload problem and became INVALID_SLIP, while the upload panel hid the picker on every non-OK verdict, so a customer whose money had already left the account had nothing left to press. The guard now trusts only the documented success codes (SUCCESS_CODES = 200000, 200200): any other code, payload or none, is a verdict with providerCode stamped on the row. 200404 therefore reads as SLIP_DELAYED and the panel shows ตรวจสลิปอีกครั้ง, which re-verifies the stored file rather than asking for a new upload; a rejected slip (amount or receiver) keeps the picker so a corrected file can go against the same order. The branch also carries the server-side recheck (a 2.5-minute timer at verdict time plus the 10-minute sweep: payable-or-expired orders only, 3 tries, CAS on updatedAt), the positional middle-mask compare that stops a genuine 199-1-xxx786 being read as another account, and the provider-code read on /management/orders (GET is free from the attempt row; POST re-probes the stored image for 1 credit and writes no order state). PREPARED, NOT LIVE — nothing has been opened to the public. Build X-kOU-T2pEQr4Q-JrkpsY (#555, VERSION 1.2.6) was made from the clean tree at a57c18f5a9d1cffe48e9cdcda314e0fabd7bb4db, and .next/GIT_SHA holds exactly that sha. Gates on the shipped tree: full suite 136 files / 1,259 tests, tsc and eslint clean. These papers are committed after the build, so the bundle does not carry this row or its Thai note (the same ordering 1.2.5 used) — deploy with SKIP_BUILD=1 bash scripts/deploy-artifact.sh so the BUILD_ID recorded here is the one that actually ships, re-pin task 250 to X-kOU-T2pEQr4Q-JrkpsY + a57c18f…, then append the live proof (version endpoint, health, one real slip) to this cell."
+  },
+  {
     "version": "1.2.5",
     "date": "2026-11-23",
     "dateLabel": "Nov 23, 2026",
