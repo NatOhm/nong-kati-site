@@ -210,6 +210,12 @@ jobs:
       - name: Apply migrations
         if: steps.engine.outputs.provider == 'mysql'
         run: npx prisma migrate deploy
+      - name: Real-engine slip-attempt race
+        # tests/db/** is excluded from `npm test` (it needs a server). This is
+        # where it runs: five genuinely concurrent find-or-create transactions
+        # on one order must leave exactly one pending attempt.
+        if: steps.engine.outputs.provider == 'mysql'
+        run: npm run test:db
       - name: Report the server (drift stays visible)
         if: steps.engine.outputs.provider == 'mysql'
         run: |
