@@ -212,8 +212,27 @@ describe('D10: the delayed-slip sweep keeps a caller at deploy time', () => {
 
   it('the pack script checks the DEFAULT branch, not this branch', () => {
     expect(script).toContain("SWEEP_ENDPOINT='internal/orders/slip-recheck'");
-    expect(script).toContain('origin/master:.github/workflows/prod-health-monitor.yml');
+    // The DEFAULT branch, read by ref + blob hash (D10b pins why not rev:path).
+    expect(script).toContain("SWEEP_FILE='.github/workflows/prod-health-monitor.yml'");
+    expect(script).toContain('git ls-tree "origin/master"');
     expect(script).toContain('NK_ALLOW_NO_SWEEP_CALLER');
+  });
+
+  it('D10b: the preflight reads the blob, not a `rev:path` argument', () => {
+    // Git Bash on Windows rewrites `origin/master:<path>` into a path list
+    // (`origin\master;.github\...`), so `git show` failed and the guard read 0
+    // even after the branch was merged — every Windows pack was refused, and the
+    // only way out was the override that disables this guard (2026-11-24).
+    // `ls-tree` + `cat-file` take a ref and a blob hash, which no shell rewrites.
+    const guard = script.slice(
+      script.indexOf("SWEEP_ENDPOINT='internal/orders/slip-recheck'"),
+      script.indexOf('# ── Guard: the release commit'),
+    );
+    expect(guard).toContain('git ls-tree');
+    expect(guard).toContain('git cat-file -p "$SWEEP_BLOB"');
+    expect(guard, 'a rev:path argument comes back and Windows mangles it').not.toContain(
+      'git show "origin/master:',
+    );
   });
 
   it('a missing caller dies the pack rather than warning it', () => {

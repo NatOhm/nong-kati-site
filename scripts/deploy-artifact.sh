@@ -72,8 +72,19 @@ START_SHA="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
 # refuse to pack it. Override only when you have decided the timer half is
 # enough for this deploy.
 SWEEP_ENDPOINT='internal/orders/slip-recheck'
-SWEEP_CALLERS="$(git show "origin/master:.github/workflows/prod-health-monitor.yml" 2>/dev/null \
-  | grep -c "$SWEEP_ENDPOINT" || true)"
+SWEEP_FILE='.github/workflows/prod-health-monitor.yml'
+# Read the blob by hash, never as `origin/master:<path>`. Git Bash on Windows
+# rewrites a `rev:path` argument as a path list (`origin\master;.github\...`), so
+# `git show` failed and this guard answered 0 for a caller that WAS present: it
+# died on every Windows pack — including after the branch was merged — and
+# taught operators to pass the very override it exists to prevent (measured
+# 2026-11-24). `ls-tree` + `cat-file` pass a ref and a blob hash, neither of
+# which any shell rewrites, so the check means the same thing on every platform.
+SWEEP_BLOB="$(git ls-tree "origin/master" -- "$SWEEP_FILE" 2>/dev/null | awk '{ print $3 }' || true)"
+SWEEP_CALLERS=0
+if [ -n "$SWEEP_BLOB" ]; then
+  SWEEP_CALLERS="$(git cat-file -p "$SWEEP_BLOB" | grep -c "$SWEEP_ENDPOINT" || true)"
+fi
 case "${SWEEP_CALLERS:-0}" in
   (0)
     if [ -n "${NK_ALLOW_NO_SWEEP_CALLER:-}" ]; then

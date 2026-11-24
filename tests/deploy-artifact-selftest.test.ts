@@ -97,7 +97,7 @@ interface Fixture {
  * so running there would fail) and `release` (the shipped scripts, plus the
  * files `deploy-artifact.sh` stages into the bundle).
  */
-function makeFixture(): Fixture {
+function makeFixture(opts: { sweepCallerOnMaster?: boolean } = {}): Fixture {
   const base = mkdtempSync(join(tmpdir(), 'nk-artifact-'));
   sandboxes.push(base);
   const remotePath = join(base, 'remote.git');
@@ -108,6 +108,27 @@ function makeFixture(): Fixture {
   git(work, 'symbolic-ref', 'HEAD', 'refs/heads/master');
 
   put(work, 'README.md', '# fixture\n');
+  if (opts.sweepCallerOnMaster) {
+    // A default branch whose housekeeping schedule really calls the endpoint,
+    // shaped like the repo's own volume: the endpoint name must be there once.
+    put(
+      work,
+      '.github/workflows/prod-health-monitor.yml',
+      [
+        'name: prod health monitor',
+        'on:',
+        '  schedule:',
+        "    - cron: '*/10 * * * *'",
+        'jobs:',
+        '  housekeeping:',
+        '    steps:',
+        '      - run: |',
+        '          endpoints="internal/orders/expire internal/orders/slip-recheck"',
+        '          echo "$endpoints"',
+        '',
+      ].join('\n'),
+    );
+  }
   git(work, 'add', '-A');
   git(work, 'commit', '-q', '-m', 'default branch without the gate scripts');
   git(work, 'checkout', '-q', '-b', 'release');
@@ -150,11 +171,18 @@ function makeFixture(): Fixture {
 interface Published {
   sha: string;
   subject: string;
+  /** Full stdout+stderr, so a test can assert on what the pack printed. */
+  out: string;
 }
 
 /** Publish with the real script, exactly as a release would. */
-function publish(f: Fixture, buildId: string): Published {
+function publish(
+  f: Fixture,
+  buildId: string,
+  opts: { allowNoSweepCaller?: boolean } = {},
+): Published {
   put(f.work, '.next/BUILD_ID', `${buildId}\n`);
+  const allowNoSweepCaller = opts.allowNoSweepCaller ?? true;
   const r = spawnSync('bash', [join(f.work, 'scripts', 'deploy-artifact.sh')], {
     cwd: f.work,
     encoding: 'utf8',
@@ -165,10 +193,10 @@ function publish(f: Fixture, buildId: string): Published {
       // push updates the same remote-tracking ref a real release would.
       ARTIFACT_BRANCH: 'deploy-artifact',
       SITE_URL: 'http://127.0.0.1:9',
-      // The fixture remote has no default-branch workflow, so the sweep-caller
-      // preflight has nothing to read. This suite certifies the pack/publish
-      // path; the preflight itself is pinned by D10 in deploy-runbook.test.ts.
-      NK_ALLOW_NO_SWEEP_CALLER: '1',
+      // Most fixtures have no default-branch workflow, so the sweep-caller
+      // preflight has nothing to read; the test that GIVES master a caller runs
+      // without this override on purpose.
+      ...(allowNoSweepCaller ? { NK_ALLOW_NO_SWEEP_CALLER: '1' } : {}),
     },
   });
   const out = `${r.stdout ?? ''}${r.stderr ?? ''}`;
@@ -176,6 +204,7 @@ function publish(f: Fixture, buildId: string): Published {
   return {
     sha: git(f.work, 'rev-parse', 'origin/deploy-artifact').trim(),
     subject: git(f.work, 'log', '-1', '--format=%s', 'origin/deploy-artifact').trim(),
+    out,
   };
 }
 
@@ -272,6 +301,25 @@ describe.skipIf(!HAS_BASH)('deploy-artifact → post-switch gate, offline', () =
         'scripts/ci-postswitch-gate.sh',
         'scripts/wait-for-build.mjs',
       ]);
+    },
+  );
+
+  it(
+    'a caller on the default branch satisfies the sweep preflight with no override',
+    { timeout: 60_000 },
+    () => {
+      // The guard's job is to prove master's schedule calls the delayed-slip
+      // endpoint. Read as `git show origin/master:<path>`, Git Bash on Windows
+      // rewrote that argument into a path list, the read failed, and the guard
+      // answered 0 for a caller that WAS present — so every Windows pack died on
+      // a correctly merged branch and the only way forward was the override that
+      // disables the guard (measured 2026-11-24).
+      const f = makeFixture({ sweepCallerOnMaster: true });
+      const published = publish(f, 'sweep-caller-1', { allowNoSweepCaller: false });
+
+      expect(published.out).toContain('Delayed-slip sweep has a caller on origin/master');
+      // Still a real publish: the guard passing must not skip the push.
+      expect(published.sha).toMatch(/^[0-9a-f]{40}$/);
     },
   );
 
