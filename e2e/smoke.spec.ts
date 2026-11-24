@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 
+import { inlineScriptTags, nonceLessExecutableInlineScripts } from './inline-script-csp';
+
 /**
  * Production smoke suite (production roadmap §7/§8 — the last missing gates):
  * the deployed build must actually load under the ENFORCED CSP (no blocked
@@ -121,12 +123,16 @@ test.describe('prerendered routes under enforced CSP', () => {
       // Browsers strip the nonce attribute from the live DOM once a script
       // executes, so the check must run against the RAW served HTML.
       const html = await (await page.request.get(path)).text();
-      const inlineOpenTags = html.match(/<script(?![^>]*\bsrc=)[^>]*>/g) ?? [];
+      const inlineOpenTags = inlineScriptTags(html);
       expect(inlineOpenTags.length, 'page must ship inline bootstrap scripts').toBeGreaterThan(0);
-      const nonceless = inlineOpenTags.filter((t) => !/\bnonce=/.test(t));
+      // Executable inline scripts only: a `<script type="application/ld+json">`
+      // data block is never executed and is not nonced by policy, so counting it
+      // failed this gate for a healthy page as soon as a breadcrumb added JSON-LD
+      // to the legal routes (CI 2026-11-24). See e2e/inline-script-csp.ts.
+      const nonceless = nonceLessExecutableInlineScripts(html);
       expect(
         nonceless,
-        'every inline script must carry the per-request nonce (prerender bake-in)',
+        'every executable inline script must carry the per-request nonce (prerender bake-in)',
       ).toEqual([]);
 
       expect(
