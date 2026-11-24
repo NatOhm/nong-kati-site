@@ -106,6 +106,102 @@ describe('Slip2Go receiver enforcement', () => {
   });
 });
 
+describe('Slip2Go amount guard', () => {
+  it('rejects when the order total is not a finite number, instead of accepting anything', async () => {
+    // Audit 2026-11-24: the guard was `Math.abs(amount - expected) > 0.005`,
+    // which is FALSE when either side is NaN — so an order row whose total did
+    // not parse confirmed a slip of ANY amount. The comparison is now total:
+    // an uncomparable amount is a mismatch, never a pass.
+    process.env['NK_SLIP2GO_SECRET'] = 'test-secret';
+    fetchMock.mockResolvedValueOnce(okResponse('xxx-x-x5786-x'));
+    const { verifySlip2Go } = await import('@/lib/payment/slip2go');
+    const r = await verifySlip2Go({
+      imageBase64: 'aGk=',
+      expectedAmountThb: Number.NaN,
+      expectedReceiverDigits: '1234565786',
+    });
+    expect(r).toMatchObject({ ok: false, code: 'AMOUNT_MISMATCH' });
+  });
+
+  it('still accepts an exact match at the satang tolerance', async () => {
+    // The fix must not turn a real match into a reject: tolerance is unchanged.
+    process.env['NK_SLIP2GO_SECRET'] = 'test-secret';
+    fetchMock.mockResolvedValueOnce(okResponse('xxx-x-x5786-x'));
+    const { verifySlip2Go } = await import('@/lib/payment/slip2go');
+    const r = await verifySlip2Go({
+      imageBase64: 'aGk=',
+      expectedAmountThb: 25.004,
+      expectedReceiverDigits: '1234565786',
+    });
+    expect(r).toMatchObject({ ok: true });
+  });
+});
+
+describe('Slip2Go auth-scheme retry', () => {
+  it('does NOT re-send the request for a quota refusal (401005)', async () => {
+    // Audit 2026-11-24: `/^401\d*$/` also matched the non-credential refusals, so
+    // a spent quota produced a second identical outbound request for an answer
+    // that could not change.
+    process.env['NK_SLIP2GO_SECRET'] = 'test-secret';
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ code: '401005', message: 'โควต้าหมด' }), { status: 200 }),
+    );
+    const { verifySlip2Go } = await import('@/lib/payment/slip2go');
+    const r = await verifySlip2Go({ imageBase64: 'aGk=', expectedAmountThb: 25 });
+    expect(r).toMatchObject({ ok: false, code: 'QUOTA_EXCEEDED' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('also does not re-send for 401006 or 401007 (credit / IP)', async () => {
+    process.env['NK_SLIP2GO_SECRET'] = 'test-secret';
+    for (const code of ['401006', '401007']) {
+      fetchMock.mockClear();
+      fetchMock.mockResolvedValueOnce(
+        new Response(JSON.stringify({ code, message: 'refused' }), { status: 200 }),
+      );
+      const { verifySlip2Go } = await import('@/lib/payment/slip2go');
+      const r = await verifySlip2Go({ imageBase64: 'aGk=', expectedAmountThb: 25 });
+      expect(r.ok, code).toBe(false);
+      expect(fetchMock, code).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it('still retries once with the raw secret when the TOKEN is rejected', async () => {
+    process.env['NK_SLIP2GO_SECRET'] = 'test-secret';
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ code: '401001', message: 'Authentication Token Mismatch' }), {
+          status: 401,
+        }),
+      )
+      .mockResolvedValueOnce(okResponse('xxx-x-x5786-x'));
+    const { verifySlip2Go } = await import('@/lib/payment/slip2go');
+    const r = await verifySlip2Go({ imageBase64: 'aGk=', expectedAmountThb: 25 });
+    expect(r).toMatchObject({ ok: true });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const second = fetchMock.mock.calls[1] as unknown as [string, { headers: Record<string, string> }];
+    // The retry is the RAW secret — the whole point of the fallback.
+    expect(second[1].headers['Authorization']).toBe('test-secret');
+  });
+});
+
+describe('Slip2Go image MIME', () => {
+  it('declares the caller-provided type in the data URI', async () => {
+    // The route sniffs the bytes (a slip is usually a JPEG screenshot), so the
+    // declaration must follow the real format rather than a hardcoded PNG.
+    process.env['NK_SLIP2GO_SECRET'] = 'test-secret';
+    fetchMock.mockResolvedValueOnce(okResponse('xxx-x-x5786-x'));
+    const { verifySlip2Go } = await import('@/lib/payment/slip2go');
+    await verifySlip2Go({
+      imageBase64: '/9j/4AAQ',
+      expectedAmountThb: 25,
+      imageMime: 'image/jpeg',
+    });
+    const payload = sentBody()['payload'] as Record<string, unknown>;
+    expect(payload['imageBase64']).toBe('data:image/jpeg;base64,/9j/4AAQ');
+  });
+});
+
 /**
  * A condition code is the answer, even when the provider echoes a `data`
  * object beside it. Live 23 พ.ย. 2569 (NK-2026-000237): a `200404` for a real

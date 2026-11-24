@@ -17,6 +17,14 @@
  *   · a reconciliation failure (the bank verified the money, nothing recorded
  *     it) counts as a spent retry and closes at the same cap, instead of
  *     re-paying and re-pinging every backoff until the window ages out;
+ *   · a still-delayed check RE-ARMS the 2.5-minute timer while the budget
+ *     lasts: the sweep lands hours late in production, so without the re-arm
+ *     the documented 3 tries were really one;
+ *   · a payment another writer already recorded (duplicate slip ref, a lost
+ *     claim) closes the attempt instead of leaving it sweepable, which used to
+ *     re-buy the same check on every later tick without ever reaching the cap;
+ *   · a terminal verdict keeps the evidence the live route keeps — the account
+ *     the bank named and its raw provider code — so an admin can act on it;
  *   · the sweep's query only ever selects delayed, payable, stored slips;
  *   · the internal endpoint keeps the sibling sweeps' fail-closed auth.
  *
@@ -81,7 +89,12 @@ vi.mock('@/lib/db', () => ({ prisma: prismaMock }));
 vi.mock('@/api/orders', () => ordersMock);
 vi.mock('@/lib/fulfilment', () => fulfilmentMock);
 vi.mock('@/lib/notify', () => notifyMock);
-vi.mock('@/lib/slipStore', () => storeMock);
+// Only the disk edge is faked: the re-check sniffs the slip's real bytes to
+// declare its MIME, so the production sniffer must run here too.
+vi.mock('@/lib/slipStore', async (importOriginal) => ({
+  ...storeMock,
+  sniffSlipMime: (await importOriginal<typeof import('@/lib/slipStore')>()).sniffSlipMime,
+}));
 vi.mock('@/lib/data', () => dataMock);
 vi.mock('@/lib/paymentReconciliation', () => ({ recordPaymentReconciliation: vi.fn(async () => 'rec') }));
 vi.mock('@/lib/payment/slip2go', () => ({
@@ -197,6 +210,32 @@ describe('recheckDelayedAttempt — still delayed', () => {
     expect(notifyMock.notifyPaymentPending).not.toHaveBeenCalled();
   });
 
+  it('can never re-claim a row whose token is in the future (clock skew)', async () => {
+    // The timer and the sweep can fire inside one millisecond, and two app
+    // servers can disagree about "now". If the claim writes a stamp that is
+    // not strictly later than the token it replaces, the token stays valid and
+    // the other runner buys a SECOND paid provider call for the same slip.
+    const future = new Date(Date.now() + 60_000);
+    prismaMock.paymentAttempt.findUnique.mockResolvedValue(attemptRow({ updatedAt: future }));
+    provider.verifySlip2Go.mockResolvedValue({
+      ok: false,
+      code: 'SLIP_DELAYED',
+      detail: 'not found yet',
+    });
+
+    await recheckDelayedAttempt('att-1');
+
+    const claim = prismaMock.paymentAttempt.updateMany.mock.calls[0]![0] as {
+      where: { updatedAt: Date };
+      data: { updatedAt: Date };
+    };
+    // The predicate itself: the row must still be delayed and un-taken, or the
+    // "already checked" state could be bought again.
+    expect(claim.where).toMatchObject({ id: 'att-1', failureReason: 'SLIP_DELAYED' });
+    expect(claim.where.updatedAt.getTime()).toBe(future.getTime());
+    expect(claim.data.updatedAt.getTime()).toBeGreaterThan(future.getTime());
+  });
+
   it('marks the attempt failed once the retry budget is spent', async () => {
     prismaMock.paymentAttempt.findUnique.mockResolvedValue(
       attemptRow({
@@ -244,6 +283,126 @@ describe('recheckDelayedAttempt — still delayed', () => {
     expect(notifyMock.notifyPaymentPending).toHaveBeenCalledWith(
       expect.objectContaining({ orderNumber: 'NK-2026-000735' }),
     );
+  });
+
+  it('keeps the account the bank named on a terminal verdict', async () => {
+    // The bank answered, but paid a different account: the shared flow turns
+    // that success into RECEIVER_MISMATCH and still carries the account it saw.
+    provider.verifySlip2Go.mockResolvedValue({
+      ok: true,
+      ref: 'ref-735',
+      amountThb: 735,
+      receiverAccount: '999-x-x0001-x',
+      receiverName: null,
+      transferAt: null,
+      raw: {},
+    });
+
+    const outcome = await recheckDelayedAttempt('att-1');
+
+    expect(outcome).toEqual({ kind: 'closed', detail: 'RECEIVER_MISMATCH' });
+    const update = prismaMock.paymentAttempt.update.mock.calls.at(-1)![0] as {
+      data: Record<string, unknown>;
+    };
+    // An admin confirms by hand from this row: without the account it is just a
+    // red chip, which is exactly the screen the receiver guard exists to avoid.
+    expect(update.data).toMatchObject({
+      status: 'failed',
+      failureReason: 'RECEIVER_MISMATCH',
+      slipReceiverAccount: '999-x-x0001-x',
+    });
+  });
+
+  it('keeps the raw provider code beside the verdict, as the live route does', async () => {
+    provider.verifySlip2Go.mockResolvedValue({
+      ok: false,
+      code: 'AMOUNT_MISMATCH',
+      detail: 'amount 700 vs order 735',
+      providerCode: '200402',
+      providerMessage: 'จำนวนเงินไม่ตรง',
+      httpStatus: 200,
+    });
+
+    await recheckDelayedAttempt('att-1');
+
+    const update = prismaMock.paymentAttempt.update.mock.calls.at(-1)![0] as {
+      data: Record<string, unknown>;
+    };
+    expect(update.data['gatewayResponse']).toMatchObject({
+      error: 'AMOUNT_MISMATCH',
+      providerCode: '200402',
+      rechecks: 1,
+    });
+  });
+
+  it('re-arms the timer while the budget lasts, so the three tries really happen', async () => {
+    vi.useFakeTimers();
+    try {
+      provider.verifySlip2Go
+        .mockResolvedValueOnce({ ok: false, code: 'SLIP_DELAYED' })
+        .mockResolvedValueOnce({ ok: false, code: 'SLIP_DELAYED' });
+      seededVerify(); // the third answer is the bank's success
+
+      expect(await recheckDelayedAttempt('att-1')).toEqual({ kind: 'delayed', rechecks: 1 });
+      expect(provider.verifySlip2Go).toHaveBeenCalledTimes(1);
+
+      // Only this timer re-checks on time: the housekeeping cron asks for 10
+      // minutes but lands hours apart, and the sweep's 20-minute window has
+      // closed by then. One try would strand a slip the bank published late.
+      await vi.advanceTimersByTimeAsync(SLIP_RECHECK_DELAY_MS + 10);
+      expect(provider.verifySlip2Go).toHaveBeenCalledTimes(2);
+
+      await vi.advanceTimersByTimeAsync(SLIP_RECHECK_DELAY_MS + 10);
+      expect(provider.verifySlip2Go).toHaveBeenCalledTimes(3);
+      expect(ordersMock.claimOrderForConfirmation).toHaveBeenCalledWith('ord-1', prismaMock, {
+        paidExternally: true,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not re-arm after a failed stamp — the budget would never advance', async () => {
+    vi.useFakeTimers();
+    try {
+      provider.verifySlip2Go.mockResolvedValue({ ok: false, code: 'SLIP_DELAYED' });
+      // The retry-count write is the only thing that bounds the loop.
+      prismaMock.paymentAttempt.update.mockRejectedValue(new Error('db down'));
+
+      expect(await recheckDelayedAttempt('att-1')).toEqual({ kind: 'delayed', rechecks: 1 });
+
+      await vi.advanceTimersByTimeAsync(SLIP_RECHECK_DELAY_MS + 10);
+      // Nothing was armed: an un-counted retry every 2.5 minutes is a paid loop.
+      expect(provider.verifySlip2Go).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('recheckDelayedAttempt — another writer already owns the payment', () => {
+  it('closes the attempt instead of re-buying the check on every later tick', async () => {
+    seededVerify();
+    // The claim returns null → the settlement throws ALREADY_CLAIMED inside its
+    // transaction, so this run recorded nothing at all.
+    ordersMock.claimOrderForConfirmation.mockResolvedValue(null);
+
+    const outcome = await recheckDelayedAttempt('att-1');
+
+    expect(outcome).toEqual({ kind: 'closed', detail: 'already_claimed' });
+    const update = prismaMock.paymentAttempt.update.mock.calls.at(-1)![0] as {
+      data: Record<string, unknown>;
+    };
+    // `failed` is the selector the sweep reads. Unset, the row stayed
+    // SLIP_DELAYED/pending forever: every tick bought another provider call and
+    // `rechecks` never reached the cap, so the 3-call budget could not end it.
+    expect(update.data['status']).toBe('failed');
+    expect(update.data['gatewayResponse']).toMatchObject({
+      error: 'ALREADY_CLAIMED',
+      rechecks: 1,
+    });
+    // The other writer announces the payment; this path has nothing to add.
+    expect(notifyMock.notifyPaymentPending).not.toHaveBeenCalled();
   });
 });
 

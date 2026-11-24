@@ -25,6 +25,17 @@ describe('storeReceiverDigits', () => {
     expect(storeReceiverDigits(null)).toBe('');
     expect(storeReceiverDigits('  -  ')).toBe('');
   });
+
+  it('treats a too-short account as unconfigured — it can never be compared', () => {
+    // Audit 2026-11-24: checkReceiverMatch passes anything when the store side
+    // has fewer than 4 digits, so a typo like '12' used to switch the only
+    // authoritative receiver check off while still looking configured — every
+    // slip paid to any account would auto-confirm. Unconfigured fails closed.
+    expect(storeReceiverDigits('12')).toBe('');
+    expect(storeReceiverDigits('1-2-3')).toBe('');
+    // Four digits is the shortest value the compare can actually test.
+    expect(storeReceiverDigits('5786')).toBe('5786');
+  });
 });
 
 describe('checkReceiverMatch', () => {

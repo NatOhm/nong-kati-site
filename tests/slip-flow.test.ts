@@ -27,7 +27,11 @@ const h = vi.hoisted(() => {
     },
     order: {
       update: vi.fn(async (_args: Row): Promise<Row> => ({})),
-      findUnique: vi.fn(async (_args: Row): Promise<Row | null> => null),
+      // The find-or-create reads the order's timestamp as its claim token…
+      findUnique: vi.fn(async (_args: Row): Promise<Row | null> => ({ updatedAt: new Date(0) })),
+      // …and claims it with a compare-and-set: 1 row = this caller won,
+      // 0 rows = another upload won and this caller must re-read.
+      updateMany: vi.fn(async (_args: Row): Promise<{ count: number }> => ({ count: 1 })),
     },
     paymentAttempt: {
       findFirst: vi.fn(async (_args: Row): Promise<Row | null> => null),
@@ -128,7 +132,13 @@ vi.mock('@/api/orders', () => h.orders);
 vi.mock('@/lib/fulfilment', () => h.fulfil);
 vi.mock('@/lib/notify', () => h.notify);
 vi.mock('@/lib/slipSecurity', () => h.slipSec);
-vi.mock('@/lib/slipStore', () => h.slipStore);
+// Only the disk write is faked: the real magic-byte sniffer stays in place, so
+// the MIME assertions below exercise the production sniff (a stub would make
+// "a JPEG is declared image/jpeg" vacuous).
+vi.mock('@/lib/slipStore', async (importOriginal) => ({
+  ...h.slipStore,
+  sniffSlipMime: (await importOriginal<typeof import('@/lib/slipStore')>()).sniffSlipMime,
+}));
 vi.mock('@/lib/delivery/customerCodes', () => h.codes);
 vi.mock('@/lib/payment/slipok', () => h.slipok);
 vi.mock('@/lib/payment/slip2go', () => h.slip2go);
@@ -334,6 +344,214 @@ describe('provider dispatch in POST /api/v1/payments/slip-verify', () => {
     );
   });
 
+  it('refuses to confirm when the bank names no receiving account (fail closed)', async () => {
+    // Audit 2026-11-24. Both providers type the receiver as OPTIONAL
+    // (`data.receiver?.account?.bank?.account` / `d.receiver?.account?.value`)
+    // and each parser answers ok:true on the success code alone, so a payload
+    // without it is reachable. checkReceiverMatch passes anything shorter than
+    // 4 digits by design and the provider's own checkReceiver condition is
+    // known not to fire (a wrong account still answered 200200), so accepting
+    // this would confirm a slip paid to ANY account — and deliver the goods.
+    h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
+
+    // Two shapes of the same hole: no account at all, and a fully masked line
+    // (a present string with zero digits, which checkReceiverMatch also passes).
+    for (const receiver of [null, 'xxx-x-xxxx-x']) {
+      h.slip2go.verifySlip2Go.mockResolvedValueOnce({
+        ...slipOkSuccess,
+        receiverAccount: receiver,
+      });
+
+      const res = await callVerify();
+      expect(res.status).toBe(502);
+      const body = (await res.json()) as { error: string; message: string; slipStored: boolean };
+      expect(body.error).toBe('RECEIVER_MISSING');
+      expect(body.message).toContain('ไม่ได้ระบุบัญชีผู้รับ');
+      // Nothing was settled and nothing was delivered; the order stays payable.
+      expect(body.slipStored).toBe(true);
+    }
+    expect(h.orders.claimOrderForConfirmation).not.toHaveBeenCalled();
+    expect(h.fulfil.fulfilOrder).not.toHaveBeenCalled();
+    // The slip is still evidence in the admin queue — a human confirms it.
+    expect(h.notify.notifyPaymentPending).toHaveBeenCalled();
+  });
+
+  it('fails closed on a store account too short to compare, without spending a credit', async () => {
+    // Audit 2026-11-24: a 1–3 digit setting is not an account and can never be
+    // compared, but it used to count as "configured" — so the route called the
+    // provider and the receiver rule then passed everything.
+    h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
+    h.manualTransfer.getManualTransferInfo.mockResolvedValueOnce({
+      enabled: true,
+      accountName: 'ร้านนกกะทา',
+      accountNumber: '12',
+      accountType: 'bank',
+      bankName: null,
+      qrImageUrl: null,
+    });
+
+    const res = await callVerify();
+    expect(res.status).toBe(503);
+    expect(((await res.json()) as { error: string }).error).toBe('RECEIVER_UNCONFIGURED');
+    expect(h.slip2go.verifySlip2Go).not.toHaveBeenCalled();
+    expect(h.orders.claimOrderForConfirmation).not.toHaveBeenCalled();
+  });
+
+  it('serializes find-or-create, so two concurrent uploads leave ONE pending attempt', async () => {
+    // Audit 2026-11-24: findFirst-then-create let two uploads both read "none"
+    // and both INSERT. Nothing double-confirms, but each attempt carries its own
+    // paid re-check budget, so concurrent delayed uploads multiplied the shop's
+    // provider spend for one order. The read, the claim and the insert now live
+    // in ONE transaction, and a conditional write on the parent order decides
+    // the winner (see the mechanism test below).
+    h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
+    h.slip2go.verifySlip2Go.mockResolvedValue({ ok: false, code: 'SLIP_DELAYED' });
+
+    const created: string[] = [];
+    let seq = 0;
+    // A real Serializable transaction serializes the two callers on this
+    // predicate; model it as a queue so a read+insert OUTSIDE a transaction
+    // (the old code) still interleaves and would create two rows.
+    let tail: Promise<unknown> = Promise.resolve();
+    h.prisma.$transaction.mockImplementation((fn: (tx: unknown) => Promise<unknown>) => {
+      const run = tail.then(() => fn(h.prisma));
+      tail = run.then(
+        () => undefined,
+        () => undefined,
+      );
+      return run;
+    });
+    h.prisma.paymentAttempt.findFirst.mockImplementation(async () =>
+      created.length > 0 ? { id: created.at(-1)! } : null,
+    );
+    h.prisma.paymentAttempt.create.mockImplementation(async () => {
+      seq += 1;
+      created.push(`att-${seq}`);
+      return { id: `att-${seq}` };
+    });
+    try {
+      const [first, second] = await Promise.all([callVerify(), callVerify()]);
+
+      expect(first.status).toBe(502);
+      expect(second.status).toBe(502);
+      // The loser reuses the winner's row instead of inserting a twin…
+      expect(h.prisma.paymentAttempt.create).toHaveBeenCalledTimes(1);
+      expect(created).toEqual(['att-1']);
+      // …so both verdicts land on that ONE attempt: one budget, not two.
+      const stampedOn = (h.prisma.paymentAttempt.update.mock.calls as unknown[][]).map(
+        (call) => (call[0] as { where: { id: string } }).where.id,
+      );
+      expect(new Set(stampedOn)).toEqual(new Set(['att-1']));
+      // Exactly ONE claim write decided it, and it was the conditional write
+      // on the parent order — not an engine's gap-lock deadlock.
+      const claimCalls = (h.prisma.order.updateMany.mock.calls as unknown[][]).filter(
+        (call) => (call[0] as { where: { updatedAt?: unknown } }).where.updatedAt !== undefined,
+      );
+      expect(claimCalls).toHaveLength(1);
+      expect(claimCalls[0]![0]).toMatchObject({
+        where: { id: ORDER.id, updatedAt: new Date(0) },
+        data: { updatedAt: expect.any(Date) },
+      });
+      // …and no isolation level is asked of the engine any more.
+      const txCalls = (h.prisma.$transaction as unknown as { mock: { calls: unknown[][] } }).mock
+        .calls;
+      expect(txCalls[0]![1]).toBeUndefined();
+    } finally {
+      // clearAllMocks keeps implementations, so restore the module defaults.
+      h.prisma.$transaction.mockImplementation(
+        async (fn: (tx: unknown) => Promise<unknown>) => fn(h.prisma),
+      );
+      h.prisma.paymentAttempt.findFirst.mockReset();
+      h.prisma.paymentAttempt.findFirst.mockResolvedValue({ id: 'att-flow' });
+      h.prisma.paymentAttempt.create.mockReset();
+      h.prisma.paymentAttempt.create.mockResolvedValue({ id: 'att-new' });
+    }
+  });
+
+  it('a loser of the conditional claim inserts nothing and adopts the winner attempt', async () => {
+    // The mechanism this guard actually rests on: the claim is a
+    // compare-and-set on the parent order. Two transactions read the same
+    // timestamp; the second one's update matches ZERO rows, so it re-reads and
+    // returns the winner's row. No engine error is required for that verdict —
+    // which is why the guard no longer depends on Serializable gap-lock
+    // deadlocks (engine-specific, and absent where a driver ignores the option).
+    h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
+    h.slip2go.verifySlip2Go.mockResolvedValue({ ok: false, code: 'SLIP_DELAYED' });
+
+    const winner = { id: 'att-winner', gatewayResponse: { rechecks: 2 } };
+    h.prisma.paymentAttempt.findFirst
+      .mockResolvedValueOnce(null) // first pass: nothing committed yet
+      .mockResolvedValueOnce(winner); // after losing the claim: the winner's row
+    h.prisma.order.updateMany.mockResolvedValueOnce({ count: 0 }); // CAS lost
+
+    const res = await callVerify();
+    expect(res.status).toBe(502);
+    expect(((await res.json()) as { error: string }).error).toBe('SLIP_DELAYED');
+
+    // It never inserted a twin…
+    expect(h.prisma.paymentAttempt.create).not.toHaveBeenCalled();
+    // …it claimed with exactly this predicate (a positive, checkable signal)…
+    expect(h.prisma.order.updateMany).toHaveBeenCalledWith({
+      where: { id: ORDER.id, updatedAt: new Date(0) },
+      data: { updatedAt: expect.any(Date) },
+    });
+    // …and the verdict landed on the winner's attempt with ITS budget carried
+    // forward (2 paid checks already spent, not a fresh 0).
+    const stamp = (h.prisma.paymentAttempt.update.mock.calls as unknown[][])[0]![0] as {
+      where: { id: string };
+      data: { gatewayResponse: { rechecks?: number } };
+    };
+    expect(stamp.where.id).toBe('att-winner');
+    expect(stamp.data.gatewayResponse).toMatchObject({ rechecks: 2 });
+    // Two transactions: the lost claim, then the re-read that adopted the row.
+    expect(h.prisma.$transaction).toHaveBeenCalledTimes(2);
+  });
+
+  it('declares the sniffed image type to the provider — a JPEG is not "image/png"', async () => {
+    // This route throws away the multipart file.type and the JSON data-URI
+    // prefix, so before the fix every upload reached the provider as PNG.
+    // JPEG magic bytes: FF D8 FF E0 …
+    h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
+    h.slip2go.verifySlip2Go.mockResolvedValueOnce({ ...slipOkSuccess });
+    const route = (await import('@/app/api/v1/payments/slip-verify/route')) as unknown as Record<
+      string,
+      (r: NextRequest) => Promise<Response>
+    >;
+    const res = await route['POST']!(
+      new NextRequest('http://localhost/api/v1/payments/slip-verify', {
+        method: 'POST',
+        body: JSON.stringify({
+          orderId: ORDER.id,
+          token: 'tok',
+          imageBase64: '/9j/4AAQSkZJRgABAQAAAQ==',
+        }),
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(h.slip2go.verifySlip2Go).toHaveBeenCalledWith(
+      expect.objectContaining({ imageMime: 'image/jpeg' }),
+    );
+  });
+
+  it('sends image/png for a PNG upload — the sniff, not a constant', async () => {
+    h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
+    h.slip2go.verifySlip2Go.mockResolvedValueOnce({ ...slipOkSuccess });
+    await callVerify(); // PNG_B64
+    expect(h.slip2go.verifySlip2Go).toHaveBeenCalledWith(
+      expect.objectContaining({ imageMime: 'image/png' }),
+    );
+  });
+
+  it('forwards the sniffed type on the SlipOK fallback path too', async () => {
+    h.slipok.isSlipVerificationEnabled.mockReturnValue(true);
+    h.slipok.verifySlip.mockResolvedValueOnce({ ...slipOkSuccess });
+    await callVerify();
+    expect(h.slipok.verifySlip).toHaveBeenCalledWith(
+      expect.objectContaining({ imageMime: 'image/png' }),
+    );
+  });
+
   it('skips the upstream call when Slip2Go is not configured', async () => {
     h.slipok.isSlipVerificationEnabled.mockReturnValue(true);
     h.slipok.verifySlip.mockResolvedValueOnce(slipOkSuccess);
@@ -364,6 +582,35 @@ describe('provider dispatch in POST /api/v1/payments/slip-verify', () => {
     expect(((await res.json()) as { status: string }).status).toBe('confirmed');
     expect(h.slip2go.verifySlip2Go).toHaveBeenCalledTimes(1);
     expect(h.slipok.verifySlip).toHaveBeenCalledTimes(1);
+  });
+
+  it('records the abandoned provider in the attempt row, not just the last one', async () => {
+    // The row used to keep only the final answer, so "why did Slip2Go not
+    // answer?" survived only in a log line (audit 2026-11-24).
+    h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
+    h.slipok.isSlipVerificationEnabled.mockReturnValue(true);
+    h.slip2go.verifySlip2Go.mockResolvedValueOnce({
+      ok: false,
+      code: 'QUOTA_EXCEEDED',
+      detail: 'credit 0',
+    });
+    h.slipok.verifySlip.mockResolvedValueOnce({ ok: false, code: 'INVALID_SLIP', detail: 'bad image' });
+
+    const res = await callVerify();
+    expect(res.status).toBe(422);
+    expect(h.prisma.paymentAttempt.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          failureReason: 'INVALID_SLIP',
+          gatewayStatusCode: 'slipok',
+          gatewayResponse: expect.objectContaining({
+            provider: 'slipok',
+            error: 'INVALID_SLIP',
+            fallback: { provider: 'slip2go', code: 'QUOTA_EXCEEDED', detail: 'credit 0' },
+          }),
+        }),
+      }),
+    );
   });
 
   it('does NOT retry on a definitive verdict (amount mismatch)', async () => {
@@ -825,27 +1072,43 @@ describe('confirmation transaction budget + retry (live P2028, 2026-11-01)', () 
       { code: 'P2028' },
     );
 
+  /**
+   * The CONFIRMATION / PARKING transactions — the ones the route sizes with a
+   * `timeout`. Since the find-or-create claim (2026-11-24) is a `$transaction`
+   * too, but carries only an isolation level, counting raw calls would point
+   * this suite at the wrong transaction.
+   */
+  const confirmCalls = (): unknown[][] =>
+    (txSpy().mock.calls as unknown[][]).filter(
+      (call) => (call[1] as { timeout?: number } | undefined)?.timeout !== undefined,
+    );
+
+  /** Failures to inject into the next confirmations, oldest first. */
+  let txFailures: Error[] = [];
+
   beforeEach(() => {
     // Restore the pass-through implementation a previous case may have spent.
-    txSpy().mockImplementation(async (fn: unknown) =>
-      (fn as (tx: unknown) => Promise<unknown>)(h.prisma),
-    );
+    // A failure is only thrown for a timed (confirm/park) transaction, so the
+    // claim still creates the attempt those transactions need.
+    txFailures = [];
+    txSpy().mockImplementation(async (fn: unknown, opts?: { timeout?: number }) => {
+      if (opts?.timeout !== undefined && txFailures.length > 0) throw txFailures.shift()!;
+      return (fn as (tx: unknown) => Promise<unknown>)(h.prisma);
+    });
   });
 
   it('sizes the transaction above the 5s default and retries once when it expires', async () => {
     h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
     h.slip2go.verifySlip2Go.mockResolvedValueOnce(slipOkSuccess);
-    txSpy().mockImplementationOnce(async () => {
-      throw p2028();
-    });
+    txFailures = [p2028()];
 
     const res = await callVerify();
     expect(res.status).toBe(200);
     expect(((await res.json()) as { status: string }).status).toBe('confirmed');
 
     // One automatic retry, with a budget this path can actually fit in.
-    expect(txSpy()).toHaveBeenCalledTimes(2);
-    expect(txSpy().mock.calls[0]![1]).toMatchObject({ timeout: CONFIRM_TX_TIMEOUT_MS });
+    expect(confirmCalls()).toHaveLength(2);
+    expect(confirmCalls()[0]![1]).toMatchObject({ timeout: CONFIRM_TX_TIMEOUT_MS });
     // A retry after a rollback re-runs the guarded claim — never a second
     // provider call and never a second delivery.
     expect(h.slip2go.verifySlip2Go).toHaveBeenCalledTimes(1);
@@ -855,23 +1118,17 @@ describe('confirmation transaction budget + retry (live P2028, 2026-11-01)', () 
   it('stops after one retry and parks the order instead of 5xx-ing the customer', async () => {
     h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
     h.slip2go.verifySlip2Go.mockResolvedValueOnce(slipOkSuccess);
-    txSpy()
-      .mockImplementationOnce(async () => {
-        throw p2028();
-      })
-      .mockImplementationOnce(async () => {
-        throw p2028();
-      });
+    txFailures = [p2028(), p2028()];
 
     const res = await callVerify();
     expect(res.status).toBe(200);
     const body = (await res.json()) as { status: string; paymentVerified: boolean };
     expect(body.status).toBe('pending_manual_fulfilment');
     expect(body.paymentVerified).toBe(true);
-    // Two confirmation attempts + the parking transaction. A third attempt
-    // would have hit the restored default and answered 'confirmed' — so this
-    // also proves the retry is bounded.
-    expect(txSpy()).toHaveBeenCalledTimes(3);
+    // Two confirmation attempts + the parking transaction. A third
+    // confirmation would have hit the restored default and answered
+    // 'confirmed' — the retry is bounded.
+    expect(confirmCalls()).toHaveLength(3);
     expect(h.prisma.order.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: 'pending_manual_fulfilment' }),
@@ -885,9 +1142,7 @@ describe('confirmation transaction budget + retry (live P2028, 2026-11-01)', () 
     // sentence — the codes differ only for logs and support.
     h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
     h.slip2go.verifySlip2Go.mockResolvedValueOnce(slipOkSuccess);
-    txSpy().mockImplementationOnce(async () => {
-      throw new Error('Unique constraint failed on the fields: (`slipVerifiedRef`)');
-    });
+    txFailures = [new Error('Unique constraint failed on the fields: (`slipVerifiedRef`)')];
 
     const res = await callVerify();
     expect(res.status).toBe(422);

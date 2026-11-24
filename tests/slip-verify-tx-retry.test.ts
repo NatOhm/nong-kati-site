@@ -46,6 +46,8 @@ type Store = {
     status: string;
     manualFulfilmentReason: string | null;
     slipImageUrl: string | null;
+    /** The slip-verify find-or-create's claim token (audit 2026-11-24). */
+    updatedAt: string;
   };
   attempts: AttemptRow[];
   settings: Row[];
@@ -61,9 +63,14 @@ type Store = {
 };
 
 type Tx = {
-  paymentAttempt: { update: (args: Row) => Promise<Row> };
+  paymentAttempt: {
+    update: (args: Row) => Promise<Row>;
+    findFirst: (args: Row) => Promise<Row | null>;
+    create: (args: Row) => Promise<Row>;
+  };
   order: {
     update: (args: Row) => Promise<Row>;
+    findUnique: (args: Row) => Promise<Row | null>;
     updateMany: (args: Row) => Promise<{ count: number }>;
   };
 };
@@ -76,6 +83,7 @@ const h = vi.hoisted(() => ({
       status: 'pending_payment',
       manualFulfilmentReason: null as string | null,
       slipImageUrl: null as string | null,
+      updatedAt: '2026-11-05T00:00:00.000Z',
     },
     attempts: [] as AttemptRow[],
     settings: [] as Row[],
@@ -187,6 +195,18 @@ function pick(args: Row): { where: Row; data: Row } {
 function makeTx(draft: Store): Tx {
   return {
     paymentAttempt: {
+      // Since 2026-11-24 the route's find-or-create for the pending attempt
+      // runs inside its own Serializable transaction, so the tx client needs it.
+      findFirst: async () => draft.attempts.find((a) => a.status === 'pending') ?? null,
+      create: async (args: Row) => {
+        const { data } = pick(args);
+        const row: AttemptRow = {
+          id: `att-${draft.attempts.length + 1}`,
+          status: String(data['status'] ?? 'pending'),
+        };
+        draft.attempts.push(row);
+        return { id: row.id };
+      },
       update: async (args: Row) => {
         const { where, data } = pick(args);
         const row = draft.attempts.find((a) => a.id === where['id']);
@@ -202,8 +222,23 @@ function makeTx(draft: Store): Tx {
         if (data['status'] === 'fulfilled') draft.writes.fulfil += 1;
         return {};
       },
+      findUnique: async (args: Row) => {
+        const { where } = pick(args);
+        if (where['id'] !== draft.order.id) return null;
+        return { updatedAt: new Date(draft.order.updatedAt) };
+      },
       updateMany: async (args: Row) => {
         const { where, data } = pick(args);
+        // Two shapes reach this method: the settle CAS (`status in [...]`) and
+        // the slip-verify claim CAS on the order's own timestamp. The latter
+        // models the row lock — a token that is no longer current matches 0.
+        if (where['updatedAt'] !== undefined) {
+          const current = new Date(draft.order.updatedAt).getTime();
+          const token = new Date(String(where['updatedAt'])).getTime();
+          if (where['id'] !== draft.order.id || token !== current) return { count: 0 };
+          draft.order.updatedAt = new Date(String(data['updatedAt'])).toISOString();
+          return { count: 1 };
+        }
         const wanted = (where['status'] as { in?: string[] } | undefined)?.in ?? [];
         const hit = wanted.includes(draft.order.status) && draft.order.id === where['id'];
         if (!hit) return { count: 0 };
@@ -294,11 +329,22 @@ async function call(): Promise<{ res: Response; body: Body }> {
   return { res, body: (await res.json()) as Body };
 }
 
+/**
+ * Timeouts of the confirmation/parking transactions, in order.
+ *
+ * The route also opens one Serializable transaction to find-or-create the
+ * pending attempt; that one carries an isolation level and no timeout, so a
+ * raw index into `txOptions` would now point at the wrong transaction.
+ */
+const confirmBudgets = (): Array<number | undefined> =>
+  h.state.txOptions.filter((o) => o?.timeout !== undefined).map((o) => o?.timeout);
+
 beforeEach(() => {
   vi.clearAllMocks();
   h.state.order.status = 'pending_payment';
   h.state.order.manualFulfilmentReason = null;
   h.state.order.slipImageUrl = null;
+  h.state.order.updatedAt = '2026-11-05T00:00:00.000Z';
   h.state.attempts.length = 0;
   h.state.settings.length = 0;
   h.state.reconciliations.length = 0;
@@ -335,10 +381,10 @@ describe('POST /api/v1/payments/slip-verify — confirmation transaction expiry'
 
     expect(res.status).toBe(200);
     expect(body.status).toBe('confirmed');
-    // Two confirmation attempts (the expired one + the retry), and the
+    // claim (Serializable) + the expired confirmation + the retry, and the
     // production budget is still 30s — the timeout was faked, not loosened.
-    expect(h.state.transactions).toBe(2);
-    expect(h.state.txOptions[0]?.timeout).toBe(CONFIRM_TIMEOUT_MS);
+    expect(h.state.transactions).toBe(3);
+    expect(confirmBudgets()).toEqual([CONFIRM_TIMEOUT_MS, CONFIRM_TIMEOUT_MS]);
 
     // The provider was asked exactly once: a retry must never re-verify (and
     // never re-charge) the same slip.
@@ -368,7 +414,7 @@ describe('POST /api/v1/payments/slip-verify — confirmation transaction expiry'
 
     // The parking transaction committed the payment exactly once — the two
     // expired attempts contributed nothing.
-    expect(h.state.transactions).toBe(3); // confirm, confirm, park
+    expect(h.state.transactions).toBe(4); // claim, confirm, confirm, park
     expect(h.state.writes.attemptSucceeded).toBe(1);
     expect(h.state.writes.claim).toBe(1);
     expect(h.state.writes.fulfil).toBe(0);
@@ -406,11 +452,9 @@ describe('POST /api/v1/payments/slip-verify — confirmation transaction expiry'
 
     const { res, body } = await call();
 
-    // One confirmation attempt (no retry) + the parking transaction.
-    expect(h.state.transactions).toBe(2);
-    expect(h.state.txOptions).toHaveLength(2);
-    expect(h.state.txOptions[0]?.timeout).toBe(CONFIRM_TIMEOUT_MS);
-    expect(h.state.txOptions[1]?.timeout).toBe(PARK_TIMEOUT_MS);
+    // claim + one confirmation attempt (no retry) + the parking transaction.
+    expect(h.state.transactions).toBe(3);
+    expect(confirmBudgets()).toEqual([CONFIRM_TIMEOUT_MS, PARK_TIMEOUT_MS]);
     expect(res.status).toBe(200);
     expect(body.status).toBe('pending_manual_fulfilment');
     expect(h.state.writes.attemptSucceeded).toBe(1);

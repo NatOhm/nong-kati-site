@@ -87,8 +87,11 @@ vi.doMock('@/lib/slipSecurity', () => tokenMock);
 // getManualTransferInfo — the real module pulls React.cache at import
 // time, which does not exist in the vitest environment. The account is
 // CONFIGURED because slip-verify now refuses to auto-confirm without one
-// (fail-closed, 2026-11-21); the slip mock reports 'x', too short to compare,
-// so the provider verdict stands as before.
+// (fail-closed, 2026-11-21), and the slip mocks report the REAL masked account
+// (`xxx-x-x3578-x`, the live 2026-11-01 payload shape) so the receiver rule
+// actually runs. Until 2026-11-24 these fixtures said `'x'` — too short to
+// compare, which made the authoritative check pass silently and let a
+// receiver-less payload confirm an order.
 vi.doMock('@/lib/data', () => ({
   getManualTransferInfo: vi.fn(async () => ({
     enabled: true,
@@ -102,6 +105,9 @@ vi.doMock('@/lib/data', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // The slip-verify find-or-create claims the parent order with a
+  // compare-and-set: it reads this timestamp, then updates under it.
+  prismaMock.order.findUnique.mockResolvedValue({ updatedAt: new Date(0) });
   prismaMock.order.updateMany.mockResolvedValue({ count: 1 });
   prismaMock.paymentAttempt.updateMany.mockResolvedValue({ count: 1 });
 });
@@ -194,7 +200,7 @@ describe('POST /api/v1/payments/slip-verify — recovery honesty (audit #4)', ()
       ok: true,
       ref: 'ref-1',
       amountThb: 107,
-      receiverAccount: 'x',
+      receiverAccount: 'xxx-x-x3578-x',
       raw: {},
     });
     ordersMock.claimOrderForConfirmation.mockResolvedValue({ id: 'ord-sv' });
@@ -228,7 +234,7 @@ describe('POST /api/v1/payments/slip-verify — recovery honesty (audit #4)', ()
       ok: true,
       ref: 'ref-race',
       amountThb: 107,
-      receiverAccount: 'x',
+      receiverAccount: 'xxx-x-x3578-x',
       raw: {},
     });
     ordersMock.claimOrderForConfirmation.mockResolvedValue(null);
@@ -244,7 +250,7 @@ describe('POST /api/v1/payments/slip-verify — recovery honesty (audit #4)', ()
       ok: true,
       ref: 'ref-2',
       amountThb: 107,
-      receiverAccount: 'x',
+      receiverAccount: 'xxx-x-x3578-x',
       raw: {},
     });
     ordersMock.claimOrderForConfirmation.mockResolvedValue({ id: 'ord-sv' });
@@ -266,7 +272,7 @@ describe('POST /api/v1/payments/slip-verify — recovery honesty (audit #4)', ()
       ok: true,
       ref: 'ref-3',
       amountThb: 107,
-      receiverAccount: 'x',
+      receiverAccount: 'xxx-x-x3578-x',
       raw: {},
     });
     ordersMock.claimOrderForConfirmation.mockResolvedValue({ id: 'ord-sv' });
@@ -303,7 +309,7 @@ describe('POST /api/v1/payments/slip-verify — recovery honesty (audit #4)', ()
       ok: true,
       ref: 'ref-4',
       amountThb: 107,
-      receiverAccount: 'x',
+      receiverAccount: 'xxx-x-x3578-x',
       raw: {},
     });
     ordersMock.claimOrderForConfirmation.mockResolvedValue({ id: 'ord-sv' });
@@ -533,7 +539,7 @@ describe('post-commit stock policy delegation', () => {
       ok: true,
       ref: 'ref-ok',
       amountThb: 107,
-      receiverAccount: 'x',
+      receiverAccount: 'xxx-x-x3578-x',
       raw: {},
     });
     ordersMock.claimOrderForConfirmation.mockResolvedValue({ id: 'ord-sv' });

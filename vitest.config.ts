@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 
 export default defineConfig({
   // JSX for tests uses the automatic runtime. The app's tsconfig says
@@ -16,6 +16,11 @@ export default defineConfig({
     // `// @vitest-environment jsdom` docblock at the top of the file (a
     // per-file environment function is not serializable to the forks pool).
     include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
+    // `tests/db/**` opens a REAL database (see vitest.db.config.ts + `npm run
+    // test:db`). Keeping it out of the default run means `npm test` needs no
+    // server and its skip count stays a known number instead of "however many
+    // DB suites there are today".
+    exclude: [...configDefaults.exclude, 'tests/db/**'],
     environment: 'node',
     globals: true,
     // Cap workers: vitest otherwise spawns one per CPU (89 on this box) and

@@ -18,6 +18,7 @@
     "format:check": "prettier --check .",
     "patch-notes": "node scripts/patch-notes.mjs",
     "test": "vitest run",
+    "test:db": "vitest run --config vitest.db.config.ts",
     "test:e2e": "playwright test",
     "monitor:health": "node scripts/monitor-health.mjs",
     "monitor:sellable": "node scripts/check-sellable.mjs",

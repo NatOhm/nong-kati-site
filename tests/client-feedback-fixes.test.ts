@@ -539,8 +539,9 @@ describe('Slip2Go adapter — error mapping', () => {
 
   it('maps 401005/401006 to QUOTA_EXCEEDED and 401007 (IP) to NOT_CONFIGURED', async () => {
     process.env['NK_SLIP2GO_SECRET'] = 'test-secret';
-    // 401xxx codes are auth-family: each attempt (Bearer then raw) is queued
-    // its own response, and BOTH must map to the same outcome.
+    // A quota / credit / IP refusal is NOT about the Authorization header form,
+    // so since the 2026-11-24 narrowing it issues exactly ONE request. The
+    // customer-facing mapping must be unchanged for all three.
     const code401 = (code: string): Response =>
       new Response(
         JSON.stringify({
@@ -551,35 +552,25 @@ describe('Slip2Go adapter — error mapping', () => {
       );
     const { verifySlip2Go } = await import('@/lib/payment/slip2go');
 
-    fetchMock.mockResolvedValueOnce(code401('401005')).mockResolvedValueOnce(code401('401005'));
-    expect(
-      failed(
-        await verifySlip2Go({
-          imageBase64: 'aGk=',
-          expectedAmountThb: 25,
-        }),
-      ).code,
-    ).toBe('QUOTA_EXCEEDED');
-
-    fetchMock.mockResolvedValueOnce(code401('401006')).mockResolvedValueOnce(code401('401006'));
-    expect(
-      failed(
-        await verifySlip2Go({
-          imageBase64: 'aGk=',
-          expectedAmountThb: 25,
-        }),
-      ).code,
-    ).toBe('QUOTA_EXCEEDED');
-
-    fetchMock.mockResolvedValueOnce(code401('401007')).mockResolvedValueOnce(code401('401007'));
-    expect(
-      failed(
-        await verifySlip2Go({
-          imageBase64: 'aGk=',
-          expectedAmountThb: 25,
-        }),
-      ).code,
-    ).toBe('NOT_CONFIGURED');
+    const cases: Array<[string, string]> = [
+      ['401005', 'QUOTA_EXCEEDED'],
+      ['401006', 'QUOTA_EXCEEDED'],
+      ['401007', 'NOT_CONFIGURED'],
+    ];
+    for (const [code, expected] of cases) {
+      fetchMock.mockClear();
+      fetchMock.mockResolvedValueOnce(code401(code));
+      expect(
+        failed(
+          await verifySlip2Go({
+            imageBase64: 'aGk=',
+            expectedAmountThb: 25,
+          }),
+        ).code,
+        code,
+      ).toBe(expected);
+      expect(fetchMock, code).toHaveBeenCalledTimes(1);
+    }
   });
 
   it('treats a 5xx / non-JSON body as UPSTREAM_ERROR', async () => {
