@@ -30,8 +30,13 @@ import { NextRequest } from 'next/server';
 process.env['NK_JWT_SECRET'] = 'recheck-test-secret-0123456789abcdef0123456789ab';
 
 const STORE_ACCOUNT = '199-1-73578-6';
-/** The bank's own mask for that account — the slip this feature exists for. */
-const BBL_MASK = '199-1-xxx786';
+/**
+ * The receiver string every observed payload carries for that account: the
+ * tail mask (live: NK-2026-000183). A middle mask (`199-1-xxx786`) has never
+ * been seen from the provider, and the positional compare for it was cut from
+ * 1.2.6 — so this suite pins the shape the recheck must actually confirm.
+ */
+const BBL_MASK = 'xxx-x-x3578-x';
 
 const { prismaMock, provider, ordersMock, fulfilmentMock, notifyMock, storeMock, dataMock } =
   vi.hoisted(() => {
