@@ -131,6 +131,14 @@ esac
 echo "$TAR_GIT_SHA" | grep -Eq '^[0-9a-f]{40}$' \
   || die "Bundle GIT_SHA '$TAR_GIT_SHA' is not a 40-hex commit id — stamp-git-sha.mjs did not run."
 say "Stamps verified: BUILD_ID=$TAR_BUILD_ID · git=$TAR_GIT_SHA (clean)"
+# A frozen build (SKIP_BUILD=1 after commit-and-build) is made from an EARLIER
+# commit than HEAD, so every literal below must be the bundle's stamp: the
+# Step-2 grep compares against the tar, not against HEAD, and a HEAD literal
+# there stages nothing at all (measured on 1.2.6: bundle a57c18f, HEAD the
+# papers commit). /api/v1/version reports the stamp too, never HEAD.
+if [ "$TAR_GIT_SHA" != "$START_SHA" ]; then
+  warn "HEAD is $START_SHA but the bundle was built from $TAR_GIT_SHA — printing the BUNDLE's stamps (that is what ships and what /api/v1/version will report)."
+fi
 
 # ── Step 1: publish as artifact branch ──────────────────────────────────────
 if [ "${DRY_RUN:-0}" = "1" ]; then
@@ -187,15 +195,15 @@ cat <<SUMMARY
  NEXT: Plesk half (docs/deploy-hostatom-manual.md Step 2–6)
 ──────────────────────────────────────────────────────────────────────────────
  BUILD_ID : $BUILD_ID
- git sha  : $START_SHA   → set Infisical GIT_SHA to this (GIT_REF=master) BEFORE restart
+ git sha  : $TAR_GIT_SHA   → set Infisical GIT_SHA to this (GIT_REF=master) BEFORE restart
 
  1. Infisical → nong-kati → Production → GIT_SHA=$START_SHA, GIT_REF=master
 
  2. Plesk → Scheduled Tasks → Run a command → paste → Run Now (don't save):
 
-cd httpdocs && rm -rf .next-stage && curl -fsSLk --max-time 180 -o deploy-bundle.tar.gz $RAW_URL?cb=\$\$ && mkdir -p .next-stage && tar -xzf deploy-bundle.tar.gz -C .next-stage && grep -Fxq $BUILD_ID .next-stage/.next/BUILD_ID && grep -Fxq $START_SHA .next-stage/.next/GIT_SHA && rm -rf .next.old && if test -d .next; then mv .next .next.old; fi && mv .next-stage/.next .next && cp -a .next-stage/. . && rm -rf .next-stage deploy-bundle.tar.gz && { cat .next/BUILD_ID; echo; cat .next/GIT_SHA; echo; } > extract-check.txt && touch tmp/restart.txt
+cd httpdocs && rm -rf .next-stage && curl -fsSLk --max-time 180 -o deploy-bundle.tar.gz $RAW_URL?cb=\$\$ && mkdir -p .next-stage && tar -xzf deploy-bundle.tar.gz -C .next-stage && grep -Fxq $BUILD_ID .next-stage/.next/BUILD_ID && grep -Fxq $TAR_GIT_SHA .next-stage/.next/GIT_SHA && rm -rf .next.old && if test -d .next; then mv .next .next.old; fi && mv .next-stage/.next .next && cp -a .next-stage/. . && rm -rf .next-stage deploy-bundle.tar.gz && { cat .next/BUILD_ID; echo; cat .next/GIT_SHA; echo; } > extract-check.txt && touch tmp/restart.txt
 
- 3. Verify: httpdocs/extract-check.txt — line 1 == BUILD_ID above, line 2 == $START_SHA,
+ 3. Verify: httpdocs/extract-check.txt — line 1 == BUILD_ID above,     line 2 == $TAR_GIT_SHA,
     exactly. The task compared both stamps to those literals BEFORE the swap, so no file
     means nothing moved (the previous build is still live, .next-stage is kept for
     inspection) and a mismatch cannot have reached the docroot; .next.old is the on-disk
@@ -215,7 +223,7 @@ cd httpdocs && rm -rf .next-stage && curl -fsSLk --max-time 180 -o deploy-bundle
  5. Verification curls:
 
 curl -s https://nongkatistore.com/api/v1/version
-#   expect buildId == $BUILD_ID above AND gitSha == $START_SHA: stamp-git-sha.mjs
+#   expect buildId == $BUILD_ID above AND gitSha == $TAR_GIT_SHA: stamp-git-sha.mjs
 #   writes the commit INTO .next/GIT_SHA at build time, and the route prefers
 #   that stamp over the env var — the SHA is now the verification signal
 #   (before 2026-10-27 it was a stale Infisical echo and could not be trusted).
