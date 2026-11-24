@@ -15,6 +15,7 @@ import { isSlipVerificationEnabled, verifySlip } from '@/lib/payment/slipok';
 import {
   checkReceiverMatch,
   normalizeAccountDigits,
+  receiverIsProven,
   storeReceiverDigits,
 } from '@/lib/payment/receiverPolicy';
 
@@ -107,6 +108,13 @@ export async function verifySlipImage(input: {
   imageMime?: string | undefined;
   expectedAmountThb: number;
   storeAccountNumber: string | null | undefined;
+  /**
+   * The shop's own account HOLDER name (`manual-transfer.accountName`). The
+   * digits alone cannot prove identity through a mask (audit 2026-11-24), so
+   * this is the evidence that turns "the visible digits fit" into "this is our
+   * account". Empty ⇒ nothing can be proven and the slip goes to review.
+   */
+  storeAccountName?: string | null | undefined;
   /**
    * Default true: no store account means no provider call at all (a credit is
    * not spent on a verdict the shop cannot act on). The admin "read the
@@ -245,6 +253,31 @@ export async function verifySlipImage(input: {
       provider: usedProvider,
       receiverAccount: result.receiverAccount,
     };
+  }
+
+  // Digits fitting a mask is NOT proof of identity (audit 2026-11-24):
+  // `xxx-x-x3578-x` fits every account with 3578 in slots 6–9, so a slip from
+  // another bank could auto-confirm an order whose money never reached this
+  // shop. Only a printed full account or the holder's name closes that gap;
+  // when neither is available the slip is parked for an admin instead of being
+  // confirmed. The informational read (`requireStoreAccount: false`) never
+  // settles money, so it skips the requirement and still returns the account.
+  if (input.requireStoreAccount !== false) {
+    const proof = receiverIsProven({
+      storeAccountNumber: input.storeAccountNumber,
+      storeAccountName: input.storeAccountName,
+      slipReceiverAccount: result.receiverAccount,
+      slipReceiverName: result.receiverName,
+    });
+    if (!proof.proven) {
+      return {
+        ok: false,
+        code: 'RECEIVER_UNPROVEN',
+        detail: proof.detail,
+        provider: usedProvider,
+        receiverAccount: result.receiverAccount,
+      };
+    }
   }
 
   return {

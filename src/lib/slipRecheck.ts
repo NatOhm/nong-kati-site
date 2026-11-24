@@ -195,6 +195,9 @@ export async function recheckDelayedAttempt(attemptId: string): Promise<RecheckO
       imageMime: sniffSlipMime(bytes),
       expectedAmountThb: Number(order.totalAmountThb),
       storeAccountNumber: manualInfo.accountNumber,
+      // Same proof requirement as the live route: a re-check that only fits the
+      // mask must not settle money an admin has not looked at.
+      storeAccountName: manualInfo.accountName,
     });
   } catch (err) {
     // A provider/network throw is not a verdict; count it as a failed retry so

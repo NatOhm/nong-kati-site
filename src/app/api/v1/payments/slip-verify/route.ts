@@ -215,6 +215,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     imageMime,
     expectedAmountThb: expected,
     storeAccountNumber: manualInfo.accountNumber,
+    // The holder name is the only evidence that can prove the masked receiver
+    // is THIS shop's account — the digits fit any account with the same mask
+    // window (audit 2026-11-24). Empty ⇒ review, never auto-confirm.
+    storeAccountName: manualInfo.accountName,
   });
 
   if (!result.ok) {
@@ -287,6 +291,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       // only authoritative check has nothing to compare. Not the customer's
       // fault and no retry of this file can fix it → 5xx, admin confirms.
       RECEIVER_MISSING: 502,
+      // The receiver fits the shop account's mask but cannot be PROVEN to be
+      // that account (no holder name to compare, or a different holder). Same
+      // class as RECEIVER_MISSING: the customer did nothing wrong and this slip
+      // may be perfectly genuine — a human must look, so it is never an
+      // auto-confirm and never a 4xx that blames the customer's file.
+      RECEIVER_UNPROVEN: 502,
       // Our misconfiguration, not the customer's slip, and no retry of the
       // same request can fix it — same 5xx class as NOT_CONFIGURED.
       RECEIVER_UNCONFIGURED: 503,
@@ -303,6 +313,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       RECEIVER_MISMATCH: 'บัญชีผู้รับในสลิปไม่ตรงกับร้าน',
       RECEIVER_MISSING:
         'ธนาคารยืนยันยอดเงินแล้วแต่ไม่ได้ระบุบัญชีผู้รับ — รอแอดมินตรวจสอบและยืนยันให้',
+      // Says what we know and what we cannot prove — never "สลิปไม่ถูกต้อง",
+      // because a genuine slip from another bank lands here too.
+      RECEIVER_UNPROVEN:
+        'ตรวจสลิปผ่านแล้ว แต่ยืนยันได้ไม่เต็มร้อยว่าบัญชีผู้รับคือบัญชีร้าน — ส่งเรื่องให้แอดมินตรวจสอบและยืนยันให้',
       // Our fault, not the customer's: with no store account there is nothing
       // to compare the slip against, so verification is refused and the slip
       // goes to the admin instead of auto-confirming blind.

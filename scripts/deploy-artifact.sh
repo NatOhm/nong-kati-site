@@ -61,6 +61,30 @@ git diff --quiet || warn "Working tree has uncommitted changes — the build sta
 
 START_SHA="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
 
+# ── Guard: the delayed-slip sweep must have a caller on the default branch ────
+# 1.2.6 adds POST /api/v1/internal/orders/slip-recheck as the backstop for a
+# delayed slip whose in-process 2.5-minute timer was lost to a restart or a
+# deploy. GitHub only runs `schedule` workflows from the DEFAULT branch, so the
+# caller lives in master's prod-health-monitor.yml — a release branch that adds
+# the endpoint without that line deploys a route nobody calls, and nothing in
+# the build or the tests can notice (the route exists; the cron never asks).
+# That failure mode is silent and costs a paid order its automatic re-check, so
+# refuse to pack it. Override only when you have decided the timer half is
+# enough for this deploy.
+SWEEP_ENDPOINT='internal/orders/slip-recheck'
+SWEEP_CALLERS="$(git show "origin/master:.github/workflows/prod-health-monitor.yml" 2>/dev/null \
+  | grep -c "$SWEEP_ENDPOINT" || true)"
+case "${SWEEP_CALLERS:-0}" in
+  (0)
+    if [ -n "${NK_ALLOW_NO_SWEEP_CALLER:-}" ]; then
+      warn "origin/master never calls $SWEEP_ENDPOINT — shipping anyway (NK_ALLOW_NO_SWEEP_CALLER is set). The in-process timer still runs; the lost-timer backstop does NOT."
+    else
+      die "origin/master's prod-health-monitor.yml never calls $SWEEP_ENDPOINT, so this deploy would silently lose the delayed-slip backstop (GitHub runs schedule workflows from the default branch only). Merge the release branch first, or re-run with NK_ALLOW_NO_SWEEP_CALLER=1 if you have decided the in-process timer is enough."
+    fi
+    ;;
+  (*) say "Delayed-slip sweep has a caller on origin/master" ;;
+esac
+
 # ── Guard: the release commit must be reachable from a branch ───────────────
 # The build the site served for two days was `206a6a2`, a commit on NO branch
 # (P0-2): live code that cannot be rebuilt from source, and nothing noticed.

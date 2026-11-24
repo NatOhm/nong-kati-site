@@ -117,3 +117,114 @@ export function checkReceiverMatch(
   if (maskMatches(want, slipReceiver ?? '')) return { ok: true };
   return { ok: false, detail: `receiver …${got.slice(-4)} vs store …${want.slice(-4)}` };
 }
+
+/** Titles banks print in front of the holder name — formatting, not identity. */
+const NAME_TITLES = [
+  'นางสาว',
+  'นาง',
+  'นาย',
+  'น.ส.',
+  'ด.ช.',
+  'ด.ญ.',
+  'mr.',
+  'mrs.',
+  'ms.',
+  'miss',
+  'master',
+];
+
+/**
+ * Compare a holder name the way a bank prints it: titles, spacing and case are
+ * presentation. Returns '' for anything empty so callers can tell "no name"
+ * from "a name that differs".
+ */
+export function normalizePersonName(name: string | null | undefined): string {
+  let v = (name ?? '').normalize('NFKC').toLowerCase();
+  // Zero-width spaces survive NFKC and would otherwise make two identical
+  // names unequal.
+  v = v.replace(/[\u200B-\u200D\uFEFF]/g, '');
+  let previous = '';
+  while (previous !== v) {
+    previous = v;
+    for (const title of NAME_TITLES) {
+      if (v.startsWith(title)) v = v.slice(title.length);
+    }
+    v = v.trimStart();
+  }
+  // Letters and digits only: Thai combining marks are \p{M}, kept below.
+  return v.replace(/[^\p{L}\p{M}\p{N}]/gu, '');
+}
+
+export type ReceiverProof =
+  | { proven: true; by: 'full-account' | 'holder-name' }
+  | {
+      proven: false;
+      reason: 'store-account-unset' | 'store-name-unset' | 'provider-named-no-holder' | 'holder-name-differs';
+      detail: string;
+    };
+
+/**
+ * Can we POSITIVELY prove the slip's receiver is the shop's own account?
+ *
+ * `checkReceiverMatch` answers a weaker question — "do the visible digits fit
+ * the store account?" — and a mask cannot answer more than that. `xxx-x-x3578-x`
+ * fits EVERY 10-digit account whose 6th–9th digits are 3578, so a slip from
+ * another bank with a coincidentally identical mask passed the digit compare
+ * and auto-confirmed an order: the money went to somebody else and this shop
+ * released codes. The bank-side `checkReceiver` cannot close that (a wrong
+ * accountNumber still answered 200200 on 2026-10-30 and 2026-11-24), so the
+ * only evidence left is the one the provider does send and we used to discard:
+ * the receiving account's HOLDER NAME.
+ *
+ * Proven means one of:
+ *  - the provider printed the FULL account (no mask chars) and its digits equal
+ *    the store account, or
+ *  - the holder name the bank reports equals the shop's configured account
+ *    name once titles/spacing/case are normalized.
+ *
+ * Anything else — no store name configured, the provider named no holder, or a
+ * different holder — is NOT proven, and the caller must park the slip for an
+ * admin instead of confirming. A false reject is a queue entry; a false confirm
+ * is goods handed out for a payment that went to another account.
+ */
+export function receiverIsProven(input: {
+  storeAccountNumber: string | null | undefined;
+  storeAccountName: string | null | undefined;
+  slipReceiverAccount: string | null | undefined;
+  slipReceiverName: string | null | undefined;
+}): ReceiverProof {
+  const want = storeReceiverDigits(input.storeAccountNumber);
+  if (want === '') {
+    return { proven: false, reason: 'store-account-unset', detail: 'store receiving account not configured' };
+  }
+
+  const printed = input.slipReceiverAccount ?? '';
+  const printedUnmasked = !Array.from(printed).some((ch) => MASK_CHARS.includes(ch));
+  if (printedUnmasked && normalizeAccountDigits(printed) === want) {
+    return { proven: true, by: 'full-account' };
+  }
+
+  const storeName = normalizePersonName(input.storeAccountName);
+  if (storeName === '') {
+    return {
+      proven: false,
+      reason: 'store-name-unset',
+      detail: 'shop account holder name not configured — the receiver cannot be proven',
+    };
+  }
+  const slipName = normalizePersonName(input.slipReceiverName);
+  if (slipName === '') {
+    return {
+      proven: false,
+      reason: 'provider-named-no-holder',
+      detail: 'provider named no receiving account holder',
+    };
+  }
+  if (slipName === storeName) return { proven: true, by: 'holder-name' };
+
+  return {
+    proven: false,
+    reason: 'holder-name-differs',
+    detail: 'receiving account holder is not the shop account holder',
+  };
+}
