@@ -49,6 +49,17 @@ Sessions expire in minutes — re-SSO right before each Plesk step.
 > (reuse a fresh build), `DRY_RUN=1` (build + stage only, no push — and nothing gets certified).
 > The commands below are the same flow spelled out manually — use them as fallback or to
 > understand what the scripts do.
+>
+> **Preflight (2026-11-24) — the delayed-slip sweep needs a caller on the DEFAULT branch.**
+> `deploy-artifact.sh` reads `origin/master:.github/workflows/prod-health-monitor.yml` before it
+> packs. GitHub runs `schedule` workflows from the default branch only, so a release branch that
+> adds `POST /api/v1/internal/orders/slip-recheck` without that line deploys a route **nobody
+> calls**: the in-process 2.5-minute timer still runs, the lost-timer backstop is dead, and no
+> unit test can see it (the route exists and every test passes). The pack therefore **fails** with
+> that sentence instead of shipping the gap. Resolve it by merging the release branch — or, having
+> decided the in-process timer is enough for this deploy, set `NK_ALLOW_NO_SWEEP_CALLER=1` to ship
+> with a loud warning. The guard itself is pinned by `D10` in `tests/deploy-runbook.test.ts`, which
+> also asserts this branch's workflow really does call the endpoint.
 
 ```bash
 cd "<project root>"                       # webapp/nong-kati/nong-kati
