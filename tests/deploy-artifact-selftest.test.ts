@@ -165,6 +165,10 @@ function publish(f: Fixture, buildId: string): Published {
       // push updates the same remote-tracking ref a real release would.
       ARTIFACT_BRANCH: 'deploy-artifact',
       SITE_URL: 'http://127.0.0.1:9',
+      // The fixture remote has no default-branch workflow, so the sweep-caller
+      // preflight has nothing to read. This suite certifies the pack/publish
+      // path; the preflight itself is pinned by D10 in deploy-runbook.test.ts.
+      NK_ALLOW_NO_SWEEP_CALLER: '1',
     },
   });
   const out = `${r.stdout ?? ''}${r.stderr ?? ''}`;

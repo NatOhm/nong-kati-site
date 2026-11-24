@@ -201,6 +201,7 @@ describe('POST /api/v1/payments/slip-verify — recovery honesty (audit #4)', ()
       ref: 'ref-1',
       amountThb: 107,
       receiverAccount: 'xxx-x-x3578-x',
+      receiverName: 'ร้านนกกะทา',
       raw: {},
     });
     ordersMock.claimOrderForConfirmation.mockResolvedValue({ id: 'ord-sv' });
@@ -235,6 +236,7 @@ describe('POST /api/v1/payments/slip-verify — recovery honesty (audit #4)', ()
       ref: 'ref-race',
       amountThb: 107,
       receiverAccount: 'xxx-x-x3578-x',
+      receiverName: 'ร้านนกกะทา',
       raw: {},
     });
     ordersMock.claimOrderForConfirmation.mockResolvedValue(null);
@@ -251,6 +253,7 @@ describe('POST /api/v1/payments/slip-verify — recovery honesty (audit #4)', ()
       ref: 'ref-2',
       amountThb: 107,
       receiverAccount: 'xxx-x-x3578-x',
+      receiverName: 'ร้านนกกะทา',
       raw: {},
     });
     ordersMock.claimOrderForConfirmation.mockResolvedValue({ id: 'ord-sv' });
@@ -273,6 +276,7 @@ describe('POST /api/v1/payments/slip-verify — recovery honesty (audit #4)', ()
       ref: 'ref-3',
       amountThb: 107,
       receiverAccount: 'xxx-x-x3578-x',
+      receiverName: 'ร้านนกกะทา',
       raw: {},
     });
     ordersMock.claimOrderForConfirmation.mockResolvedValue({ id: 'ord-sv' });
@@ -310,6 +314,7 @@ describe('POST /api/v1/payments/slip-verify — recovery honesty (audit #4)', ()
       ref: 'ref-4',
       amountThb: 107,
       receiverAccount: 'xxx-x-x3578-x',
+      receiverName: 'ร้านนกกะทา',
       raw: {},
     });
     ordersMock.claimOrderForConfirmation.mockResolvedValue({ id: 'ord-sv' });
@@ -540,6 +545,7 @@ describe('post-commit stock policy delegation', () => {
       ref: 'ref-ok',
       amountThb: 107,
       receiverAccount: 'xxx-x-x3578-x',
+      receiverName: 'ร้านนกกะทา',
       raw: {},
     });
     ordersMock.claimOrderForConfirmation.mockResolvedValue({ id: 'ord-sv' });

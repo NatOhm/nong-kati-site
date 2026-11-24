@@ -219,8 +219,15 @@ describe('ATTACK: make a ฿9.00 order settle for a different amount', () => {
 // ─── B. Slip accepted for the wrong receiver ───────────────────────────────
 
 describe('ATTACK: get a slip to MY account accepted as the shop', () => {
+  // The holder name is part of the receiver evidence now (`receiverIsProven`):
+  // the digits only say the mask FITS, the name says whose account it is.
   const flow = (storeAccount: string | null = STORE_ACCOUNT) =>
-    verifySlipImage({ imageBase64: 'aGk=', expectedAmountThb: 9, storeAccountNumber: storeAccount });
+    verifySlipImage({
+      imageBase64: 'aGk=',
+      expectedAmountThb: 9,
+      storeAccountNumber: storeAccount,
+      storeAccountName: 'ร้าน',
+    });
 
   it('a different account (zeros) is refused and NOT laundered through the fallback', async () => {
     h.verifySlip2Go.mockResolvedValueOnce(ok2go('xxx-x-x0000-x'));
@@ -294,7 +301,12 @@ describe('ATTACK: get a slip to MY account accepted as the shop', () => {
 
 describe('ATTACK: exploit the fallback order or a slow/odd provider answer', () => {
   const flow = () =>
-    verifySlipImage({ imageBase64: 'aGk=', expectedAmountThb: 9, storeAccountNumber: STORE_ACCOUNT });
+    verifySlipImage({
+      imageBase64: 'aGk=',
+      expectedAmountThb: 9,
+      storeAccountNumber: STORE_ACCOUNT,
+      storeAccountName: 'ร้าน',
+    });
 
   it('a fraud-shaped payload that carries `data` is still not a pass', async () => {
     // 200500 = fraudulent transaction. The code decides, not the payload shape.

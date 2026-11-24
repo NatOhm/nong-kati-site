@@ -7,6 +7,8 @@ import { describe, expect, it } from 'vitest';
 import {
   checkReceiverMatch,
   normalizeAccountDigits,
+  normalizePersonName,
+  receiverIsProven,
   storeReceiverDigits,
 } from '@/lib/payment/receiverPolicy';
 
@@ -77,5 +79,105 @@ describe('checkReceiverMatch', () => {
     expect(checkReceiverMatch('1234565786', 'xx')).toEqual({ ok: true });
     expect(checkReceiverMatch('', 'xxx-x-x9999-x')).toEqual({ ok: true });
     expect(checkReceiverMatch(null, null)).toEqual({ ok: true });
+  });
+});
+
+describe('receiverIsProven — a compatible mask is not proof of identity', () => {
+  const store = { storeAccountNumber: '199-1-73578-6', storeAccountName: 'กนกนาถ โรจนวุฒิ' };
+
+  it('proves the shop account through the holder name on both real mask shapes', () => {
+    // Tail mask (live NK-2026-000183) and Bangkok Bank middle mask (the ฿67
+    // receipt): the digits differ in shape, the holder does not.
+    for (const account of ['xxx-x-x3578-x', '199-1-xxx786']) {
+      expect(
+        receiverIsProven({ ...store, slipReceiverAccount: account, slipReceiverName: 'กนกนาถ โรจนวุฒิ' }),
+      ).toEqual({ proven: true, by: 'holder-name' });
+    }
+  });
+
+  it('treats titles, spacing, case and zero-width characters as presentation', () => {
+    for (const name of [
+      'นางสาวกนกนาถ โรจนวุฒิ',
+      'นาย กนกนาถ   โรจนวุฒิ',
+      'นางสาว กนกนาถ\u200Bโรจนวุฒิ',
+      'MRS. กนกนาถ โรจนวุฒิ',
+    ]) {
+      expect(
+        receiverIsProven({ ...store, slipReceiverAccount: 'xxx-x-x3578-x', slipReceiverName: name }),
+      ).toEqual({ proven: true, by: 'holder-name' });
+    }
+    expect(normalizePersonName('  นาย  สมชาย ')).toBe('สมชาย');
+  });
+
+  it('refuses a different holder whose mask fits the same window — the cross-bank hole', () => {
+    // `xxx-x-x3578-x` fits EVERY account with 3578 in slots 6–9. Before this
+    // rule, that was enough to auto-confirm an order whose money went to
+    // someone else.
+    const verdict = receiverIsProven({
+      ...store,
+      slipReceiverAccount: 'xxx-x-x3578-x',
+      slipReceiverName: 'สมชาย ใจดี',
+    });
+    expect(verdict).toMatchObject({ proven: false, reason: 'holder-name-differs' });
+    expect('detail' in verdict && verdict.detail).toBe(
+      'receiving account holder is not the shop account holder',
+    );
+  });
+
+  it('fails closed when the shop has no holder name to compare', () => {
+    expect(
+      receiverIsProven({
+        ...store,
+        storeAccountName: null,
+        slipReceiverAccount: 'xxx-x-x3578-x',
+        slipReceiverName: 'กนกนาถ โรจนวุฒิ',
+      }),
+    ).toMatchObject({ proven: false, reason: 'store-name-unset' });
+    // A name of only punctuation/masks is not a name either.
+    expect(
+      receiverIsProven({
+        ...store,
+        storeAccountName: '  -  ',
+        slipReceiverAccount: 'xxx-x-x3578-x',
+        slipReceiverName: 'กนกนาถ โรจนวุฒิ',
+      }),
+    ).toMatchObject({ proven: false, reason: 'store-name-unset' });
+  });
+
+  it('fails closed when the provider names no holder', () => {
+    expect(
+      receiverIsProven({ ...store, slipReceiverAccount: 'xxx-x-x3578-x', slipReceiverName: null }),
+    ).toMatchObject({ proven: false, reason: 'provider-named-no-holder' });
+  });
+
+  it('accepts a fully printed account without needing any name', () => {
+    expect(
+      receiverIsProven({
+        ...store,
+        storeAccountName: null,
+        slipReceiverAccount: '199-1-73578-6',
+        slipReceiverName: null,
+      }),
+    ).toEqual({ proven: true, by: 'full-account' });
+    // A printed account that is not ours is never proof, name or not.
+    expect(
+      receiverIsProven({
+        ...store,
+        storeAccountName: 'กนกนาถ โรจนวุฒิ',
+        slipReceiverAccount: '199-1-73578-9',
+        slipReceiverName: 'กนกนาถ โรจนวุฒิ',
+      }),
+    ).toMatchObject({ proven: true, by: 'holder-name' });
+  });
+
+  it('never proves anything without a configured store account', () => {
+    expect(
+      receiverIsProven({
+        storeAccountNumber: null,
+        storeAccountName: 'กนกนาถ โรจนวุฒิ',
+        slipReceiverAccount: '199-1-73578-6',
+        slipReceiverName: 'กนกนาถ โรจนวุฒิ',
+      }),
+    ).toMatchObject({ proven: false, reason: 'store-account-unset' });
   });
 });

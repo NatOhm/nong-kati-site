@@ -38,6 +38,8 @@ import { NextRequest } from 'next/server';
 process.env['NK_JWT_SECRET'] = 'recheck-test-secret-0123456789abcdef0123456789ab';
 
 const STORE_ACCOUNT = '199-1-73578-6';
+/** The shop's own holder name — the re-check needs the same proof as the route. */
+const HOLDER_NAME = 'กนกนาถ โรจนวุฒิ';
 /**
  * Bangkok Bank masks the middle: a real receipt for that account prints
  * `199-1-xxx786` (attached 2026-11-24, ฿67.00), which only the positional
@@ -80,7 +82,10 @@ const { prismaMock, provider, ordersMock, fulfilmentMock, notifyMock, storeMock,
       ),
     };
     const dataMock = {
-      getManualTransferInfo: vi.fn(async () => ({ accountNumber: STORE_ACCOUNT })),
+      getManualTransferInfo: vi.fn(async () => ({
+        accountNumber: STORE_ACCOUNT,
+        accountName: HOLDER_NAME,
+      })),
     };
     return { prismaMock, provider, ordersMock, fulfilmentMock, notifyMock, storeMock, dataMock };
   });
@@ -143,7 +148,7 @@ function seededVerify(): void {
     ref: 'ref-735',
     amountThb: 735,
     receiverAccount: BBL_MASK,
-    receiverName: null,
+    receiverName: HOLDER_NAME,
     transferAt: null,
     raw: { ok: true },
   });
@@ -160,7 +165,10 @@ beforeEach(() => {
   prismaMock.order.findUnique.mockResolvedValue({ status: 'pending_payment' });
   prismaMock.order.update.mockResolvedValue({});
   storeMock.readSlip.mockResolvedValue(Buffer.from('slip-bytes'));
-  dataMock.getManualTransferInfo.mockResolvedValue({ accountNumber: STORE_ACCOUNT });
+  dataMock.getManualTransferInfo.mockResolvedValue({
+    accountNumber: STORE_ACCOUNT,
+    accountName: HOLDER_NAME,
+  });
 });
 
 describe('recheckDelayedAttempt — a Bangkok Bank slip the bank has since published', () => {
@@ -537,7 +545,7 @@ describe('recheckDelayedSlips — the sweep', () => {
         ref: 'ref-735',
         amountThb: 735,
         receiverAccount: BBL_MASK,
-        receiverName: null,
+        receiverName: HOLDER_NAME,
         transferAt: null,
         raw: {},
       })

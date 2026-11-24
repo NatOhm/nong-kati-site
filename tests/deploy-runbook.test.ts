@@ -197,3 +197,34 @@ describe('Post-switch verifier — uptime rule (Phase 3)', () => {
     });
   });
 });
+
+describe('D10: the delayed-slip sweep keeps a caller at deploy time', () => {
+  // GitHub only runs `schedule` workflows from the DEFAULT branch, so a release
+  // branch that adds `internal/orders/slip-recheck` deploys a route nobody
+  // calls until it is merged. The route still exists and every unit test still
+  // passes — the loss is silent and costs a paid order its re-check. The pack
+  // step therefore refuses instead of shipping that gap.
+  const workflow = read('.github/workflows/prod-health-monitor.yml');
+
+  it('the branch workflow really calls the endpoint the deploy guard looks for', () => {
+    expect(workflow).toContain('internal/orders/slip-recheck');
+  });
+
+  it('the pack script checks the DEFAULT branch, not this branch', () => {
+    expect(script).toContain("SWEEP_ENDPOINT='internal/orders/slip-recheck'");
+    expect(script).toContain('origin/master:.github/workflows/prod-health-monitor.yml');
+    expect(script).toContain('NK_ALLOW_NO_SWEEP_CALLER');
+  });
+
+  it('a missing caller dies the pack rather than warning it', () => {
+    const guard = script.slice(
+      script.indexOf("SWEEP_ENDPOINT='internal/orders/slip-recheck'"),
+      script.indexOf('START_SHA=') > script.indexOf("SWEEP_ENDPOINT='internal/orders/slip-recheck'")
+        ? script.indexOf('START_SHA=')
+        : undefined,
+    );
+    const block = guard.length > 0 ? guard : script;
+    expect(block).toContain('die "origin/master');
+    expect(block).toContain('delayed-slip backstop');
+  });
+});

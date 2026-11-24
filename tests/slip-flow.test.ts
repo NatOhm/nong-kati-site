@@ -1254,3 +1254,72 @@ describe('paid-retry budget across a customer retry (2026-11-23)', () => {
     );
   });
 });
+
+describe('receiver proof — a mask that fits is not proof (audit 2026-11-24)', () => {
+  beforeEach(() => {
+    h.slip2go.isSlip2GoEnabled.mockReturnValue(true);
+    h.slip2go.verifySlip2Go.mockResolvedValue(slipOkSuccess);
+  });
+
+  it('parks a slip whose mask fits but whose holder is someone else', async () => {
+    // THE HOLE: `xxx-x-x3578-x` fits every 10-digit account with 3578 in
+    // slots 6–9. A slip from another bank with that shape used to confirm this
+    // order and release its codes, though the money never reached the shop.
+    h.slip2go.verifySlip2Go.mockResolvedValueOnce({
+      ...slipOkSuccess,
+      receiverName: 'นายสมชาย ใจดี',
+    });
+
+    const res = await callVerify();
+
+    expect(res.status).toBe(502);
+    const body = (await res.json()) as { error: string; slipStored: boolean };
+    expect(body.error).toBe('RECEIVER_UNPROVEN');
+    expect(body.slipStored).toBe(true);
+    // Nothing was settled, nothing was delivered, no claim was taken.
+    expect(h.orders.claimOrderForConfirmation).not.toHaveBeenCalled();
+    expect(h.fulfil.fulfilOrder).not.toHaveBeenCalled();
+    // The queue can explain itself: code + the account the bank named.
+    expect(h.prisma.paymentAttempt.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          failureReason: 'RECEIVER_UNPROVEN',
+          slipReceiverAccount: 'xxx-x-x3578-x',
+          gatewayStatusCode: 'slip2go',
+        }),
+      }),
+    );
+    expect(h.notify.notifyPaymentPending).toHaveBeenCalled();
+  });
+
+  it('still auto-confirms when the holder name proves the account (happy path unchanged)', async () => {
+    const res = await callVerify();
+
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { status: string }).status).toBe('confirmed');
+    expect(h.orders.claimOrderForConfirmation).toHaveBeenCalled();
+    expect(h.fulfil.fulfilOrder).toHaveBeenCalled();
+    expect(h.prisma.paymentAttempt.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ slipVerifiedBy: 'slip2go:auto' }),
+      }),
+    );
+  });
+
+  it('parks the slip when the shop has no holder name configured to compare', async () => {
+    h.manualTransfer.getManualTransferInfo.mockResolvedValue({
+      enabled: true,
+      accountName: null,
+      accountNumber: '199-1-73578-6',
+      accountType: 'bank',
+      bankName: null,
+      qrImageUrl: null,
+    });
+
+    const res = await callVerify();
+
+    expect(res.status).toBe(502);
+    expect(((await res.json()) as { error: string }).error).toBe('RECEIVER_UNPROVEN');
+    expect(h.orders.claimOrderForConfirmation).not.toHaveBeenCalled();
+  });
+});
