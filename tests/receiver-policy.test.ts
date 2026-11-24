@@ -40,21 +40,6 @@ describe('checkReceiverMatch', () => {
     expect(checkReceiverMatch('199-1-73578-6', 'xxx-x-x3578-x')).toEqual({ ok: true });
   });
 
-  it('accepts the Bangkok Bank mask (front and tail visible, middle hidden)', () => {
-    // A real BBL slip to 199-1-73578-6 prints 199-1-xxx786: its digits
-    // (1991786) are not one contiguous run, so containment alone can never
-    // match it — the delayed-slip re-check exists for exactly these slips.
-    expect(checkReceiverMatch('199-1-73578-6', '199-1-xxx786')).toEqual({ ok: true });
-  });
-
-  it('rejects a masked account whose visible digits sit in the wrong slots', () => {
-    // The mask is the ruler: one mask char hides one digit, so a visible digit
-    // in the wrong slot is a different account even when the same run appears.
-    expect(checkReceiverMatch('199-1-73578-6', '1xx-9-73578-x').ok).toBe(false);
-    // A mask one digit longer than the store account is another account.
-    expect(checkReceiverMatch('199-1-73578-6', '199-1-xxx786-0').ok).toBe(false);
-  });
-
   it('fails closed on a definite mismatch, reporting last-4 only', () => {
     const v = checkReceiverMatch('123-456-5786', 'xxx-x-x9999-x');
     expect(v).toEqual({ ok: false, detail: 'receiver …9999 vs store …5786' });

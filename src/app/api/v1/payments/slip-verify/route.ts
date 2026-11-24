@@ -254,7 +254,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
               error: result.code,
               detail: result.detail ?? null,
               // Kept so a failed verdict is explainable from the row alone.
-              // See /api/v1/admin/orders/[id]/slip-provider-code.
               ...(result.providerCode ? { providerCode: result.providerCode } : {}),
               checkedAt: new Date().toISOString(),
               ...(priorRechecks > 0 ? { rechecks: priorRechecks } : {}),

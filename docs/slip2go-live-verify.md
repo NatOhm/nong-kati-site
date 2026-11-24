@@ -98,14 +98,15 @@ which is the documented BBL delay — the case that maps to `SLIP_DELAYED`.
   a `data` object, `verifySlip2Go` passed its `!parsed.data` guard, ran
   `verifySuccess`, and the missing-amount/transRef branch returned
   `INVALID_SLIP` — bypassing the `case '200404'` mapping. Fixed in
-  `src/lib/payment/slip2go.ts` (`VERDICT_CODES` is decided before
+  `src/lib/payment/slip2go.ts` (`SUCCESS_CODES` is decided before
   `verifySuccess`), regression-tested in `tests/slip2go-receiver.test.ts`.
 - Side effect of the same bug: `scheduleSlipRecheck` keys off `SLIP_DELAYED`, so
   no re-check was ever queued — the slip sat in the manual queue and the order
   expired ฿67 in (real money, in the store's BBL account).
 - **Decision (23 พ.ย. 2569, user): leave NK-2026-000237 `expired`; no refund,
   no re-issue, no money moves.** The order stays as the worked example for the
-  diagnostics endpoint and the 1.2.6 offline re-check.
+  1.2.6 offline re-check; the diagnostics endpoint that would have re-probed it
+  was cut from that release (see the scope note at the end of this file).
 - No provider credit was spent here: the console log is free, which is why this
   is the first probe in this file that cost nothing.
 
@@ -145,3 +146,28 @@ Accepted cost: an undocumented *success* code now answers `INVALID_SLIP` +
 `providerCode` on the order (the slip is stored, the admin can confirm by hand)
 instead of confirming silently. A false reject is recoverable; a false confirm
 is not. Before widening the list, prove the code live first.
+
+## 2026-11-24 scope cut before the 1.2.6 deploy
+
+Two pieces of 1.2.6 work were built and then cut, because they widen a release
+that exists to fix one customer-facing failure:
+
+- **Positional middle-mask compare** (`maskMatches` in `receiverPolicy.ts`, which
+  read `199-1-xxx786` as the same account as `199-1-73578-6`). No provider
+  payload this store has ever received has used a middle mask — every observed
+  `receiverAccount` is tail-masked (`xxx-x-x3578-x`, confirmed live on
+  NK-2026-000183), and the existing containment check already accepts those. The
+  branch would therefore have added a *new reject path* to the one flow that
+  just burned a paying customer, exercised by nothing in production.
+  `receiverPolicy.ts` is back at the live (`3bcdb6b`) version.
+- **Provider-code diagnostics endpoint + `/management/orders` panel**
+  (`GET/POST /api/v1/admin/orders/[id]/slip-provider-code`, the paid re-probe,
+  and its two test files). New admin API surface and a credit-spending POST for
+  a support convenience. Cut; retire it as one piece behind its own gate.
+
+**Kept:** `providerCode` persisted on the verification attempt row by
+`slip-verify`. It is a column write with no new surface, and it is the only
+thing that makes a future `INVALID_SLIP` explainable without the worker log.
+
+Both cuts are recoverable: the work is in `a57c18f` (and its tests in that tree),
+so `git show a57c18f -- <path>` restores it when it gets its own release.

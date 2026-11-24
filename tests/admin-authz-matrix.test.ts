@@ -215,10 +215,6 @@ const ROUTE_COVERAGE: MatrixRow[] = [
     perm: 'orders:write',
     body: {},
   },
-  // Raw provider code behind a slip verdict (23 Nov 2026): reading the stored
-  // row is orders:read; the paid re-probe is a confirm-a-slip permission.
-  { method: 'GET', path: '/orders/ord-1/slip-provider-code', perm: 'orders:read' },
-  { method: 'POST', path: '/orders/ord-1/slip-provider-code', perm: 'orders:write', body: {} },
   { method: 'GET', path: '/orders/search', perm: 'orders:read' },
   { method: 'GET', path: '/orders/ord-1/delivery', perm: 'orders:delivery:reveal' },
   // record-only refund: 07-api.md §22. The gateway move happens in the
@@ -379,11 +375,9 @@ async function callHandler(
     ...(token ? { authorization: `Bearer ${token}` } : {}),
     ...row.headers,
   });
-  const idMatch =
-    /\/(cat-1|c-1|h-1|cust-1|ord-1|p-1|s-1|t-1|tk-1|v-1|some-key)(\/)?$/.exec(row.path) ??
-    // Sub-resource routes (/orders/ord-1/slip-provider-code) end with the
-    // action, not the id — the handler still needs ctx.params.id.
-    /\/(cat-1|c-1|h-1|cust-1|ord-1|p-1|s-1|t-1|tk-1|v-1|some-key)\//.exec(row.path);
+  const idMatch = /\/(cat-1|c-1|h-1|cust-1|ord-1|p-1|s-1|t-1|tk-1|v-1|some-key)(\/)?$/.exec(
+    row.path,
+  );
   return idMatch ? handler(req, CTX(idMatch[1] as string)) : handler(req);
 }
 
