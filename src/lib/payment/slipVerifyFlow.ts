@@ -40,6 +40,14 @@ export type SlipVerification =
       /** Provider diagnostic (last-4 only for receiver mismatches). */
       detail?: string | null | undefined;
       /**
+       * The provider's raw code/message/HTTP status, when a provider answered.
+       * Persisted on the attempt so an `INVALID_SLIP` can be explained later
+       * without re-paying for the check (see slip2go.ts).
+       */
+      providerCode?: string | undefined;
+      providerMessage?: string | undefined;
+      httpStatus?: number | undefined;
+      /**
        * The receiver the bank reported, when a provider DID answer (a policy
        * refusal such as RECEIVER_MISMATCH still has it); null when nobody
        * named one. The admin "read the receiver" action shows this even
@@ -135,10 +143,15 @@ export async function verifySlipImage(input: {
   }
 
   if (!result.ok) {
+    // SlipOK's result has no raw-code fields, so narrow instead of assuming.
+    const raw = 'providerCode' in result ? result : null;
     return {
       ok: false,
       code: result.code,
       detail: result.detail,
+      ...(raw?.providerCode ? { providerCode: raw.providerCode } : {}),
+      ...(raw?.providerMessage ? { providerMessage: raw.providerMessage } : {}),
+      ...(raw?.httpStatus !== undefined ? { httpStatus: raw.httpStatus } : {}),
       provider: usedProvider,
       receiverAccount: null,
     };

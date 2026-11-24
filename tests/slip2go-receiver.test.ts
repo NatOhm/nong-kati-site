@@ -105,3 +105,91 @@ describe('Slip2Go receiver enforcement', () => {
     expect(r).toMatchObject({ ok: true, receiverAccount: 'xxx-x-x9999-x' });
   });
 });
+
+/**
+ * A condition code is the answer, even when the provider echoes a `data`
+ * object beside it. Live 23 พ.ย. 2569 (NK-2026-000237): a `200404` for a real
+ * ฿67 slip carried an empty `data`, `verifySuccess` ran, and its
+ * missing-amount/transRef guard reported INVALID_SLIP — so the customer read
+ * "สลิปไม่ถูกต้อง" for a slip the bank had merely not published yet, and the
+ * delayed re-check never ran (it keys off SLIP_DELAYED).
+ */
+describe('Slip2Go verdict codes win over an echoed payload', () => {
+  function codeResponse(code: string, data?: unknown): Response {
+    return new Response(JSON.stringify({ code, message: 'condition', ...(data ? { data } : {}) }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  }
+
+  it('maps 200404 + empty data to SLIP_DELAYED, not INVALID_SLIP', async () => {
+    process.env['NK_SLIP2GO_SECRET'] = 'test-secret';
+    fetchMock.mockResolvedValueOnce(codeResponse('200404', {}));
+    const { verifySlip2Go } = await import('@/lib/payment/slip2go');
+    const r = await verifySlip2Go({ imageBase64: 'aGk=', expectedAmountThb: 67 });
+    expect(r).toMatchObject({ ok: false, code: 'SLIP_DELAYED', providerCode: '200404' });
+  });
+
+  it('never confirms a 200404 even if its data looks complete', async () => {
+    process.env['NK_SLIP2GO_SECRET'] = 'test-secret';
+    fetchMock.mockResolvedValueOnce(
+      codeResponse('200404', {
+        transRef: 'TR1234567890',
+        amount: 67,
+        receiver: { account: { bank: { account: 'xxx-x-x5786-x' } } },
+      }),
+    );
+    const { verifySlip2Go } = await import('@/lib/payment/slip2go');
+    const r = await verifySlip2Go({ imageBase64: 'aGk=', expectedAmountThb: 67 });
+    expect(r).toMatchObject({ ok: false, code: 'SLIP_DELAYED' });
+  });
+
+  it('maps 200500 + data to INVALID_SLIP (fraud is still a verdict)', async () => {
+    process.env['NK_SLIP2GO_SECRET'] = 'test-secret';
+    fetchMock.mockResolvedValueOnce(codeResponse('200500', { transRef: 'TR1', amount: 67 }));
+    const { verifySlip2Go } = await import('@/lib/payment/slip2go');
+    const r = await verifySlip2Go({ imageBase64: 'aGk=', expectedAmountThb: 67 });
+    expect(r).toMatchObject({ ok: false, code: 'INVALID_SLIP', providerCode: '200500' });
+  });
+
+  it('never confirms an undocumented 200xxx, however complete its data looks', async () => {
+    // A confirmed order delivers codes, so "the payload looks fine" cannot be
+    // the test — the code has to be one we know means money. A new success
+    // code surfaces as INVALID_SLIP + providerCode (admin-confirmable, the
+    // slip is stored) instead of silently handing out goods.
+    process.env['NK_SLIP2GO_SECRET'] = 'test-secret';
+    fetchMock.mockResolvedValueOnce(
+      codeResponse('200777', {
+        transRef: 'TR1234567890',
+        amount: 67,
+        receiver: { account: { bank: { account: 'xxx-x-x5786-x' } } },
+      }),
+    );
+    const { verifySlip2Go } = await import('@/lib/payment/slip2go');
+    const r = await verifySlip2Go({ imageBase64: 'aGk=', expectedAmountThb: 67 });
+    expect(r).toMatchObject({ ok: false, code: 'INVALID_SLIP', providerCode: '200777' });
+  });
+
+  it('still confirms 200200 — the success code this account really answers', async () => {
+    // The allowlist must not be narrower than observed reality: 200200 is
+    // undocumented but live-verified (30 ต.ค. and 1 พ.ย. 2569).
+    process.env['NK_SLIP2GO_SECRET'] = 'test-secret';
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          code: '200200',
+          message: 'Slip found.',
+          data: {
+            transRef: 'TR1234567890',
+            amount: 25,
+            receiver: { account: { bank: { account: 'xxx-x-x5786-x' } } },
+          },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+    );
+    const { verifySlip2Go } = await import('@/lib/payment/slip2go');
+    const r = await verifySlip2Go({ imageBase64: 'aGk=', expectedAmountThb: 25 });
+    expect(r).toMatchObject({ ok: true, ref: 'TR1234567890', providerCode: '200200' });
+  });
+});

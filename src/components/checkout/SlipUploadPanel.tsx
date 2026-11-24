@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import Link from 'next/link';
-import { CheckCircle2, FileImage, Loader2, ShieldCheck, Upload, XCircle } from 'lucide-react';
+import { CheckCircle2, FileImage, Loader2, RefreshCw, ShieldCheck, Upload, XCircle } from 'lucide-react';
 
 import { cn } from '@/utils/cn';
 import { safeJson } from '@/lib/json';
@@ -31,6 +31,14 @@ interface SlipTicket {
  *    clicks ยืนยันการชำระเงิน as before.
  */
 
+/**
+ * The sentence every non-auto-confirmed slip ends with: the evidence already
+ * sits on the order, so the customer never has to upload it again.
+ */
+function manualReviewMessage(reason: string | null): string {
+  return `${reason ?? 'ระบบตรวจสลิปยังไม่ยืนยันอัตโนมัติ'} — สลิปถูกส่งให้แอดมินตรวจแล้ว แอดมินจะยืนยันให้เร็วที่สุด`;
+}
+
 export function SlipUploadPanel({
   orderId,
   orderNumber,
@@ -51,7 +59,12 @@ export function SlipUploadPanel({
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [result, setResult] = useState<{
+    ok: boolean;
+    message: string;
+    /** The same file is worth submitting again (see SLIP_DELAYED below). */
+    retry?: boolean;
+  } | null>(null);
   // Set once the bank has verified the slip: the panel stops asking for a
   // file and shows the product + code the customer just paid for.
   const [ticket, setTicket] = useState<SlipTicket | null>(null);
@@ -149,18 +162,21 @@ export function SlipUploadPanel({
             onConfirmed?.(body.status as 'confirmed' | 'pending_manual_fulfilment');
             return;
           }
-          if (res.ok) {
-            // Unexpected success shape — still hand it to the admin below.
-            verifyMessage = body.message ?? null;
-          } else {
-            // Keep the provider's reason: "why did it not auto-confirm?"
-            // (message only — a raw error code is not a sentence)
-            verifyMessage = body.message ?? null;
-          }
+          // Keep the provider's reason: "why did it not auto-confirm?" — a
+          // message only, since a raw error code is not a sentence. Both a
+          // failure and an unexpected success shape fall through to the
+          // manual upload below with that reason attached.
+          verifyMessage = body.message ?? null;
           if (body.slipStored) {
             setResult({
               ok: false,
-              message: `${verifyMessage ?? 'ระบบตรวจสลิปยังไม่ยืนยันอัตโนมัติ'} — สลิปถูกส่งให้แอดมินตรวจแล้ว แอดมินจะยืนยันให้เร็วที่สุด`,
+              message: manualReviewMessage(verifyMessage),
+              // Bangkok Bank (and GSB) only publish a transfer 2–3 minutes
+              // after it happens, so "not found yet" is the NORMAL first
+              // answer for a กรุงเทพ slip and a retry is what turns it into a
+              // pass. Every other failure has a cause a retry cannot fix, so
+              // the button is not offered there.
+              retry: body.error === 'SLIP_DELAYED',
             });
             return;
           }
@@ -174,7 +190,7 @@ export function SlipUploadPanel({
         if (uploaded) {
           setResult({
             ok: false,
-            message: `${verifyMessage ?? 'ระบบตรวจสลิปยังไม่ยืนยันอัตโนมัติ'} — สลิปถูกส่งให้แอดมินตรวจแล้ว แอดมินจะยืนยันให้เร็วที่สุด`,
+            message: manualReviewMessage(verifyMessage),
           });
         }
       } else {
@@ -186,6 +202,11 @@ export function SlipUploadPanel({
       setBusy(false);
     }
   }
+
+  // A rejected slip is not a dead end: the picker stays so a corrected slip
+  // can be uploaded for the same order. A delayed slip already offers its own
+  // retry for the file that is sitting there, so it needs no second picker.
+  const showPicker = !result || (!result.ok && !result.retry);
 
   return (
     <div className="mt-4 rounded-lg border border-dashed border-line-brand bg-surface-brand-subtle p-4">
@@ -234,24 +255,52 @@ export function SlipUploadPanel({
         </Link>
       )}
 
-      {result ? (
-        <div
-          className={cn(
-            'mt-3 flex items-start gap-2 rounded-md px-3 py-2.5 text-sm',
-            result.ok
-              ? 'border border-jade-500/40 bg-jade-500/15 text-jade-700 dark:text-jade-200'
-              : 'border border-coral-300 bg-coral-50 text-fg-error',
+      {result && (
+        <>
+          <div
+            className={cn(
+              'mt-3 flex items-start gap-2 rounded-md px-3 py-2.5 text-sm',
+              result.ok
+                ? 'border border-jade-500/40 bg-jade-500/15 text-jade-700 dark:text-jade-200'
+                : 'border border-coral-300 bg-coral-50 text-fg-error',
+            )}
+            role="status"
+          >
+            {result.ok ? (
+              <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
+            ) : (
+              <XCircle size={16} className="mt-0.5 shrink-0" />
+            )}
+            <span>{result.message}</span>
+          </div>
+          {/* Delayed slip: the file is still in state and the evidence is on
+              the order, so one tap re-checks the SAME slip — the customer no
+              longer has to reload the page and pick the screenshot again,
+              which is what made a กรุงเทพ transfer impossible to finish. */}
+          {result.retry && (
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+              <button
+                type="button"
+                onClick={() => void submit()}
+                disabled={busy}
+                className="flex min-h-[44px] items-center gap-2 rounded-md border border-line-brand bg-surface px-3.5 py-2 text-sm font-semibold text-fg-brand transition-colors hover:bg-surface-brand-subtle disabled:opacity-60"
+              >
+                {busy ? (
+                  <Loader2 size={15} className="animate-spin" />
+                ) : (
+                  <RefreshCw size={15} />
+                )}
+                {busy ? 'กำลังตรวจสลิป...' : 'ตรวจสลิปอีกครั้ง'}
+              </button>
+              <span className="text-xs text-fg-muted">
+                ธนาคารกรุงเทพ/ออมสินใช้เวลาประมาณ 2–3 นาทีก่อนระบบจะเห็นสลิป
+              </span>
+            </div>
           )}
-          role="status"
-        >
-          {result.ok ? (
-            <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
-          ) : (
-            <XCircle size={16} className="mt-0.5 shrink-0" />
-          )}
-          <span>{result.message}</span>
-        </div>
-      ) : ticket ? null : (
+        </>
+      )}
+
+      {showPicker && (
         <>
           {/* Wraps on a phone: the select button, thumbnail and submit used to
               share one 390px row and squeeze the submit label. */}

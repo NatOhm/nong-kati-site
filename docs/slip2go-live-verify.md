@@ -79,3 +79,69 @@ probe was spent confirming this, further calls buy nothing.
   (duplicate) or `confirmed`. Open side effects of this probe: 1 Discord
   payment-pending ping for the test order; no secrets touched (the Slip2Go
   secret never left the server — the app called the provider itself).
+
+## 2026-11-23 console evidence (free, 0 credits) — NK-2026-000237 answered 200404
+
+The merchant console's own API log (ร้าน Nongkati store → API Connect →
+ประวัติการใช้งาน, week of 23 พ.ย. 2569) lists exactly two calls, and the only
+one at 21:12 — the second the order NK-2026-000237 ฿67 slip was uploaded — is:
+
+| API Endpoint | Response code | เวลา | bucket |
+| --- | --- | --- | --- |
+| `/verify-slip/qr-base64/info` | **`200404`** | 23 พ.ย. 2569 21:12 | ไม่พบสลิป/หมดอายุ |
+
+The other (`200200`, 17:31) is unrelated. So the provider did NOT answer a
+fraud code and did not go silent: it said "this slip is not published yet",
+which is the documented BBL delay — the case that maps to `SLIP_DELAYED`.
+
+- **The app stored `INVALID_SLIP` anyway.** Because that response also carries
+  a `data` object, `verifySlip2Go` passed its `!parsed.data` guard, ran
+  `verifySuccess`, and the missing-amount/transRef branch returned
+  `INVALID_SLIP` — bypassing the `case '200404'` mapping. Fixed in
+  `src/lib/payment/slip2go.ts` (`VERDICT_CODES` is decided before
+  `verifySuccess`), regression-tested in `tests/slip2go-receiver.test.ts`.
+- Side effect of the same bug: `scheduleSlipRecheck` keys off `SLIP_DELAYED`, so
+  no re-check was ever queued — the slip sat in the manual queue and the order
+  expired ฿67 in (real money, in the store's BBL account).
+- **Decision (23 พ.ย. 2569, user): leave NK-2026-000237 `expired`; no refund,
+  no re-issue, no money moves.** The order stays as the worked example for the
+  diagnostics endpoint and the 1.2.6 offline re-check.
+- No provider credit was spent here: the console log is free, which is why this
+  is the first probe in this file that cost nothing.
+
+## 2026-11-23 customer-side delayed-slip retry (branch, ships with 1.2.6)
+
+The guard fix alone left the customer facing the same dead end: live 1.2.5's
+`SlipUploadPanel` renders the verdict box *instead of* the picker, so a
+`SLIP_DELAYED` slip could not be re-checked without a page reload and a second
+upload — inside the 2–3 minute window the bank needs. Ported from
+`db/mariadb-port` (`ff58e65`) onto `release/1.2.6-slip-recheck`:
+
+- `result.retry` is set only when the route answers `error: 'SLIP_DELAYED'`, and
+  the panel then shows **ตรวจสลิปอีกครั้ง**, which re-submits the file already
+  in state against the same order (same paid provider call, same stored slip).
+- `showPicker = !result || (!result.ok && !result.retry)`: every other rejection
+  (wrong amount, receiver mismatch, duplicate) keeps the picker, so a corrected
+  slip can go against the same order instead of a reload.
+
+Guarded by `tests/SlipUploadPanel.test.tsx` (retry offered for `SLIP_DELAYED`
+and never for `AMOUNT_MISMATCH`; picker kept after a rejection and the second
+submit reaches `/slip-verify`). The server-side sweep (`src/lib/slipRecheck.ts`)
+still covers the customer who closes the tab, and both paths CAS on
+`updatedAt`, so timer + tap cannot both pay.
+
+## 2026-11-24 fail closed on unknown success codes
+
+`verifySlip2Go` used to send any `200xxx` with a usable `data` object down the
+success path. That is how a `200404` for NK-2026-000237 was read as
+`INVALID_SLIP`, and it also meant an undocumented condition code that happened
+to echo amount/transRef could CONFIRM an order and deliver codes.
+
+Now only `SUCCESS_CODES` (`200000` documented, `200200` observed live on 30 ต.ค.
+and 1 พ.ย. 2569) may confirm; every other code is a verdict. The payload is no
+longer evidence on its own — the provider echoes `data` beside condition codes.
+
+Accepted cost: an undocumented *success* code now answers `INVALID_SLIP` +
+`providerCode` on the order (the slip is stored, the admin can confirm by hand)
+instead of confirming silently. A false reject is recoverable; a false confirm
+is not. Before widening the list, prove the code live first.

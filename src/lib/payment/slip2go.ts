@@ -63,6 +63,8 @@ export interface Slip2GoSuccess {
   receiverName: string | null;
   transferAt: string | null;
   raw: Record<string, unknown>;
+  /** Raw provider code — diagnostics; the verdict is the type. */
+  providerCode?: string;
 }
 
 export type Slip2GoResult =
@@ -80,7 +82,15 @@ export type Slip2GoResult =
         | 'AMOUNT_MISMATCH'
         | 'RECEIVER_MISMATCH';
       detail?: string;
+      /** Raw provider code (`200500`, `HTTP_502`) — diagnostics; `detail` is prose. */
+      providerCode?: string;
+      providerMessage?: string;
+      httpStatus?: number;
     };
+
+/** Only these may confirm: a false reject is recoverable (admin confirms by
+ * hand), a false confirm delivers goods. 200200 is what this account answers. */
+const SUCCESS_CODES = new Set(['200000', '200200']);
 
 export function isSlip2GoEnabled(): boolean {
   return Boolean(process.env['NK_SLIP2GO_SECRET']);
@@ -103,32 +113,38 @@ interface Slip2GoBody {
 }
 
 /** Condition/auth/infra response codes → our result variants. */
-function mapSlip2GoError(code: string, message: string): Slip2GoResult {
+function mapSlip2GoError(code: string, message: string, httpStatus?: number): Slip2GoResult {
   const detail = `${code}: ${message}`;
+  /** The raw answer, carried on every variant so support can read the code. */
+  const raw = {
+    providerCode: code,
+    providerMessage: message,
+    ...(httpStatus !== undefined ? { httpStatus } : {}),
+  };
   switch (code) {
     case '200402':
-      return { ok: false, code: 'AMOUNT_MISMATCH', detail: message };
+      return { ok: false, code: 'AMOUNT_MISMATCH', detail: message, ...raw };
     case '200401':
-      return { ok: false, code: 'RECEIVER_MISMATCH', detail: message };
+      return { ok: false, code: 'RECEIVER_MISMATCH', detail: message, ...raw };
     case '200501':
       // The provider has already seen this transfer. That is usually a retry
       // AFTER a successful check, so "สลิปไม่ถูกต้อง/ถูกใช้ไปแล้ว" told a paying
       // customer their payment failed. Its own code carries "already
       // confirmed — open the order to see the code" instead.
-      return { ok: false, code: 'SLIP_DUPLICATE', detail: 'duplicate: ' + message };
+      return { ok: false, code: 'SLIP_DUPLICATE', detail: 'duplicate: ' + message, ...raw };
     case '200500':
-      return { ok: false, code: 'INVALID_SLIP', detail: 'fraud: ' + message };
+      return { ok: false, code: 'INVALID_SLIP', detail: 'fraud: ' + message, ...raw };
     case '200404':
       // The bank has not published this slip yet (Bangkok Bank needs ~2–3
       // minutes; support confirmed the delay and recommends their queue API).
       // Treating "not found yet" as a forged slip was the customer-facing bug.
-      return { ok: false, code: 'SLIP_DELAYED', detail: message };
+      return { ok: false, code: 'SLIP_DELAYED', detail: message, ...raw };
     case '200502':
       // Bank-side error — transient upstream trouble, not a bad slip.
-      return { ok: false, code: 'UPSTREAM_ERROR', detail };
+      return { ok: false, code: 'UPSTREAM_ERROR', detail, ...raw };
     case '401005':
     case '401006':
-      return { ok: false, code: 'QUOTA_EXCEEDED', detail: message };
+      return { ok: false, code: 'QUOTA_EXCEEDED', detail: message, ...raw };
     case '401001':
     case '401002':
     case '401003':
@@ -136,24 +152,24 @@ function mapSlip2GoError(code: string, message: string): Slip2GoResult {
     case '401007':
       // Config/IP problems — behave like "feature not usable" so the
       // checkout falls back to the manual admin path with an honest message.
-      return { ok: false, code: 'NOT_CONFIGURED', detail: message };
+      return { ok: false, code: 'NOT_CONFIGURED', detail: message, ...raw };
     case '429000':
-      return { ok: false, code: 'RATE_LIMITED', detail };
+      return { ok: false, code: 'RATE_LIMITED', detail, ...raw };
     case '500500':
     case '500503':
-      return { ok: false, code: 'UPSTREAM_ERROR', detail };
+      return { ok: false, code: 'UPSTREAM_ERROR', detail, ...raw };
     default:
       // Never accuse the customer's slip for provider/infra problems
       // (client feedback 19 Oct: rate limits, 5xx and body-validation
       // errors all surfaced as "สลิปไม่ถูกต้อง/อ่านไม่ได้/ถูกใช้ไปแล้ว").
       // Only the documented slip-condition codes (2xxxxx) may call the
       // slip itself invalid; anything else is ours or the provider's fault.
-      if (code.startsWith('200')) return { ok: false, code: 'INVALID_SLIP', detail };
-      if (code.startsWith('401')) return { ok: false, code: 'NOT_CONFIGURED', detail };
+      if (code.startsWith('200')) return { ok: false, code: 'INVALID_SLIP', detail, ...raw };
+      if (code.startsWith('401')) return { ok: false, code: 'NOT_CONFIGURED', detail, ...raw };
       if (code.startsWith('429') || code === 'HTTP_429') {
-        return { ok: false, code: 'RATE_LIMITED', detail };
+        return { ok: false, code: 'RATE_LIMITED', detail, ...raw };
       }
-      return { ok: false, code: 'UPSTREAM_ERROR', detail };
+      return { ok: false, code: 'UPSTREAM_ERROR', detail, ...raw };
   }
 }
 
@@ -212,15 +228,21 @@ export async function verifySlip2Go(input: Slip2GoVerifyInput): Promise<Slip2GoR
     try {
       parsed = (await res.json()) as Slip2GoBody;
     } catch {
-      return { ok: false, code: 'UPSTREAM_ERROR', detail: `HTTP ${res.status}` };
+      return {
+        ok: false,
+        code: 'UPSTREAM_ERROR',
+        detail: `HTTP ${res.status}`,
+        httpStatus: res.status,
+      };
     }
 
     const code = typeof parsed?.code === 'string' ? parsed.code : `HTTP_${res.status}`;
     const message = typeof parsed?.message === 'string' ? parsed.message : `HTTP ${res.status}`;
 
-    if (res.status !== 200 || !code.startsWith('200') || !parsed?.data) {
+    // The code decides, not the payload: a 200404 can carry a `data` object.
+    if (res.status !== 200 || !parsed?.data || !SUCCESS_CODES.has(code)) {
       if (attempt === 0 && isAuthRejection(res.status, code)) continue;
-      return mapSlip2GoError(code, message);
+      return mapSlip2GoError(code, message, res.status);
     }
 
     return verifySuccess(parsed, input);
@@ -238,7 +260,14 @@ function verifySuccess(parsed: Slip2GoBody, input: Slip2GoVerifyInput): Slip2GoR
   const d = parsed.data;
   const amount = Number(d.amount ?? NaN);
   if (!Number.isFinite(amount) || !d.transRef) {
-    return { ok: false, code: 'INVALID_SLIP', detail: 'missing amount/transRef' };
+    return {
+      ok: false,
+      code: 'INVALID_SLIP',
+      detail: 'missing amount/transRef',
+      providerCode: code,
+      providerMessage: message,
+      httpStatus: 200,
+    };
   }
   // Slip2Go already enforced the amount via checkAmount (200402), but the
   // local re-check keeps the invariant in our hands, not the provider's.
@@ -263,6 +292,7 @@ function verifySuccess(parsed: Slip2GoBody, input: Slip2GoVerifyInput): Slip2GoR
     receiverName: d.receiver?.account?.name ?? null,
     transferAt: d.dateTime ?? null,
     raw: d as unknown as Record<string, unknown>,
+    ...(code !== '' ? { providerCode: code } : {}),
   };
 }
 
