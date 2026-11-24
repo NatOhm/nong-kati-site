@@ -343,9 +343,17 @@ export async function recheckDelayedAttempt(attemptId: string): Promise<RecheckO
   // untouched, so every later timer or sweep tick paid the provider again for
   // a payment that was already settled — and since `rechecks` never advanced,
   // the 3-call cap could never end it.
+  //
+  // `status: 'pending'` in the WHERE is the guard, not bookkeeping: when the
+  // customer's own retry settled THIS attempt while this run was waiting on
+  // the bank, the row is already `succeeded` with its ref. Closing it here used
+  // to rewrite that settlement to `failed`, leaving a record that says failed
+  // AND paid — the exact status the admin screen and the checkout poller read.
+  // A read-then-write check would race the settlement the same way; the
+  // conditional update cannot.
   await prisma.paymentAttempt
-    .update({
-      where: { id: attempt.id },
+    .updateMany({
+      where: { id: attempt.id, status: 'pending' },
       data: {
         status: 'failed',
         gatewayResponse: stamp({

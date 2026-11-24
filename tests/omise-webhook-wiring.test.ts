@@ -25,7 +25,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const { prismaMock, ordersMock, fulfilMock, adapterMock } = vi.hoisted(() => {
+const { prismaMock, ordersMock, fulfilMock, adapterMock, event } = vi.hoisted(() => {
   const prismaMock = {
     paymentAttempt: { findUnique: vi.fn(), update: vi.fn() },
     order: { findUnique: vi.fn() },
@@ -53,7 +53,9 @@ const { prismaMock, ordersMock, fulfilMock, adapterMock } = vi.hoisted(() => {
       retrieveCharge = vi.fn();
     },
   };
-  return { prismaMock, ordersMock, fulfilMock, adapterMock };
+  // Exposed so a test can make the payload say "failed" or a different
+  // amount without rebuilding the adapter mock.
+  return { prismaMock, ordersMock, fulfilMock, adapterMock, event: EVENT };
 });
 
 vi.mock('@/lib/db', () => ({ prisma: prismaMock }));
@@ -67,17 +69,21 @@ vi.mock('@/lib/notify', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/notify')>();
   return {
     ...actual,
-    // Silence the payment ping (no Discord traffic in tests).
+    // Silence the payment pings (no Discord traffic in tests).
     notifyPaymentConfirmed: vi.fn(async () => undefined),
+    notifyPaymentPending: vi.fn(async () => undefined),
     // Call-through spy: the route gets the REAL helper, so its swallow of a
     // failing stock query is exercised end-to-end here.
     notifyStockAlertsForVariants: vi.fn(actual.notifyStockAlertsForVariants),
   };
 });
 
-import { notifyStockAlertsForVariants } from '@/lib/notify';
+import { notifyPaymentPending, notifyStockAlertsForVariants } from '@/lib/notify';
+import { recordPaymentReconciliation } from '@/lib/paymentReconciliation';
 
 const helperSpy = vi.mocked(notifyStockAlertsForVariants);
+const pendingSpy = vi.mocked(notifyPaymentPending);
+const reconciliationSpy = vi.mocked(recordPaymentReconciliation);
 
 const ORDER = {
   id: 'ord-om',
@@ -89,6 +95,10 @@ const ORDER = {
 beforeEach(async () => {
   vi.clearAllMocks();
   delete process.env['NK_DISCORD_WEBHOOK_URL'];
+  // The shared payload the adapter mock hands every request.
+  event.key = 'charge.complete';
+  event.status = 'successful';
+  event.amount = 10700;
 
   // Restore the call-through impl — a prior test may have replaced it.
   const actual = await vi.importActual<typeof import('@/lib/notify')>('@/lib/notify');
@@ -162,5 +172,56 @@ describe('POST /api/v1/webhooks/omise — notification wiring + LD-10', () => {
     helperSpy.mockRejectedValue(new Error('notification layer exploded'));
 
     await expectGatewayOk(await call());
+  });
+
+  it('a failure event never downgrades a payment the bank already settled', async () => {
+    // Out-of-order delivery: `charge.complete` arrived, the order was fulfilled
+    // and the attempt is `succeeded`; a late/duplicate `charge.failed` for the
+    // same charge must not rewrite that record. It did — the attempt became
+    // `failed` with its slip/charge evidence still attached, so
+    // /api/v1/payments/[id]/status (the checkout poller) and the admin order
+    // screen reported a FAILED payment on a completed, paid order.
+    prismaMock.paymentAttempt.findUnique.mockResolvedValue({
+      id: 'att-om',
+      orderId: ORDER.id,
+      status: 'succeeded',
+      failureReason: null,
+    });
+    event.status = 'failed';
+
+    await expectGatewayOk(await call());
+
+    expect(prismaMock.paymentAttempt.update).not.toHaveBeenCalled();
+    expect(ordersMock.claimOrderForConfirmation).not.toHaveBeenCalled();
+  });
+
+  it('a charge settled at the wrong amount reaches a human, not only a log line', async () => {
+    // The gateway says this charge SUCCEEDED, so the money exists — but for
+    // ฿99.00 against a ฿107.00 order. Refusing to apply it is right; leaving no
+    // evidence row and no ping is not: the order expires unpaid, the customer
+    // is told to pay again, and the captured charge is discoverable only by
+    // reading the server log. Every other verified-but-unrecorded path writes
+    // `payment_reconciliation_required` and pings the ops channel.
+    event.amount = 9900;
+
+    await expectGatewayOk(await call());
+
+    expect(prismaMock.paymentAttempt.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'failed', failureReason: 'AMOUNT_MISMATCH' }),
+      }),
+    );
+    expect(reconciliationSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderId: ORDER.id,
+        paymentRef: 'chrg_test_1',
+        paymentAttemptId: 'att-om',
+        failureReason: 'AMOUNT_MISMATCH',
+      }),
+    );
+    expect(pendingSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ orderNumber: ORDER.orderNumber, totalThb: 107 }),
+    );
+    expect(ordersMock.claimOrderForConfirmation).not.toHaveBeenCalled();
   });
 });

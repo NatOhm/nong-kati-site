@@ -398,19 +398,47 @@ describe('recheckDelayedAttempt — another writer already owns the payment', ()
     const outcome = await recheckDelayedAttempt('att-1');
 
     expect(outcome).toEqual({ kind: 'closed', detail: 'already_claimed' });
-    const update = prismaMock.paymentAttempt.update.mock.calls.at(-1)![0] as {
+    const close = prismaMock.paymentAttempt.updateMany.mock.calls.at(-1)![0] as {
       data: Record<string, unknown>;
     };
     // `failed` is the selector the sweep reads. Unset, the row stayed
     // SLIP_DELAYED/pending forever: every tick bought another provider call and
     // `rechecks` never reached the cap, so the 3-call budget could not end it.
-    expect(update.data['status']).toBe('failed');
-    expect(update.data['gatewayResponse']).toMatchObject({
+    expect(close.data['status']).toBe('failed');
+    expect(close.data['gatewayResponse']).toMatchObject({
       error: 'ALREADY_CLAIMED',
       rechecks: 1,
     });
     // The other writer announces the payment; this path has nothing to add.
     expect(notifyMock.notifyPaymentPending).not.toHaveBeenCalled();
+  });
+
+  it('never rewrites a settlement that landed while the bank was answering', async () => {
+    // The customer tapped ตรวจสลิปอีกครั้ง while this re-check waited on the
+    // provider; the customer's confirmation committed first, so the attempt is
+    // `succeeded` and carries its ref. The close below then used to write
+    // `status: 'failed'` unconditionally — a row that says failed AND paid, which
+    // is what the admin screen and the checkout poller read. The guard must be
+    // in the WHERE clause: a read-then-write would race the settlement exactly
+    // as this state models it.
+    prismaMock.paymentAttempt.findUnique.mockResolvedValue(attemptRow({ status: 'succeeded' }));
+    seededVerify();
+    ordersMock.claimOrderForConfirmation.mockResolvedValue(null);
+
+    const outcome = await recheckDelayedAttempt('att-1');
+
+    expect(outcome).toEqual({ kind: 'closed', detail: 'already_claimed' });
+    // The settlement's own write (`succeeded` + ref) is expected here — it is
+    // the other writer's commit that this run could not claim. What must never
+    // happen is a write that turns the row into a failure.
+    const downgrades = prismaMock.paymentAttempt.update.mock.calls.filter(
+      ([arg]) => (arg as { data?: { status?: string } }).data?.status === 'failed',
+    );
+    expect(downgrades).toEqual([]);
+    const close = prismaMock.paymentAttempt.updateMany.mock.calls.at(-1)![0] as {
+      where: Record<string, unknown>;
+    };
+    expect(close.where).toMatchObject({ id: 'att-1', status: 'pending' });
   });
 });
 

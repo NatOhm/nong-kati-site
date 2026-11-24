@@ -26,7 +26,9 @@ export type ReconciliationTrigger =
   | 'slip_verify_recovery_failed'
   | 'admin_verify_recovery_failed'
   | 'admin_resume_recovery_failed'
-  | 'webhook_recovery_failed';
+  | 'webhook_recovery_failed'
+  /** The gateway settled a charge for an amount this order does not owe. */
+  | 'webhook_amount_mismatch';
 
 export interface PaymentReconciliationInput {
   trigger: ReconciliationTrigger;

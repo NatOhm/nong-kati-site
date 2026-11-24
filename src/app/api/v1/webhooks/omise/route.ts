@@ -19,7 +19,7 @@ import { prisma } from '@/lib/db';
 import { getOrderById, claimOrderForConfirmation } from '@/api/orders';
 import { fulfilOrder, scheduleOutboxDrain } from '@/lib/fulfilment';
 import { recordPaymentReconciliation } from '@/lib/paymentReconciliation';
-import { notifyPaymentConfirmed, notifyStockAlertsForVariants } from '@/lib/notify';
+import { notifyPaymentConfirmed, notifyPaymentPending, notifyStockAlertsForVariants } from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
 
@@ -154,6 +154,26 @@ async function handleChargeSucceeded(chargeId: string, gatewayAmount: number): P
     await prisma.paymentAttempt.update({
       where: { id: attempt.id },
       data: { status: 'failed', failureReason: 'AMOUNT_MISMATCH' },
+    });
+    // The gateway says this charge SUCCEEDED, so the money exists — and it is
+    // not this order's amount, so applying it is refused. Refusing was all this
+    // branch did: the order expired unpaid, the customer was told to pay again,
+    // and the captured charge could only be found by reading the server log.
+    // The same evidence row every other verified-but-unrecorded path writes is
+    // what gives an operator the charge id to refund against.
+    await recordPaymentReconciliation({
+      trigger: 'webhook_amount_mismatch',
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      paymentRef: chargeId,
+      paymentAttemptId: attempt.id,
+      failureReason: 'AMOUNT_MISMATCH',
+      recoveryError: `gateway reported ${gatewayAmount} satang, order owes ${expectedSatang}`,
+    });
+    void notifyPaymentPending({
+      orderNumber: order.orderNumber,
+      totalThb: Number(order.totalAmountThb),
+      customerEmail: order.customerEmail,
     });
     return;
   }
@@ -291,6 +311,15 @@ async function handleChargeFailed(
     where: { gatewayName_gatewayRef: { gatewayName: 'omise', gatewayRef: chargeId } },
   });
   if (!attempt) return;
+  // A settled attempt is terminal. Opn redelivers, and a late or duplicated
+  // `charge.failed` for a charge that has since succeeded used to rewrite the
+  // settled row to `failed` — the checkout's /payments/[id]/status poll and the
+  // admin order screen then reported a FAILED payment on a completed, paid
+  // order. Mirrors the duplicate guard in handleChargeSucceeded.
+  if (attempt.status === 'succeeded') {
+    console.warn('[Webhook] Ignoring failure event for a settled charge:', chargeId);
+    return;
+  }
 
   await prisma.paymentAttempt.update({
     where: { id: attempt.id },

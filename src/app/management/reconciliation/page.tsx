@@ -63,6 +63,7 @@ const TRIGGER_LABELS: Record<string, string> = {
   admin_verify_recovery_failed: 'ยืนยันโดยแอดมินล้มเหลว',
   admin_resume_recovery_failed: 'ส่งมอบซ้ำล้มเหลว',
   webhook_recovery_failed: 'เว็บฮุกล้มเหลว',
+  webhook_amount_mismatch: 'ยอดจากเว็บฮุกไม่ตรงกับออเดอร์',
   unknown: 'ไม่ทราบสาเหตุ',
 };
 
